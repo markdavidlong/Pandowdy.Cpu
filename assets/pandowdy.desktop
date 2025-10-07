@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Pandowdy
+Comment=Apple II disk image utility and 8-bit code analyzer
+GenericName=Disk Image Utility
+Exec=/home/mlong/develop/pandowdy/.build/src/pandowdy
+Icon=/home/mlong/develop/pandowdy/assets/ico/pandowdy_64.png
+Terminal=false
+StartupNotify=true
+StartupWMClass=Pandowdy
+Categories=Development;Utility;
+Keywords=apple;disk;image;analyzer;8bit;retro;computing;pandowdy;
+MimeType=application/x-disk-image;

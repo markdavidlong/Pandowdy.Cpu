@@ -1,0 +1,3 @@
+[submodule "legacy/AppleSAWS"]
+	path = legacy/AppleSAWS
+	url = https://github.com/markdavidlong/AppleSAWS.git

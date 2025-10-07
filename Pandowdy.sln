@@ -1,0 +1,123 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36518.9
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy.UI", "Pandowdy.UI\Pandowdy.UI.csproj", "{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy.Core", "Pandowdy.Core\Pandowdy.Core.csproj", "{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy.Tests", "Pandowdy.Tests\Pandowdy.Tests.csproj", "{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Assets", "Assets", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		assets\ico\pandowdy.ico = assets\ico\pandowdy.ico
+		assets\ico\pandowdy_1024.png = assets\ico\pandowdy_1024.png
+		assets\ico\pandowdy_128.png = assets\ico\pandowdy_128.png
+		assets\ico\pandowdy_16.png = assets\ico\pandowdy_16.png
+		assets\ico\pandowdy_24.png = assets\ico\pandowdy_24.png
+		assets\ico\pandowdy_256.png = assets\ico\pandowdy_256.png
+		assets\ico\pandowdy_32.png = assets\ico\pandowdy_32.png
+		assets\ico\pandowdy_48.png = assets\ico\pandowdy_48.png
+		assets\ico\pandowdy_512.png = assets\ico\pandowdy_512.png
+		assets\ico\pandowdy_64.png = assets\ico\pandowdy_64.png
+		assets\ico\README.md = assets\ico\README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libs", "Libs", "{FD974DB3-D11C-4196-B1A9-E2122F997281}"
+	ProjectSection(SolutionItems) = preProject
+		libs\CommonUtil.dll = libs\CommonUtil.dll
+		libs\DiskArc.dll = libs\DiskArc.dll
+		libs\FileConv.dll = libs\FileConv.dll
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AppleSAWS", "legacy\AppleSAWS\build\AppleSAWS.vcxproj", "{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docs", "Docs", "{BABE080F-8A88-4BFC-8A17-ABDDA536D783}"
+	ProjectSection(SolutionItems) = preProject
+		docs\Git Strategy.md = docs\Git Strategy.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		MinSizeRel|Any CPU = MinSizeRel|Any CPU
+		MinSizeRel|x64 = MinSizeRel|x64
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		RelWithDebInfo|Any CPU = RelWithDebInfo|Any CPU
+		RelWithDebInfo|x64 = RelWithDebInfo|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.Debug|x64.Build.0 = Debug|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.MinSizeRel|Any CPU.ActiveCfg = Release|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.MinSizeRel|Any CPU.Build.0 = Release|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.MinSizeRel|x64.ActiveCfg = Release|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.MinSizeRel|x64.Build.0 = Release|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.Release|x64.ActiveCfg = Release|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.Release|x64.Build.0 = Release|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.RelWithDebInfo|Any CPU.ActiveCfg = Debug|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.RelWithDebInfo|Any CPU.Build.0 = Debug|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.RelWithDebInfo|x64.ActiveCfg = Debug|Any CPU
+		{C04F2AF5-3C3E-AC7C-1AC8-E98647B00F3B}.RelWithDebInfo|x64.Build.0 = Debug|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.Debug|x64.Build.0 = Debug|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.MinSizeRel|Any CPU.ActiveCfg = Release|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.MinSizeRel|Any CPU.Build.0 = Release|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.MinSizeRel|x64.ActiveCfg = Release|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.MinSizeRel|x64.Build.0 = Release|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.Release|x64.ActiveCfg = Release|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.Release|x64.Build.0 = Release|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.RelWithDebInfo|Any CPU.ActiveCfg = Debug|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.RelWithDebInfo|Any CPU.Build.0 = Debug|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.RelWithDebInfo|x64.ActiveCfg = Debug|Any CPU
+		{2B3AAF1B-836B-46B3-87CE-3D3A08F80255}.RelWithDebInfo|x64.Build.0 = Debug|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.Debug|x64.Build.0 = Debug|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.MinSizeRel|Any CPU.ActiveCfg = Release|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.MinSizeRel|Any CPU.Build.0 = Release|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.MinSizeRel|x64.ActiveCfg = Release|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.MinSizeRel|x64.Build.0 = Release|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.Release|x64.ActiveCfg = Release|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.Release|x64.Build.0 = Release|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.RelWithDebInfo|Any CPU.ActiveCfg = Debug|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.RelWithDebInfo|Any CPU.Build.0 = Debug|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.RelWithDebInfo|x64.ActiveCfg = Debug|Any CPU
+		{CAF7F731-5EEF-45F4-9C9B-B70FADA19360}.RelWithDebInfo|x64.Build.0 = Debug|Any CPU
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.Debug|x64.ActiveCfg = Debug|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.Debug|x64.Build.0 = Debug|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.MinSizeRel|Any CPU.ActiveCfg = MinSizeRel|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.MinSizeRel|Any CPU.Build.0 = MinSizeRel|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.MinSizeRel|x64.ActiveCfg = MinSizeRel|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.MinSizeRel|x64.Build.0 = MinSizeRel|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.Release|Any CPU.ActiveCfg = Release|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.Release|Any CPU.Build.0 = Release|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.Release|x64.ActiveCfg = Release|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.Release|x64.Build.0 = Release|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.RelWithDebInfo|Any CPU.ActiveCfg = RelWithDebInfo|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.RelWithDebInfo|Any CPU.Build.0 = RelWithDebInfo|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.RelWithDebInfo|x64.ActiveCfg = RelWithDebInfo|x64
+		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.RelWithDebInfo|x64.Build.0 = RelWithDebInfo|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9085D42A-6F6D-4FE5-A653-D60B77161933}
+	EndGlobalSection
+EndGlobal
