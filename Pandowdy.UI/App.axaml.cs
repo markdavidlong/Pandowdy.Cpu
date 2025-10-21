@@ -15,7 +15,11 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow();
+            var mainWindow = new MainWindow();
+            desktop.MainWindow = mainWindow;
+            
+            // Set initial text in the output window
+            mainWindow.SetText("Welcome to Pandowdy!\n");
         }
 
         base.OnFrameworkInitializationCompleted();

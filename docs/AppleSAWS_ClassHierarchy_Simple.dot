@@ -1,0 +1,74 @@
+// AppleSAWS Simplified Class Hierarchy
+// This is a simplified version showing only the main inheritance chains
+// Generate with: dot -Tpng AppleSAWS_ClassHierarchy_Simple.dot -o AppleSAWS_ClassHierarchy_Simple.png
+
+digraph AppleSAWS_Simple {
+    rankdir=TB;
+    node [shape=box, style=filled, fontname="Arial", fontsize=10];
+    edge [arrowhead=empty];
+    
+    // Qt Base Classes
+    QObject [fillcolor=lightyellow, shape=box3d];
+    QWidget [fillcolor=lightyellow, shape=box3d];
+    QMainWindow [fillcolor=lightyellow, shape=box3d];
+    QDialog [fillcolor=lightyellow, shape=box3d];
+    QAbstractTableModel [fillcolor=lightyellow, shape=box3d];
+    
+    QMainWindow -> QWidget;
+    QDialog -> QWidget;
+    
+    // GenericFile hierarchy
+    GenericFile [fillcolor=cyan, style="filled,bold"];
+    GenericFile -> ApplesoftFile [label="5 subclasses"];
+    GenericFile -> BinaryFile;
+    GenericFile -> IntBasicFile;
+    GenericFile -> RelocatableFile;
+    GenericFile -> TextFile;
+    
+    // FileViewerInterface hierarchy
+    QWidget -> FileViewerInterface [fillcolor=lightgreen, style="filled,bold"];
+    FileViewerInterface -> ApplesoftFileViewer [label="8 viewers"];
+    FileViewerInterface -> CharSetViewer;
+    FileViewerInterface -> DisassemblerViewer;
+    FileViewerInterface -> HexDumpViewer;
+    FileViewerInterface -> HiresViewer;
+    FileViewerInterface -> IntBasicFileViewer;
+    FileViewerInterface -> MazeViewer;
+    FileViewerInterface -> TextHexDumpViewer;
+    
+    // Main Windows
+    QMainWindow -> DiskExplorer [fillcolor=lightpink];
+    QMainWindow -> ViewerBase [fillcolor=lightpink];
+    
+    // Dialogs
+    QDialog -> AsciiInfoDialog [label="8 dialogs"];
+    QDialog -> CharacterSetExplorer;
+    QDialog -> DisassemblerMetadataDialog;
+    QDialog -> HexConverter;
+    QDialog -> HRCGControlsInfo;
+    QDialog -> LocationInfoDialog;
+    QDialog -> NotesDialog;
+    QDialog -> StartupDialog;
+    
+    // Widgets
+    QWidget -> CatalogWidget [fillcolor=lavender];
+    QWidget -> CharacterWidget [fillcolor=lavender];
+    QWidget -> HiresScreenWidget [fillcolor=lavender];
+    QWidget -> DiskExplorerMapWidget [fillcolor=lavender];
+    QWidget -> ApplesoftFileDetailViewer [fillcolor=lavender];
+    
+    // QObject derivatives
+    QObject -> ApplesoftFormatter [fillcolor=aliceblue];
+    QObject -> AssemblerSymbols [fillcolor=aliceblue];
+    QObject -> BinaryFileMetadata [fillcolor=aliceblue];
+    QObject -> EntryPoints [fillcolor=aliceblue];
+    
+    // Models
+    QAbstractTableModel -> AssemblerSymbolModel [fillcolor=azure];
+    QAbstractTableModel -> EntryPointModel [fillcolor=azure];
+    
+    // Memory Roles
+    MemRole [fillcolor=coral, style="filled,bold"];
+    MemRole -> RoleAsmOpcode;
+    MemRole -> RoleAsmOperand;
+}

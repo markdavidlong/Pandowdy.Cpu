@@ -1,0 +1,3 @@
+// Resource script to embed Windows icon into the executable
+// Referencing the ICO in the repository's assets folder
+1 ICON "..\\assets\\ico\\pandowdy.ico"

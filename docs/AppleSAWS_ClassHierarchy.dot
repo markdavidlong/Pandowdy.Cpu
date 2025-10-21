@@ -1,0 +1,266 @@
+// AppleSAWS Class Hierarchy
+// This Graphviz diagram shows the inheritance structure of the AppleSAWS project
+// Generate with: dot -Tpng AppleSAWS_ClassHierarchy.dot -o AppleSAWS_ClassHierarchy.png
+// Or: dot -Tsvg AppleSAWS_ClassHierarchy.dot -o AppleSAWS_ClassHierarchy.svg
+
+digraph AppleSAWS_ClassHierarchy {
+    // Graph settings
+    rankdir=TB;
+    node [shape=box, style=filled, fontname="Arial"];
+    edge [arrowhead=empty];
+    
+    // Define node styles
+    node [fillcolor=lightblue];
+    
+    // Qt Base Classes
+    subgraph cluster_qt {
+        label="Qt Framework Classes";
+        style=dashed;
+        fillcolor=lightyellow;
+        node [fillcolor=lightyellow];
+        
+        QObject [shape=box3d];
+        QWidget [shape=box3d];
+        QMainWindow [shape=box3d];
+        QDialog [shape=box3d];
+        QAbstractTableModel [shape=box3d];
+        QByteArray [shape=box3d];
+        QPushButton [shape=box3d];
+        QTextBrowser [shape=box3d];
+        
+        QMainWindow -> QWidget;
+        QDialog -> QWidget;
+        QPushButton -> QWidget;
+        QTextBrowser -> QWidget;
+    }
+    
+    // File Type Classes
+    subgraph cluster_files {
+        label="File Type Classes";
+        style=filled;
+        fillcolor=lightcyan;
+        node [fillcolor=lightcyan];
+        
+        GenericFile [fillcolor=cyan, style="filled,bold"];
+        ApplesoftFile;
+        BinaryFile;
+        IntBasicFile;
+        RelocatableFile;
+        TextFile;
+        
+        GenericFile -> ApplesoftFile;
+        GenericFile -> BinaryFile;
+        GenericFile -> IntBasicFile;
+        GenericFile -> RelocatableFile;
+        GenericFile -> TextFile;
+    }
+    
+    // Viewer Classes
+    subgraph cluster_viewers {
+        label="Viewer Classes";
+        style=filled;
+        fillcolor=lightgreen;
+        node [fillcolor=lightgreen];
+        
+        FileViewerInterface [fillcolor=green, style="filled,bold"];
+        ApplesoftFileViewer;
+        CharSetViewer;
+        DisassemblerViewer;
+        HexDumpViewer;
+        HiresViewer;
+        IntBasicFileViewer;
+        MazeViewer;
+        TextHexDumpViewer;
+        
+        QWidget -> FileViewerInterface;
+        FileViewerInterface -> ApplesoftFileViewer;
+        FileViewerInterface -> CharSetViewer;
+        FileViewerInterface -> DisassemblerViewer;
+        FileViewerInterface -> HexDumpViewer;
+        FileViewerInterface -> HiresViewer;
+        FileViewerInterface -> IntBasicFileViewer;
+        FileViewerInterface -> MazeViewer;
+        FileViewerInterface -> TextHexDumpViewer;
+    }
+    
+    // Main Window Classes
+    subgraph cluster_mainwindows {
+        label="Main Window Classes";
+        style=filled;
+        fillcolor=lightpink;
+        node [fillcolor=lightpink];
+        
+        DiskExplorer;
+        ViewerBase;
+        
+        QMainWindow -> DiskExplorer;
+        QMainWindow -> ViewerBase;
+    }
+    
+    // Dialog Classes
+    subgraph cluster_dialogs {
+        label="Dialog Classes";
+        style=filled;
+        fillcolor=wheat;
+        node [fillcolor=wheat];
+        
+        AsciiInfoDialog;
+        CharacterSetExplorer;
+        DisassemblerMetadataDialog;
+        HexConverter;
+        HRCGControlsInfo;
+        LocationInfoDialog;
+        NotesDialog;
+        StartupDialog;
+        
+        QDialog -> AsciiInfoDialog;
+        QDialog -> CharacterSetExplorer;
+        QDialog -> DisassemblerMetadataDialog;
+        QDialog -> HexConverter;
+        QDialog -> HRCGControlsInfo;
+        QDialog -> LocationInfoDialog;
+        QDialog -> NotesDialog;
+        QDialog -> StartupDialog;
+    }
+    
+    // Widget Classes
+    subgraph cluster_widgets {
+        label="Widget Classes";
+        style=filled;
+        fillcolor=lavender;
+        node [fillcolor=lavender];
+        
+        DiskExplorerMapWidget;
+        ApplesoftFileDetailViewer;
+        CatalogWidget;
+        CharacterWidget;
+        HiresScreenWidget;
+        
+        QWidget -> DiskExplorerMapWidget;
+        QWidget -> ApplesoftFileDetailViewer;
+        QWidget -> CatalogWidget;
+        QWidget -> CharacterWidget;
+        QWidget -> HiresScreenWidget;
+    }
+    
+    // Button Classes
+    subgraph cluster_buttons {
+        label="Button Classes";
+        style=filled;
+        fillcolor=mistyrose;
+        node [fillcolor=mistyrose];
+        
+        DEButton;
+        
+        QPushButton -> DEButton;
+    }
+    
+    // Text Browser Classes
+    subgraph cluster_textbrowsers {
+        label="Text Browser Classes";
+        style=filled;
+        fillcolor=honeydew;
+        node [fillcolor=honeydew];
+        
+        FlowLineTextBrowser;
+        
+        QTextBrowser -> FlowLineTextBrowser;
+    }
+    
+    // Model Classes
+    subgraph cluster_models {
+        label="Model Classes";
+        style=filled;
+        fillcolor=azure;
+        node [fillcolor=azure];
+        
+        AssemblerSymbolModel;
+        EntryPointModel;
+        
+        QAbstractTableModel -> AssemblerSymbolModel;
+        QAbstractTableModel -> EntryPointModel;
+    }
+    
+    // Memory Role Classes
+    subgraph cluster_memroles {
+        label="Memory Role Classes";
+        style=filled;
+        fillcolor=seashell;
+        node [fillcolor=seashell];
+        
+        MemRole [fillcolor=coral, style="filled,bold"];
+        RoleAsmOpcode;
+        RoleAsmOperand;
+        
+        MemRole -> RoleAsmOpcode;
+        MemRole -> RoleAsmOperand;
+    }
+    
+    // QObject Derivatives
+    subgraph cluster_qobjects {
+        label="QObject Derivatives";
+        style=filled;
+        fillcolor=aliceblue;
+        node [fillcolor=aliceblue];
+        
+        ApplesoftFormatter;
+        AssemblerSymbols;
+        BinaryFileMetadata;
+        EntryPoints;
+        
+        QObject -> ApplesoftFormatter;
+        QObject -> AssemblerSymbols;
+        QObject -> BinaryFileMetadata;
+        QObject -> EntryPoints;
+    }
+    
+    // Utility Classes
+    subgraph cluster_utilities {
+        label="Utility Classes";
+        style=filled;
+        fillcolor=lemonchiffon;
+        node [fillcolor=lemonchiffon];
+        
+        AppleString;
+        
+        QByteArray -> AppleString;
+    }
+    
+    // Non-Qt Classes
+    subgraph cluster_standalone {
+        label="Standalone Classes (No Inheritance)";
+        style=filled;
+        fillcolor=gainsboro;
+        node [fillcolor=gainsboro, shape=ellipse];
+        
+        DiskFile;
+        Sector;
+        VTOC;
+        CatalogSector;
+        TrackSectorList;
+        FileDescriptiveEntry;
+        TSPair;
+        ApplesoftLine;
+        ApplesoftToken;
+        ApplesoftRetokenizer;
+        CharacterSet;
+        CharSetCharacter;
+        AttributedMemory;
+        MemoryCell;
+        RelocatableDictItem;
+    }
+    
+    // Key relationships and associations (not inheritance)
+    edge [style=dashed, arrowhead=vee, color=gray];
+    
+    DiskFile -> GenericFile [label="manages"];
+    ViewerBase -> FileViewerInterface [label="contains"];
+    DiskExplorer -> DiskFile [label="loads"];
+    DiskExplorer -> ViewerBase [label="opens"];
+    ApplesoftFile -> ApplesoftLine [label="contains"];
+    ApplesoftFile -> ApplesoftRetokenizer [label="uses"];
+    ApplesoftFormatter -> ApplesoftFile [label="formats"];
+    BinaryFile -> BinaryFileMetadata [label="has"];
+    DisassemblerViewer -> AttributedMemory [label="uses"];
+    CharSetViewer -> CharacterSet [label="displays"];
+}

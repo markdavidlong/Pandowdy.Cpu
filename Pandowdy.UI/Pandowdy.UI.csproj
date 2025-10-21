@@ -6,6 +6,11 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Use the ICO in the repo's assets folder as the application icon -->
+    <ApplicationIcon>..\assets\ico\pandowdy.ico</ApplicationIcon>
+    <!-- Path to generated .res file -->
+    <PandowdyWinRes>$(IntermediateOutputPath)pandowdy.res</PandowdyWinRes>
+    <!-- Do not set Win32Resource here; it will be set by the target only if the .res was successfully generated -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,4 +24,40 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
   </ItemGroup>
+
+  <!-- Link the ICO into the project so it's visible in Visual Studio and included in the build metadata -->
+  <ItemGroup>
+    <None Include="..\assets\ico\pandowdy.ico">
+      <Link>assets\ico\pandowdy.ico</Link>
+      <Visible>true</Visible>
+    </None>
+    <None Include="pandowdy.rc">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <Visible>true</Visible>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\legacy\CiderPress2\CommonUtil\CommonUtil.csproj" />
+    <ProjectReference Include="..\legacy\CiderPress2\DiskArc\DiskArc.csproj" />
+    <ProjectReference Include="..\legacy\CiderPress2\FileConv\FileConv.csproj" />
+  </ItemGroup>
+
+  <!-- On Windows, compile the RC to a RES using rc.exe before the build collects Win32Resource. Make this tolerant when rc.exe is not available. -->
+  <Target Name="CompilePandowdyRC" BeforeTargets="BeforeBuild" Condition=" '$(OS)' == 'Windows_NT' ">
+    <PropertyGroup>
+      <_RCExe>rc.exe</_RCExe>
+      <_RCArgs>/fo "$(PandowdyWinRes)" "$(MSBuildThisFileDirectory)pandowdy.rc"</_RCArgs>
+    </PropertyGroup>
+    <Message Text="Attempting to compile pandowdy.rc to $(PandowdyWinRes) using $(_RCExe)" Importance="High" />
+    <!-- Do not fail the build if rc.exe is not present -->
+    <Exec Command="$(_RCExe) $(_RCArgs)" ContinueOnError="true" />
+
+    <!-- If the .res exists after the Exec, set Win32Resource so the linker will embed it. Otherwise show a message. -->
+    <PropertyGroup Condition="Exists('$(PandowdyWinRes)')">
+      <Win32Resource>$(PandowdyWinRes)</Win32Resource>
+    </PropertyGroup>
+
+    <Message Text="pandowdy.res generated and will be embedded as Win32Resource." Importance="High" Condition="Exists('$(PandowdyWinRes)')" />
+    <Message Text="rc.exe not found or pandowdy.res not created. The executable will be built without the embedded ICO. Install the Windows SDK (or make rc.exe available on PATH) to embed the icon." Importance="High" Condition="!Exists('$(PandowdyWinRes)')" />
+  </Target>
 </Project>

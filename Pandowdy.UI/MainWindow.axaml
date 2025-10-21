@@ -4,6 +4,32 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="pandowdy.MainWindow"
-        Title="pandowdy">
-    Welcome to Avalonia!
+        Title="Pandowdy"
+        Width="800" Height="600">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_Quit" Click="OnQuitClicked" InputGesture="Alt+F4" />
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="Select _All" Click="OnSelectAllClicked" InputGesture="Ctrl+A" />
+                <MenuItem Header="_Copy" Click="OnCopyClicked" InputGesture="Ctrl+C" />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="_Clear Text" Click="OnClearTextClicked" InputGesture="Ctrl+L" />
+                <MenuItem Header="_Test Disk Read" Click="OnTestDiskReadClicked" InputGesture="Ctrl+T" />
+            </MenuItem>
+        </Menu>
+        
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <TextBox x:Name="OutputTextBox"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     IsReadOnly="True"
+                     FontFamily="Consolas,Courier New,monospace"
+                     FontSize="12"
+                     Padding="10"
+                     BorderThickness="0" />
+        </ScrollViewer>
+    </DockPanel>
 </Window>

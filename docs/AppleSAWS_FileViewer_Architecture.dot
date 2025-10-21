@@ -1,0 +1,135 @@
+// AppleSAWS File and Viewer Architecture
+// This diagram focuses on the relationship between file types and their viewers
+// Generate with: dot -Tpng AppleSAWS_FileViewer_Architecture.dot -o AppleSAWS_FileViewer_Architecture.png
+
+digraph AppleSAWS_FileViewer {
+    rankdir=LR;
+    node [shape=box, style=filled, fontname="Arial"];
+    
+    // File Types
+    subgraph cluster_files {
+        label="File Types";
+        style=filled;
+        fillcolor=lightcyan;
+        
+        GenericFile [shape=box, fillcolor=cyan, style="filled,bold"];
+        
+        subgraph cluster_file_types {
+            label="";
+            style=invis;
+            
+            ApplesoftFile [fillcolor=lightblue];
+            BinaryFile [fillcolor=lightblue];
+            IntBasicFile [fillcolor=lightblue];
+            RelocatableFile [fillcolor=lightblue];
+            TextFile [fillcolor=lightblue];
+        }
+        
+        GenericFile -> ApplesoftFile [style=bold, arrowhead=empty];
+        GenericFile -> BinaryFile [style=bold, arrowhead=empty];
+        GenericFile -> IntBasicFile [style=bold, arrowhead=empty];
+        GenericFile -> RelocatableFile [style=bold, arrowhead=empty];
+        GenericFile -> TextFile [style=bold, arrowhead=empty];
+    }
+    
+    // Viewer Interface
+    subgraph cluster_viewers {
+        label="Viewers";
+        style=filled;
+        fillcolor=lightgreen;
+        
+        FileViewerInterface [shape=box, fillcolor=green, style="filled,bold"];
+        
+        subgraph cluster_viewer_types {
+            label="";
+            style=invis;
+            
+            ApplesoftFileViewer [fillcolor=palegreen];
+            CharSetViewer [fillcolor=palegreen];
+            DisassemblerViewer [fillcolor=palegreen];
+            HexDumpViewer [fillcolor=palegreen];
+            HiresViewer [fillcolor=palegreen];
+            IntBasicFileViewer [fillcolor=palegreen];
+            MazeViewer [fillcolor=palegreen];
+            TextHexDumpViewer [fillcolor=palegreen];
+        }
+        
+        FileViewerInterface -> ApplesoftFileViewer [style=bold, arrowhead=empty];
+        FileViewerInterface -> CharSetViewer [style=bold, arrowhead=empty];
+        FileViewerInterface -> DisassemblerViewer [style=bold, arrowhead=empty];
+        FileViewerInterface -> HexDumpViewer [style=bold, arrowhead=empty];
+        FileViewerInterface -> HiresViewer [style=bold, arrowhead=empty];
+        FileViewerInterface -> IntBasicFileViewer [style=bold, arrowhead=empty];
+        FileViewerInterface -> MazeViewer [style=bold, arrowhead=empty];
+        FileViewerInterface -> TextHexDumpViewer [style=bold, arrowhead=empty];
+    }
+    
+    // Disk Management
+    subgraph cluster_disk {
+        label="Disk Management";
+        style=filled;
+        fillcolor=lightyellow;
+        
+        DiskFile [shape=box, fillcolor=gold];
+        DiskExplorer [shape=box, fillcolor=yellow];
+        ViewerBase [shape=box, fillcolor=yellow];
+        
+        DiskExplorer -> DiskFile [label="loads", style=dashed];
+        DiskExplorer -> ViewerBase [label="creates", style=dashed];
+    }
+    
+    // File-to-Viewer relationships
+    edge [style=dashed, color=blue, arrowhead=vee];
+    
+    ApplesoftFile -> ApplesoftFileViewer [label="viewed by"];
+    BinaryFile -> DisassemblerViewer [label="disassembled"];
+    BinaryFile -> HexDumpViewer [label="hex dump"];
+    BinaryFile -> HiresViewer [label="graphics"];
+    IntBasicFile -> IntBasicFileViewer [label="viewed by"];
+    RelocatableFile -> DisassemblerViewer [label="disassembled"];
+    TextFile -> TextHexDumpViewer [label="viewed by"];
+    GenericFile -> HexDumpViewer [label="default view"];
+    
+    // Management relationships
+    edge [style=dashed, color=red, arrowhead=vee];
+    
+    DiskFile -> GenericFile [label="manages"];
+    ViewerBase -> FileViewerInterface [label="hosts"];
+    
+    // Supporting Classes
+    subgraph cluster_support {
+        label="Supporting Classes";
+        style=filled;
+        fillcolor=lavender;
+        
+        ApplesoftFormatter [shape=ellipse, fillcolor=thistle];
+        ApplesoftRetokenizer [shape=ellipse, fillcolor=thistle];
+        BinaryFileMetadata [shape=ellipse, fillcolor=thistle];
+        AttributedMemory [shape=ellipse, fillcolor=thistle];
+        CharacterSet [shape=ellipse, fillcolor=thistle];
+        
+        ApplesoftFile -> ApplesoftRetokenizer [label="parses with", style=dotted, color=gray];
+        ApplesoftFormatter -> ApplesoftFile [label="formats", style=dotted, color=gray];
+        ApplesoftFileViewer -> ApplesoftFormatter [label="uses", style=dotted, color=gray];
+        BinaryFile -> BinaryFileMetadata [label="metadata", style=dotted, color=gray];
+        DisassemblerViewer -> AttributedMemory [label="uses", style=dotted, color=gray];
+        CharSetViewer -> CharacterSet [label="displays", style=dotted, color=gray];
+    }
+    
+    // Legend
+    subgraph cluster_legend {
+        label="Legend";
+        style=filled;
+        fillcolor=white;
+        
+        leg1 [label="Inheritance", shape=plaintext];
+        leg2 [label="Uses/Views", shape=plaintext];
+        leg3 [label="Manages", shape=plaintext];
+        leg4 [label="Support", shape=plaintext];
+        
+        leg1 -> leg2 [style=bold, arrowhead=empty, label="     "];
+        leg2 -> leg3 [style=dashed, color=blue, arrowhead=vee, label="     "];
+        leg3 -> leg4 [style=dashed, color=red, arrowhead=vee, label="     "];
+        leg4 -> leg1 [style=dotted, color=gray, label="     "];
+    }
+}
