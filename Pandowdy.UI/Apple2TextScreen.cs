@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using Avalonia.Input;
 using Pandowdy.Core; // IMappedMemory, MemoryAccessEventArgs
 
 namespace pandowdy;
@@ -49,7 +50,7 @@ public class Apple2TextScreen : Control
                 DetachMemory(_memorySource);
                 _memorySource = value;
                 AttachMemory(_memorySource);
-                
+
             }
         }
     }
@@ -84,6 +85,11 @@ public class Apple2TextScreen : Control
     {
         // Create a default checkerboard pattern
         Bitmap = CreateCheckerboardBitmap();
+        Focusable = true;
+        this.GotFocus += (_, __) => InvalidateVisual();
+        this.LostFocus += (_, __) => InvalidateVisual();
+        this.KeyDown += OnKeyDown;
+        this.TextInput += OnTextInput; // use text input to get proper ASCII with layout
     }
 
     /// <summary>
@@ -126,18 +132,18 @@ public class Apple2TextScreen : Control
         {
             var addr = e.Address;
             var val = e.Value;
-            Dispatcher.UIThread.Post(() => OnMemoryWritten(sender, new MemoryAccessEventArgs { Address = addr, Value = val, Length =1 }));
+            Dispatcher.UIThread.Post(() => OnMemoryWritten(sender, new MemoryAccessEventArgs { Address = addr, Value = val, Length = 1 }));
             return;
         }
 
         // Text page is $400-$7FF. Draw the one cell.
-        if (e.Address >=0x400 && e.Address <0x800 && e.Value.HasValue)
+        if (e.Address >= 0x400 && e.Address < 0x800 && e.Value.HasValue)
         {
             int offset = AddressToOffset(e.Address);
-            if (offset >=0)
+            if (offset >= 0)
             {
-                int x = offset %40;
-                int y = offset /40;
+                int x = offset % 40;
+                int y = offset / 40;
                 SetChar(x, y, e.Value.Value);
             }
             InvalidateVisual();
@@ -157,7 +163,8 @@ public class Apple2TextScreen : Control
         }
 
         // For a range, pull bytes from MemorySource.Read
-        if (_memorySource == null) { return; }
+        if (_memorySource == null)
+        { return; }
         int s = e.Address;
         int ed = e.Address + e.Length;
         UpdateScreenBlock(s, ed);
@@ -176,11 +183,11 @@ public class Apple2TextScreen : Control
                     int x = offset % 40;
 
                     int y = offset / 40;
-                    byte val = _memorySource!.Read((ushort)addr);
+                    byte val = _memorySource!.Read((ushort) addr);
                     SetChar(x, y, val);
                     if (Use80Cols) // TODO: Handle aux memory later for 80-column mode.
                     {
-                        SetChar(x+1, y, val);
+                        SetChar(x + 1, y, val);
                     }
                     dirty = true;
                 }
@@ -189,7 +196,7 @@ public class Apple2TextScreen : Control
 
         if (dirty)
         {
-           InvalidateVisual();
+            InvalidateVisual();
         }
     }
 
@@ -236,7 +243,7 @@ public class Apple2TextScreen : Control
 
         // Create pixel data (BGRA format, 32 bits per pixel)
         var pixelData = new byte[bitmapWidth * bitmapHeight * 4];
-        
+
         // Fill with checkerboard pattern
         for (int y = 0; y < numRows * blockHeight; y++)
         {
@@ -245,15 +252,15 @@ public class Apple2TextScreen : Control
                 // Determine which block this pixel belongs to
                 int blockX = x / blockWidth;
                 int blockY = y / blockHeight;
-                
+
                 // Checkerboard: alternate black/white based on block coordinates
                 bool isWhite = (blockX + blockY) % 2 == 0;
-                
+
                 // Calculate pixel index in BGRA format
                 int pixelIndex = (y * bitmapWidth + x) * 4;
-                
+
                 // Set BGRA values (B, G, R, A)
-                byte colorValue = isWhite ? (byte)80 : (byte)64;
+                byte colorValue = isWhite ? (byte) 80 : (byte) 64;
                 pixelData[pixelIndex + 0] = colorValue;     // B
                 pixelData[pixelIndex + 1] = colorValue;     // G
                 pixelData[pixelIndex + 2] = colorValue;     // R
@@ -317,7 +324,7 @@ public class Apple2TextScreen : Control
 
         // Draw the bitmap with pixel-perfect scaling using nearest-neighbor
         var rect = new Rect(offsetX, offsetY, scaledWidth, scaledHeight);
-        
+
         // Create a clipped context to prevent blur from scaling
         using (context.PushClip(new Rect(Bounds.Size)))
         {
@@ -338,7 +345,7 @@ public class Apple2TextScreen : Control
         int maxX = Use80Cols ? 79 : 39;
         if (x < 0 || x > maxX)
         {
-            throw new ArgumentOutOfRangeException(nameof(x), 
+            throw new ArgumentOutOfRangeException(nameof(x),
                 $"X coordinate must be between 0 and {maxX} (Use80Cols={Use80Cols})");
         }
 
@@ -367,7 +374,7 @@ public class Apple2TextScreen : Control
         {
             unsafe
             {
-                byte* pixelPtr = (byte*)frameBuffer.Address;
+                byte* pixelPtr = (byte*) frameBuffer.Address;
 
                 // For each row of the character
                 for (int row = 0; row < charHeight; row++)
@@ -383,7 +390,7 @@ public class Apple2TextScreen : Control
 
                         // Calculate screen X position
                         int screenX = Use80Cols ? (x * charWidth) : (x * charWidth * 2);
-                        
+
                         // If 40-column mode, double the pixel width
                         int pixelCount = Use80Cols ? 1 : 2;
 
@@ -401,15 +408,15 @@ public class Apple2TextScreen : Control
                             int pixelIndex = (screenY * 2 * bitmapWidth + finalScreenX) * 4;
 
                             // Set BGRA values (B, G, R, A)
-                            byte colorValue = isPixelSet ? (byte)255 : (byte)0;
+                            byte colorValue = isPixelSet ? (byte) 255 : (byte) 0;
                             pixelPtr[pixelIndex + 0] = colorValue;     // B
                             pixelPtr[pixelIndex + 1] = colorValue;     // G
                             pixelPtr[pixelIndex + 2] = colorValue;     // R
                             pixelPtr[pixelIndex + 3] = 255;            // A (fully opaque)
-                            pixelPtr[pixelIndex + bitmapWidth*4 + 0] = colorValue;     // B
-                            pixelPtr[pixelIndex + bitmapWidth*4 + 1] = colorValue;     // G
-                            pixelPtr[pixelIndex + bitmapWidth*4 + 2] = colorValue;     // R
-                            pixelPtr[pixelIndex + bitmapWidth*4 + 3] = 255;            // A (fully opaque)
+                            pixelPtr[pixelIndex + bitmapWidth * 4 + 0] = colorValue;     // B
+                            pixelPtr[pixelIndex + bitmapWidth * 4 + 1] = colorValue;     // G
+                            pixelPtr[pixelIndex + bitmapWidth * 4 + 2] = colorValue;     // R
+                            pixelPtr[pixelIndex + bitmapWidth * 4 + 3] = 255;            // A (fully opaque)
 
                         }
                     }
@@ -430,7 +437,7 @@ public class Apple2TextScreen : Control
         {
             throw new ArgumentOutOfRangeException(nameof(address), "Address must be in range 0x400-0x7FF for text screen memory.");
         }
-        
+
         address -= 0x400;
 
         var macroline_x = address % 128; // 0-127 (0-119 visible, 120-127 screen hole)
@@ -446,5 +453,147 @@ public class Apple2TextScreen : Control
 
         return (macroline_x % 40) + (40 * row);
     }
+
+    private VA2M? _machine;
+    public void AttachMachine(VA2M machine)
+    {
+        _machine = machine;
+    }
+
+    private void OnTextInput(object? sender, TextInputEventArgs e)
+    {
+        if (_machine == null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(e.Text))
+        {
+            return;
+        }
+
+        foreach (char ch in e.Text)
+        {
+            char c = ch;
+            // Normalize newline to CR for Apple II
+            if (c == '\n')
+            {
+                c = '\r';
+            }
+
+            // Uppercase letters (Apple II text is uppercase by default)
+            if (c >= 'a' && c <= 'z')
+            {
+                c = (char)(c -32);
+            }
+
+            // Only handle7-bit ASCII
+            if (c <=0x7F)
+            {
+                byte value = (byte)((byte)c |0x80); // set key-ready bit
+                _machine.InjectKey(value);
+            }
+        }
+
+        e.Handled = true;
+    }
+
+    private void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_machine == null)
+        {
+            return;
+        }
+
+        // Handle control-key combinations to generate control codes (Ctrl+A =>0x01 ... Ctrl+Z =>0x1A)
+        if ((e.KeyModifiers & KeyModifiers.Control) !=0 && e.Key >= Key.A && e.Key <= Key.Z)
+        {
+            byte ctrl = (byte)((int)(e.Key - Key.A) +1);
+            byte value = (byte)(ctrl |0x80);
+            _machine.InjectKey(value);
+            e.Handled = true;
+            return;
+        }
+
+        // Handle arrows and special non-text keys
+        byte? ascii = null;
+        switch (e.Key)
+        {
+            case Key.Up:
+            {
+                // ^K
+                ascii =0x0B;
+                break;
+            }
+            case Key.Down:
+            {
+                // ^J (LF)
+                ascii =0x0A;
+                break;
+            }
+            case Key.Left:
+            {
+                // ^H (BS)
+                ascii =0x08;
+                break;
+            }
+            case Key.Right:
+            {
+                // ^U
+                ascii =0x15;
+                break;
+            }
+            case Key.Back:
+            {
+                // Treat Backspace as Left (BS). Shift+Backspace => DEL (127)
+                if ((e.KeyModifiers & KeyModifiers.Shift) !=0)
+                {
+                    ascii =0x7F;
+                }
+                else
+                {
+                    ascii =0x08;
+                }
+                break;
+            }
+            case Key.Delete:
+            {
+                // DEL
+                ascii =0x7F;
+                break;
+            }
+            case Key.Enter:
+            {
+                ascii = (byte)'\r';
+                break;
+            }
+            case Key.Tab:
+            {
+                ascii = (byte)'\t';
+                break;
+            }
+            case Key.Escape:
+            {
+                ascii =0x1B;
+                break;
+            }
+            default:
+            {
+                break;
+            }
+        }
+
+        if (ascii.HasValue)
+        {
+            byte value = (byte)(ascii.Value |0x80);
+            _machine.InjectKey(value);
+            e.Handled = true;
+            return;
+        }
+
+        // Let TextInput handle printable characters and layout-dependent keys
+    }
+
+    // ...rest of file unchanged...
 }
 

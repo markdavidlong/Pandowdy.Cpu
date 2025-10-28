@@ -7,9 +7,9 @@ namespace Pandowdy.Core;
 /// </summary>
 public sealed class MemoryAccessEventArgs : EventArgs
 {
- public ushort Address { get; init; }
- public byte? Value { get; init; }
- public int Length { get; init; }
+    public ushort Address { get; init; }
+    public byte? Value { get; init; }
+    public int Length { get; init; }
 }
 
 /// <summary>
@@ -17,8 +17,8 @@ public sealed class MemoryAccessEventArgs : EventArgs
 /// </summary>
 public interface IMappedMemory
 {
- event EventHandler<MemoryAccessEventArgs> MemoryWritten;
- event EventHandler<MemoryAccessEventArgs> MemoryBlockWritten;
+    event EventHandler<MemoryAccessEventArgs> MemoryWritten;
+    event EventHandler<MemoryAccessEventArgs> MemoryBlockWritten;
 
- byte Read(ushort address);
+    byte Read(ushort address);
 }

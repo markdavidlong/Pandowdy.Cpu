@@ -146,12 +146,12 @@ public class DiskReadTestTemp
         }
         if (diskImage.Contents is IFileSystem)
         {
-            PrintFileSystemContents((IFileSystem)diskImage.Contents);
+            PrintFileSystemContents((IFileSystem) diskImage.Contents);
             return true;
         }
         else if (diskImage.Contents is IMultiPart)
         {
-            return HandleMultiPart((IMultiPart)diskImage.Contents);
+            return HandleMultiPart((IMultiPart) diskImage.Contents);
         }
         else
         {

@@ -1,0 +1,7 @@
+root = true
+
+[*.cs]
+# Always require braces for control flow statements
+csharp_prefer_braces = always:warning
+# Ensure the analyzer reports missing braces (IDE0011)
+dotnet_diagnostic.IDE0011.severity = warning

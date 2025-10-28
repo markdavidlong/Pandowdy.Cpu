@@ -18,9 +18,9 @@ public partial class App : Application
         {
             var mainWindow = new MainWindow();
             desktop.MainWindow = mainWindow;
-            
+
             // Display all 256 glyphs after window is shown
-           // mainWindow.Opened += (s, e) => DisplayAllGlyphs(mainWindow);
+            // mainWindow.Opened += (s, e) => DisplayAllGlyphs(mainWindow);
         }
 
         base.OnFrameworkInitializationCompleted();

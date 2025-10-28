@@ -32,6 +32,8 @@ public partial class MainWindow : Window
         if (screen != null)
         {
             screen.MemorySource = _machine.RamMapped;
+            screen.AttachMachine(_machine);
+            screen.Focus();
         }
     }
 
@@ -45,7 +47,9 @@ public partial class MainWindow : Window
     private async void OnEmuStartClicked(object? sender, RoutedEventArgs e)
     {
         if (_emuCts != null) // already running
-           { return; }
+        { return; }
+
+        _machine.Reset();
 
         _emuCts = new CancellationTokenSource();
         try
