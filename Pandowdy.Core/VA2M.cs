@@ -109,8 +109,7 @@ public sealed class VA2M : IDisposable
     /// <param name="ticksPerSecond">Time slice frequency. Use1000 for1ms slices or60 for video-frame pacing.</param>
     public async Task RunAsync(CancellationToken ct, double ticksPerSecond = 1000d)
     {
-        if (ticksPerSecond <= 0)
-        { throw new ArgumentOutOfRangeException(nameof(ticksPerSecond)); }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ticksPerSecond);
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1.0 / ticksPerSecond));
         double cyclesPerTick = TargetHz / ticksPerSecond;
         double carry = 0.0;
@@ -152,15 +151,10 @@ public sealed class VA2M : IDisposable
 
     /// <summary>
     /// Inject a keyboard value into the machine as if a key was latched at $C000.
-    /// Typical Apple II behavior: bit7 set indicates key ready; low7 bits hold ASCII.
-    /// Clearing strobe: read or write to $C010.
+    /// High bit must be set.  Cleared by access of $C010.
     /// </summary>
-    public void InjectKey(byte asciiWithReadyBit) => Poke(0xC000, asciiWithReadyBit);
+    public void InjectKey(byte ascii) => Poke(0xC000, (byte) (ascii | 0x80));
 
-    /// <summary>
-    /// Clear the keyboard strobe at $C010.
-    /// </summary>
-    public void ClearKeyStrobe() => Poke(0xC010, 0);
 
     /// <summary>
     /// Load a ROM image into RAM at the specified base address (for early testing).
@@ -175,7 +169,7 @@ public sealed class VA2M : IDisposable
         int toCopy = Math.Min(available, image.Length);
 
         // IMemoryModel has WriteBlock with params byte[] - allocate exact-sized array slice
-        byte[] buffer = image.Slice(0, toCopy).ToArray();
+        byte[] buffer = image[..toCopy].ToArray();
         RamModel.WriteBlock(baseAddress, buffer);
     }
 

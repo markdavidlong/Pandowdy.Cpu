@@ -2,29 +2,33 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.Markup.Xaml;
 using CommonUtil;
 using DiskArc;
 using Pandowdy.Core;
+using Pandowdy.UI;
 using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using static DiskArc.Defs;
 
-namespace pandowdy;
+namespace Pandowdy.UI;
 
 public partial class MainWindow : Window
 {
-    private readonly AppHook mAppHook = new AppHook(new SimpleMessageLog());
+    private readonly AppHook mAppHook = new(new SimpleMessageLog());
     private DiskReadTestTemp? mDiskReadTest;
     private string mLastDiskPath = "E:\\develop\\Pandowdy";
 
-    private VA2M _machine = new VA2M();
+    private VA2M _machine = new();
     private CancellationTokenSource? _emuCts;
+    private TextBox? _outputTextBox;
 
     public MainWindow()
     {
         InitializeComponent();
+        _outputTextBox = this.FindControl<TextBox>("OutputTextBox");
         mDiskReadTest = new DiskReadTestTemp(mAppHook, AppendText, this);
 
         // Wire emulator memory to the Apple2TextScreen via machine's mapped RAM
@@ -35,6 +39,11 @@ public partial class MainWindow : Window
             screen.AttachMachine(_machine);
             screen.Focus();
         }
+    }
+
+    private void InitializeComponent()
+    {
+        AvaloniaXamlLoader.Load(this);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -85,10 +94,7 @@ public partial class MainWindow : Window
 
     private void StopEmulator()
     {
-        if (_emuCts != null)
-        {
-            _emuCts.Cancel();
-        }
+        _emuCts?.Cancel();
     }
 
     /// <summary>
@@ -99,11 +105,11 @@ public partial class MainWindow : Window
     {
         Dispatcher.UIThread.Post(() =>
         {
-            if (OutputTextBox != null)
+            if (_outputTextBox != null)
             {
-                OutputTextBox.Text += text;
+                _outputTextBox.Text += text;
                 // Auto-scroll to the end
-                OutputTextBox.CaretIndex = OutputTextBox.Text?.Length ?? 0;
+                _outputTextBox.CaretIndex = _outputTextBox.Text?.Length ?? 0;
             }
         });
     }
@@ -116,11 +122,11 @@ public partial class MainWindow : Window
     {
         Dispatcher.UIThread.Post(() =>
         {
-            if (OutputTextBox != null)
+            if (_outputTextBox != null)
             {
-                OutputTextBox.Text = text;
+                _outputTextBox.Text = text;
                 // Auto-scroll to the end
-                OutputTextBox.CaretIndex = OutputTextBox.Text?.Length ?? 0;
+                _outputTextBox.CaretIndex = _outputTextBox.Text?.Length ?? 0;
             }
         });
     }
@@ -132,9 +138,9 @@ public partial class MainWindow : Window
     {
         Dispatcher.UIThread.Post(() =>
         {
-            if (OutputTextBox != null)
+            if (_outputTextBox != null)
             {
-                OutputTextBox.Text = string.Empty;
+                _outputTextBox.Text = string.Empty;
             }
         });
     }
@@ -148,10 +154,10 @@ public partial class MainWindow : Window
 
     private void OnSelectAllClicked(object? sender, RoutedEventArgs e)
     {
-        if (OutputTextBox != null)
+        if (_outputTextBox != null)
         {
-            OutputTextBox.SelectAll();
-            OutputTextBox.Focus();
+            _outputTextBox.SelectAll();
+            _outputTextBox.Focus();
         }
     }
 
@@ -163,16 +169,16 @@ public partial class MainWindow : Window
 
     private void OnCopyClicked(object? sender, RoutedEventArgs e)
     {
-        if (OutputTextBox != null && !string.IsNullOrEmpty(OutputTextBox.SelectedText))
+        if (_outputTextBox != null && !string.IsNullOrEmpty(_outputTextBox.SelectedText))
         {
             var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            clipboard?.SetTextAsync(OutputTextBox.SelectedText);
+            clipboard?.SetTextAsync(_outputTextBox.SelectedText);
         }
-        else if (OutputTextBox != null && !string.IsNullOrEmpty(OutputTextBox.Text))
+        else if (_outputTextBox != null && !string.IsNullOrEmpty(_outputTextBox.Text))
         {
             // If nothing is selected, copy all text
             var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            clipboard?.SetTextAsync(OutputTextBox.Text);
+            clipboard?.SetTextAsync(_outputTextBox.Text);
         }
     }
 

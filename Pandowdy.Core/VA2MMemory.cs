@@ -8,9 +8,9 @@ namespace Pandowdy.Core;
 /// and exposes Pandowdy.Core.IMappedMemory for UI updates.
 /// Supports optional read-only regions and non-zero start address.
 /// </summary>
-public sealed class VA2MMemory : IMemory, IMappedMemory
+public sealed class VA2MMemory(int startAddress, int size, VA2MMemory.MemAccessType accessType = VA2MMemory.MemAccessType.ReadWrite) : IMemory, IMappedMemory
 {
-    private readonly byte[] _data;
+    private readonly byte[] _data = new byte[size];
 
     public enum MemAccessType
     {
@@ -18,18 +18,9 @@ public sealed class VA2MMemory : IMemory, IMappedMemory
         ReadOnly
     }
 
-    private readonly MemAccessType _accessType;
-
-    public int StartAddress { get; init; }
+    public int StartAddress { get; init; } = startAddress;
 
     public VA2MMemory(int size) : this(0, size) { }
-
-    public VA2MMemory(int startAddress, int size, MemAccessType accessType = MemAccessType.ReadWrite)
-    {
-        _accessType = accessType;
-        StartAddress = startAddress;
-        _data = new byte[size];
-    }
 
     private int Translate(ushort address)
     {
@@ -64,7 +55,7 @@ public sealed class VA2MMemory : IMemory, IMappedMemory
                 return;
             }
 
-            if (_accessType == MemAccessType.ReadOnly)
+            if (accessType == MemAccessType.ReadOnly)
             {
                 return;
             }
@@ -93,7 +84,7 @@ public sealed class VA2MMemory : IMemory, IMappedMemory
             return;
         }
 
-        if (_accessType == MemAccessType.ReadOnly)
+        if (accessType == MemAccessType.ReadOnly)
         {
             return;
         }
@@ -111,7 +102,7 @@ public sealed class VA2MMemory : IMemory, IMappedMemory
             return;
         }
 
-        if (_accessType == MemAccessType.ReadOnly)
+        if (accessType == MemAccessType.ReadOnly)
         {
             return;
         }
@@ -126,7 +117,7 @@ public sealed class VA2MMemory : IMemory, IMappedMemory
     {
         if (!InRange(address) || length <= 0)
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
         int idx = Translate(address);

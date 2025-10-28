@@ -12,7 +12,7 @@ public static class VA2MMemoryDumping
         int rows = 0x100 / columns;
         if (writeHeader)
         {
-            sb.Append(" ");
+            sb.Append(' ');
             AppendHeader(sb, width);
             sb.AppendLine();
             sb.AppendLine($" +{new string('-', 48 * width + 1)}+");

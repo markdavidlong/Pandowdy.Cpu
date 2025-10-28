@@ -7,9 +7,9 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using Avalonia.Input;
-using Pandowdy.Core; // IMappedMemory, MemoryAccessEventArgs
+using Pandowdy.Core;
 
-namespace pandowdy;
+namespace Pandowdy.UI;
 
 /// <summary>
 /// A custom control for displaying Apple II text screen output.
@@ -84,12 +84,12 @@ public class Apple2TextScreen : Control
     public Apple2TextScreen()
     {
         // Create a default checkerboard pattern
-        Bitmap = CreateCheckerboardBitmap();
+        Bitmap = CreateCheckerboardBitmap;
         Focusable = true;
-        this.GotFocus += (_, __) => InvalidateVisual();
-        this.LostFocus += (_, __) => InvalidateVisual();
-        this.KeyDown += OnKeyDown;
-        this.TextInput += OnTextInput; // use text input to get proper ASCII with layout
+        GotFocus += (_, __) => InvalidateVisual();
+        LostFocus += (_, __) => InvalidateVisual();
+        KeyDown += OnKeyDown;
+        TextInput += OnTextInput; // use text input to get proper ASCII with layout
     }
 
     /// <summary>
@@ -232,56 +232,59 @@ public class Apple2TextScreen : Control
     /// Resolution: 561x384 (40 14-pixel blocks wide × 24 16-pixel blocks tall + 1 pixel horizontal). 
     /// </summary>
     /// <returns>A new Bitmap with checkerboard pattern.</returns>
-    private static Bitmap CreateCheckerboardBitmap()
+    private static Bitmap CreateCheckerboardBitmap
     {
-        const int numRows = 24;
-        const int numCols = 80; // 80 max, 40 colum doubles pixel values.
-        const int blockWidth = 7;
-        const int blockHeight = 16;
-        const int bitmapWidth = 561;   // 40 blocks × 14 pixels (+ 1 pixel)
-        const int bitmapHeight = 384;  // 24 blocks × 16 pixels
-
-        // Create pixel data (BGRA format, 32 bits per pixel)
-        var pixelData = new byte[bitmapWidth * bitmapHeight * 4];
-
-        // Fill with checkerboard pattern
-        for (int y = 0; y < numRows * blockHeight; y++)
+        get
         {
-            for (int x = 0; x < numCols * blockWidth; x++)
+            const int numRows = 24;
+            const int numCols = 80; // 80 max, 40 colum doubles pixel values.
+            const int blockWidth = 7;
+            const int blockHeight = 16;
+            const int bitmapWidth = 561;   // 40 blocks × 14 pixels (+ 1 pixel)
+            const int bitmapHeight = 384;  // 24 blocks × 16 pixels
+
+            // Create pixel data (BGRA format, 32 bits per pixel)
+            var pixelData = new byte[bitmapWidth * bitmapHeight * 4];
+
+            // Fill with checkerboard pattern
+            for (int y = 0; y < numRows * blockHeight; y++)
             {
-                // Determine which block this pixel belongs to
-                int blockX = x / blockWidth;
-                int blockY = y / blockHeight;
+                for (int x = 0; x < numCols * blockWidth; x++)
+                {
+                    // Determine which block this pixel belongs to
+                    int blockX = x / blockWidth;
+                    int blockY = y / blockHeight;
 
-                // Checkerboard: alternate black/white based on block coordinates
-                bool isWhite = (blockX + blockY) % 2 == 0;
+                    // Checkerboard: alternate black/white based on block coordinates
+                    bool isWhite = (blockX + blockY) % 2 == 0;
 
-                // Calculate pixel index in BGRA format
-                int pixelIndex = (y * bitmapWidth + x) * 4;
+                    // Calculate pixel index in BGRA format
+                    int pixelIndex = (y * bitmapWidth + x) * 4;
 
-                // Set BGRA values (B, G, R, A)
-                byte colorValue = isWhite ? (byte) 80 : (byte) 64;
-                pixelData[pixelIndex + 0] = colorValue;     // B
-                pixelData[pixelIndex + 1] = colorValue;     // G
-                pixelData[pixelIndex + 2] = colorValue;     // R
-                pixelData[pixelIndex + 3] = 255;            // A (fully opaque)
+                    // Set BGRA values (B, G, R, A)
+                    byte colorValue = isWhite ? (byte) 80 : (byte) 64;
+                    pixelData[pixelIndex + 0] = colorValue;     // B
+                    pixelData[pixelIndex + 1] = colorValue;     // G
+                    pixelData[pixelIndex + 2] = colorValue;     // R
+                    pixelData[pixelIndex + 3] = 255;            // A (fully opaque)
+                }
             }
+
+            // Create bitmap from pixel data
+            var bitmap = new WriteableBitmap(
+                new PixelSize(bitmapWidth, bitmapHeight),
+                new Vector(96, 96),  // DPI
+                PixelFormat.Bgra8888);
+
+            // Copy pixel data to bitmap
+            using (var frameBuffer = bitmap.Lock())
+            {
+                System.Runtime.InteropServices.Marshal.Copy(
+                    pixelData, 0, frameBuffer.Address, pixelData.Length);
+            }
+
+            return bitmap;
         }
-
-        // Create bitmap from pixel data
-        var bitmap = new WriteableBitmap(
-            new PixelSize(bitmapWidth, bitmapHeight),
-            new Vector(96, 96),  // DPI
-            PixelFormat.Bgra8888);
-
-        // Copy pixel data to bitmap
-        using (var frameBuffer = bitmap.Lock())
-        {
-            System.Runtime.InteropServices.Marshal.Copy(
-                pixelData, 0, frameBuffer.Address, pixelData.Length);
-        }
-
-        return bitmap;
     }
 
     public override void Render(DrawingContext context)
@@ -298,8 +301,8 @@ public class Apple2TextScreen : Control
         const double padding = 30;
 
         // Available space after padding
-        double availableWidth = Bounds.Width - (padding * 2);
-        double availableHeight = Bounds.Height - (padding * 2);
+        double availableWidth = Bounds.Width - padding * 2;
+        double availableHeight = Bounds.Height - padding * 2;
 
         double displayAspect = availableWidth / availableHeight;
 
@@ -310,7 +313,7 @@ public class Apple2TextScreen : Control
             // Available space is wider - letterbox top/bottom
             scaledHeight = availableHeight;
             scaledWidth = availableHeight * SourceAspect;
-            offsetX = padding + ((availableWidth - scaledWidth) / 2);
+            offsetX = padding + (availableWidth - scaledWidth) / 2;
             offsetY = padding;
         }
         else
@@ -319,7 +322,7 @@ public class Apple2TextScreen : Control
             scaledWidth = availableWidth;
             scaledHeight = availableWidth / SourceAspect;
             offsetX = padding;
-            offsetY = padding + ((availableHeight - scaledHeight) / 2);
+            offsetY = padding + (availableHeight - scaledHeight) / 2;
         }
 
         // Draw the bitmap with pixel-perfect scaling using nearest-neighbor
@@ -380,23 +383,23 @@ public class Apple2TextScreen : Control
                 for (int row = 0; row < charHeight; row++)
                 {
                     byte rowData = charBitmap[row];
-                    int screenY = (y * charHeight) + row;
+                    int screenY = y * charHeight + row;
 
                     // For each pixel in the row (7 pixels wide)
                     for (int col = 0; col < charWidth; col++)
                     {
                         // Extract pixel from rowData (LSB = leftmost pixel)
-                        bool isPixelSet = (rowData & (1 << (col))) == 0;
+                        bool isPixelSet = (rowData & 1 << col) == 0;
 
                         // Calculate screen X position
-                        int screenX = Use80Cols ? (x * charWidth) : (x * charWidth * 2);
+                        int screenX = Use80Cols ? x * charWidth : x * charWidth * 2;
 
                         // If 40-column mode, double the pixel width
                         int pixelCount = Use80Cols ? 1 : 2;
 
                         for (int p = 0; p < pixelCount; p++)
                         {
-                            int finalScreenX = screenX + (col * pixelCount) + p;
+                            int finalScreenX = screenX + col * pixelCount + p;
 
                             // Bounds check
                             if (finalScreenX >= bitmapWidth || screenY >= bitmapHeight)
@@ -441,7 +444,7 @@ public class Apple2TextScreen : Control
         address -= 0x400;
 
         var macroline_x = address % 128; // 0-127 (0-119 visible, 120-127 screen hole)
-        var macroline_y = (address / 128); // 0-7
+        var macroline_y = address / 128; // 0-7
 
         if (macroline_x >= 120) // screen hole
         {
@@ -449,9 +452,9 @@ public class Apple2TextScreen : Control
         }
 
         int section = macroline_x / 40;  // 0-2
-        int row = macroline_y + (8 * section); // 0-23
+        int row = macroline_y + 8 * section; // 0-23
 
-        return (macroline_x % 40) + (40 * row);
+        return macroline_x % 40 + 40 * row;
     }
 
     private VA2M? _machine;
@@ -508,7 +511,7 @@ public class Apple2TextScreen : Control
         // Handle control-key combinations to generate control codes (Ctrl+A =>0x01 ... Ctrl+Z =>0x1A)
         if ((e.KeyModifiers & KeyModifiers.Control) !=0 && e.Key >= Key.A && e.Key <= Key.Z)
         {
-            byte ctrl = (byte)((int)(e.Key - Key.A) +1);
+            byte ctrl = (byte)(e.Key - Key.A +1);
             byte value = (byte)(ctrl |0x80);
             _machine.InjectKey(value);
             e.Handled = true;

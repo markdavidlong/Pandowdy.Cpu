@@ -8,7 +8,7 @@ using DiskArc;
 using DiskArc.Multi;
 using static DiskArc.Defs;
 
-namespace pandowdy;
+namespace Pandowdy.UI;
 
 /// <summary>
 /// Temporary class for testing disk read functionality.
@@ -164,13 +164,13 @@ public class DiskReadTestTemp
     {
         // We could dive into each one, but for this simple example we'll just list them.
         mAppendText("Found multi-part image with " + partitions.Count + " partitions:\n");
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         foreach (Partition part in partitions)
         {
             sb.Clear();
             sb.AppendFormat("  start={0,-9} count={1,-9}",
                 part.StartOffset / BLOCK_SIZE, part.Length / BLOCK_SIZE);
-            APM_Partition? apmPart = part as APM_Partition;
+            var apmPart = part as APM_Partition;
             if (apmPart != null)
             {
                 sb.AppendFormat(" name='{0}' type='{1}'",

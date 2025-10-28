@@ -1,7 +1,7 @@
 ﻿using Avalonia;
 using System;
 
-namespace pandowdy;
+namespace Pandowdy.UI;
 
 class Program
 {

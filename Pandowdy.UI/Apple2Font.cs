@@ -1,7 +1,7 @@
 using System;
 using System.Reflection;
 
-namespace pandowdy;
+namespace Pandowdy.UI;
 
 /// <summary>
 /// Apple II Enhanced Video ROM font data.
@@ -37,13 +37,13 @@ public static class Apple2Font
     private static byte[] LoadFontRom()
     {
         // Try multiple possible resource names since the exact path depends on project structure
-        string[] possibleResourceNames = new[]
-        {
+        string[] possibleResourceNames =
+        [
             "Pandowdy.UI.Resources.a2e_enh_video.rom",  // Correct name
             "pandowdy.Resources.a2e_enh_video.rom",
             "pandowdy.a2e_enh_video.rom",
             "a2e_enh_video.rom"
-        };
+        ];
 
         const int fontSize = 2048;
         const int fileSize = 4096;
@@ -52,29 +52,27 @@ public static class Apple2Font
 
         foreach (var resourceName in possibleResourceNames)
         {
-            using (var stream = assembly.GetManifestResourceStream(resourceName))
+            using var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream != null)
             {
-                if (stream != null)
+                // Verify file size
+                if (stream.Length != fileSize)
                 {
-                    // Verify file size
-                    if (stream.Length != fileSize)
-                    {
-                        throw new InvalidOperationException(
-                            $"Font ROM '{resourceName}' is {stream.Length} bytes, expected {fileSize} bytes.");
-                    }
-
-                    // Read only the first 2048 bytes (256 characters)
-                    var fontData = new byte[fontSize];
-                    int bytesRead = stream.Read(fontData, 0, fontSize);
-
-                    if (bytesRead != fontSize)
-                    {
-                        throw new InvalidOperationException(
-                            $"Read {bytesRead} bytes, expected {fontSize} bytes from font ROM.");
-                    }
-
-                    return fontData;
+                    throw new InvalidOperationException(
+                        $"Font ROM '{resourceName}' is {stream.Length} bytes, expected {fileSize} bytes.");
                 }
+
+                // Read only the first 2048 bytes (256 characters)
+                var fontData = new byte[fontSize];
+                int bytesRead = stream.Read(fontData, 0, fontSize);
+
+                if (bytesRead != fontSize)
+                {
+                    throw new InvalidOperationException(
+                        $"Read {bytesRead} bytes, expected {fontSize} bytes from font ROM.");
+                }
+
+                return fontData;
             }
         }
 
