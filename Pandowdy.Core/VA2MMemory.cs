@@ -1,4 +1,5 @@
 using System;
+using System.Security.Authentication.ExtendedProtection;
 using Emulator;
 
 namespace Pandowdy.Core;
@@ -79,12 +80,17 @@ public sealed class VA2MMemory(int startAddress, int size, VA2MMemory.MemAccessT
 
     public void Write(ushort address, byte data)
     {
+        Write(address, data, false);
+    }
+
+    public void Write(ushort address, byte data, bool force)
+    {
         if (!InRange(address))
         {
             return;
         }
 
-        if (accessType == MemAccessType.ReadOnly)
+        if (!force && accessType == MemAccessType.ReadOnly)
         {
             return;
         }
