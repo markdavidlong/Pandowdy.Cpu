@@ -22,8 +22,9 @@ public partial class MainWindow : Window
     private DiskReadTestTemp? mDiskReadTest;
     private string mLastDiskPath = "E:\\develop\\Pandowdy";
 
-    private VA2M _machine = new();
+    private VA2M _machine; // acquired from DI
     private CancellationTokenSource? _emuCts;
+    private Task? _emuTask;
     private TextBox? _outputTextBox;
     private MenuItem? _throttleMenuItem;
     private MenuItem? _capsLockMenuItem;
@@ -37,6 +38,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Retrieve DI-provided machine
+        var app = (App?)Application.Current;
+        _machine = (VA2M)app!.Services.GetService(typeof(VA2M))!;
+
         _outputTextBox = this.FindControl<TextBox>("OutputTextBox");
         _throttleMenuItem = this.FindControl<MenuItem>("ThrottleMenuItem");
         _capsLockMenuItem = this.FindControl<MenuItem>("CapsLockMenuItem");
@@ -49,24 +54,20 @@ public partial class MainWindow : Window
             _mainMenu.PointerExited += (_, __) => _menuPointerActive = false;
         }
 
-        // Wire emulator memory to the Apple2TextScreen via machine's mapped RAM
         _screen = this.FindControl<Apple2TextScreen>("ScreenDisplay");
         if (_screen != null)
         {
             _screen.MemorySource = _machine.RamMapped;
             _screen.AttachMachine(_machine);
+            if (_machine.Bus is VA2MBus bus)
+            {
+                _screen.SubscribeToVBlank(bus);
+            }
             _screen.Focus();
         }
 
-        // Initialize menu states
-        if (_throttleMenuItem != null)
-        {
-            _throttleMenuItem.IsChecked = _machine.ThrottleEnabled;
-        }
-        if (_capsLockMenuItem != null)
-        {
-            _capsLockMenuItem.IsChecked = _capsLockEnabled;
-        }
+        if (_throttleMenuItem != null) _throttleMenuItem.IsChecked = _machine.ThrottleEnabled;
+        if (_capsLockMenuItem != null) _capsLockMenuItem.IsChecked = _capsLockEnabled;
     }
 
     private void InitializeComponent()
@@ -99,9 +100,8 @@ public partial class MainWindow : Window
         {
             _screen.UnsubscribeFromVBlank(bus);
         }
-        base.OnClosed(e);
         StopEmulator();
-        _machine.Dispose();
+        base.OnClosed(e);
     }
 
     protected override void OnGotFocus(GotFocusEventArgs e)
@@ -153,26 +153,32 @@ public partial class MainWindow : Window
 
     private async void OnEmuStartClicked(object? sender, RoutedEventArgs e)
     {
-        if (_emuCts != null) // already running
-        { return; }
+        if (_emuCts != null) return; // already running
 
         _machine.Reset();
 
         _emuCts = new CancellationTokenSource();
-        try
+        var token = _emuCts.Token;
+        _emuTask = Task.Run(async () =>
         {
-            // run at1ms slices
-            await _machine.RunAsync(_emuCts.Token,60 /*1000*/);
-        }
-        catch (OperationCanceledException)
+            try
+            {
+                await _machine.RunAsync(token, 60).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) { }
+        });
+
+        // Optionally observe completion (fire-and-forget)
+        _ = _emuTask.ContinueWith(t =>
         {
-            // ignore
-        }
-        finally
-        {
-            _emuCts.Dispose();
-            _emuCts = null;
-        }
+            // Cleanup after exit
+            Dispatcher.UIThread.Post(() =>
+            {
+                _emuCts?.Dispose();
+                _emuCts = null;
+                _emuTask = null;
+            });
+        });
     }
 
     private void OnEmuStopClicked(object? sender, RoutedEventArgs e)
@@ -187,6 +193,8 @@ public partial class MainWindow : Window
 
     private void OnEmuStepOnceClicked(object? sender, RoutedEventArgs e)
     {
+        // Prevent stepping while background thread running
+        if (_emuCts != null) return;
         _machine.Clock();
     }
 
@@ -210,7 +218,8 @@ public partial class MainWindow : Window
 
     private void StopEmulator()
     {
-        _emuCts?.Cancel();
+        if (_emuCts == null) return;
+        _emuCts.Cancel();
     }
 
     // Window-level key handling for accelerators when child controls have focus.

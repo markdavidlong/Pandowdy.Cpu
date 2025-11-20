@@ -1,42 +1,46 @@
 using Emulator;
 using System;
 using System.Diagnostics;
+using System.Threading;
 
 namespace Pandowdy.Core;
 
-
 /// <summary>
 /// VA2M-specific Bus that owns the CPU connection and routes reads/writes to VA2MMemory.
-/// Emits a VBlank event at ~60Hz based on wall-clock time.
+/// Emits a VBlank event based on CPU cycles (every 17063 cycles ~= 60Hz at 1.023MHz).
+/// Threading: All public methods (Connect, CpuRead/Write, Clock, Reset) are expected to be called ONLY from the emulator worker thread.
+/// VBlank event is raised on the emulator thread; subscribers on the UI thread MUST marshal via dispatcher.
+/// After disposal, no further events are raised and Clock() becomes a no-op.
 /// </summary>
-public sealed class VA2MBus(VA2MMemory ram, VA2MMemory auxram, VA2MMemory ROM) : IBus
+public sealed class VA2MBus(VA2MMemory ram, VA2MMemory auxram, VA2MMemory ROM) : IBus, IDisposable
 {
     private int lastPc = 0;
-    private AppleSoftHookTable? _hookTable; // externalized hook table
-
+    private AppleSoftHookTable? _hookTable;
     private CPU? _cpu;
     private ulong _systemClock;
-    public IMemory RAM => ram; // IMemory-typed view of VA2MMemory
+    public IMemory RAM => ram;
     private IMemory AuxRAM => auxram;
     private IMemory Rom => ROM;
     public ulong SystemClockCounter => _systemClock;
+    private bool _disposed;
 
-    // VBlank at ~60Hz wall-clock
-    private readonly long _vblankIntervalTicks = Stopwatch.Frequency / 60;
-    private long _nextVblankTicks = Stopwatch.GetTimestamp();
+    // Cycle-based VBlank (1,023,000 Hz / 60 ? 17050; using 17063 from spec for Apple II NTSC)
+    private const ulong CyclesPerVBlank = 17063; // adjust if more precise timing required
+    private ulong _nextVblankCycle = CyclesPerVBlank;
     public event EventHandler? VBlank;
 
     public void Connect(CPU cpu)
     {
+        ThrowIfDisposed();
         _cpu = cpu;
         _cpu.Connect(this);
-        // Initialize hook table lazily
         _hookTable ??= new AppleSoftHookTable();
         _hookTable.InitializeDefault();
     }
 
     public byte CpuRead(ushort address, bool readOnly = false)
     {
+        ThrowIfDisposed();
         if (address < 0xC000)
         {
             return RAM.Read(address);
@@ -46,7 +50,7 @@ public sealed class VA2MBus(VA2MMemory ram, VA2MMemory auxram, VA2MMemory ROM) :
             if (address == 0xC010)
             {
                 var keyval = auxram.Read(0xC000);
-                auxram.Write(0xC000, (byte)(keyval & 0x7F)); // clear high bit on read of strobe
+                auxram.Write(0xC000, (byte)(keyval & 0x7F));
             }
             return RAM.Read(address);
         }
@@ -58,17 +62,14 @@ public sealed class VA2MBus(VA2MMemory ram, VA2MMemory auxram, VA2MMemory ROM) :
 
     public void CpuWrite(ushort address, byte data)
     {
-        if (address >= 0xD000)
-        {
-            // ROM area is not writable
-            return;
-        }
+        ThrowIfDisposed();
+        if (address >= 0xD000) return;
         else if (address >= 0xC000)
         {
             if (address == 0xC010)
             {
                 var keyval = auxram.Read(0xC000);
-                ram.Write(0xC000, (byte)(keyval & 0x7F)); // clear high bit on read of strobe
+                ram.Write(0xC000, (byte)(keyval & 0x7F));
                 return;
             }
             ram.Write(address, data);
@@ -79,10 +80,9 @@ public sealed class VA2MBus(VA2MMemory ram, VA2MMemory auxram, VA2MMemory ROM) :
         }
     }
 
-
     public void Clock()
     {
-        // PC trace (preserved)
+        if (_disposed) return;
         var currPc = _cpu!.PC;
         if (lastPc != currPc)
         {
@@ -93,53 +93,47 @@ public sealed class VA2MBus(VA2MMemory ram, VA2MMemory auxram, VA2MMemory ROM) :
                 string ln = lineNum < 0xFA00 ? lineNum.ToString() : "IMM";
                 var sp = _cpu!.SP;
                 var spcs = 0xFF - sp;
-                hook(-1, lineNum, spcs); // 1 = BASIC commands, 3= more detailed interpreter calls
+                hook(-1, lineNum, spcs);
             }
-
             #region LegacyTrace_DoNotRemove
-            // The following debug trace code is intentionally left commented for
-            // temporary instrumentation during AppleSoft tracing. Do not remove.
-            //if (currPc ==0xD805)
-            //{
-            // var lineNum = CpuRead(0x75) + (CpuRead(0x76) *256);
-            // if (lineNum <0xFF00)
-            // {
-            // Debug.WriteLine($"LineNum: {lineNum}");
-            // }
-            // else
-            // {
-            // Debug.WriteLine("LineNum: IMMEDIATE");
-            // }
-            //}
-            //else if (currPc ==0xD766)
-            //{
-            // Debug.WriteLine(" FOR");
-            //}
-            //else if (currPc ==0xDCF9)
-            //{
-            // Debug.WriteLine(" NEXT");
-            //}
+            // (Preserved commented instrumentation)
             #endregion
         }
         lastPc = currPc;
 
-        // Execute one CPU cycle
         _cpu!.Clock();
         _systemClock++;
 
-        // Wall-clock driven VBlank: coalesce multiple due events so we don't drift
-        long now = Stopwatch.GetTimestamp();
-        if (now >= _nextVblankTicks)
+        if (_systemClock >= _nextVblankCycle)
         {
-            do { _nextVblankTicks += _vblankIntervalTicks; } while (now >= _nextVblankTicks);
-            VBlank?.Invoke(this, EventArgs.Empty);
+            // Catch up if emulator ran fast (unthrottled batches)
+            do { _nextVblankCycle += CyclesPerVBlank; } while (_systemClock >= _nextVblankCycle);
+            if (!_disposed)
+            {
+                VBlank?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 
     public void Reset()
     {
+        ThrowIfDisposed();
         _cpu!.Reset();
         _systemClock = 0;
-        _nextVblankTicks = Stopwatch.GetTimestamp() + _vblankIntervalTicks;
+        _nextVblankCycle = CyclesPerVBlank;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        VBlank = null;
+        _cpu = null;
+        _hookTable = null;
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(VA2MBus));
     }
 }

@@ -48,6 +48,7 @@ public class Apple2TextScreen : Control
 
     private IFrameProvider? _frameProvider;
     private byte[]? _lastFrame;
+    private DispatcherTimer? _refreshTimer; // wall-clock display timer (?60Hz)
 
     /// <summary>
     /// Optional mapped memory source this screen listens to for write notifications.
@@ -104,6 +105,22 @@ public class Apple2TextScreen : Control
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
         TextInput += OnTextInput; // use text input to get proper ASCII with layout
+        // 60Hz wall-clock render cadence
+        _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000.0 / 60.0) };
+        _refreshTimer.Tick += (_, __) =>
+        {
+            if (_frameProvider != null && _lastFrame != null)
+            {
+                // Redraw current frame snapshot
+                InvalidateVisual();
+            }
+            else if (_dirty)
+            {
+                // Fallback legacy path still uses dirty tracking
+                InvalidateVisual();
+            }
+        };
+        _refreshTimer.Start();
     }
 
     /// <summary>
@@ -134,7 +151,11 @@ public class Apple2TextScreen : Control
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-        // Ensure we don't keep event handlers alive after control is detached
+        if (_refreshTimer != null)
+        {
+            _refreshTimer.Stop();
+            _refreshTimer = null;
+        }
         if (_vblankBus != null)
         {
             _vblankBus.VBlank -= OnVBlank;
@@ -143,6 +164,10 @@ public class Apple2TextScreen : Control
         if (_memorySource != null)
         {
             DetachMemory(_memorySource);
+        }
+        if (_frameProvider != null)
+        {
+            _frameProvider.FrameAvailable -= OnFrameAvailable;
         }
     }
 
@@ -277,8 +302,9 @@ public class Apple2TextScreen : Control
 
     private void OnFrameAvailable(object? sender, EventArgs e)
     {
+        // Worker thread invokes this; just update buffer reference, do not invalidate here.
         _lastFrame = _frameProvider?.GetFrame();
-        InvalidateVisual();
+        // UI will redraw on next 60Hz tick.
     }
 
     /// <summary>
@@ -378,9 +404,7 @@ public class Apple2TextScreen : Control
                 unsafe
                 {
                     byte* dst = (byte*)fb.Address;
-                    int stridePixels = 561; // existing width assumption
-                    // Simple upscale: each source byte represents 7 pixels; we approximate to 7 wide *2 vertical scaling
-                    // For now render each bit as white pixel horizontally; duplicate vertically to 2 rows.
+                    int stridePixels = 561;
                     for (int y = 0; y < _frameProvider.Height; y++)
                     {
                         int outYTop = y * 2;
@@ -390,7 +414,7 @@ public class Apple2TextScreen : Control
                             byte bits = _lastFrame[y * 80 + xByte];
                             for (int bit = 0; bit < 7; bit++)
                             {
-                                bool on = (bits & (1 << bit)) == 0; // Apple2 inverted logic retained
+                                bool on = (bits & (1 << bit)) == 0;
                                 int outX = xByte * 7 + bit;
                                 if (outX >= 561) break;
                                 uint color = on ? 0xFFFFFFFFu : 0xFF000000u;
@@ -404,7 +428,7 @@ public class Apple2TextScreen : Control
             DrawBitmapScaled(context);
             return;
         }
-        // fallback to existing path
+        // fallback legacy path
         if (Bitmap == null)
         {
             context.FillRectangle(new SolidColorBrush(Colors.Black), new Rect(Bounds.Size));
