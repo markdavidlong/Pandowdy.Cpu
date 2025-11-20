@@ -57,12 +57,14 @@ public partial class MainWindow : Window
         _screen = this.FindControl<Apple2TextScreen>("ScreenDisplay");
         if (_screen != null)
         {
-            _screen.MemorySource = _machine.RamMapped;
             _screen.AttachMachine(_machine);
             if (_machine.Bus is VA2MBus bus)
             {
-                _screen.SubscribeToVBlank(bus);
+                _screen.SubscribeToVBlank(bus); // will be disabled if frame provider attached
             }
+            // Attach frame provider from DI
+            var frameProvider = (IFrameProvider)app!.Services.GetService(typeof(IFrameProvider))!;
+            _screen.AttachFrameProvider(frameProvider);
             _screen.Focus();
         }
 

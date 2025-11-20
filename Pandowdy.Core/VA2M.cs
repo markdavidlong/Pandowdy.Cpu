@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Emulator;
+using System.Reflection.Metadata.Ecma335;
 
 namespace Pandowdy.Core;
 
@@ -51,30 +52,54 @@ public sealed class VA2M : IDisposable
         }
     }
 
+    public bool Use80Cols { get; set; } = false; // text mode flag mirrored from UI
+
     private void OnVBlank(object? sender, EventArgs e)
     {
         if (_frameSink is null) return;
         var buf = _frameSink.BorrowWritable();
         Array.Clear(buf, 0, buf.Length);
-        // Compose text page into 80x192 buffer: each 40-col char -> two horizontal bytes (duplicated), each font row 7 bits used.
         for (int addr = 0x400; addr < 0x800; addr++)
         {
             int off = AddressToOffset(addr);
             if (off < 0) continue;
             int col = off % 40;
-            int row = off / 40; // 0-23
+            int row = off / 40;
             byte ch = RamModel.Read((ushort)addr);
-            ch &= 0x7F; // strip high bit
             var glyph = VideoFont.Glyph(ch);
             for (int r = 0; r < 8; r++)
             {
                 int y = row * 8 + r;
                 if (y >= _frameSink.Height) break;
-                byte fontRow = glyph[r];
+                byte fontRow = (byte) (glyph[r]); 
                 int baseX = col * 2;
-                if (baseX + 1 >= _frameSink.Width) break;
-                buf[y * _frameSink.Width + baseX] = fontRow;
-                buf[y * _frameSink.Width + baseX + 1] = fontRow; // duplicate for 40-col widening
+                if (!Use80Cols)
+                {
+                    // 40-column mode: expand each bit (MSB first) into two horizontal bits forming 16-bit pattern
+                    // Pattern: 0xXABCDEFG becomes 0x0AABBCCD, 0x0DEEFFGG (or 0x0AABBCCD0DEEFFGG as a word)
+                    if (baseX + 1 >= _frameSink.Width) break;
+
+                    byte hi = 0xff;
+                    byte lo = 0xff;
+                    
+                    if ((fontRow & 0x01) == 0) { hi &= 0b11111100;                    }
+                    if ((fontRow & 0x02) == 0) { hi &= 0b11110011;                    }
+                    if ((fontRow & 0x04) == 0) { hi &= 0b11001111;                    }
+                    if ((fontRow & 0x08) == 0) { hi &= 0b10111111; lo &= 0b11111110;  }
+                    if ((fontRow & 0x10) == 0) {                   lo &= 0b11111001;  }
+                    if ((fontRow & 0x20) == 0) {                   lo &= 0b11100111;  }
+                    if ((fontRow & 0x40) == 0) {                   lo &= 0b10011111;  }
+
+
+                    buf[y * _frameSink.Width + baseX] = hi;
+                    buf[y * _frameSink.Width + baseX + 1] = lo;
+                }
+                else
+                {
+                    // 80-column mode: single 8-bit glyph row per character (use first slot)
+                    if (baseX >= _frameSink.Width) break;
+                    buf[y * _frameSink.Width + baseX] = fontRow;
+                }
             }
         }
         _frameSink.CommitWritable();
@@ -86,7 +111,9 @@ public sealed class VA2M : IDisposable
         address -= 0x400;
         var macroline_x = address % 128;
         var macroline_y = address / 128;
-        if (macroline_x >= 120) return -1;
+        // Return -1 for screen holes.
+        if (macroline_x >= 120)
+            return -1; 
         int section = macroline_x / 40;
         int row = macroline_y + 8 * section;
         return macroline_x % 40 + 40 * row;

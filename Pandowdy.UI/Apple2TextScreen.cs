@@ -129,23 +129,23 @@ public class Apple2TextScreen : Control
     public Apple2TextScreen(IMappedMemory memory)
     : this()
     {
-        MemorySource = memory;
+        //MemorySource = memory;
     }
 
     private void AttachMemory(IMappedMemory? source)
     {
-        if (source == null) return;
-        source.MemoryWritten += OnMemoryWritten;
-        source.MemoryBlockWritten += OnMemoryBlockWritten;
-        // initial full refresh
-        MarkAllCellsDirty();
+        //if (source == null) return;
+        //source.MemoryWritten += OnMemoryWritten;
+        //source.MemoryBlockWritten += OnMemoryBlockWritten;
+        //// initial full refresh
+        //MarkAllCellsDirty();
     }
 
     private void DetachMemory(IMappedMemory? source)
     {
-        if (source == null) return;
-        source.MemoryWritten -= OnMemoryWritten;
-        source.MemoryBlockWritten -= OnMemoryBlockWritten;
+        //if (source == null) return;
+        //source.MemoryWritten -= OnMemoryWritten;
+        //source.MemoryBlockWritten -= OnMemoryBlockWritten;
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -173,120 +173,120 @@ public class Apple2TextScreen : Control
 
     private void MarkAllCellsDirty()
     {
-        lock (_dirtyLock)
-        {
-            for (int i =0; i < _cellDirty.Length; i++) _cellDirty[i] = true;
-            _dirty = true;
-        }
+        //lock (_dirtyLock)
+        //{
+        //    for (int i =0; i < _cellDirty.Length; i++) _cellDirty[i] = true;
+        //    _dirty = true;
+        //}
     }
 
     public void SubscribeToVBlank(VA2MBus bus)
     {
-        if (!ReferenceEquals(_vblankBus, bus))
-        {
-            if (_vblankBus != null) _vblankBus.VBlank -= OnVBlank;
-            _vblankBus = bus;
-            _vblankBus.VBlank += OnVBlank;
-        }
+        //if (!ReferenceEquals(_vblankBus, bus))
+        //{
+        //    if (_vblankBus != null) _vblankBus.VBlank -= OnVBlank;
+        //    _vblankBus = bus;
+        //    _vblankBus.VBlank += OnVBlank;
+        //}
     }
 
     public void UnsubscribeFromVBlank(VA2MBus bus)
     {
-        if (ReferenceEquals(_vblankBus, bus))
-        {
-            _vblankBus.VBlank -= OnVBlank;
-            _vblankBus = null;
-        }
+        //if (ReferenceEquals(_vblankBus, bus))
+        //{
+        //    _vblankBus.VBlank -= OnVBlank;
+        //    _vblankBus = null;
+        //}
     }
 
     private void OnVBlank(object? sender, EventArgs e)
     {
-        if (!_dirty) return;
-        if (_applyScheduled) return; // coalesce if a post is already queued
-        _applyScheduled = true;
-        Dispatcher.UIThread.Post(() =>
-        {
-            _applyScheduled = false;
-            ApplyDirtyAndInvalidate();
-        }, DispatcherPriority.Render);
+        //if (!_dirty) return;
+        //if (_applyScheduled) return; // coalesce if a post is already queued
+        //_applyScheduled = true;
+        //Dispatcher.UIThread.Post(() =>
+        //{
+        //    _applyScheduled = false;
+        //    ApplyDirtyAndInvalidate();
+        //}, DispatcherPriority.Render);
     }
 
     private void ApplyDirtyAndInvalidate()
     {
-        if (!IsEffectivelyVisible || _memorySource == null) { _dirty = false; return; }
-        bool any = false;
-        // Walk text page addresses; draw only dirty cells
-        for (int addr =0x400; addr <0x800; addr++)
-        {
-            int off = AddressToOffset(addr);
-            if (off <0) continue;
-            bool consume;
-            lock (_dirtyLock)
-            {
-                consume = _cellDirty[off];
-                if (consume) _cellDirty[off] = false; // consume under lock to avoid missing late writes
-            }
-            if (!consume) continue;
-            int x = off %40;
-            int y = off /40;
-            byte val = _memorySource.Read((ushort)addr);
-            SetChar(x, y, val);
-            any = true;
-        }
-        if (any)
-        {
-            InvalidateVisual();
-        }
-        _dirty = false;
+        //if (!IsEffectivelyVisible || _memorySource == null) { _dirty = false; return; }
+        //bool any = false;
+        //// Walk text page addresses; draw only dirty cells
+        //for (int addr =0x400; addr <0x800; addr++)
+        //{
+        //    int off = AddressToOffset(addr);
+        //    if (off <0) continue;
+        //    bool consume;
+        //    lock (_dirtyLock)
+        //    {
+        //        consume = _cellDirty[off];
+        //        if (consume) _cellDirty[off] = false; // consume under lock to avoid missing late writes
+        //    }
+        //    if (!consume) continue;
+        //    int x = off %40;
+        //    int y = off /40;
+        //    byte val = _memorySource.Read((ushort)addr);
+        //    SetChar(x, y, val);
+        //    any = true;
+        //}
+        //if (any)
+        //{
+        //    InvalidateVisual();
+        //}
+        //_dirty = false;
     }
 
     private void OnMemoryWritten(object? sender, MemoryAccessEventArgs e)
     {
         // Record dirtiness only; no UI thread marshalling per write
-        if (e.Address >=0x400 && e.Address <0x800)
-        {
-            int off = AddressToOffset(e.Address);
-            if (off >=0)
-            {
-                lock (_dirtyLock) { _cellDirty[off] = true; }
-                _dirty = true;
-            }
-        }
+        //if (e.Address >=0x400 && e.Address <0x800)
+        //{
+        //    int off = AddressToOffset(e.Address);
+        //    if (off >=0)
+        //    {
+        //        lock (_dirtyLock) { _cellDirty[off] = true; }
+        //        _dirty = true;
+        //    }
+        //}
     }
 
     private void OnMemoryBlockWritten(object? sender, MemoryAccessEventArgs e)
     {
-        int start = e.Address;
-        int end = e.Address + e.Length;
-        for (int addr = start; addr < end; addr++)
-        {
-            if (addr >=0x400 && addr <0x800)
-            {
-                int off = AddressToOffset(addr);
-                if (off >=0)
-                {
-                    lock (_dirtyLock) { _cellDirty[off] = true; }
-                    _dirty = true;
-                }
-            }
-        }
+        //int start = e.Address;
+        //int end = e.Address + e.Length;
+        //for (int addr = start; addr < end; addr++)
+        //{
+        //    if (addr >=0x400 && addr <0x800)
+        //    {
+        //        int off = AddressToOffset(addr);
+        //        if (off >=0)
+        //        {
+        //            lock (_dirtyLock) { _cellDirty[off] = true; }
+        //            _dirty = true;
+        //        }
+        //    }
+        //}
     }
 
     private void UpdateScreenBlock(int start, int end)
     {
-        // No immediate drawing here; VBlank will handle rendering of dirty cells
-        for (int addr = start; addr < end; addr++)
-        {
-            if (addr >=0x400 && addr <0x800)
-            {
-                int off = AddressToOffset(addr);
-                if (off >=0)
-                {
-                    lock (_dirtyLock) { _cellDirty[off] = true; }
-                    _dirty = true;
-                }
-            }
-        }
+        //// No immediate drawing here; VBlank will handle rendering of dirty cells
+        //for (int addr = start; addr < end; addr++)
+        //{
+        //    if (addr >=0x400 && addr <0x800)
+        //    {
+        //        int off = AddressToOffset(addr);
+        //        if (off >=0)
+        //        {
+        //            lock (_dirtyLock) { _cellDirty[off] = true; }
+        //            _dirty = true;
+        //        }
+        //    }
+        //}
     }
 
     public void AttachFrameProvider(IFrameProvider provider)
@@ -298,6 +298,18 @@ public class Apple2TextScreen : Control
         _frameProvider = provider;
         _frameProvider.FrameAvailable += OnFrameAvailable;
         _lastFrame = _frameProvider.GetFrame();
+        // Disable legacy incremental text rendering once frame provider active
+        if (_vblankBus != null)
+        {
+            _vblankBus.VBlank -= OnVBlank;
+            _vblankBus = null;
+        }
+        if (_memorySource != null)
+        {
+            DetachMemory(_memorySource);
+            _memorySource = null;
+        }
+        _dirty = false; // stop dirty tracking
     }
 
     private void OnFrameAvailable(object? sender, EventArgs e)
@@ -499,113 +511,113 @@ public class Apple2TextScreen : Control
     /// <exception cref="ArgumentOutOfRangeException">If coordinates are out of valid range</exception>
     public void SetChar(int x, int y, byte val)
     {
-        // Validate x coordinate based on mode
-        int maxX = Use80Cols ? 79 : 39;
-        if (x < 0 || x > maxX)
-        {
-            throw new ArgumentOutOfRangeException(nameof(x),
-            $"X coordinate must be between0 and {maxX} (Use80Cols={Use80Cols})");
-        }
+        //// Validate x coordinate based on mode
+        //int maxX = Use80Cols ? 79 : 39;
+        //if (x < 0 || x > maxX)
+        //{
+        //    throw new ArgumentOutOfRangeException(nameof(x),
+        //    $"X coordinate must be between0 and {maxX} (Use80Cols={Use80Cols})");
+        //}
 
-        // Validate y coordinate
-        if (y < 0 || y > 23)
-        {
-            throw new ArgumentOutOfRangeException(nameof(y), "Y coordinate must be between0 and23");
-        }
+        //// Validate y coordinate
+        //if (y < 0 || y > 23)
+        //{
+        //    throw new ArgumentOutOfRangeException(nameof(y), "Y coordinate must be between0 and23");
+        //}
 
-        // Cannot modify bitmap if it's not a WriteableBitmap
-        if (Bitmap is not WriteableBitmap writableBitmap)
-        {
-            return;
-        }
+        //// Cannot modify bitmap if it's not a WriteableBitmap
+        //if (Bitmap is not WriteableBitmap writableBitmap)
+        //{
+        //    return;
+        //}
 
-        const int bitmapWidth = 561;
-        const int bitmapHeight = 384;
-        const int charWidth = 7;
-        const int charHeight = 8;
+        //const int bitmapWidth = 561;
+        //const int bitmapHeight = 384;
+        //const int charWidth = 7;
+        //const int charHeight = 8;
 
-        // Get the character bitmap data from the font ROM
-        byte[] charBitmap = Apple2Font.GetCharacterBitmap(val);
+        //// Get the character bitmap data from the font ROM
+        //byte[] charBitmap = Apple2Font.GetCharacterBitmap(val);
 
-        // Lock the bitmap for pixel access
-        using (var frameBuffer = writableBitmap.Lock())
-        {
-            unsafe
-            {
-                byte* pixelPtr = (byte*) frameBuffer.Address;
+        //// Lock the bitmap for pixel access
+        //using (var frameBuffer = writableBitmap.Lock())
+        //{
+        //    unsafe
+        //    {
+        //        byte* pixelPtr = (byte*) frameBuffer.Address;
 
-                // For each row of the character
-                for (int row = 0; row < charHeight; row++)
-                {
-                    byte rowData = charBitmap[row];
-                    int screenY = y * charHeight + row;
+        //        // For each row of the character
+        //        for (int row = 0; row < charHeight; row++)
+        //        {
+        //            byte rowData = charBitmap[row];
+        //            int screenY = y * charHeight + row;
 
-                    // For each pixel in the row (7 pixels wide)
-                    for (int col = 0; col < charWidth; col++)
-                    {
-                        // Extract pixel from rowData (LSB = leftmost pixel)
-                        bool isPixelSet = (rowData & 1 << col) == 0;
+        //            // For each pixel in the row (7 pixels wide)
+        //            for (int col = 0; col < charWidth; col++)
+        //            {
+        //                // Extract pixel from rowData (LSB = leftmost pixel)
+        //                bool isPixelSet = (rowData & 1 << col) == 0;
 
-                        // Calculate screen X position
-                        int screenX = Use80Cols ? x * charWidth : x * charWidth * 2;
+        //                // Calculate screen X position
+        //                int screenX = Use80Cols ? x * charWidth : x * charWidth * 2;
 
-                        // If40-column mode, double the pixel width
-                        int pixelCount = Use80Cols ? 1 : 2;
+        //                // If40-column mode, double the pixel width
+        //                int pixelCount = Use80Cols ? 1 : 2;
 
-                        for (int p = 0; p < pixelCount; p++)
-                        {
-                            int finalScreenX = screenX + col * pixelCount + p;
+        //                for (int p = 0; p < pixelCount; p++)
+        //                {
+        //                    int finalScreenX = screenX + col * pixelCount + p;
 
-                            // Bounds check
-                            if (finalScreenX < bitmapWidth && screenY < bitmapHeight)
-                            {
-                                // Calculate pixel index in BGRA format (4 bytes per pixel)
-                                int pixelIndex = (screenY * 2 * bitmapWidth + finalScreenX) * 4;
+        //                    // Bounds check
+        //                    if (finalScreenX < bitmapWidth && screenY < bitmapHeight)
+        //                    {
+        //                        // Calculate pixel index in BGRA format (4 bytes per pixel)
+        //                        int pixelIndex = (screenY * 2 * bitmapWidth + finalScreenX) * 4;
 
-                                // Set BGRA values (B, G, R, A)
-                                byte colorValue = isPixelSet ? (byte) 255 : (byte) 0;
-                                pixelPtr[pixelIndex + 0] = colorValue; // B
-                                pixelPtr[pixelIndex + 1] = colorValue; // G
-                                pixelPtr[pixelIndex + 2] = colorValue; // R
-                                pixelPtr[pixelIndex + 3] = 255; // A (fully opaque)
-                                pixelPtr[pixelIndex + bitmapWidth * 4 + 0] = colorValue; // B
-                                pixelPtr[pixelIndex + bitmapWidth * 4 + 1] = colorValue; // G
-                                pixelPtr[pixelIndex + bitmapWidth * 4 + 2] = colorValue; // R
-                                pixelPtr[pixelIndex + bitmapWidth * 4 + 3] = 255;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        //                        // Set BGRA values (B, G, R, A)
+        //                        byte colorValue = isPixelSet ? (byte) 255 : (byte) 0;
+        //                        pixelPtr[pixelIndex + 0] = colorValue; // B
+        //                        pixelPtr[pixelIndex + 1] = colorValue; // G
+        //                        pixelPtr[pixelIndex + 2] = colorValue; // R
+        //                        pixelPtr[pixelIndex + 3] = 255; // A (fully opaque)
+        //                        pixelPtr[pixelIndex + bitmapWidth * 4 + 0] = colorValue; // B
+        //                        pixelPtr[pixelIndex + bitmapWidth * 4 + 1] = colorValue; // G
+        //                        pixelPtr[pixelIndex + bitmapWidth * 4 + 2] = colorValue; // R
+        //                        pixelPtr[pixelIndex + bitmapWidth * 4 + 3] = 255;
+        //                    }
+        //                }
+        //            }
+        //        }
+        //    }
+        //}
 
         // Redraw is driven by VBlank
     }
 
     // The returned offset (if >=0) can be interpreted as column = offset %40, row = offset /40
     // TODO: Handle80 columns. Might have to change guard values and constants to handle whatever memory config is used. Forgive the magic numbers for now.
-    private static int AddressToOffset(int address)
-    {
-        if (address < 0x400 || address >= 0x800)
-        {
-            throw new ArgumentOutOfRangeException(nameof(address), "Address must be in range0x400-0x7FF for text screen memory.");
-        }
+    //private static int AddressToOffset(int address)
+    //{
+        //if (address < 0x400 || address >= 0x800)
+        //{
+        //    throw new ArgumentOutOfRangeException(nameof(address), "Address must be in range0x400-0x7FF for text screen memory.");
+        //}
 
-        address -= 0x400;
+        //address -= 0x400;
 
-        var macroline_x = address % 128; //0-127 (0-119 visible,120-127 screen hole)
-        var macroline_y = address / 128; //0-7
+        //var macroline_x = address % 128; //0-127 (0-119 visible,120-127 screen hole)
+        //var macroline_y = address / 128; //0-7
 
-        if (macroline_x >= 120) // screen hole
-        {
-            return -1;
-        }
+        //if (macroline_x >= 120) // screen hole
+        //{
+        //    return -1;
+        //}
 
-        int section = macroline_x / 40; //0-2
-        int row = macroline_y + 8 * section; //0-23
+        //int section = macroline_x / 40; //0-2
+        //int row = macroline_y + 8 * section; //0-23
 
-        return macroline_x % 40 + 40 * row;
-    }
+        //return macroline_x % 40 + 40 * row;
+    //}
 
     private bool GetCapsLockEnabled()
     {
