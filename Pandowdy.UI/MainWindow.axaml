@@ -6,7 +6,7 @@
 		mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
 		x:Class="Pandowdy.UI.MainWindow"
 		Title="Pandowdy"
-		Width="800" Height="600"
+		Width="600" Height="480"
 		MinWidth="600" MinHeight="480"
 		KeyDown="OnWindowKeyDown">
 	<DockPanel>
@@ -37,7 +37,7 @@
 		<!-- Apple2TextScreen centered and scaled to fill available space -->
 		<Grid Background="Black"
 			  DockPanel.Dock="Bottom">
-			<local:Apple2TextScreen x:Name="ScreenDisplay"
+			<local:Apple2Display x:Name="ScreenDisplay"
 									HorizontalAlignment="Center"
 									VerticalAlignment="Center" />
 		</Grid>

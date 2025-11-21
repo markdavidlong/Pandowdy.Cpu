@@ -29,7 +29,7 @@ public partial class MainWindow : Window
     private MenuItem? _throttleMenuItem;
     private MenuItem? _capsLockMenuItem;
     private Menu? _mainMenu;
-    private Apple2TextScreen? _screen;
+    private Apple2Display? _screen;
     private bool _menuPointerActive; // true while pointer is over the menu bar
 
     private bool _capsLockEnabled = true; // default ON
@@ -54,14 +54,11 @@ public partial class MainWindow : Window
             _mainMenu.PointerExited += (_, __) => _menuPointerActive = false;
         }
 
-        _screen = this.FindControl<Apple2TextScreen>("ScreenDisplay");
+        _screen = this.FindControl<Apple2Display>("ScreenDisplay");
         if (_screen != null)
         {
             _screen.AttachMachine(_machine);
-            if (_machine.Bus is VA2MBus bus)
-            {
-                _screen.SubscribeToVBlank(bus); // will be disabled if frame provider attached
-            }
+
             // Attach frame provider from DI
             var frameProvider = (IFrameProvider)app!.Services.GetService(typeof(IFrameProvider))!;
             _screen.AttachFrameProvider(frameProvider);
@@ -82,26 +79,13 @@ public partial class MainWindow : Window
         base.OnOpened(e);
         // Ensure the screen has focus when window opens
         _screen?.Focus();
-        // subscribe to vblank
-        if (_screen != null && _machine?.Bus is VA2MBus bus)
-        {
-            _screen.SubscribeToVBlank(bus);
-        }
-        else
-        {
-            throw new System.Exception("Failed to subscribe to VBlank: screen or bus is null.");
-        }
+
             // Auto-start the emulator after the window is shown
             Dispatcher.UIThread.Post(() => OnEmuStartClicked(this, new RoutedEventArgs()));
     }
 
     protected override void OnClosed(EventArgs e)
     {
-        // unsubscribe
-        if (_screen != null && _machine?.Bus is VA2MBus bus)
-        {
-            _screen.UnsubscribeFromVBlank(bus);
-        }
         StopEmulator();
         base.OnClosed(e);
     }
