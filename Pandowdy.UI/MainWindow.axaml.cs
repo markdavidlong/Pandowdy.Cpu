@@ -87,10 +87,7 @@ public partial class MainWindow : Window // reverted base class
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
-        if (_screen != null)
-        {
-            _screen.Focus();
-        }
+        _screen?.Focus();
         Dispatcher.UIThread.Post(() => OnEmuStartClicked(this, new RoutedEventArgs()));
     }
 
@@ -105,10 +102,7 @@ public partial class MainWindow : Window // reverted base class
         base.OnGotFocus(e);
         if (!_menuPointerActive)
         {
-            if (_screen != null)
-            {
-                _screen.Focus();
-            }
+            _screen?.Focus();
         }
     }
 
@@ -117,10 +111,7 @@ public partial class MainWindow : Window // reverted base class
         base.OnPointerPressed(e);
         if (!_menuPointerActive)
         {
-            if (_screen != null)
-            {
-                _screen.Focus();
-            }
+            _screen?.Focus();
         }
     }
 
@@ -154,10 +145,7 @@ public partial class MainWindow : Window // reverted base class
             }
         }
         _menuPointerActive = false;
-        if (_screen != null)
-        {
-            _screen.Focus();
-        }
+        _screen?.Focus();
     }
 
     private async void OnEmuStartClicked(object? sender, RoutedEventArgs e)
@@ -252,10 +240,7 @@ public partial class MainWindow : Window // reverted base class
             e.Handled = true;
             return;
         }
-        if (_screen != null)
-        {
-            _screen.Focus();
-        }
+        _screen?.Focus();
     }
 
     protected override void OnTextInput(TextInputEventArgs e)

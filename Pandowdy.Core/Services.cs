@@ -6,11 +6,11 @@ namespace Pandowdy.Core;
 public interface IFrameProvider {
     int Width { get; } // 80 row bytes per scanline
     int Height { get; } // 192 scanlines (24 rows * 8)
-    bool IsGraphics { get; } // true if in graphics mode
-    bool IsMixed { get; } // true if in mixed text/graphics mode
+    bool IsGraphics { get; set; } // true if in graphics mode
+    bool IsMixed { get; set;  } // true if in mixed text/graphics mode
     event EventHandler? FrameAvailable; // raised after new frame committed
-    byte[] GetFrame(); // returns current front buffer (length = Width*Height)
-    byte[] BorrowWritable(); // returns back buffer for composition
+    BitmapDataArray GetFrame(); // returns current front buffer (length = Width*Height)
+    BitmapDataArray BorrowWritable(); // returns back buffer for composition
     void CommitWritable(); // swap buffers & raise event
 }
 
@@ -28,7 +28,7 @@ public interface ISystemStatusProvider
     bool StateAnn0 { get; }
     bool StateAnn1 { get; }
     bool StateAnn2 { get; }
-    bool StateAnn3 { get; }
+    bool StateAnn3_DGR { get; }
     bool StatePage2 { get; }
     bool StateHiRes { get; }
     bool StateMixed { get; }
@@ -56,7 +56,7 @@ public record SystemStatusSnapshot(
     bool StateAnn0,
     bool StateAnn1,
     bool StateAnn2,
-    bool StateAnn3,
+    bool StateAnn3_DGR,
     bool StatePage2,
     bool StateHiRes,
     bool StateMixed,
@@ -86,7 +86,7 @@ public sealed class SystemStatusProvider : ISystemStatusProvider
     public bool StateAnn0 => _current.StateAnn0;
     public bool StateAnn1 => _current.StateAnn1;
     public bool StateAnn2 => _current.StateAnn2;
-    public bool StateAnn3 => _current.StateAnn3;
+    public bool StateAnn3_DGR => _current.StateAnn3_DGR;
     public bool StatePage2 => _current.StatePage2;
     public bool StateHiRes => _current.StateHiRes;
     public bool StateMixed => _current.StateMixed;
@@ -105,33 +105,11 @@ public sealed class SystemStatusProvider : ISystemStatusProvider
     }
 }
 
-public sealed class SystemStatusSnapshotBuilder
+public sealed class SystemStatusSnapshotBuilder(SystemStatusSnapshot s)
 {
-    public bool State80Store, StateRamRd, StateRamWrt, StateIntCxRom, StateAltZp, StateSlotC3Rom,
-        StatePb0, StatePb1, StatePb2, StateAnn0, StateAnn1, StateAnn2, StateAnn3,
-        StatePage2, StateHiRes, StateMixed, StateTextMode, StateAltCharSet;
-
-    public SystemStatusSnapshotBuilder(SystemStatusSnapshot s)
-    {
-        State80Store = s.State80Store;
-        StateRamRd = s.StateRamRd;
-        StateRamWrt = s.StateRamWrt;
-        StateIntCxRom = s.StateIntCxRom;
-        StateAltZp = s.StateAltZp;
-        StateSlotC3Rom = s.StateSlotC3Rom;
-        StatePb0 = s.StatePb0;
-        StatePb1 = s.StatePb1;
-        StatePb2 = s.StatePb2;
-        StateAnn0 = s.StateAnn0;
-        StateAnn1 = s.StateAnn1;
-        StateAnn2 = s.StateAnn2;
-        StateAnn3 = s.StateAnn3;
-        StatePage2 = s.StatePage2;
-        StateHiRes = s.StateHiRes;
-        StateMixed = s.StateMixed;
-        StateTextMode = s.StateTextMode;
-        StateAltCharSet = s.StateAltCharSet;
-    }
+    public bool State80Store = s.State80Store, StateRamRd = s.StateRamRd, StateRamWrt = s.StateRamWrt, StateIntCxRom = s.StateIntCxRom, StateAltZp = s.StateAltZp, StateSlotC3Rom = s.StateSlotC3Rom,
+        StatePb0 = s.StatePb0, StatePb1 = s.StatePb1, StatePb2 = s.StatePb2, StateAnn0 = s.StateAnn0, StateAnn1 = s.StateAnn1, StateAnn2 = s.StateAnn2, StateAnn3 = s.StateAnn3_DGR,
+        StatePage2 = s.StatePage2, StateHiRes = s.StateHiRes, StateMixed = s.StateMixed, StateTextMode = s.StateTextMode, StateAltCharSet = s.StateAltCharSet;
 
     public SystemStatusSnapshot Build() => new(
         State80Store, StateRamRd, StateRamWrt, StateIntCxRom, StateAltZp, StateSlotC3Rom,
@@ -169,20 +147,17 @@ public record AddressRange(ushort Start, ushort End);
 public sealed class FrameProvider : IFrameProvider {
     private const int W = 80;
     private const int H = 192;
-    private byte[] _front = new byte[W * H];
-    private byte[] _back = new byte[W * H];
+    private BitmapDataArray _front = new();
+    private BitmapDataArray _back = new ();
     public int Width => W;
     public int Height => H;
     public event EventHandler? FrameAvailable;
-    public bool IsGraphics { get; private set; } = false;
-    public bool IsMixed { get; private set; } = false;
-    public byte[] GetFrame() => _front;
-    public byte[] BorrowWritable() => _back;
+    public bool IsGraphics { get;  set; } = false;
+    public bool IsMixed { get; set; } = false;
+    public BitmapDataArray GetFrame() => _front;
+    public BitmapDataArray BorrowWritable() => _back;
     public void CommitWritable() {
-        // swap
-        var tmp = _front;
-        _front = _back;
-        _back = tmp;
+        (_back, _front) = (_front, _back);
         FrameAvailable?.Invoke(this, EventArgs.Empty);
     }
 }

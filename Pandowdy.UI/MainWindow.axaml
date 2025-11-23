@@ -10,6 +10,7 @@
 		Title="Pandowdy"
 		Width="800" Height="480"
 		MinWidth="800" MinHeight="480"
+        Icon="assets/ico/pandowdy.ico"
 		KeyDown="OnWindowKeyDown">
 	<DockPanel>
 		<Menu x:Name="MainMenu" DockPanel.Dock="Top">
@@ -65,7 +66,7 @@
 					<TextBlock Text="{Binding StateAnn1}" Grid.Row="10" Grid.Column="1" Foreground="White" />
 					<TextBlock Text="ANN2" Grid.Row="11" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
 					<TextBlock Text="{Binding StateAnn2}" Grid.Row="11" Grid.Column="1" Foreground="White" />
-					<TextBlock Text="ANN3" Grid.Row="12" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
+					<TextBlock Text="ANN3/DGR" Grid.Row="12" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
 					<TextBlock Text="{Binding StateAnn3}" Grid.Row="12" Grid.Column="1" Foreground="White" />
 					<TextBlock Text="PAGE2" Grid.Row="13" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
 					<TextBlock Text="{Binding StatePage2}" Grid.Row="13" Grid.Column="1" Foreground="White" />

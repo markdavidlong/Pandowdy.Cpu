@@ -54,7 +54,7 @@ public sealed class SystemStatusViewModel : ReactiveObject
         StateAnn0 = s.StateAnn0;
         StateAnn1 = s.StateAnn1;
         StateAnn2 = s.StateAnn2;
-        StateAnn3 = s.StateAnn3;
+        StateAnn3 = s.StateAnn3_DGR;
         StatePage2 = s.StatePage2;
         StateHiRes = s.StateHiRes;
         StateMixed = s.StateMixed;

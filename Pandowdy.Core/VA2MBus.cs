@@ -132,8 +132,11 @@ public sealed class VA2MBus(VA2MMemory ram,  VA2MMemory ROM, ISystemStatusProvid
                         case 0xC057:
                             b.StateHiRes = true;
                             break;       // HIRES ON
+
+                            //C05E/C05F - Double Lo-Res (not implemented)
                     }
                 });
+
                 // Return a dummy value (Apple II returns floating bus); keep existing semantics.
                 return 0x5f;
             }
@@ -287,9 +290,6 @@ public sealed class VA2MBus(VA2MMemory ram,  VA2MMemory ROM, ISystemStatusProvid
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(VA2MBus));
-        }
+        ObjectDisposedException.ThrowIf(_disposed, nameof(VA2MBus));
     }
 }

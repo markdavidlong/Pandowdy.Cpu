@@ -39,6 +39,7 @@ public sealed class VA2M : IDisposable
     {
         _stateSink = stateSink;
         _frameSink = frameSink;
+        _sysStatusSink = statusProvider;
         TryLoadEmbeddedRom("Pandowdy.Core.Resources.a2e_enh_c-f.rom", 0xC000);
         var mem = new VA2MMemory(0,RamSize);
         RamModel = mem;
@@ -51,13 +52,13 @@ public sealed class VA2M : IDisposable
         }
     }
 
-    public bool Use80Cols { get; set; } = false; // text mode flag mirrored from UI
 
     private void OnVBlank(object? sender, EventArgs e)
     {
         if (_frameSink is null) { return; }
         var buf = _frameSink.BorrowWritable();
-        Array.Clear(buf, 0, buf.Length);
+        buf.Clear();
+        //Array.Clear(buf, 0, buf.Length);
         for (int addr = 0x400; addr < 0x800; addr++)
         {
             int off = AddressToOffset(addr);
@@ -65,42 +66,33 @@ public sealed class VA2M : IDisposable
             int col = off % 40;
             int row = off / 40;
             byte ch = RamModel.Read((ushort)addr);
-            var glyph = VideoFont.Glyph(ch);
-            for (int r = 0; r < 8; r++)
+            var glyph = VideoFont.Glyph(ch); // returns span of 8 rows
+
+            for (int r = 0; r < 8; r++)  // 8 rows per glyph
             {
                 int y = row * 8 + r;
                 if (y >= _frameSink.Height) { break; }
-                byte fontRow = (byte)(glyph[r]);
+                byte fontRow = (byte)~glyph[r]; // invert bits (was glyph ^ 0xff intent)
+                                                //  fontRow = (byte)((y / 8) % 16 * 0x11);
+                
                 int baseX = col * 2;
-                if (!Use80Cols)
+                if (_sysStatusSink!.State80Store)
                 {
-                    // 40-column mode: expand each bit (MSB first) into two horizontal bits forming 16-bit pattern
-                    // Pattern: 0xXABCDEFG becomes 0x0AABBCCD, 0x0DEEFFGG (or 0x0AABBCCD0DEEFFGG as a word)
-                    if (baseX + 1 >= _frameSink.Width) { break; }
-
-                    byte hi = 0xff;
-                    byte lo = 0xff;
-                    
-                    if ((fontRow & 0x01) == 0) { hi &= 0b11111100;                    }
-                    if ((fontRow & 0x02) == 0) { hi &= 0b11110011;                    }
-                    if ((fontRow & 0x04) == 0) { hi &= 0b11001111;                    }
-                    if ((fontRow & 0x08) == 0) { hi &= 0b10111111; lo &= 0b11111110;  }
-                    if ((fontRow & 0x10) == 0) {                   lo &= 0b11111001;  }
-                    if ((fontRow & 0x20) == 0) {                   lo &= 0b11100111;  }
-                    if ((fontRow & 0x40) == 0) {                   lo &= 0b10011111;  }
-
-
-                    buf[y * _frameSink.Width + baseX] = hi;
-                    buf[y * _frameSink.Width + baseX + 1] = lo;
+                    if (baseX >= _frameSink.Width)
+                    { break; }
+                    buf.Insert7BitLsbAt(col * 2 * 7, y, fontRow, false);
+                    buf.Insert7BitLsbAt(col * 2 * 7 + 7, y, fontRow, false);
+                  //  buf.SetByteAt(col*2*8, y, fontRow);  
+                  //      buf.SetByteAt(col*2*8 + 8, y, fontRow);
                 }
                 else
                 {
-                    // 80-column mode: single 8-bit glyph row per character (use first slot)
-                    if (baseX >= _frameSink.Width) { break; }
-                    buf[y * _frameSink.Width + baseX] = fontRow;
+                    buf.Insert7BitLsbAt(col * 2 * 7, y, fontRow, true);
                 }
             }
         }
+        _frameSink.IsGraphics = !_sysStatusSink!.StateTextMode;
+        _frameSink.IsMixed = _sysStatusSink!.StateMixed;
         _frameSink.CommitWritable();
     }
 
@@ -280,4 +272,5 @@ public sealed class VA2M : IDisposable
     public void Dispose()
     {
     }
+
 }

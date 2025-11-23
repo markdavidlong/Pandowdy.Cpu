@@ -7,9 +7,8 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <!-- Enable unsafe code for direct bitmap pixel manipulation -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <!-- Path to generated .res file -->
-    <PandowdyWinRes>$(IntermediateOutputPath)pandowdy.res</PandowdyWinRes>
-    <!-- Do not set ApplicationIcon or ApplicationManifest here; they will be embedded in Win32Resource -->
+    <!-- Point to actual icon source path -->
+    <ApplicationIcon>..\assets\ico\pandowdy.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,14 +21,13 @@
     <PackageReference Include="System.Reactive" Version="6.0.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
     <PackageReference Include="Avalonia.Diagnostics" Version="11.3.6">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
   </ItemGroup>
 
-  <!-- Link the ICO into the project so it's visible in Visual Studio and included in the build metadata -->
+  <!-- Include external ICO in project view (not required for build) -->
   <ItemGroup>
     <None Include="..\assets\ico\pandowdy.ico">
       <Link>assets\ico\pandowdy.ico</Link>
@@ -41,7 +39,6 @@
     </None>
   </ItemGroup>
 
-  <!-- Include custom fonts as resources (add this section once font files exist in assets/fonts) -->
   <ItemGroup>
     <None Include="..\assets\Apple2Forever\Apple2Forever.ttf">
       <Link>Assets\Fonts\Apple2Forever.ttf</Link>
@@ -53,7 +50,6 @@
     </None>
   </ItemGroup>
 
-  <!-- Apple II Enhanced Video ROM font data -->
   <ItemGroup>
     <EmbeddedResource Include="..\assets\a2e_enh_video.rom">
       <Link>Resources\a2e_enh_video.rom</Link>
@@ -72,22 +68,10 @@
     <Folder Include="Themes\" />
   </ItemGroup>
 
-  <!-- On Windows, compile the RC to a RES using rc.exe before the build collects Win32Resource. Make this tolerant when rc.exe is not available. -->
-  <Target Name="CompilePandowdyRC" BeforeTargets="BeforeBuild" Condition=" '$(OS)' == 'Windows_NT' ">
-    <PropertyGroup>
-      <_RCExe>rc.exe</_RCExe>
-      <_RCArgs>/fo "$(PandowdyWinRes)" "$(MSBuildThisFileDirectory)pandowdy.rc"</_RCArgs>
-    </PropertyGroup>
-    <Message Text="Attempting to compile pandowdy.rc to $(PandowdyWinRes) using $(_RCExe)" Importance="High" />
-    <!-- Do not fail the build if rc.exe is not present -->
-    <Exec Command="$(_RCExe) $(_RCArgs)" ContinueOnError="true" />
-
-    <!-- If the .res exists after the Exec, set Win32Resource so the linker will embed it. Otherwise show a message. -->
-    <PropertyGroup Condition="Exists('$(PandowdyWinRes)')">
-      <Win32Resource>$(PandowdyWinRes)</Win32Resource>
-    </PropertyGroup>
-
-    <Message Text="pandowdy.res generated and will be embedded as Win32Resource." Importance="High" Condition="Exists('$(PandowdyWinRes)')" />
-    <Message Text="rc.exe not found or pandowdy.res not created. The executable will be built without the embedded ICO. Install the Windows SDK (or make rc.exe available on PATH) to embed the icon." Importance="High" Condition="!Exists('$(PandowdyWinRes)')" />
-  </Target>
+  <!-- Provide ICO as Avalonia resource for XAML Icon URI -->
+  <ItemGroup>
+    <AvaloniaResource Include="..\assets\ico\pandowdy.ico">
+      <Link>assets\ico\pandowdy.ico</Link>
+    </AvaloniaResource>
+  </ItemGroup>
 </Project>

@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace Pandowdy.Core
 {
-    internal class BitmapDataArray
+    public class BitmapDataArray
     {
         private const int lines = 192; // logical scanlines
         private const int logicalPixels = 561; // visible pixel width
@@ -26,17 +26,17 @@ namespace Pandowdy.Core
         {
             if (x < 0 || x >= stridePixels)
             {
-                Debug.Assert(false, $"SetPixel: x {x} outside capacity 0..{stridePixels - 1}");
+              //  Debug.Assert(false, $"SetPixel: x {x} outside capacity 0..{stridePixels - 1}");
                 return;
             }
             if (y < 0 || y >= lines)
             {
-                Debug.Assert(false, $"SetPixel: y {y} outside capacity 0..{lines - 1}");
+         //       Debug.Assert(false, $"SetPixel: y {y} outside capacity 0..{lines - 1}");
                 return;
             }
             if (x >= logicalPixels)
             {
-                Debug.Assert(false, $"SetPixel: x {x} in overscan region >= {logicalPixels}");
+      //          Debug.Assert(false, $"SetPixel: x {x} in overscan region >= {logicalPixels}");
                 return;
             }
             int index = y * rowBytes + (x >> 3);
@@ -48,12 +48,12 @@ namespace Pandowdy.Core
         {
             if (x < 0 || x >= stridePixels / 2)
             {
-                Debug.Assert(false, $"SetDoublePixel: x {x} outside capacity 0..{(stridePixels / 2) - 1}");
+         //       Debug.Assert(false, $"SetDoublePixel: x {x} outside capacity 0..{(stridePixels / 2) - 1}");
                 return;
             }
             if (y < 0 || y >= lines)
             {
-                Debug.Assert(false, $"SetDoublePixel: y {y} outside capacity 0..{lines - 1}");
+          //      Debug.Assert(false, $"SetDoublePixel: y {y} outside capacity 0..{lines - 1}");
                 return;
             }
             int px = x; // doubled space origin
@@ -61,16 +61,44 @@ namespace Pandowdy.Core
             SetPixel(px + 1, y);
         }
 
-        public void Insert7BitLsbAt(int x, int y, byte value, bool expand = false)
+        public void SetByteAt(int x, int y, byte value)
         {
-            if (x < 0 || x >= stridePixels)
+            if (x < 0 || x >= stridePixels - 7)
             {
-                Debug.Assert(false, $"Insert7BitLsbAt: x {x} outside capacity 0..{stridePixels - 1}");
+         //       Debug.Assert(false, $"SetByteAt: x {x} outside capacity 0..{stridePixels - 8}");
                 return;
             }
             if (y < 0 || y >= lines)
             {
-                Debug.Assert(false, $"Insert7BitLsbAt: y {y} outside capacity 0..{lines - 1}");
+          //      Debug.Assert(false, $"SetByteAt: y {y} outside capacity 0..{lines - 1}");
+                return;
+            }
+            int px = x;
+            for (int bit = 0; bit < 8; bit++)
+            {
+                bool on = (value & (1 << (bit))) != 0;
+                int p = px + bit;
+                if (on)
+                {
+                    SetPixel(p, y);
+                }
+                else
+                {
+                    ClearPixel(p, y);
+                }
+            }
+        }
+
+        public void Insert7BitLsbAt(int x, int y, byte value, bool expand = false)
+        {
+            if (x < 0 || x >= stridePixels)
+            {
+         //       Debug.Assert(false, $"Insert7BitLsbAt: x {x} outside capacity 0..{stridePixels - 1}");
+                return;
+            }
+            if (y < 0 || y >= lines)
+            {
+          //      Debug.Assert(false, $"Insert7BitLsbAt: y {y} outside capacity 0..{lines - 1}");
                 return;
             }
             int px = x;
@@ -111,12 +139,12 @@ namespace Pandowdy.Core
         {
             if (x < 0 || x >= stridePixels / 2)
             {
-                Debug.Assert(false, $"ClearDoublePixel: x {x} outside capacity 0..{(stridePixels / 2) - 1}");
+         //       Debug.Assert(false, $"ClearDoublePixel: x {x} outside capacity 0..{(stridePixels / 2) - 1}");
                 return;
             }
             if (y < 0 || y >= lines)
             {
-                Debug.Assert(false, $"ClearDoublePixel: y {y} outside capacity 0..{lines - 1}");
+          //      Debug.Assert(false, $"ClearDoublePixel: y {y} outside capacity 0..{lines - 1}");
                 return;
             }
             int px = x;
@@ -128,17 +156,17 @@ namespace Pandowdy.Core
         {
             if (x < 0 || x >= stridePixels)
             {
-                Debug.Assert(false, $"ClearPixel: x {x} outside capacity 0..{stridePixels - 1}");
+    //            Debug.Assert(false, $"ClearPixel: x {x} outside capacity 0..{stridePixels - 1}");
                 return;
             }
             if (y < 0 || y >= lines)
             {
-                Debug.Assert(false, $"ClearPixel: y {y} outside capacity 0..{lines - 1}");
+   //             Debug.Assert(false, $"ClearPixel: y {y} outside capacity 0..{lines - 1}");
                 return;
             }
             if (x >= logicalPixels)
             {
-                Debug.Assert(false, $"ClearPixel: x {x} in overscan region >= {logicalPixels}");
+    //            Debug.Assert(false, $"ClearPixel: x {x} in overscan region >= {logicalPixels}");
                 return;
             }
             int index = y * rowBytes + (x >> 3);
@@ -150,11 +178,13 @@ namespace Pandowdy.Core
         {
             if (x < 0 || x >= stridePixels)
             {
-                throw new ArgumentOutOfRangeException(nameof(x), $"x must be between 0 and {stridePixels - 1} inclusive.");
+                return false;
+   //             throw new ArgumentOutOfRangeException(nameof(x), $"x must be between 0 and {stridePixels - 1} inclusive.");
             }
             if (y < 0 || y >= lines)
             {
-                throw new ArgumentOutOfRangeException(nameof(y), $"y must be between 0 and {lines - 1} inclusive.");
+                return false;
+              //  throw new ArgumentOutOfRangeException(nameof(y), $"y must be between 0 and {lines - 1} inclusive.");
             }
             if (x >= logicalPixels)
             {
