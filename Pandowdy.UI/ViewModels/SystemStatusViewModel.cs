@@ -26,10 +26,11 @@ public sealed class SystemStatusViewModel : ReactiveObject
     public bool StateMixed { get => _stateMixed; private set => this.RaiseAndSetIfChanged(ref _stateMixed, value); }
     public bool StateTextMode { get => _stateTextMode; private set => this.RaiseAndSetIfChanged(ref _stateTextMode, value); }
     public bool StateAltCharSet { get => _stateAltCharSet; private set => this.RaiseAndSetIfChanged(ref _stateAltCharSet, value); }
+    public bool StateFlashOn { get => _stateFlashOn; private set => this.RaiseAndSetIfChanged(ref _stateFlashOn, value); }
 
     private bool _state80Store, _stateRamRd, _stateRamWrt, _stateIntCxRom, _stateAltZp, _stateSlotC3Rom,
                  _statePb0, _statePb1, _statePb2, _stateAnn0, _stateAnn1, _stateAnn2, _stateAnn3,
-                 _statePage2, _stateHiRes, _stateMixed, _stateTextMode, _stateAltCharSet;
+                 _statePage2, _stateHiRes, _stateMixed, _stateTextMode, _stateAltCharSet, _stateFlashOn;
 
     public SystemStatusViewModel(ISystemStatusProvider status)
     {
@@ -60,5 +61,6 @@ public sealed class SystemStatusViewModel : ReactiveObject
         StateMixed = s.StateMixed;
         StateTextMode = s.StateTextMode;
         StateAltCharSet = s.StateAltCharSet;
+        StateFlashOn = s.StateFlashOn;
     }
 }

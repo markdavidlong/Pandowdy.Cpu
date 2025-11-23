@@ -51,6 +51,18 @@ public static class VideoFont
         throw new InvalidOperationException("Enhanced video ROM resource not found for glyph composition.");
     }
 
-    public static ReadOnlySpan<byte> Glyph(byte ch)
-        => FontData.AsSpan(ch * 8, 8);
+    public static byte[] Glyph(byte ch)
+        => FontData.AsSpan(ch * 8, 8).ToArray();
+
+    public static (byte[], byte[]) GetGlyphPair(byte ch, bool altCharSet = false)
+            {
+        if (!altCharSet)
+        {
+            return (Glyph(ch), Glyph(ch));
+        }
+        else
+        {
+            return (Glyph(ch), Glyph(ch));
+        }
+    }
 }

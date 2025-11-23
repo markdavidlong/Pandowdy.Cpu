@@ -38,6 +38,10 @@ public sealed class VA2MBus(VA2MMemory ram,  VA2MMemory ROM, ISystemStatusProvid
     private ulong _nextVblankCycle = CyclesPerVBlank;
     public event EventHandler? VBlank;
 
+    // 2.1 Hz flash timer (approx every 476 ms)
+    private Timer? _flashTimer;
+    private static readonly TimeSpan FlashPeriod = TimeSpan.FromMilliseconds(476);
+
     public void Connect(CPU cpu)
     {
         ThrowIfDisposed();
@@ -45,6 +49,15 @@ public sealed class VA2MBus(VA2MMemory ram,  VA2MMemory ROM, ISystemStatusProvid
         _cpu.Connect(this);
         _hookTable ??= new AppleSoftHookTable();
         _hookTable.InitializeDefault();
+        // Start flash timer if status provider available
+        if (_status != null && _flashTimer == null)
+        {
+            _flashTimer = new Timer(_ =>
+            {
+                if (_disposed) { return; }
+                _status!.Mutate(b => b.StateFlashOn = !b.StateFlashOn);
+            }, null, FlashPeriod, FlashPeriod);
+        }
     }
 
 
@@ -132,11 +145,8 @@ public sealed class VA2MBus(VA2MMemory ram,  VA2MMemory ROM, ISystemStatusProvid
                         case 0xC057:
                             b.StateHiRes = true;
                             break;       // HIRES ON
-
-                            //C05E/C05F - Double Lo-Res (not implemented)
                     }
                 });
-
                 // Return a dummy value (Apple II returns floating bus); keep existing semantics.
                 return 0x5f;
             }
@@ -286,6 +296,8 @@ public sealed class VA2MBus(VA2MMemory ram,  VA2MMemory ROM, ISystemStatusProvid
         VBlank = null;
         _cpu = null;
         _hookTable = null;
+        _flashTimer?.Dispose();
+        _flashTimer = null;
     }
 
     private void ThrowIfDisposed()

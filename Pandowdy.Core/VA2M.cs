@@ -61,10 +61,10 @@ public sealed class VA2M : IDisposable
         //Array.Clear(buf, 0, buf.Length);
         for (int addr = 0x400; addr < 0x800; addr++)
         {
-            int off = AddressToOffset(addr);
-            if (off < 0) { continue; }
-            int col = off % 40;
-            int row = off / 40;
+            var col_row = AddressToOffset(addr);
+            if (col_row == null) { continue; }
+            int col = col_row.Value.Item1;
+            int row = col_row.Value.Item2;
             byte ch = RamModel.Read((ushort)addr);
             var glyph = VideoFont.Glyph(ch); // returns span of 8 rows
 
@@ -96,17 +96,17 @@ public sealed class VA2M : IDisposable
         _frameSink.CommitWritable();
     }
 
-    private static int AddressToOffset(int address)
+    private static (int,int)? AddressToOffset(int address)
     {
-        if (address < 0x400 || address >= 0x800) { return -1; }
+        if (address < 0x400 || address >= 0x800) { return null; }
         address -= 0x400;
         var macroline_x = address % 128;
         var macroline_y = address / 128;
         // Return -1 for screen holes.
-        if (macroline_x >= 120) { return -1; }
+        if (macroline_x >= 120) { return null; }
         int section = macroline_x / 40;
         int row = macroline_y + 8 * section;
-        return macroline_x % 40 + 40 * row;
+        return (macroline_x % 40, row);
     }
 
     private void TryLoadEmbeddedRom(string resourceName, ushort baseAddress)
