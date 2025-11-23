@@ -71,11 +71,8 @@ public class Apple2Display : Control
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-        if (_refreshTimer != null)
-        {
-            _refreshTimer.Stop();
-            _refreshTimer = null;
-        }
+        _refreshTimer?.Stop();
+        _refreshTimer = null;
         if (_frameProvider != null)
         {
             _frameProvider.FrameAvailable -= OnFrameAvailable;
@@ -177,7 +174,7 @@ public class Apple2Display : Control
         DrawBitmapScaled(context);
     }
 
-    private unsafe void RenderMonochromeLine(byte* dst, int stridePixels, int outYTop, byte[] frame, int lineOffset)
+    static private unsafe void RenderMonochromeLine(byte* dst, int stridePixels, int outYTop, byte[] frame, int lineOffset)
     {
         for (int xByte = 0; xByte < 80; xByte++)
         {

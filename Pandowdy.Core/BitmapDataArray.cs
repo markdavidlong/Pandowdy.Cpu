@@ -192,9 +192,9 @@ namespace Pandowdy.Core
             return new ReadOnlySpan<byte>(data, row * rowBytes, rowBytes);
         }
 
-        public int Width => logicalPixels;
-        public int CapacityWidth => stridePixels;
-        public int Height => lines;
-        public int RowByteCount => rowBytes;
+        static public int Width => logicalPixels;
+        static public int CapacityWidth => stridePixels;
+        static public int Height => lines;
+        static public int RowByteCount => rowBytes;
     }
 }

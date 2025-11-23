@@ -6,6 +6,10 @@ using System.Threading;
 namespace Pandowdy.Core;
 
 
+public interface IAppleIIBus : IBus
+{
+    public void SetKeyValue(byte key);
+}
 
 /// <summary>
 /// VA2M-specific Bus that owns the CPU connection and routes reads/writes to VA2MMemory.
@@ -14,7 +18,7 @@ namespace Pandowdy.Core;
 /// VBlank event is raised on the emulator thread; subscribers on the UI thread MUST marshal via dispatcher.
 /// After disposal, no further events are raised and Clock() becomes a no-op.
 /// </summary>
-public sealed class VA2MBus(VA2MMemory ram,  VA2MMemory ROM, ISystemStatusProvider? statusProvider = null) : IBus, IDisposable
+public sealed class VA2MBus(VA2MMemory ram,  VA2MMemory ROM, ISystemStatusProvider? statusProvider = null) : IAppleIIBus, IDisposable
 {
     private readonly ISystemStatusProvider? _status = statusProvider;
 

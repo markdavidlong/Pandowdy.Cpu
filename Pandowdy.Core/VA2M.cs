@@ -13,7 +13,7 @@ public sealed class VA2M : IDisposable
 {
     public const int RamSize = 64 * 1024;
 
-    public IBus Bus { get; }
+    public IAppleIIBus Bus { get; }
     public VA2MMemory RamModel { get; }
 //    public VA2MMemory AuxRamModel { get; }
     public IMappedMemory RamMapped => RamModel;
@@ -275,8 +275,6 @@ public sealed class VA2M : IDisposable
         // IMemoryModel has WriteBlock with params byte[] - allocate exact-sized array slice
         byte[] buffer = image[..toCopy].ToArray();
         ROM.WriteBlock(baseAddress, buffer);
-
-
     }
 
     public void Dispose()
