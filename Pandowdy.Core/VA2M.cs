@@ -11,13 +11,11 @@ namespace Pandowdy.Core;
 
 public sealed class VA2M : IDisposable
 {
-    public const int RamSize = 64 * 1024;
+    public MemoryPool MemoryPool { get; private set; } = new MemoryPool();
+
+ //   public const int RamSize = 64 * 1024;
 
     public IAppleIIBus Bus { get; }
-    public VA2MMemory RamModel { get; }
-//    public VA2MMemory AuxRamModel { get; }
-    public IMappedMemory RamMapped => RamModel;
-//    public IMappedMemory AuxRamMapped => AuxRamModel;
 
     private readonly CPU _cpu;
     private readonly Stopwatch _throttleSw = Stopwatch.StartNew();
@@ -26,8 +24,6 @@ public sealed class VA2M : IDisposable
     public double TargetHz { get; set; } = 1_023_000d;
     public ulong SystemClock => Bus.SystemClockCounter;
 
-    // 16KB ROM space at $C000-$FFFF
-    private VA2MMemory ROM = new (0x0000, 64 * 1024, VA2MMemory.MemAccessType.ReadWrite); 
 
     private readonly IEmulatorState? _stateSink; // optional DI-provided state publisher
     private readonly IFrameProvider? _frameSink; // optional DI-provided frame publisher
@@ -40,10 +36,10 @@ public sealed class VA2M : IDisposable
         _stateSink = stateSink;
         _frameSink = frameSink;
         _sysStatusSink = statusProvider;
-        TryLoadEmbeddedRom("Pandowdy.Core.Resources.a2e_enh_c-f.rom", 0xC000);
-        var mem = new VA2MMemory(0,RamSize);
-        RamModel = mem;
-        Bus = new VA2MBus(mem, ROM, statusProvider);
+        TryLoadEmbeddedRom("Pandowdy.Core.Resources.a2e_enh_c-f.rom");
+        //var mem = new VA2MMemory(0,RamSize);
+        
+        Bus = new VA2MBus(MemoryPool, statusProvider);
         _cpu = new CPU();
         Bus.Connect(_cpu);
         if (_frameSink is not null && Bus is VA2MBus vb)
@@ -52,6 +48,7 @@ public sealed class VA2M : IDisposable
         }
     }
 
+    
 
     private void OnVBlank(object? sender, EventArgs e)
     {
@@ -62,31 +59,54 @@ public sealed class VA2M : IDisposable
         for (int addr = 0x400; addr < 0x800; addr++)
         {
             var col_row = AddressToOffset(addr);
-            if (col_row == null) { continue; }
+            if (col_row == null)
+            {
+                continue;
+            }
             int col = col_row.Value.Item1;
             int row = col_row.Value.Item2;
-            byte ch = RamModel.Read((ushort)addr);
-            var glyph = VideoFont.Glyph(ch); // returns span of 8 rows
 
-            for (int r = 0; r < 8; r++)  // 8 rows per glyph
+            if (_sysStatusSink!.StateShow80Col)
+            // if 80 cols
             {
-                int y = row * 8 + r;
-                if (y >= _frameSink.Height) { break; }
-                byte fontRow = (byte)~glyph[r]; // invert bits (was glyph ^ 0xff intent)
-                                                //  fontRow = (byte)((y / 8) % 16 * 0x11);
-                
-                int baseX = col * 2;
-                if (_sysStatusSink!.State80Store)
+                byte ch1 = MemoryPool.ReadRawMain((ushort) addr);
+                var glyph1 = VideoFont.Glyph(ch1); // returns span of 8 rows
+
+                byte ch2 = MemoryPool.ReadRawAux((ushort) addr);
+                var glyph2 = VideoFont.Glyph(ch2); // returns span of 8 rows
+
+                for (int r = 0; r < 8; r++)  // 8 rows per glyph
                 {
-                    if (baseX >= _frameSink.Width)
+                    int y = row * 8 + r;
+                    if (y >= _frameSink.Height)
                     { break; }
-                    buf.Insert7BitLsbAt(col * 2 * 7, y, fontRow, false);
-                    buf.Insert7BitLsbAt(col * 2 * 7 + 7, y, fontRow, false);
-                  //  buf.SetByteAt(col*2*8, y, fontRow);  
-                  //      buf.SetByteAt(col*2*8 + 8, y, fontRow);
+                    byte fontRow1 = (byte) ~glyph1[r]; // invert bits (was glyph ^ 0xff intent)
+                                                       //  fontRow = (byte)((y / 8) % 16 * 0x11);
+                    byte fontRow2 = (byte) ~glyph2[r]; 
+                                                       
+
+                    int baseX = col * 2;
+                    {
+                        if (baseX >= _frameSink.Width)
+                        { break; }
+                        buf.Insert7BitLsbAt(col * 2 * 7, y, fontRow1, false);
+                        buf.Insert7BitLsbAt(col * 2 * 7 + 7, y, fontRow2, false);
+                    }
                 }
-                else
+            }
+            else // 40 columns
+            {
+                byte ch = MemoryPool.Read((ushort) addr);
+                var glyph = VideoFont.Glyph(ch); // returns span of 8 rows
+
+                for (int r = 0; r < 8; r++)  // 8 rows per glyph
                 {
+                    int y = row * 8 + r;
+                    if (y >= _frameSink.Height)
+                    { break; }
+                    byte fontRow = (byte) ~glyph[r]; // invert bits (was glyph ^ 0xff intent)
+                                                     //  fontRow = (byte)((y / 8) % 16 * 0x11);
+
                     buf.Insert7BitLsbAt(col * 2 * 7, y, fontRow, true);
                 }
             }
@@ -109,7 +129,7 @@ public sealed class VA2M : IDisposable
         return (macroline_x % 40, row);
     }
 
-    private void TryLoadEmbeddedRom(string resourceName, ushort baseAddress)
+    private void TryLoadEmbeddedRom(string resourceName)
     {
         // Temporarily disable exceptions for missing resources. Don't want it to silently catch.
         //    try
@@ -120,7 +140,7 @@ public sealed class VA2M : IDisposable
             {
                 using var ms = new MemoryStream();
                 s.CopyTo(ms);
-                LoadRom(ms.ToArray(), baseAddress);
+                MemoryPool.InstallApple2ROM(ms.ToArray());
             }
         }
    //     catch { }
@@ -253,7 +273,7 @@ public sealed class VA2M : IDisposable
     public void InjectKey(byte ascii) => Bus.SetKeyValue((byte)(ascii | 0x80));
 
 
-    /// <summary>
+/*    /// <summary>
     /// Load a ROM image into RAM at the specified base address (for early testing).
     /// Clips to RAM bounds; partial copy if image overflows.
     /// </summary>
@@ -267,7 +287,7 @@ public sealed class VA2M : IDisposable
         // IMemoryModel has WriteBlock with params byte[] - allocate exact-sized array slice
         byte[] buffer = image[..toCopy].ToArray();
         ROM.WriteBlock(baseAddress, buffer);
-    }
+    }*/
 
     public void Dispose()
     {

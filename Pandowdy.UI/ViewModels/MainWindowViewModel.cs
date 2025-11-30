@@ -7,8 +7,8 @@ namespace Pandowdy.UI.ViewModels;
 public sealed class MainWindowViewModel : ReactiveObject
 {
     public EmulatorStateViewModel EmulatorState { get; }
-    public ErrorLogViewModel ErrorLog { get; }
-    public DisassemblyViewModel Disassembly { get; }
+    //public ErrorLogViewModel ErrorLog { get; }
+    //public DisassemblyViewModel Disassembly { get; }
     public SystemStatusViewModel SystemStatus { get; }
 
     public ReactiveCommand<Unit, Unit> PauseCommand { get; }
@@ -18,14 +18,14 @@ public sealed class MainWindowViewModel : ReactiveObject
     private readonly IEmulatorState _emuState;
 
     public MainWindowViewModel(EmulatorStateViewModel emulatorState,
-                               ErrorLogViewModel errorLog,
-                               DisassemblyViewModel disassembly,
+                               //ErrorLogViewModel errorLog,
+                               //DisassemblyViewModel disassembly,
                                IEmulatorState emuState,
                                SystemStatusViewModel systemStatus)
     {
         EmulatorState = emulatorState;
-        ErrorLog = errorLog;
-        Disassembly = disassembly;
+        //ErrorLog = errorLog;
+        //Disassembly = disassembly;
         _emuState = emuState;
         SystemStatus = systemStatus;
 

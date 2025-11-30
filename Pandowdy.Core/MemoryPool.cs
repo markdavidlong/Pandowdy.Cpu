@@ -1,7 +1,55 @@
-﻿namespace Pandowdy.Core
+﻿using System;   
+using Emulator;
+
+namespace Pandowdy.Core
 {
-    public sealed class MemoryPool
+    public sealed class MemoryPool : IMemory, IMappedMemory
     {
+        //Methods from IMemory:
+        public System.Int32 Size { get => 0x10000;  } // 64k addressable space
+
+        public byte Read(ushort address) => ReadMapped(address);
+        public void Write (ushort address, byte value) => WriteMapped(address, value);
+
+        public byte[] ReadBlock(ushort address, int length)
+        {
+            byte[] buffer = new byte[length];
+            for (int i = 0; i < length; i++)
+            {
+                buffer[i] = ReadMapped((ushort)(address + i));
+            }
+            return buffer;
+        }
+
+        public void WriteBlock(ushort offset, params byte[] data)
+        {
+            for (int i = 0; i < data.Length; i++)
+            {
+                WriteMapped((ushort)(offset + i), data[i]);
+            }
+            MemoryBlockWritten?.Invoke(this, new MemoryAccessEventArgs { Address = offset, Value = null, Length = data.Length });
+        }
+
+        public byte[] DataArray() { throw new Exception("Not implemented"); }
+
+        public byte this[ushort address]
+        {
+            get => ReadMapped(address);
+            set => WriteMapped(address, value);
+        }
+
+        //Methods from IMappedMemory:
+
+
+        public event EventHandler<MemoryAccessEventArgs>? MemoryWritten;
+
+        public event EventHandler<MemoryAccessEventArgs>? MemoryBlockWritten;
+
+        
+        
+        // MemoryPool Internal implementation:
+
+
         private readonly byte[] _pool; // backing store
         public byte[] Pool => _pool;
 
@@ -103,13 +151,13 @@
             }
 
             // Create slices (offset, length) exactly as before
-            _m1 = _pool.AsMemory(0x0000, 0x0200);
-            _m2 = _pool.AsMemory(0x0200, 0x0200);
-            _m3 = _pool.AsMemory(0x0400, 0x0400);
-            _m4 = _pool.AsMemory(0x0800, 0x1800);
-            _m5 = _pool.AsMemory(0x2000, 0x2000);
-            _m6 = _pool.AsMemory(0x4000, 0x2000);
-            _m7 = _pool.AsMemory(0x6000, 0x6000);
+            _m1 = _pool.AsMemory(0x0000, 0x0200); // Default
+            _m2 = _pool.AsMemory(0x0200, 0x0200); // Default
+            _m3 = _pool.AsMemory(0x0400, 0x0400); // Default
+            _m4 = _pool.AsMemory(0x0800, 0x1800); // Default
+            _m5 = _pool.AsMemory(0x2000, 0x2000); // Default
+            _m6 = _pool.AsMemory(0x4000, 0x2000); // Default
+            _m7 = _pool.AsMemory(0x6000, 0x6000); // Default
             _m8a = _pool.AsMemory(0xC000, 0x1000);
             _m8b = _pool.AsMemory(0xD000, 0x1000);
             _m9 = _pool.AsMemory(0xE000, 0x2000);
@@ -134,17 +182,17 @@
             _int5 = _pool.AsMemory(0x20500, 0x0100);
             _int6 = _pool.AsMemory(0x20600, 0x0100);
             _int7 = _pool.AsMemory(0x20700, 0x0100);
-            _intext = _pool.AsMemory(0x20800, 0x0800);
+            _intext = _pool.AsMemory(0x20800, 0x0800); // Default
 
-            _rom1 = _pool.AsMemory(0x21000, 0x1000);
-            _rom2 = _pool.AsMemory(0x22000, 0x2000);
-            _s1 = _pool.AsMemory(0x24000, 0x0100);
-            _s2 = _pool.AsMemory(0x24100, 0x0100);
-            _s3 = _pool.AsMemory(0x24200, 0x0100);
-            _s4 = _pool.AsMemory(0x24300, 0x0100);
-            _s5 = _pool.AsMemory(0x24400, 0x0100);
-            _s6 = _pool.AsMemory(0x24500, 0x0100);
-            _s7 = _pool.AsMemory(0x24600, 0x0100);
+            _rom1 = _pool.AsMemory(0x21000, 0x1000); // Default
+            _rom2 = _pool.AsMemory(0x22000, 0x2000); // Default
+            _s1 = _pool.AsMemory(0x24000, 0x0100); // Default
+            _s2 = _pool.AsMemory(0x24100, 0x0100); // Default
+            _s3 = _pool.AsMemory(0x24200, 0x0100); // Default
+            _s4 = _pool.AsMemory(0x24300, 0x0100); // Default
+            _s5 = _pool.AsMemory(0x24400, 0x0100); // Default
+            _s6 = _pool.AsMemory(0x24500, 0x0100); // Default
+            _s7 = _pool.AsMemory(0x24600, 0x0100); // Default
 
             _s1ext = _pool.AsMemory(0x24700, 0x0800);
             _s2ext = _pool.AsMemory(0x24F00, 0x0800);
@@ -198,8 +246,8 @@
             _writeRanges[Ranges.Region_C600_C6FF] = null;
             _writeRanges[Ranges.Region_C700_C7FF] = null;
             _writeRanges[Ranges.Region_C800_CFFF] = null;
-            _writeRanges[Ranges.Region_D000_DFFF] = _rom1; // optionally write-enabled
-            _writeRanges[Ranges.Region_E000_FFFF] = _rom2; // optionally write-enabled
+            _writeRanges[Ranges.Region_D000_DFFF] = null;
+            _writeRanges[Ranges.Region_E000_FFFF] = null;
         }
 
         public byte ReadRawMain(int address) => _pool[address]; // $C000-$CFFF returns $D000-$DFFF Bank 1
@@ -287,6 +335,8 @@
                 _ => Ranges.Region_0000_01FF
             };
             WriteToRegion(range, address, value);
+            MemoryWritten?.Invoke(this, new MemoryAccessEventArgs { Address = address, Value = value, Length = 1 });
+
         }
 
 
@@ -327,6 +377,34 @@
             UpdateMemoryMappings();
         }
 
+        public void SetCxRom(bool _ /*intCxRom*/)
+        {
+            // Temporarily Disabled
+            //    if (intCxRom)
+            //    {
+            //       // TODO
+            //    }
+            //    else
+            //    {
+            //        //TODO
+            //    }
+            UpdateMemoryMappings();
+        }
+
+        public void SetSlotC3Rom(bool _ /* intCxRom */ )
+        {
+            // Temporarily Disabled
+            //    if (slotC3Rom)
+            //    {
+            //        //TODO
+            //    }
+            //    else
+            //    {
+            //        //TODO
+            //    }
+            UpdateMemoryMappings();
+        }
+
         public void UpdateMemoryMappings()
         {
             _readRanges[Ranges.Region_0000_01FF] = _altZp ? _a1 : _m1;
@@ -345,12 +423,12 @@
              * | | | +---- Page2      0200-/0800-/4000-/6000-    0400-     2000-
              * | | | |                03ff /1fff /5fff /bfff     07ff      3fff
              * -------                -------------------------  --------  ------
-             * 1 x x x                Main                       Main      Main
-             * 1 0 x x                Aux                        Aux       Aux
-             * 1 1 0 0                Aux                        Main      Aux
-             * 1 1 0 1                Aux                        Aux       Main
-             * 1 1 1 0                Aux                        Main      Main
-             * 1 1 1 1                Aux                        Aux       Aux
+             * 0 x x x   (0x00-0x07)  Main                       Main      Main
+             * 1 0 x x   (0x08-0x0B)  Aux                        Aux       Aux
+             * 1 1 0 0   (0x0C)       Aux                        Main      Aux
+             * 1 1 0 1   (0x0D)       Aux                        Aux       Main
+             * 1 1 1 0   (0x0E)       Aux                        Main      Main
+             * 1 1 1 1   (0x0F)       Aux                        Aux       Aux
              */
 
             switch (matrixval)
@@ -363,7 +441,7 @@
                     _readRanges[Ranges.Region_4000_5FFF] = _m6;
                     _readRanges[Ranges.Region_6000_BFFF] = _m7;
                     break;
-                case int n when (n>=8 && n<12): // Auxiliary RAM RamRd is high and 80Store is low, else don't care.
+                case int n when (n>=8 && n<0x0c): // Auxiliary RAM RamRd is high and 80Store is low, else don't care.
                     _readRanges[Ranges.Region_0200_03FF] = _a2;
                     _readRanges[Ranges.Region_0400_07FF] = _a3;
                     _readRanges[Ranges.Region_0800_1FFF] = _a4;
@@ -371,7 +449,7 @@
                     _readRanges[Ranges.Region_4000_5FFF] = _a6;
                     _readRanges[Ranges.Region_6000_BFFF] = _a7;
                     break;
-                case 12:  
+                case 0x0c:  
                     _readRanges[Ranges.Region_0200_03FF] = _a2;
                     _readRanges[Ranges.Region_0400_07FF] = _m3;
                     _readRanges[Ranges.Region_0800_1FFF] = _a4;
@@ -379,7 +457,7 @@
                     _readRanges[Ranges.Region_4000_5FFF] = _m6;
                     _readRanges[Ranges.Region_6000_BFFF] = _m7;
                     break;
-                case 13:
+                case 0x0d:
                     _readRanges[Ranges.Region_0200_03FF] = _a2;
                     _readRanges[Ranges.Region_0400_07FF] = _a3;
                     _readRanges[Ranges.Region_0800_1FFF] = _a4;
@@ -387,7 +465,7 @@
                     _readRanges[Ranges.Region_4000_5FFF] = _m6;
                     _readRanges[Ranges.Region_6000_BFFF] = _m7;
                     break;
-                case 14:
+                case 0x0e:
                     _readRanges[Ranges.Region_0200_03FF] = _a2;
                     _readRanges[Ranges.Region_0400_07FF] = _m3;
                     _readRanges[Ranges.Region_0800_1FFF] = _a4;
@@ -395,7 +473,7 @@
                     _readRanges[Ranges.Region_4000_5FFF] = _m6;
                     _readRanges[Ranges.Region_6000_BFFF] = _m7;
                     break;
-                case 15:
+                case 0x0f:
                     _readRanges[Ranges.Region_0200_03FF] = _a2;
                     _readRanges[Ranges.Region_0400_07FF] = _a3;
                     _readRanges[Ranges.Region_0800_1FFF] = _a4;
@@ -403,7 +481,8 @@
                     _readRanges[Ranges.Region_4000_5FFF] = _m6;
                     _readRanges[Ranges.Region_6000_BFFF] = _m7;
                     break;
-                default: break;
+                default:
+                    throw new Exception("Execution should never get here.");
             }
 
             // Swap out RamRd for RamWrt in matrixval
@@ -421,7 +500,7 @@
                     _writeRanges[Ranges.Region_4000_5FFF] = _m6;
                     _writeRanges[Ranges.Region_6000_BFFF] = _m7;
                     break;
-                case int n when (n >= 8 && n < 12): // Auxiliary RAM RamWrt is high and 80Store is low, else don't care.
+                case int n when (n >= 8 && n < 0x0c): // Auxiliary RAM RamWrt is high and 80Store is low, else don't care.
                     _writeRanges[Ranges.Region_0200_03FF] = _a2;
                     _writeRanges[Ranges.Region_0400_07FF] = _a3;
                     _writeRanges[Ranges.Region_0800_1FFF] = _a4;
@@ -429,7 +508,7 @@
                     _writeRanges[Ranges.Region_4000_5FFF] = _a6;
                     _writeRanges[Ranges.Region_6000_BFFF] = _a7;
                     break;
-                case 12:
+                case 0x0c:
                     _writeRanges[Ranges.Region_0200_03FF] = _a2;
                     _writeRanges[Ranges.Region_0400_07FF] = _m3;
                     _writeRanges[Ranges.Region_0800_1FFF] = _a4;
@@ -437,7 +516,7 @@
                     _writeRanges[Ranges.Region_4000_5FFF] = _m6;
                     _writeRanges[Ranges.Region_6000_BFFF] = _m7;
                     break;
-                case 13:
+                case 0x0d:
                     _writeRanges[Ranges.Region_0200_03FF] = _a2;
                     _writeRanges[Ranges.Region_0400_07FF] = _a3;
                     _writeRanges[Ranges.Region_0800_1FFF] = _a4;
@@ -445,7 +524,7 @@
                     _writeRanges[Ranges.Region_4000_5FFF] = _m6;
                     _writeRanges[Ranges.Region_6000_BFFF] = _m7;
                     break;
-                case 14:
+                case 0x0e:
                     _writeRanges[Ranges.Region_0200_03FF] = _a2;
                     _writeRanges[Ranges.Region_0400_07FF] = _m3;
                     _writeRanges[Ranges.Region_0800_1FFF] = _a4;
@@ -453,7 +532,7 @@
                     _writeRanges[Ranges.Region_4000_5FFF] = _m6;
                     _writeRanges[Ranges.Region_6000_BFFF] = _m7;
                     break;
-                case 15:
+                case 0x0f:
                     _writeRanges[Ranges.Region_0200_03FF] = _a2;
                     _writeRanges[Ranges.Region_0400_07FF] = _a3;
                     _writeRanges[Ranges.Region_0800_1FFF] = _a4;
@@ -462,7 +541,7 @@
                     _writeRanges[Ranges.Region_6000_BFFF] = _m7;
                     break;
                 default:
-                    break;
+                    throw new Exception("Execution should never get here.");
             }
 
 
@@ -494,6 +573,31 @@
                 /// Else if there is a card in Slot 3, map to that card's I/O region
 
             */
+        }
+
+        public void InstallApple2ROM(byte[] rom)
+        {
+            // check rom size and throw if not 16k
+            if (rom.Length != 0x4000)
+            {
+                throw new Exception("Apple IIe ROM must be exactly 16KB in size.");
+            }
+
+            // rom should be 16k with the rom data filling _io, _int1-_int7, _intext, _rom1, _rom2
+            rom.AsSpan(0x0000, 0x0100).CopyTo(_io.Span);
+            rom.AsSpan(0x0100, 0x0100).CopyTo(_int1.Span);
+            rom.AsSpan(0x0200, 0x0100).CopyTo(_int2.Span);
+            rom.AsSpan(0x0300, 0x0100).CopyTo(_int3.Span);
+            rom.AsSpan(0x0400, 0x0100).CopyTo(_int4.Span);
+            rom.AsSpan(0x0500, 0x0100).CopyTo(_int5.Span);
+            rom.AsSpan(0x0600, 0x0100).CopyTo(_int6.Span);
+            rom.AsSpan(0x0700, 0x0100).CopyTo(_int7.Span);
+            rom.AsSpan(0x0800, 0x0800).CopyTo(_intext.Span);
+            rom.AsSpan(0x1000, 0x1000).CopyTo(_rom1.Span);
+
+            rom.AsSpan(0x2000, 0x2000).CopyTo(_rom2.Span);
+
+
         }
     }
 }

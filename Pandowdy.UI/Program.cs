@@ -16,15 +16,15 @@ class Program
         var builder = new HostApplicationBuilder(args);
         builder.Services.AddLogging(l => l.AddDebug());
         builder.Services.AddSingleton<IFrameProvider, FrameProvider>();
-        builder.Services.AddSingleton<IErrorProvider, ErrorProvider>();
+        //builder.Services.AddSingleton<IErrorProvider, ErrorProvider>();
         builder.Services.AddSingleton<IEmulatorState, EmulatorStateProvider>();
-        builder.Services.AddSingleton<IDisassemblyProvider, DisassemblyProvider>();
+        //builder.Services.AddSingleton<IDisassemblyProvider, DisassemblyProvider>();
         builder.Services.AddSingleton<ISystemStatusProvider, SystemStatusProvider>();
 
         // ViewModels
         builder.Services.AddTransient<EmulatorStateViewModel>();
-        builder.Services.AddTransient<ErrorLogViewModel>();
-        builder.Services.AddTransient<DisassemblyViewModel>();
+        //builder.Services.AddTransient<ErrorLogViewModel>();
+        //builder.Services.AddTransient<DisassemblyViewModel>();
         builder.Services.AddTransient<MainWindowViewModel>();
         builder.Services.AddTransient<SystemStatusViewModel>();
 

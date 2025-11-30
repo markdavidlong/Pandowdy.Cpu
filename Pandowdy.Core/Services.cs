@@ -33,6 +33,7 @@ public interface ISystemStatusProvider
     bool StateHiRes { get; }
     bool StateMixed { get; }
     bool StateTextMode { get; }
+    bool StateShow80Col { get; }
     bool StateAltCharSet { get; }
     bool StateFlashOn { get; }
     byte BSRStatusByte { get; }
@@ -64,6 +65,7 @@ public record SystemStatusSnapshot(
     bool StateHiRes,
     bool StateMixed,
     bool StateTextMode,
+    bool StateShow80Col,
     bool StateAltCharSet,
     bool StateFlashOn,
     byte BSRStatusByte,
@@ -72,8 +74,29 @@ public record SystemStatusSnapshot(
 
 public sealed class SystemStatusProvider : ISystemStatusProvider
 {
-    private SystemStatusSnapshot _current = new(false,false,false,false,false,false,
-        false,false,false,false,false,false,false,false,false,false,true,false, false, 0, 0);
+    private SystemStatusSnapshot _current = new(
+        State80Store: false,
+        StateRamRd: false,
+        StateRamWrt: false,
+        StateIntCxRom: true,
+        StateAltZp: false,
+        StateSlotC3Rom: false,
+        StatePb0: false,
+        StatePb1: false,
+        StatePb2: false,
+        StateAnn0: false,
+        StateAnn1: false,
+        StateAnn2: false,
+        StateAnn3_DGR: false,
+        StatePage2: false,
+        StateHiRes: false,
+        StateMixed: false,
+        StateTextMode: true,
+        StateShow80Col: false,
+        StateAltCharSet: false,
+        StateFlashOn: false,
+        BSRStatusByte: 0,
+        StateBSRWriteCount: 0);
 
     private readonly System.Reactive.Subjects.BehaviorSubject<SystemStatusSnapshot> _subject;
 
@@ -98,6 +121,7 @@ public sealed class SystemStatusProvider : ISystemStatusProvider
     public bool StateHiRes => _current.StateHiRes;
     public bool StateMixed => _current.StateMixed;
     public bool StateTextMode => _current.StateTextMode;
+    public bool StateShow80Col => _current.StateShow80Col;
     public bool StateAltCharSet => _current.StateAltCharSet;
     public bool StateFlashOn => !_current.StateFlashOn;
     public byte BSRStatusByte => _current.BSRStatusByte;
@@ -119,21 +143,39 @@ public sealed class SystemStatusProvider : ISystemStatusProvider
 
 public sealed class SystemStatusSnapshotBuilder(SystemStatusSnapshot s)
 {
-    public bool State80Store = s.State80Store, StateRamRd = s.StateRamRd, StateRamWrt = s.StateRamWrt, StateIntCxRom = s.StateIntCxRom, StateAltZp = s.StateAltZp, StateSlotC3Rom = s.StateSlotC3Rom,
-        StatePb0 = s.StatePb0, StatePb1 = s.StatePb1, StatePb2 = s.StatePb2, StateAnn0 = s.StateAnn0, StateAnn1 = s.StateAnn1, StateAnn2 = s.StateAnn2, StateAnn3 = s.StateAnn3_DGR,
-        StatePage2 = s.StatePage2, StateHiRes = s.StateHiRes, StateMixed = s.StateMixed, StateTextMode = s.StateTextMode, StateAltCharSet = s.StateAltCharSet, StateFlashOn = s.StateFlashOn;
-    int BSRStatusByte = s.BSRStatusByte, StateBSRWriteCount = s.StateBSRWriteCount;
+    public bool State80Store = s.State80Store;
+    public bool StateRamRd = s.StateRamRd;
+    public bool StateRamWrt = s.StateRamWrt;
+    public bool StateIntCxRom = s.StateIntCxRom;
+    public bool StateAltZp = s.StateAltZp;
+    public bool StateSlotC3Rom = s.StateSlotC3Rom;
+    public bool StatePb0 = s.StatePb0;
+    public bool StatePb1 = s.StatePb1;
+    public bool StatePb2 = s.StatePb2;
+    public bool StateAnn0 = s.StateAnn0;
+    public bool StateAnn1 = s.StateAnn1;
+    public bool StateAnn2 = s.StateAnn2;
+    public bool StateAnn3 = s.StateAnn3_DGR;
+    public bool StatePage2 = s.StatePage2;
+    public bool StateHiRes = s.StateHiRes;
+    public bool StateMixed = s.StateMixed;
+    public bool StateTextMode = s.StateTextMode;
+    public bool StateShow80Col = s.StateShow80Col;
+    public bool StateAltCharSet = s.StateAltCharSet;
+    public bool StateFlashOn = s.StateFlashOn;
+    byte BSRStatusByte = s.BSRStatusByte;
+    byte StateBSRWriteCount = s.StateBSRWriteCount;
 
     public SystemStatusSnapshot Build() => new(
         State80Store, StateRamRd, StateRamWrt, StateIntCxRom, StateAltZp, StateSlotC3Rom,
         StatePb0, StatePb1, StatePb2, StateAnn0, StateAnn1, StateAnn2, StateAnn3,
-        StatePage2, StateHiRes, StateMixed, StateTextMode, StateAltCharSet, StateFlashOn, 0, 0);
+        StatePage2, StateHiRes, StateMixed, StateTextMode, StateShow80Col, StateAltCharSet, StateFlashOn, BSRStatusByte, StateBSRWriteCount);
 }
 
-public interface IErrorProvider {
-    IObservable<LogEvent> Events { get; }
-    void Publish(LogEvent evt);
-}
+//public interface IErrorProvider {
+//    IObservable<LogEvent> Events { get; }
+//    void Publish(LogEvent evt);
+//}
 
 public interface IEmulatorState {
     IObservable<StateSnapshot> Stream { get; }
@@ -144,18 +186,18 @@ public interface IEmulatorState {
     void RequestStep();
 }
 
-public interface IDisassemblyProvider {
-    IObservable<DisassemblyUpdate> Updates { get; }
-    Task<Line[]> QueryRange(AddressRange range);
-    void Invalidate(AddressRange range);
-    void SetHighlight(ushort pc);
-}
+//public interface IDisassemblyProvider {
+//    IObservable<DisassemblyUpdate> Updates { get; }
+//    Task<Line[]> QueryRange(AddressRange range);
+//    void Invalidate(AddressRange range);
+//    void SetHighlight(ushort pc);
+//}
 
 public record StateSnapshot(ushort PC, byte SP, ulong Cycles, int? LineNumber, bool IsRunning, bool IsPaused);
-public record LogEvent(DateTime Timestamp, string Severity, string Message, ushort? PC = null);
-public record DisassemblyUpdate(AddressRange Range, IReadOnlyList<Line> Lines);
-public record Line(ushort Address, string BytesHex, string Mnemonic, string Comment);
-public record AddressRange(ushort Start, ushort End);
+//public record LogEvent(DateTime Timestamp, string Severity, string Message, ushort? PC = null);
+//public record DisassemblyUpdate(AddressRange Range, IReadOnlyList<Line> Lines);
+//public record Line(ushort Address, string BytesHex, string Mnemonic, string Comment);
+//public record AddressRange(ushort Start, ushort End);
 
 public sealed class FrameProvider : IFrameProvider {
     private const int W = 80;
@@ -175,11 +217,11 @@ public sealed class FrameProvider : IFrameProvider {
     }
 }
 
-public sealed class ErrorProvider : IErrorProvider {
-    private readonly System.Reactive.Subjects.Subject<LogEvent> _subject = new();
-    public IObservable<LogEvent> Events => _subject;
-    public void Publish(LogEvent evt) => _subject.OnNext(evt);
-}
+//public sealed class ErrorProvider : IErrorProvider {
+//    private readonly System.Reactive.Subjects.Subject<LogEvent> _subject = new();
+//    public IObservable<LogEvent> Events => _subject;
+//    public void Publish(LogEvent evt) => _subject.OnNext(evt);
+//}
 
 public sealed class EmulatorStateProvider : IEmulatorState {
     private readonly System.Reactive.Subjects.BehaviorSubject<StateSnapshot> _subject = new(new StateSnapshot(0,0,0,null,false,false));
@@ -191,10 +233,10 @@ public sealed class EmulatorStateProvider : IEmulatorState {
     public void RequestStep() { /* placeholder */ }
 }
 
-public sealed class DisassemblyProvider : IDisassemblyProvider {
-    private readonly System.Reactive.Subjects.Subject<DisassemblyUpdate> _updates = new();
-    public IObservable<DisassemblyUpdate> Updates => _updates;
-    public Task<Line[]> QueryRange(AddressRange range) => Task.FromResult(Array.Empty<Line>());
-    public void Invalidate(AddressRange range) { }
-    public void SetHighlight(ushort pc) { }
-}
+//public sealed class DisassemblyProvider : IDisassemblyProvider {
+//    private readonly System.Reactive.Subjects.Subject<DisassemblyUpdate> _updates = new();
+//    public IObservable<DisassemblyUpdate> Updates => _updates;
+//    public Task<Line[]> QueryRange(AddressRange range) => Task.FromResult(Array.Empty<Line>());
+//    public void Invalidate(AddressRange range) { }
+//    public void SetHighlight(ushort pc) { }
+//}

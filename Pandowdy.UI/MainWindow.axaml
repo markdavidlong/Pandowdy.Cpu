@@ -41,7 +41,7 @@
 
 		<Grid DockPanel.Dock="Right" Background="Black" ColumnDefinitions="* Auto">
 			<Border Grid.Column="1" Padding="8" Margin="8" Background="#222" CornerRadius="4">
-				<Grid RowDefinitions="Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto"
+				<Grid RowDefinitions="Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto auto Auto"
 					  ColumnDefinitions="Auto Auto"
 					  DataContext="{Binding SystemStatus}">
 					<TextBlock Text="80STORE" Grid.Row="0" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
@@ -82,6 +82,8 @@
 					<TextBlock Text="{Binding StateAltCharSet}" Grid.Row="17" Grid.Column="1" Foreground="White" />
 					<TextBlock Text="FLASH ON" Grid.Row="18" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
 					<TextBlock Text="{Binding StateFlashOn}" Grid.Row="18" Grid.Column="1" Foreground="White" />
+					<TextBlock Text="Show 80 Col" Grid.Row="19" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
+					<TextBlock Text="{Binding StateShow80Col}" Grid.Row="19" Grid.Column="1" Foreground="White" />
 				</Grid>
 			</Border>
 		</Grid>

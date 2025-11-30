@@ -7,37 +7,37 @@ using Pandowdy.Core;
 
 namespace Pandowdy.UI.ViewModels;
 
-public sealed class DisassemblyViewModel : ReactiveObject, IActivatableViewModel
-{
-    private readonly IDisassemblyProvider _disasm;
-    public ViewModelActivator Activator { get; } = new();
+//public sealed class DisassemblyViewModel : ReactiveObject, IActivatableViewModel
+//{
+//    private readonly IDisassemblyProvider _disasm;
+//    public ViewModelActivator Activator { get; } = new();
 
-    private readonly ObservableCollection<Line> _lines = new();
-    public ReadOnlyObservableCollection<Line> Lines { get; }
+//    private readonly ObservableCollection<Line> _lines = new();
+//    public ReadOnlyObservableCollection<Line> Lines { get; }
 
-    private ushort _highlightPc;
-    public ushort HighlightPC { get => _highlightPc; private set => this.RaiseAndSetIfChanged(ref _highlightPc, value); }
+//    private ushort _highlightPc;
+//    public ushort HighlightPC { get => _highlightPc; private set => this.RaiseAndSetIfChanged(ref _highlightPc, value); }
 
-    public DisassemblyViewModel(IDisassemblyProvider disasm)
-    {
-        _disasm = disasm;
-        Lines = new ReadOnlyObservableCollection<Line>(_lines);
-        this.WhenActivated(disposables =>
-        {
-            _disasm.Updates
-                .ObserveOn(RxApp.MainThreadScheduler)
-                .Subscribe(update =>
-                {
-                    // naive replace; later optimize for partial patch
-                    _lines.Clear();
-                    foreach (var l in update.Lines)
-                    {
-                        _lines.Add(l);
-                    }
-                })
-                .DisposeWith(disposables);
-        });
-    }
+//    public DisassemblyViewModel(IDisassemblyProvider disasm)
+//    {
+//        _disasm = disasm;
+//        Lines = new ReadOnlyObservableCollection<Line>(_lines);
+//        this.WhenActivated(disposables =>
+//        {
+//            _disasm.Updates
+//                .ObserveOn(RxApp.MainThreadScheduler)
+//                .Subscribe(update =>
+//                {
+//                    // naive replace; later optimize for partial patch
+//                    _lines.Clear();
+//                    foreach (var l in update.Lines)
+//                    {
+//                        _lines.Add(l);
+//                    }
+//                })
+//                .DisposeWith(disposables);
+//        });
+//    }
 
-    public void RequestRange(AddressRange range) => _disasm.Invalidate(range);
-}
+//    public void RequestRange(AddressRange range) => _disasm.Invalidate(range);
+//}

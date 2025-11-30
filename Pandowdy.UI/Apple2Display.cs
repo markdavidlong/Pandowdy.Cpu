@@ -66,8 +66,8 @@ public class Apple2Display : Control
     private BitmapDataArray? _lastFrame;
     private DispatcherTimer? _refreshTimer; // ~60Hz UI redraw cadence
 
-    private ISystemStatusProvider? _status;
-    private bool _flagText, _flagMixed, _flagHiRes, _flagPage2;
+  //  private ISystemStatusProvider? _status;
+    //private bool _flagText, _flagMixed, _flagHiRes, _flagPage2;
 
     public bool ShowScanLines { get; set; } = true;
 
