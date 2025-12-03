@@ -1,4 +1,5 @@
-﻿using System;   
+﻿using System;
+using System.Diagnostics;
 using Emulator;
 
 namespace Pandowdy.Core
@@ -156,6 +157,14 @@ namespace Pandowdy.Core
                 var rnd = new Random();
                 rnd.NextBytes(_pool);
             }
+            // Fill _pool with the value 0xA0
+            else
+            {
+                for (int i = 0; i < _pool.Length; i++)
+                {
+                    _pool[i] = 0x00; //0xA0;
+                }
+            }
 
             // Create slices (offset, length) exactly as before
             _m1 = _pool.AsMemory(0x0000, 0x0200); // Default
@@ -257,8 +266,8 @@ namespace Pandowdy.Core
             _writeRanges[Ranges.Region_E000_FFFF] = null;
         }
 
-        public byte ReadRawMain(int address) => _pool[address]; // $C000-$CFFF returns $D000-$DFFF Bank 1
-        public byte ReadRawAux(int address) => _pool[address + 0x10000]; // $C000-$CFFF returns $D000-$DFFF Bank 1
+        public byte ReadRawMain(int address) => _pool[(address & 0xffff)]; // $C000-$CFFF returns $D000-$DFFF Bank 1
+        public byte ReadRawAux(int address) => _pool[(address & 0xffff) | 0x10000]; // $C000-$CFFF returns $D000-$DFFF Bank 1
 
         public byte ReadPool(int address) => _pool[address];
 
@@ -320,6 +329,7 @@ namespace Pandowdy.Core
 
         public void WriteMapped(ushort address, byte value)
         {
+
             var range = address switch
             {
                 >= (ushort) Ranges.Region_E000_FFFF => Ranges.Region_E000_FFFF,
@@ -345,8 +355,6 @@ namespace Pandowdy.Core
             MemoryWritten?.Invoke(this, new MemoryAccessEventArgs { Address = address, Value = value, Length = 1 });
 
         }
-
-
 
         public void SetRamRd(bool ramRd)
         {
@@ -454,7 +462,7 @@ namespace Pandowdy.Core
                 else
                 {
                     _readRanges[Ranges.Region_2000_3FFF] = (_ramRd ? _a5 : _m5);
-                    _writeRanges[Ranges.Region_2000_3FFF] = (_ramRd ? _a5 : _m5);
+                    _writeRanges[Ranges.Region_2000_3FFF] = (_ramWrt ? _a5 : _m5);
                 }
             }
 
@@ -540,16 +548,19 @@ namespace Pandowdy.Core
 
             // rom should be 16k with the rom data filling _io, _int1-_int7, _intext, _rom1, _rom2
             rom.AsSpan(0x0000, 0x0100).CopyTo(_io.Span);
+
             rom.AsSpan(0x0100, 0x0100).CopyTo(_int1.Span);
             rom.AsSpan(0x0200, 0x0100).CopyTo(_int2.Span);
             rom.AsSpan(0x0300, 0x0100).CopyTo(_int3.Span);
+           // rom.AsSpan(0x0300, 0x0100).CopyTo(_s3.Span);
             rom.AsSpan(0x0400, 0x0100).CopyTo(_int4.Span);
             rom.AsSpan(0x0500, 0x0100).CopyTo(_int5.Span);
             rom.AsSpan(0x0600, 0x0100).CopyTo(_int6.Span);
             rom.AsSpan(0x0700, 0x0100).CopyTo(_int7.Span);
-            rom.AsSpan(0x0800, 0x0800).CopyTo(_intext.Span);
-            rom.AsSpan(0x1000, 0x1000).CopyTo(_rom1.Span);
 
+            rom.AsSpan(0x0800, 0x0800).CopyTo(_intext.Span);
+
+            rom.AsSpan(0x1000, 0x1000).CopyTo(_rom1.Span);
             rom.AsSpan(0x2000, 0x2000).CopyTo(_rom2.Span);
 
 

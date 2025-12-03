@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Threading;
 using Emulator;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Pandowdy.Core;
 
@@ -71,7 +72,7 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
 
     public void SetPushButton(int num, bool pressed)
     {
-        _status?.Mutate(b =>
+        _status!.Mutate(b =>
         {
             switch (num)
             {
@@ -91,78 +92,78 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
 
     void Set80Store(bool enabled)
     {
-        _status?.Mutate(b => b.State80Store = enabled);
+        _status!.Mutate(b => b.State80Store = enabled);
         _memoryPool.Set80Store(enabled);
     }
 
     void SetRamRead(bool enabled)
     {
-        _status?.Mutate(b => b.StateRamRd = enabled);
+        _status!.Mutate(b => b.StateRamRd = enabled);
         _memoryPool.SetRamRd(enabled);
     }
     void SetRamWrite(bool enabled)
     {
-        _status?.Mutate(b => b.StateRamWrt = enabled);
+        _status!.Mutate(b => b.StateRamWrt = enabled);
         _memoryPool.SetRamWrt(enabled);
     }
 
 
     void SetSlotCxRom()
     {
-        _status?.Mutate(b => b.StateIntCxRom = false);
+        _status!.Mutate(b => b.StateIntCxRom = false);
         _memoryPool.SetIntCxRom(false);
     }
 
     void SetIntCxRom()
     {
-        _status?.Mutate(b => b.StateIntCxRom = true);
+        _status!.Mutate(b => b.StateIntCxRom = true);
         _memoryPool.SetIntCxRom(true);
     }
 
     void SetAltZp(bool enabled)
     {
-        _status?.Mutate(b => b.StateAltZp = enabled);
+        _status!.Mutate(b => b.StateAltZp = enabled);
         _memoryPool.SetAltZp(enabled);
     }
 
     void SetSlotC3Rom(bool enabled)
     {
-        _status?.Mutate(b => b.StateSlotC3Rom = enabled);
+        _status!.Mutate(b => b.StateSlotC3Rom = enabled);
         _memoryPool.SetSlotC3Rom(enabled);
     }
 
     void SetShow80Col(bool enabled)
     {
-        _status?.Mutate(b => b.StateShow80Col = enabled);
+        _status!.Mutate(b => b.StateShow80Col = enabled);
     }
 
     void SetAltCharSet(bool enabled)
     {
-        _status?.Mutate(b => b.StateAltCharSet = enabled);
+        _status!.Mutate(b => b.StateAltCharSet = enabled);
     }
 
     void SetTextMode(bool enabled)
     {
-        _status?.Mutate(b => b.StateTextMode = enabled);
+        _status!.Mutate(b => b.StateTextMode = enabled);
     }
 
     void SetMixed(bool enabled)
     {
-        _status?.Mutate(b => b.StateMixed = enabled);
+        _status!.Mutate(b => b.StateMixed = enabled);
     }
 
     void SetPage2(bool enabled)
     {
-        _status?.Mutate(b => b.StatePage2 = enabled);
+        _status!.Mutate(b => b.StatePage2 = enabled);
     }
 
     void SetHires(bool enabled)
     {
-        _status?.Mutate(b => b.StateHiRes = enabled);
+        _status!.Mutate(b => b.StateHiRes = enabled);
     }
 
     void SetAnnunciator(int num, bool enabled) { 
-        _status?.Mutate(b =>
+        _status!.Mutate(b =>
             {
                 switch (num)
                 {
@@ -184,35 +185,35 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
 
     void ClearWrtCount()
     {
-        _status?.Mutate(b => b.StateWriteCount = 0);
+        _status!.Mutate(b => b.StateWriteCount = 0);
     }
 
     void IncrementWrtCount()
     {
         int count = _status!.StateWriteCount + 1;
 
-        _status?.Mutate(b => b.StateWriteCount = count);
+        _status!.Mutate(b => b.StateWriteCount = count);
         if (count >= 2)
         {
             count = 2;
-            _status?.Mutate(b => b.StateHighWrite = true);
+            _status!.Mutate(b => b.StateHighWrite = true);
             _memoryPool.SetHighWrite(true);
         }
     }
 
     void SetBank1(bool status)
     {
-        _status?.Mutate(b => b.StateUseBank1 = status);
+        _status!.Mutate(b => b.StateUseBank1 = status);
         _memoryPool.SetBank1(status);
     }
     void SetHighRead(bool status)
     {
-        _status?.Mutate(b => b.StateHighRead = status);
+        _status!.Mutate(b => b.StateHighRead = status);
         _memoryPool.SetHighRead(status);
     }
     void DisableHighWrite()
     {
-        _status?.Mutate(b => b.StateHighWrite = false);
+        _status!.Mutate(b => b.StateHighWrite = false);
         _memoryPool.SetHighWrite(false);
     }
 
@@ -602,15 +603,19 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
 
     void WriteToIOSpace(ushort address, byte _ /*data*/)
     {
+
+
         if (_status != null && address >= 0xC000 && address <= 0xC0FF)
         {
             if (address == 0xC000)
             {
+      //          Debug.WriteLine("80Store Off");
                 Set80Store(false);
                 return;
             }
             else if (address == 0xC001)
             {
+   //             Debug.WriteLine("80Store On");
                 Set80Store(true);
                 return;
             }
@@ -723,12 +728,16 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
 
             if (address == 0xC054)
             {
+        //        Debug.WriteLine("Page2 Off");
+
                 SetPage2(false);
                 return;
             }
 
             if (address == 0xC055)
             {
+   //             Debug.WriteLine("Page2 On");
+
                 SetPage2(true);
                 return;
             }
@@ -873,6 +882,13 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
         }
         else
         {
+
+            //if (address >= 0xC100 && address < 0xD000)
+            //{
+            //    Debug.WriteLine($"Read from {address:X4}");
+            //}
+
+
             return _memoryPool.Read(address);
         }
     }
@@ -886,6 +902,11 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
             WriteToIOSpace(address, data);
             return;
         }
+
+        //if (address == 0x400)
+        //{
+        //    Debug.WriteLine($"Write to 0400: {data:X2}");
+        //}
 
         _memoryPool.Write(address, data);
     }

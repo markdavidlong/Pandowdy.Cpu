@@ -25,12 +25,10 @@ public sealed class EmulatorStateViewModel : ReactiveObject, IActivatableViewMod
         _state = state;
         this.WhenActivated(disposables =>
         {
-
-
-        var sub = _state.Stream.Sample(TimeSpan.FromMilliseconds(50))
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(s => { PC = s.PC; LineNumber = s.LineNumber; Cycles = s.Cycles; });
-        disposables.Add(sub);
+            var sub = _state.Stream.Sample(TimeSpan.FromMilliseconds(50))
+                .ObserveOn(RxApp.MainThreadScheduler)
+                .Subscribe(s => { PC = s.PC; LineNumber = s.LineNumber; Cycles = s.Cycles; });
+            disposables.Add(sub);
         });
     }
 }
