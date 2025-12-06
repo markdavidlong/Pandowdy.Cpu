@@ -60,11 +60,7 @@ namespace Pandowdy.Core
         public override string ToString() => $"{Name}: {base.Value}";
     }
 
-
-
-
-    // Basic stub collection for soft switches
-    public sealed class SoftSwitchCollection
+    public sealed class SoftSwitches
     {
         public enum SoftSwitchId
         {
@@ -82,7 +78,7 @@ namespace Pandowdy.Core
         }
 
         private Dictionary<SoftSwitchId, SoftSwitch> _switches = [];
-        public SoftSwitchCollection()
+        public SoftSwitches()
         {
             _switches[SoftSwitchId.Store80] = new SoftSwitch("80STORE");
             _switches[SoftSwitchId.RamRd] = new SoftSwitch("RAMRD");
@@ -97,12 +93,20 @@ namespace Pandowdy.Core
             _switches[SoftSwitchId.HighRead] = new SoftSwitch("HIGHREAD");
         }
 
+        private HashSet<ISoftSwitchResponder> _responders = [];
+
+        public void AddResponder(ISoftSwitchResponder responder)
+        {
+            _responders.Add(responder);
+        }
+
         public void Set(SoftSwitchId id, bool value)
         {
             if (_switches.TryGetValue(id, out var softSwitch))
             {
                 softSwitch.Value = value;
             }
+            TriggerResponder(id, value);
         }
 
         public List<(SoftSwitchId id, bool value, int count)> GetSwitchList()
@@ -113,6 +117,49 @@ namespace Pandowdy.Core
                 result.Add((kvp.Key, kvp.Value.Value, kvp.Value.Count));
             }
             return result;
+        }
+
+        private void TriggerResponder(SoftSwitchId id, bool value = false)
+        {
+            foreach (var responder in _responders)
+            {
+                switch (id)
+                {
+                    case SoftSwitchId.Store80:
+                        responder.Set80Store(value);
+                        break;
+                    case SoftSwitchId.RamRd:
+                        responder.SetRamRd(value);
+                        break;
+                    case SoftSwitchId.RamWrt:
+                        responder.SetRamWrt(value);
+                        break;
+                    case SoftSwitchId.AltZp:
+                        responder.SetAltZp(value);
+                        break;
+                    case SoftSwitchId.HiRes:
+                        responder.SetHiRes(value);
+                        break;
+                    case SoftSwitchId.Page2:
+                        responder.SetPage2(value);
+                        break;
+                    case SoftSwitchId.IntCxRom:
+                        responder.SetIntCxRom(value);
+                        break;
+                    case SoftSwitchId.SlotC3Rom:
+                        responder.SetSlotC3Rom(value);
+                        break;
+                    case SoftSwitchId.HighWrite:
+                        responder.SetHighWrite(value);
+                        break;
+                    case SoftSwitchId.Bank1:
+                        responder.SetBank1(value);
+                        break;
+                    case SoftSwitchId.HighRead:
+                        responder.SetHighRead(value);
+                        break;
+                }
+            }
         }
 
         public void ResetSwitchUsageCounts()
