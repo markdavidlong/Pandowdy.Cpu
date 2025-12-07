@@ -88,10 +88,10 @@ public sealed class VA2M : IDisposable
             if (_sysStatusSink!.StateShow80Col)
             // if 80 cols
             {
-                byte ch1 = MemoryPool.ReadRawMain((ushort) addr);
+                byte ch1 = MemoryPool.ReadRawAux((ushort) addr);
                 var glyph1 = VideoFont.Glyph(ch1); // returns span of 8 rows
 
-                byte ch2 = MemoryPool.ReadRawAux((ushort) addr);
+                byte ch2 = MemoryPool.ReadRawMain((ushort) addr);
                 var glyph2 = VideoFont.Glyph(ch2); // returns span of 8 rows
 
                 for (int r = 0; r < 8; r++)  // 8 rows per glyph

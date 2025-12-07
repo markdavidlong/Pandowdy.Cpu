@@ -565,7 +565,9 @@ public partial class MainWindow : Window
                 Width = (int)Width,
                 Height = (int)Height
             };
+#pragma warning disable CA1869 // Cache and reuse 'JsonSerializerOptions' instances
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+#pragma warning restore CA1869 // Cache and reuse 'JsonSerializerOptions' instances
             File.WriteAllText(GetConfigPath(), json);
         }
         catch { }

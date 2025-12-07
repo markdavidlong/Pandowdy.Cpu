@@ -312,12 +312,12 @@ namespace Pandowdy.Core
             return m.Span[offset];
         }
 
-        private void WriteToRegion(Ranges region, int address, byte value)
+        private bool WriteToRegion(Ranges region, int address, byte value)
         {
             _writeRanges.TryGetValue(region, out var mem);
             if (!mem.HasValue)
             {
-                return;
+                return false;
             }
 
             var m = mem.Value;
@@ -325,10 +325,11 @@ namespace Pandowdy.Core
             int offset = address - baseAddr;
             if ((uint) offset >= m.Length)
             {
-                return;
+                return false;
             }
 
             m.Span[offset] = value;
+            return true;
         }
 
         public byte ReadMapped(ushort address) => address switch
@@ -377,7 +378,11 @@ namespace Pandowdy.Core
                 >= (ushort) Ranges.Region_0200_03FF => Ranges.Region_0200_03FF,
                 _ => Ranges.Region_0000_01FF
             };
-            WriteToRegion(range, address, value);
+            var validWrite = WriteToRegion(range, address, value);
+            if (!validWrite)
+            {
+                Debug.WriteLine($"Write to unmapped address {address:X4} ignored."); return;
+            }
             MemoryWritten?.Invoke(this, new MemoryAccessEventArgs { Address = address, Value = value, Length = 1 });
 
         }
@@ -501,8 +506,6 @@ namespace Pandowdy.Core
                 }
             }
 
-
-
             // Region_D000_DFFF -> Slot ROM
 
             // Write:
@@ -545,9 +548,6 @@ namespace Pandowdy.Core
                 _readRanges[Ranges.Region_E000_FFFF] = _rom2;
             }
 
-
-
-
             /*
                 // Region C000_CFFF -> I/O and Internal Slots
                 /// At this point, this is scratch ram and isn't used from the user-facing side.
@@ -587,7 +587,6 @@ namespace Pandowdy.Core
             rom.AsSpan(0x0100, 0x0100).CopyTo(_int1.Span);
             rom.AsSpan(0x0200, 0x0100).CopyTo(_int2.Span);
             rom.AsSpan(0x0300, 0x0100).CopyTo(_int3.Span);
-           // rom.AsSpan(0x0300, 0x0100).CopyTo(_s3.Span);
             rom.AsSpan(0x0400, 0x0100).CopyTo(_int4.Span);
             rom.AsSpan(0x0500, 0x0100).CopyTo(_int5.Span);
             rom.AsSpan(0x0600, 0x0100).CopyTo(_int6.Span);
@@ -597,8 +596,6 @@ namespace Pandowdy.Core
 
             rom.AsSpan(0x1000, 0x1000).CopyTo(_rom1.Span);
             rom.AsSpan(0x2000, 0x2000).CopyTo(_rom2.Span);
-
-
         }
     }
 }
