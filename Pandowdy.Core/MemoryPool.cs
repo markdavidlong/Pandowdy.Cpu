@@ -6,17 +6,28 @@ namespace Pandowdy.Core
 {
     public interface ISoftSwitchResponder
     {
+        void Set80Store(bool store80);
         void SetRamRd(bool ramRd);
         void SetRamWrt(bool ramWrt);
-        void SetAltZp(bool altZp);
-        void Set80Store(bool store80);
-        void SetHiRes(bool hires);
-        void SetPage2(bool page2);
         void SetIntCxRom(bool intCxRom);
+        void SetAltZp(bool altZp);
         void SetSlotC3Rom(bool slotC3Rom);
-        void SetHighWrite(bool enabled);
+        void Set80Vid(bool vid);
+        void SetAltChar(bool altChar);
+        void SetText(bool text);
+        void SetMixed(bool mixed);
+        void SetPage2(bool page2);
+        void SetHiRes(bool hires);
+        void SetAn0(bool an0);
+        void SetAn1(bool an1);
+        void SetAn2(bool an2);
+        void SetAn3(bool an3);
+
+
         void SetBank1(bool enabled);
+        void SetHighWrite(bool enabled);
         void SetHighRead(bool enabled);
+        void SetPreWrite(bool enabled);
     }
 
     public sealed class MemoryPool : IMemory, IMappedMemory, ISoftSwitchResponder
@@ -440,6 +451,15 @@ namespace Pandowdy.Core
             UpdateMemoryMappings();
         }
 
+        public void SetMixed(bool _) {  /* NA */ }
+        public void SetText(bool _) {  /* NA */ }
+        public void SetAn0(bool _) {  /* NA */ }
+        public void SetAn1(bool _) {  /* NA */ }
+        public void SetAn2(bool _) {  /* NA */ }
+        public void SetAn3(bool _) {  /* NA */ }
+        public void Set80Vid(bool _) {  /* NA */ }
+        public void SetAltChar(bool _) {  /* NA */ }
+        public void SetPreWrite(bool _) {  /* NA */ }
 
         public void UpdateMemoryMappings()
         {

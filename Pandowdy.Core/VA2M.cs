@@ -39,7 +39,7 @@ public sealed class VA2M : IDisposable
         TryLoadEmbeddedRom("Pandowdy.Core.Resources.a2e_enh_c-f.rom");
         //var mem = new VA2MMemory(0,RamSize);
         
-        Bus = new VA2MBus(MemoryPool, statusProvider);
+        Bus = new VA2MBus(MemoryPool/*, statusProvider*/);
         _cpu = new CPU();
         Bus.Connect(_cpu);
         if (_frameSink is not null && Bus is VA2MBus vb)

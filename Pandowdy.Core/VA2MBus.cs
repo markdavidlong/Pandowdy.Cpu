@@ -7,10 +7,10 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Pandowdy.Core;
 
-
 public interface IAppleIIBus : IBus
 {
     public void SetKeyValue(byte key);
+
     public void SetPushButton(int num, bool enabled);
 }
 
@@ -21,35 +21,42 @@ public interface IAppleIIBus : IBus
 /// VBlank event is raised on the emulator thread; subscribers on the UI thread MUST marshal via dispatcher.
 /// After disposal, no further events are raised and Clock() becomes a no-op.
 /// </summary>
-public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusProvider = null, ISoftSwitchResponder? responder = null) : IAppleIIBus, IDisposable
+public sealed class VA2MBus : IAppleIIBus, IDisposable
 {
-    private readonly ISystemStatusProvider? _status = statusProvider;
+    //private readonly ISystemStatusProvider? _status;
 
-    private readonly MemoryPool _memoryPool = mempool;
-    private readonly ISoftSwitchResponder _switches = responder ?? mempool;
+    private readonly MemoryPool _memoryPool;
     private int lastPc = 0;
     private AppleSoftHookTable? _hookTable;
     private CPU? _cpu;
     private ulong _systemClock;
+    private SoftSwitches _softSwitches = new();
 
     public IMemory RAM => _memoryPool;
 
     public ulong SystemClockCounter => _systemClock;
     private bool _disposed;
     private byte _currKey = 0x00;
+    private bool _button0 = false;
+    private bool _button1 = false;
+    private bool _button2 = false;
 
     // Cycle-based VBlank (1,023,000 Hz / 60 ? 17050; using 17063 from spec for Apple II NTSC)
     private const ulong CyclesPerVBlank = 17063; // adjust if more precise timing required
+
     private ulong _nextVblankCycle = CyclesPerVBlank;
+
     public event EventHandler? VBlank;
 
     // 2.1 Hz flash timer (approx every 476 ms)
     private Timer? _flashTimer;
+
     private static readonly TimeSpan FlashPeriod = TimeSpan.FromMilliseconds(476);
 
     public static readonly ushort IOSTART = 0xC000;
-    public static readonly ushort IOEND  = 0xC0FF;
+    public static readonly ushort IOEND = 0xC0FF;
 
+    public static readonly ushort KBD_ = 0xC000;
     public static readonly ushort SET80STORE_ = 0xC000;
     public static readonly ushort CLR80STORE_ = 0xC001;
     public static readonly ushort RDMAINRAM_ = 0xC002;
@@ -67,6 +74,85 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
     public static readonly ushort CLRALTCHAR_ = 0xC00E;
     public static readonly ushort SETALTCHAR_ = 0xC00F;
 
+    public static readonly ushort KEYSTRB_ = 0xC010;
+    public static readonly ushort RD_LC_BANK1_ = 0xC011;
+    public static readonly ushort RD_LC_RAM = 0xC012;
+    public static readonly ushort RD_RAMRD_ = 0xC013;
+    public static readonly ushort RD_RAMWRT_ = 0xC014;
+    public static readonly ushort RD_INTCXROM_ = 0xC015;
+    public static readonly ushort RD_ALTZP_ = 0xC016;
+    public static readonly ushort RD_SLOTC3ROM_ = 0xC017;
+    public static readonly ushort RD_80STORE_ = 0xC018;
+    public static readonly ushort RD_VERTBLANK_ = 0xC019;
+    public static readonly ushort RD_TEXT_ = 0xC01A;
+    public static readonly ushort RD_MIXED_ = 0xC01B;
+    public static readonly ushort RD_PAGE2_ = 0xC01C;
+    public static readonly ushort RD_HIRES_ = 0xC01D;
+    public static readonly ushort RD_ALTCHAR_ = 0xC01E;
+    public static readonly ushort RD_80VID_ = 0xC01F;
+
+    public static readonly ushort TAPEOUT_ = 0xC020; // to 0xC02F
+    public static readonly ushort END_TAPEOUT_RD_ = 0xC02F;
+    public static readonly ushort SPKR_ = 0xC030; // to 0xC03F
+    public static readonly ushort END_SPKR_RD_ = 0xC03F;
+    public static readonly ushort STROBE_ = 0xC040; // to 0xC04F
+    public static readonly ushort END_STROBE_RD_ = 0xC04F;
+
+    public static readonly ushort CLRTXT_ = 0xC050;
+    public static readonly ushort SETTXT_ = 0xC051;
+    public static readonly ushort CLRMIXED_ = 0xC052;
+    public static readonly ushort SETMIXED_ = 0xC053;
+    public static readonly ushort CLRPAGE2_ = 0xC054;
+    public static readonly ushort SETPAGE2_ = 0xC055;
+    public static readonly ushort CLRHIRES_ = 0xC056;
+    public static readonly ushort SETHIRES_ = 0xC057;
+    public static readonly ushort CLRAN0_ = 0xC058;
+    public static readonly ushort SETAN0_ = 0xC059;
+    public static readonly ushort CLRAN1_ = 0xC05A;
+    public static readonly ushort SETAN1_ = 0xC05B;
+    public static readonly ushort CLRAN2_ = 0xC05C;
+    public static readonly ushort SETAN2_ = 0xC05D;
+    public static readonly ushort CLRAN3_ = 0xC05E;
+    public static readonly ushort SETAN3_ = 0xC05F;
+
+    public static readonly ushort TAPEIN_ = 0xC060;
+    public static readonly ushort BUTTON0_ = 0xC061;
+    public static readonly ushort BUTTON1_ = 0xC062;
+    public static readonly ushort BUTTON2_ = 0xC063;
+    public static readonly ushort PADDLE0_ = 0xC064;
+    public static readonly ushort PADDLE1_ = 0xC065;
+    public static readonly ushort PADDLE2_ = 0xC066;
+    public static readonly ushort PADDLE3_ = 0xC067;
+
+    public static readonly ushort PTRIG_ = 0xC070;
+    public static readonly ushort RD_IOUDISABLE_ = 0xC07E;
+    public static readonly ushort IOUDISABLE_ = 0xC07E;
+    public static readonly ushort IOUENABLE_ = 0xC07F;
+
+    public static readonly ushort B2_RD_RAM_NO_WRT_ = 0xC080;
+    public static readonly ushort B2_RD_RAM_NO_WRT_ALT_ = 0xC084;
+    public static readonly ushort B2_RD_ROM_WRT_RAM_ = 0xC081;
+    public static readonly ushort B2_RD_ROM_WRT_RAM_ALT_ = 0xC085;
+    public static readonly ushort B2_RD_ROM_NO_WRT_ = 0xC082;
+    public static readonly ushort B2_RD_ROM_NO_WRT_ALT_ = 0xC086;
+    public static readonly ushort B2_RD_RAM_WRT_RAM_ = 0xC083;
+    public static readonly ushort B2_RD_RAM_WRT_RAM_ALT_ = 0xC087;
+
+    public static readonly ushort B1_RD_RAM_NO_WRT_ = 0xC088;
+    public static readonly ushort B1_RD_RAM_NO_WRT_ALT_ = 0xC08C;
+    public static readonly ushort B1_RD_ROM_WRT_RAM_ = 0xC089;
+    public static readonly ushort B1_RD_ROM_WRT_RAM_ALT_ = 0xC08C;
+    public static readonly ushort B1_RD_ROM_NO_WRT_ = 0xC08A;
+    public static readonly ushort B1_RD_ROM_NO_WRT_ALT_ = 0xC08E;
+    public static readonly ushort B1_RD_RAM_WRT_RAM_ = 0xC08B;
+    public static readonly ushort B1_RD_RAM_WRT_RAM_ALT_ = 0xC08F;
+
+    public VA2MBus(MemoryPool mempool, ISoftSwitchResponder? responder = null)
+    {
+        _memoryPool = mempool;
+
+        _softSwitches.AddResponder(responder ?? mempool);
+    }
 
     public void Connect(CPU cpu)
     {
@@ -75,15 +161,18 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
         _cpu.Connect(this);
         _hookTable ??= new AppleSoftHookTable();
         _hookTable.InitializeDefault();
-        // Start flash timer if status provider available
-        if (_status != null && _flashTimer == null)
-        {
-            _flashTimer = new Timer(_ =>
-            {
-                if (_disposed) { return; }
-                _status!.Mutate(b => b.StateFlashOn = !b.StateFlashOn);
-            }, null, FlashPeriod, FlashPeriod);
-        }
+
+        //TODO: MOVE THE FLASH TIMER TO VA2M SYSTEM CLASS. It doesn't need to be in the bus.
+        //
+        //// Start flash timer if status provider available
+        //if (_status != null && _flashTimer == null)
+        //{
+        //    _flashTimer = new Timer(_ =>
+        //    {
+        //        if (_disposed) { return; }
+        //        _status!.Mutate(b => b.StateFlashOn = !b.StateFlashOn);
+        //    }, null, FlashPeriod, FlashPeriod);
+        //}
     }
 
     public void SetKeyValue(byte key)
@@ -91,154 +180,43 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
         _currKey = key;
     }
 
-
     public void SetPushButton(int num, bool pressed)
     {
-        _status!.Mutate(b =>
+        //_status!.Mutate(b =>
+        //{
+        switch (num)
         {
-            switch (num)
-            {
-                case 0:
-                    b.StatePb0 = pressed;
-                    break;
-                case 1:
-                    b.StatePb1 = pressed;
-                    break;
-                case 2:
-                    b.StatePb2 = pressed;
-                    break;
-            }
-        });
-    }
+            case 0:
+                _button0 = pressed;
+                //b.StatePb0 = pressed;
+                break;
 
+            case 1:
+                _button1 = pressed;
+                //b.StatePb1 = pressed;
+                break;
 
-    void Set80Store(bool enabled)
-    {
-        _status!.Mutate(b => b.State80Store = enabled);
-        _switches.Set80Store(enabled);
-    }
-
-    void SetRamRead(bool enabled)
-    {
-        _status!.Mutate(b => b.StateRamRd = enabled);
-        _switches.SetRamRd(enabled);
-    }
-    void SetRamWrite(bool enabled)
-    {
-        _status!.Mutate(b => b.StateRamWrt = enabled);
-        _switches.SetRamWrt(enabled);
-    }
-
-
-    void SetSlotCxRom()
-    {
-        _status!.Mutate(b => b.StateIntCxRom = false);
-        _switches.SetIntCxRom(false);
-    }
-
-    void SetIntCxRom()
-    {
-        _status!.Mutate(b => b.StateIntCxRom = true);
-        _switches.SetIntCxRom(true);
-    }
-
-    void SetAltZp(bool enabled)
-    {
-        _status!.Mutate(b => b.StateAltZp = enabled);
-        _switches.SetAltZp(enabled);
-    }
-
-    void SetSlotC3Rom(bool enabled)
-    {
-        _status!.Mutate(b => b.StateSlotC3Rom = enabled);
-        _switches.SetSlotC3Rom(enabled);
-    }
-
-    void SetShow80Col(bool enabled)
-    {
-        _status!.Mutate(b => b.StateShow80Col = enabled);
-    }
-
-    void SetAltCharSet(bool enabled)
-    {
-        _status!.Mutate(b => b.StateAltCharSet = enabled);
-    }
-
-    void SetTextMode(bool enabled)
-    {
-        _status!.Mutate(b => b.StateTextMode = enabled);
-    }
-
-    void SetMixed(bool enabled)
-    {
-        _status!.Mutate(b => b.StateMixed = enabled);
-    }
-
-    void SetPage2(bool enabled)
-    {
-        _status!.Mutate(b => b.StatePage2 = enabled);
-        _switches.SetPage2(enabled);
-    }
-
-    void SetHires(bool enabled)
-    {
-        _status!.Mutate(b => b.StateHiRes = enabled);
-        _switches.SetHiRes(enabled);
-    }
-
-    void SetAnnunciator(int num, bool enabled) { 
-        _status!.Mutate(b =>
-            {
-                switch (num)
-                {
-                    case 0:
-                        b.StateAnn0 = enabled;
-                        break;
-                    case 1:
-                        b.StateAnn1 = enabled;
-                        break;
-                    case 2:
-                        b.StateAnn2 = enabled;
-                        break;
-                    case 3:
-                        b.StateAnn3 = enabled;
-                        break;
-                }
-            });
-    }
-
-    void ClearWrtCount()
-    {
-        _status!.Mutate(b => b.StateWriteCount = 0);
-    }
-
-    void IncrementWrtCount()
-    {
-        int count = _status!.StateWriteCount + 1;
-
-        _status!.Mutate(b => b.StateWriteCount = count);
-        if (count >= 2)
-        {
-            count = 2;
-            _status!.Mutate(b => b.StateHighWrite = true);
-            _switches.SetHighWrite(true);
+            case 2:
+                _button2 = pressed;
+                //b.StatePb2 = pressed;
+                break;
         }
+        //});
     }
 
-    void SetBank1(bool status)
+    private void SetWriteOrPrewrite()
     {
-        _status!.Mutate(b => b.StateUseBank1 = status);
-        _switches.SetBank1(status);
-    }
-    void SetHighRead(bool status)
-    {
-        _status!.Mutate(b => b.StateHighRead = status);
-        _switches.SetHighRead(status);
-    }
-    void DisableHighWrite()
-    {
-        _status!.Mutate(b => b.StateHighWrite = false);
-        _switches.SetHighWrite(false);
+        // if prewrite isn't set, set it and return.
+        // if prewrite is already set, increment write count
+
+        if (!_softSwitches.Get(SoftSwitches.SoftSwitchId.PreWrite))
+        {
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, true);
+        }
+        else
+        {
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighWrite, true);
+        }
     }
 
     private byte ReadFromIOSpace(ushort address)
@@ -248,303 +226,315 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
             return _currKey;
         }
 
-
-        if (address == 0xC010)
+        if (address == KEYSTRB_)
         {
             _currKey &= 0x7f; // Clear high byte;
                               //Temporary fix:
             return _currKey; // Should return 0x80 if key is pressed or 0x00 if not; simplified to always 0x00
         }
 
-        if (address == 0xC011)
+        if (address == RD_LC_BANK1_)
         {
-            // Status of selected $Dx bank
-            // NOT IMPLEMENTED YET
-            return _currKey;
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.Bank1);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC012)
+        if (address == RD_LC_RAM)
         {
-            // Status of $Dx ROM / $Dx RAM
-            // NOT IMPLEMENTED YET
-            return _currKey;
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.HighRead);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC013)
+        if (address == RD_RAMRD_)
         {
-            return (byte) ((_status!.StateRamRd ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.RamRd);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC014)
+        if (address == RD_RAMWRT_)
         {
-            return (byte) ((_status!.StateRamWrt ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.RamWrt);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC015)
+        if (address == RD_INTCXROM_)
         {
-            return (byte) ((_status!.StateIntCxRom ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.IntCxRom);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC016)
+        if (address == RD_ALTZP_)
         {
-            return (byte) ((_status!.StateAltZp ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.AltZp);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC017)
+        if (address == RD_SLOTC3ROM_)
         {
-            return (byte) ((_status!.StateSlotC3Rom ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.SlotC3Rom);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC018)
+        if (address == RD_80STORE_)
         {
-            return (byte) ((_status!.State80Store ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.Store80);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC019)
+        if (address == RD_VERTBLANK_)
         {
             // Vert Blanking Status => 1 = Drawing
             // NOT IMPLEMENTED YET
             return _currKey;
         }
 
-        if (address == 0xC01A)
+        if (address == RD_TEXT_)
         {
-            return (byte) ((_status!.StateTextMode ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.Text);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC01B)
+        if (address == RD_MIXED_)
         {
-            return (byte) ((_status!.StateMixed ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.Mixed);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC01C)
+        if (address == RD_PAGE2_)
         {
-            return (byte) ((_status!.StatePage2 ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.Page2);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC01D)
+        if (address == RD_HIRES_)
         {
-            return (byte) ((_status!.StateHiRes ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.HiRes);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC01E)
+        if (address == RD_ALTCHAR_)
         {
-            return (byte) ((_status!.StateAltCharSet ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.AltChar);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address == 0xC01F)
+        if (address == RD_80VID_)
         {
-            return (byte) ((_status!.StateShow80Col ? 0x80 : 0x00) + _currKey & 0x7f);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.Vid80);
+            return (byte) ((state ? 0x80 : 0x00) + _currKey & 0x7f);
         }
 
-        if (address >= 0xC020 && address <= 0xC02F) // TAPEOUT
+        if (address >= TAPEOUT_ && address <= END_TAPEOUT_RD_) // TAPEOUT
         {
             // NOT IMPLEMENTED YET
             return 0;
         }
 
-        if (address >= 0xC030 && address <= 0xC03F) // SPKR
+        if (address >= SPKR_ && address <= END_SPKR_RD_) // SPKR
         {
             // NOT IMPLEMENTED YET
             return 0;
         }
 
-        if (address >= 0xC040 && address <= 0xC04F) // STROBE
+        if (address >= STROBE_ && address <= END_STROBE_RD_) // STROBE
         {
             // NOT IMPLEMENTED YET
             return 0;
         }
 
-        if (address == 0xC050) // TEXT OFF
+        if (address == CLRTXT_) // TEXT OFF
         {
-            SetTextMode(false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Text, false);
             return 0xA0; // Placeholder value
         }
-        if (address == 0xC051) // TEXT ON
+        if (address == SETTXT_) // TEXT ON
         {
-            SetTextMode(true);
-            return 0xA0; // Placeholder value
-        }
-
-        if (address == 0xC052) // MIXED OFF
-        {
-            SetMixed(false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Text, true);
             return 0xA0; // Placeholder value
         }
 
-        if (address == 0xC053) // MIXED ON
+        if (address == CLRMIXED_) // MIXED OFF
         {
-            SetMixed(true);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Mixed, false);
             return 0xA0; // Placeholder value
         }
 
-        if (address == 0xC054) // PAGE2 OFF
+        if (address == SETMIXED_) // MIXED ON
         {
-            SetPage2(false);
-            return 0xA0; // Placeholder value
-        }
-        if (address == 0xC055) // PAGE2 ON
-        {
-            SetPage2(true);
-            return 0xA0; // Placeholder value
-        }
-        if (address == 0xC056) // HIRES OFF
-        {
-            SetHires(false);
-            return 0xA0; // Placeholder value
-        }
-        if (address == 0xC057) // HIRES ON
-        {
-            SetHires(true);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Mixed, true);
             return 0xA0; // Placeholder value
         }
 
-        if (address == 0xC058) // ANN0
+        if (address == CLRPAGE2_) // PAGE2 OFF
         {
-            SetAnnunciator(0, false);
-            return (byte) (_status!.StateAnn0 ? 0x80 : 0x00);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Page2, false);
+            return 0xA0; // Placeholder value
         }
-        if (address == 0xC059)  
+        if (address == SETPAGE2_) // PAGE2 ON
         {
-            SetAnnunciator(0, true);
-            return (byte) (_status!.StateAnn0 ? 0x80 : 0x00);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Page2, true);
+            return 0xA0; // Placeholder value
         }
-        if (address == 0xC05A)  // ANN 1
+        if (address == CLRHIRES_) // HIRES OFF
         {
-            SetAnnunciator(1, false);
-            return (byte) (_status!.StateAnn1 ? 0x80 : 0x00);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HiRes, false);
+            return 0xA0; // Placeholder value
         }
-        if (address == 0xC05B)  
+        if (address == SETHIRES_) // HIRES ON
         {
-            SetAnnunciator(1, true);
-            return (byte) (_status!.StateAnn1 ? 0x80 : 0x00);
-        }
-        if (address == 0xC05C)  // ANN 2
-        {
-            SetAnnunciator(2, false);
-            return (byte) (_status!.StateAnn2 ? 0x80 : 0x00);
-        }
-        if (address == 0xC05D)  
-        {
-            SetAnnunciator(2, true);
-            return (byte) (_status!.StateAnn2 ? 0x80 : 0x00);
-        }
-        if (address == 0xC05E) // ANN 3  (or DHGR)
-        {
-            SetAnnunciator(3, false);
-            return (byte) (_status!.StateAnn3_DGR ? 0x80 : 0x00);
-        }
-        if (address == 0xC05F)  
-        {
-            SetAnnunciator(3, true);
-            return (byte) (_status!.StateAnn3_DGR ? 0x80 : 0x00);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HiRes, true);
+            return 0xA0; // Placeholder value
         }
 
-        if (address == 0xC060) // TAPE IN
+        if (address == CLRAN0_) // ANN0
+        {
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.An0, false);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.An0);
+            return (byte) (state ? 0x80 : 0x00);
+        }
+        if (address == SETAN0_)
+        {
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.An0, true);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.An0);
+            return (byte) (state ? 0x80 : 0x00);
+        }
+        if (address == CLRAN1_)  // ANN 1
+        {
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.An1, false);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.An1);
+            return (byte) (state ? 0x80 : 0x00);
+        }
+        if (address == SETAN1_)
+        {
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.An1, true);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.An1);
+            return (byte) (state ? 0x80 : 0x00);
+        }
+        if (address == CLRAN2_)  // ANN 2
+        {
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.An2, false);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.An2);
+            return (byte) (state ? 0x80 : 0x00);
+        }
+        if (address == SETAN2_)
+        {
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.An2, true);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.An2);
+            return (byte) (state ? 0x80 : 0x00);
+        }
+        if (address == CLRAN3_) // ANN 3  (or DHGR)
+        {
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.An3, false);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.An3);
+            return (byte) (state ? 0x80 : 0x00);
+        }
+        if (address == SETAN3_)
+        {
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.An3, true);
+            var state = _softSwitches.Get(SoftSwitches.SoftSwitchId.An3);
+            return (byte) (state ? 0x80 : 0x00);
+        }
+
+        if (address == TAPEIN_) // TAPE IN
         {
             // NOT IMPLEMENTED YET
             return 0x00;
         }
 
-        if (address == 0xC061) // Button 0
+        if (address == BUTTON0_) // Button 0
         {
-            return (byte) (_status!.StatePb0 ? 0x80 : 0x00);
+            return (byte) (_button0 ? 0x80 : 0x00);
         }
 
-        if (address == 0xC062) // Button 1
+        if (address == BUTTON1_) // Button 1
         {
-            return (byte) (_status!.StatePb1 ? 0x80 : 0x00);
+            return (byte) (_button1 ? 0x80 : 0x00);
         }
 
-        if (address == 0xC063) // Button 2
+        if (address == BUTTON2_) // Button 2
         {
-            return (byte) (_status!.StatePb2 ? 0x80 : 0x00);
+            return (byte) (_button2 ? 0x80 : 0x00);
         }
 
-        if (address == 0xC064) // Paddle 0
+        if (address == PADDLE0_) // Paddle 0
         {
             // NOT IMPLEMENTED YET
             return 0x00;
         }
-        if (address == 0xC065) // Paddle 1
+        if (address == PADDLE1_) // Paddle 1
         {
             // NOT IMPLEMENTED YET
             return 0x00;
         }
-        if (address == 0xC066) // Paddle 2
+        if (address == PADDLE2_) // Paddle 2
         {
             // NOT IMPLEMENTED YET
             return 0x00;
         }
-        if (address == 0xC067) // Paddle 3
+        if (address == PADDLE3_) // Paddle 3
         {
             // NOT IMPLEMENTED YET
             return 0x00;
         }
 
-
-
-        if (address == 0xC080 || address == 0xC084)
+        if (address == B2_RD_RAM_NO_WRT_ || address == B2_RD_RAM_NO_WRT_ALT_)
         {
-            ClearWrtCount();
-            SetBank1(false);
-            SetHighRead(true);
-            DisableHighWrite();
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, true);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighWrite, false);
         }
 
-        if (address == 0xC081 || address == 0xC085)
+        if (address == B2_RD_ROM_WRT_RAM_ || address == B2_RD_ROM_WRT_RAM_ALT_)
         {
-            SetBank1(false);
-            IncrementWrtCount();
-            SetHighRead(false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, false);
+            SetWriteOrPrewrite();
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, false);
         }
 
-
-        if (address == 0xC082 || address == 0xC086)
+        if (address == B2_RD_ROM_NO_WRT_ || address == B2_RD_ROM_NO_WRT_ALT_)
         {
-            SetBank1(false);
-            ClearWrtCount();
-            SetHighRead(false);
-            DisableHighWrite();
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighWrite, false);
         }
 
-        if (address == 0xC083 || address == 0xC087)
+        if (address == B2_RD_RAM_WRT_RAM_ || address == B2_RD_RAM_WRT_RAM_ALT_)
         {
-            SetBank1(false);
-            IncrementWrtCount();
-            SetHighRead(true);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, false);
+            SetWriteOrPrewrite();
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, true);
         }
 
-
-        if (address == 0xC088 || address == 0xC08C)
+        if (address == B1_RD_RAM_NO_WRT_ || address == B1_RD_RAM_NO_WRT_ALT_)
         {
-            ClearWrtCount();
-            SetBank1(true);
-            SetHighRead(true);
-            DisableHighWrite();
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, true);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, true);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighWrite, false);
         }
 
-        if (address == 0xC089 || address == 0xC08D)
+        if (address == B1_RD_ROM_WRT_RAM_ || address == B1_RD_ROM_WRT_RAM_ALT_)
         {
-            SetBank1(true);
-            IncrementWrtCount();
-            SetHighRead(false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, true);
+            SetWriteOrPrewrite();
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, false);
         }
 
-
-        if (address == 0xC08A || address == 0xC08E)
+        if (address == B1_RD_ROM_NO_WRT_ || address == B1_RD_ROM_NO_WRT_ALT_)
         {
-            SetBank1(true);
-            ClearWrtCount();
-            SetHighRead(false);
-            DisableHighWrite();
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, true);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, false);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighWrite, false);
         }
 
-        if (address == 0xC08B || address == 0xC08F)
+        if (address == B1_RD_RAM_WRT_RAM_ || address == B1_RD_RAM_WRT_RAM_ALT_)
         {
-            SetBank1(true);
-            IncrementWrtCount();
-            SetHighRead(true);
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, true);
+            SetWriteOrPrewrite();
+            _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, true);
         }
 
         // C080 / C084 -> Bank2, WrtCount = 0, Read = true
@@ -562,98 +552,118 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
         return 0x67; // Placehold Value
     }
 
-    void WriteToIOSpace(ushort address, byte _ /*data*/)
+    private void WriteToIOSpace(ushort address, byte _ /*data*/)
     {
-
-
-        if (_status != null && address >= IOSTART && address <= IOEND)
+        if (address >= IOSTART && address <= IOEND)
         {
             if (address == SET80STORE_)
             {
-      //          Debug.WriteLine("80Store Off");
-                Set80Store(false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Store80, false);
+                //          Debug.WriteLine("80Store Off");
+                //Set80Store(false);
                 return;
             }
             else if (address == CLR80STORE_)
             {
-   //             Debug.WriteLine("80Store On");
-                Set80Store(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Store80, true);
+                //             Debug.WriteLine("80Store On");
+                //Set80Store(true);
                 return;
             }
             else if (address == RDMAINRAM_)
             {
-                SetRamRead(false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.RamRd, false);
+
+                //SetRamRead(false);
                 return;
             }
             else if (address == RDCARDRAM_)
             {
-                SetRamRead(true);
+                //SetRamRead(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.RamRd, true);
+
                 return;
             }
             else if (address == WRMAINRAM_)
             {
-                SetRamWrite(false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.RamWrt, false);
+
+                //SetRamWrite(false);
                 return;
             }
             else if (address == WRCARDRAM_)
             {
-                SetRamWrite(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.RamWrt, true);
+
+                //SetRamWrite(true);
                 return;
             }
             else if (address == SLOTCXROM_)
             {
-                SetSlotCxRom();
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.IntCxRom, false);
+
+                //SetSlotCxRom();
                 return;
             }
             else if (address == INTCXROM_)
             {
-                SetIntCxRom();
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.IntCxRom, true);
+                //SetIntCxRom();
                 return;
             }
             else if (address == STDZP_)
             {
-                SetAltZp(false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.AltZp, false);
+
+                //   SetAltZp(false);
                 return;
             }
             else if (address == ALTZP_)
             {
-                SetAltZp(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.AltZp, true);
+                //SetAltZp(true);
                 return;
             }
             else if (address == INTC3ROM_)
             {
-                SetSlotC3Rom(false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.SlotC3Rom, false);
+
+                //SetSlotC3Rom(false);
                 return;
             }
             else if (address == SLOTC3ROM_)
             {
-                SetSlotC3Rom(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.SlotC3Rom, true);
+                //SetSlotC3Rom(true);
                 return;
             }
             else if (address == CLR80VID_)
             {
-                SetShow80Col(false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Vid80, false);
+
+                //SetShow80Col(false);
                 return;
             }
             else if (address == SET80VID_)
             {
-                SetShow80Col(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Vid80, true);
+                //SetShow80Col(true);
                 return;
             }
             else if (address == CLRALTCHAR_)
             {
-                SetAltCharSet(false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.AltChar, false);
+                //    SetAltCharSet(false);
                 return;
             }
-            else if (address == 0xC00F)
+            else if (address == SETALTCHAR_)
             {
-                SetAltCharSet(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.AltChar, true);
+                //SetAltCharSet(true);
                 return;
             }
 
-          
-
-            if (address == 0xC010)
+            if (address == KEYSTRB_)
             {
                 _currKey &= 0x7f; // Clear high byte;
 
@@ -662,161 +672,229 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
                 return;
             }
 
-            if (address == 0xC050)
+            if (address == CLRTXT_)
             {
-                SetTextMode(false);
-                return;
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Text, false);
 
-            }
-        
-            if (address == 0xC051)
-            {
-                SetTextMode(true);
+                // SetTextMode(false);
                 return;
             }
 
-            if (address == 0xC052)
+            if (address == SETTXT_)
             {
-                SetMixed(false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Text, true);
+
+                //SetTextMode(true);
                 return;
             }
 
-            if (address == 0xC053)
+            if (address == CLRMIXED_)
             {
-                SetMixed(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Mixed, false);
+
+                //SetMixed(false);
                 return;
             }
 
-            if (address == 0xC054)
+            if (address == SETMIXED_)
             {
-        //        Debug.WriteLine("Page2 Off");
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Mixed, true);
 
-                SetPage2(false);
+                //SetMixed(true);
                 return;
             }
 
-            if (address == 0xC055)
+            if (address == CLRPAGE2_)
             {
-   //             Debug.WriteLine("Page2 On");
+                //        Debug.WriteLine("Page2 Off");
 
-                SetPage2(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Page2, false);
+
+                // SetPage2(false);
                 return;
             }
 
-            if (address == 0xC056)
+            if (address == SETPAGE2_)
             {
-                SetHires(false);
+                //             Debug.WriteLine("Page2 On");
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Page2, true);
+
+                //SetPage2(true);
                 return;
             }
 
-            if (address == 0xC057)
+            if (address == CLRHIRES_)
             {
-                SetHires(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HiRes, false);
+
+                //SetHires(false);
                 return;
             }
 
-            if (address == 0xC058)
+            if (address == SETHIRES_)
             {
-                SetAnnunciator(0, false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HiRes, true);
+
+                //SetHires(true);
+                return;
             }
 
-            if (address == 0xC059)
+            if (address == CLRAN0_)
             {
-                SetAnnunciator(0, true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.An0, false);
+
+                //SetAnnunciator(0, false);
             }
 
-            if (address == 0xC05A)
+            if (address == SETAN0_)
             {
-                SetAnnunciator(1, false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.An0, true);
+                //SetAnnunciator(0, true);
             }
 
-            if (address == 0xC05B)
+            if (address == CLRAN1_)
             {
-                SetAnnunciator(1, true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.An1, false);
+                //SetAnnunciator(1, false);
             }
 
-            if (address == 0xC05C)
+            if (address == SETAN1_)
             {
-                SetAnnunciator(2, false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.An1, true);
+                //SetAnnunciator(1, true);
             }
 
-            if (address == 0xC05D)
+            if (address == CLRAN2_)
             {
-                SetAnnunciator(2, true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.An2, false);
+                //SetAnnunciator(2, false);
             }
 
-            if (address == 0xC05E)
+            if (address == SETAN2_)
             {
-                SetAnnunciator(3, false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.An2, true);
+                //SetAnnunciator(2, true);
             }
 
-            if (address == 0xC05F)
+            if (address == CLRAN3_)
             {
-                SetAnnunciator(3, true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.An3, false);
+                //SetAnnunciator(3, false);
             }
 
-
-            if (address == 0xC080 || address == 0xC084)
+            if (address == SETAN3_)
             {
-                ClearWrtCount();
-                SetBank1(false);
-                SetHighRead(true);
-                DisableHighWrite();
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.An3, true);
+                //  SetAnnunciator(3, true);
             }
 
-            if (address == 0xC081 || address == 0xC085)
+            if (address == B2_RD_RAM_NO_WRT_ || address == B2_RD_RAM_NO_WRT_ALT_)
             {
-                SetBank1(false);
-                ClearWrtCount();
-                SetHighRead(false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+                //ClearWrtCount();
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, false);
+                //SetBank1(false);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, true);
+                //SetHighRead(true);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighWrite, false);
+                //DisableHighWrite();
             }
 
-
-            if (address == 0xC082 || address == 0xC086)
+            if (address == B2_RD_ROM_WRT_RAM_ || address == B2_RD_ROM_WRT_RAM_)
             {
-                SetBank1(false);
-                ClearWrtCount();
-                SetHighRead(false);
-                DisableHighWrite();
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, false);
+                //SetBank1(false);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+                //ClearWrtCount();
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, false);
+                //SetHighRead(false);
             }
 
-            if (address == 0xC083 || address == 0xC087)
+            if (address == B2_RD_ROM_NO_WRT_ || address == B2_RD_ROM_NO_WRT_ALT_)
             {
-                SetBank1(false);
-                ClearWrtCount();
-                SetHighRead(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, false);
+                //SetBank1(false);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+                //ClearWrtCount();
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, false);
+                //SetHighRead(false);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighWrite, false);
+                //DisableHighWrite();
             }
 
-
-            if (address == 0xC088 || address == 0xC08C)
+            if (address == B2_RD_RAM_WRT_RAM_ || address == B2_RD_RAM_WRT_RAM_ALT_)
             {
-                ClearWrtCount();
-                SetBank1(true);
-                SetHighRead(true);
-                DisableHighWrite();
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, false);
+                //SetBank1(false);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+                //ClearWrtCount();
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, true);
+                //SetHighRead(true);
             }
 
-            if (address == 0xC089 || address == 0xC08D)
+            if (address == B1_RD_RAM_NO_WRT_ || address == B1_RD_RAM_NO_WRT_ALT_)
             {
-                SetBank1(true);
-                ClearWrtCount();
-                SetHighRead(false);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+                //ClearWrtCount();
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, true);
+                //SetBank1(true);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, true);
+                //SetHighRead(true);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighWrite, false);
+                //DisableHighWrite();
             }
 
-
-            if (address == 0xC08A || address == 0xC08E)
+            if (address == B1_RD_ROM_WRT_RAM_ || address == B1_RD_ROM_WRT_RAM_ALT_)
             {
-                SetBank1(true);
-                ClearWrtCount();
-                SetHighRead(false);
-                DisableHighWrite();
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, true);
+                //SetBank1(true);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+                //ClearWrtCount();
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, false);
+                //SetHighRead(false);
             }
 
-            if (address == 0xC08B || address == 0xC08F)
+            if (address == B1_RD_ROM_NO_WRT_ || address == B1_RD_ROM_NO_WRT_ALT_)
             {
-                SetBank1(true);
-                ClearWrtCount();
-                SetHighRead(true);
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, true);
+                //SetBank1(true);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+                //ClearWrtCount();
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, false);
+                //SetHighRead(false);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighWrite, false);
+                //DisableHighWrite();
+            }
+
+            if (address == B1_RD_RAM_WRT_RAM_ || address == B1_RD_RAM_WRT_RAM_ALT_)
+            {
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.Bank1, true);
+                //SetBank1(true);
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.PreWrite, false);
+                //ClearWrtCount();
+
+                _softSwitches.Set(SoftSwitches.SoftSwitchId.HighRead, true);
+                //SetHighRead(true);
             }
 
             // C080 / C084 -> Bank2, WrtCount = 0, Read = true
@@ -828,12 +906,10 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
             // C089 / C08D -> Bank1, WrtCount = 0, Read = false
             // C08A / C08E -> Bank1, WrtCount = 0, Read = false
             // C08B / C08F -> Bank1, WrtCount = 0, Read = true
-
         }
 
         // Todo: Handle C100-CFFF I/O writes here if needed
     }
-
 
     public byte CpuRead(ushort address, bool readOnly = false)
     {
@@ -845,12 +921,10 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
         }
         else
         {
-
             //if (address >= 0xC100 && address < 0xD000)
             //{
             //    Debug.WriteLine($"Read from {address:X4}");
             //}
-
 
             return _memoryPool.Read(address);
         }
@@ -884,7 +958,7 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
         var currPc = _cpu!.PC;
         if (lastPc != currPc)
         {
-            var hook = _hookTable?.Get((ushort)currPc);
+            var hook = _hookTable?.Get((ushort) currPc);
             if (hook != null)
             {
                 var lineNum = CpuRead(0x75) + (CpuRead(0x76) * 256);
@@ -893,9 +967,12 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
                 var spcs = 0xFF - sp;
                 hook(-1, lineNum, spcs);
             }
+
             #region LegacyTrace_DoNotRemove
+
             // (Preserved commented instrumentation)
-            #endregion
+
+            #endregion LegacyTrace_DoNotRemove
         }
         lastPc = currPc;
 
@@ -905,7 +982,8 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
         if (_systemClock >= _nextVblankCycle)
         {
             // Catch up if emulator ran fast (unthrottled batches)
-            do { _nextVblankCycle += CyclesPerVBlank; } while (_systemClock >= _nextVblankCycle);
+            do
+            { _nextVblankCycle += CyclesPerVBlank; } while (_systemClock >= _nextVblankCycle);
             if (!_disposed)
             {
                 VBlank?.Invoke(this, EventArgs.Empty);
@@ -916,32 +994,32 @@ public sealed class VA2MBus(MemoryPool mempool, ISystemStatusProvider? statusPro
     public void Reset()
     {
         ThrowIfDisposed();
-        SetRamRead(false);
-        SetRamWrite(false);
-        SetIntCxRom();
-        SetHires(false);
-        SetMixed(false);
-        SetPage2(false);
-        SetShow80Col(false);
-        SetSlotC3Rom(false);
-        Set80Store(false);
-        SetAltCharSet(false);
-        SetTextMode(true);
-        SetAltZp(false);
-        SetAnnunciator(0, false);
-        SetAnnunciator(1, false);
-        SetAnnunciator(2, false);
-        SetAnnunciator(3, false);
-        SetBank1(false);
-        SetHighRead(false);
-        DisableHighWrite();
-        ClearWrtCount();
-
+        _softSwitches.ResetAllSwitches();
+        //Set80Store(false);
+        //SetRamRead(false);
+        //SetRamWrite(false);
+        //SetIntCxRom();
+        //SetAltZp(false);
+        //SetSlotC3Rom(false);
+        //SetShow80Col(false); // Vid80
+        //SetAltCharSet(false);
+        //SetTextMode(true);
+        //SetMixed(false);
+        //SetPage2(false);
+        //SetHires(false);
+        //SetAnnunciator(0, false);
+        //SetAnnunciator(1, false);
+        //SetAnnunciator(2, false);
+        //SetAnnunciator(3, false);
+        //SetBank1(false);
+        //SetHighRead(false);
+        //DisableHighWrite();
+        // No PreWrite
+        //ClearWrtCount();
 
         _cpu!.Reset();
         _systemClock = 0;
         _nextVblankCycle = CyclesPerVBlank;
-
     }
 
     public void Dispose()

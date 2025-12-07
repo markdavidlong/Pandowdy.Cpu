@@ -19,8 +19,8 @@ public class Apple2Display : Control
 {
     public static readonly StyledProperty<Bitmap?> BitmapProperty =
         AvaloniaProperty.Register<Apple2Display, Bitmap?>(nameof(Bitmap), null);
-    public static readonly StyledProperty<bool> Use80ColsProperty =
-        AvaloniaProperty.Register<Apple2Display, bool>(nameof(Use80Cols), false);
+    //public static readonly StyledProperty<bool> Use80ColsProperty =
+    //    AvaloniaProperty.Register<Apple2Display, bool>(nameof(Use80Cols), false);
 
     private bool _suppressNextTextInput;
     private VA2M? _machine;
@@ -77,11 +77,11 @@ public class Apple2Display : Control
         set => SetValue(BitmapProperty, value);
     }
 
-    public bool Use80Cols
-    {
-        get => GetValue(Use80ColsProperty);
-        set => SetValue(Use80ColsProperty, value);
-    }
+    //public bool Use80Cols
+    //{
+    //    get => GetValue(Use80ColsProperty);
+    //    set => SetValue(Use80ColsProperty, value);
+    //}
 
     private const double SourceWidth = 561;
     private const double SourceHeight = 384;
