@@ -14,6 +14,14 @@ public interface IFrameProvider {
     void CommitWritable(); // swap buffers & raise event
 }
 
+// Refresh ticker abstraction for 60 Hz UI-driven updates
+public interface IRefreshTicker
+{
+    IObservable<DateTime> Stream { get; }
+    void Start();
+    void Stop();
+}
+
 public interface ISystemStatusProvider
 {
     bool State80Store { get; }

@@ -18,6 +18,7 @@ class Program
         builder.Services.AddSingleton<IFrameProvider, FrameProvider>();
         //builder.Services.AddSingleton<IErrorProvider, ErrorProvider>();
         builder.Services.AddSingleton<IEmulatorState, EmulatorStateProvider>();
+        builder.Services.AddSingleton<IRefreshTicker, AvaloniaRefreshTicker>();
         //builder.Services.AddSingleton<IDisassemblyProvider, DisassemblyProvider>();
         builder.Services.AddSingleton<ISystemStatusProvider, SystemStatusProvider>();
 

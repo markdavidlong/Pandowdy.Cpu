@@ -19,8 +19,6 @@ public class Apple2Display : Control
 {
     public static readonly StyledProperty<Bitmap?> BitmapProperty =
         AvaloniaProperty.Register<Apple2Display, Bitmap?>(nameof(Bitmap), null);
-    //public static readonly StyledProperty<bool> Use80ColsProperty =
-    //    AvaloniaProperty.Register<Apple2Display, bool>(nameof(Use80Cols), false);
 
     private bool _suppressNextTextInput;
     private VA2M? _machine;
@@ -64,7 +62,7 @@ public class Apple2Display : Control
     private IFrameProvider? _frameProvider;
     //RTH private byte[]? _lastFrame;
     private BitmapDataArray? _lastFrame;
-    private DispatcherTimer? _refreshTimer; // ~60Hz UI redraw cadence
+    // Refresh cadence driven externally (MainWindow ticker)
 
   //  private ISystemStatusProvider? _status;
     //private bool _flagText, _flagMixed, _flagHiRes, _flagPage2;
@@ -76,12 +74,6 @@ public class Apple2Display : Control
         get => GetValue(BitmapProperty);
         set => SetValue(BitmapProperty, value);
     }
-
-    //public bool Use80Cols
-    //{
-    //    get => GetValue(Use80ColsProperty);
-    //    set => SetValue(Use80ColsProperty, value);
-    //}
 
     private const double SourceWidth = 561;
     private const double SourceHeight = 384;
@@ -96,23 +88,11 @@ public class Apple2Display : Control
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
         TextInput += OnTextInput;
-
-        _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000.0 / 60.0) };
-        _refreshTimer.Tick += (_, __) =>
-        {
-            if (_frameProvider != null && _lastFrame != null)
-            {
-                InvalidateVisual();
-            }
-        };
-        _refreshTimer.Start();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-        _refreshTimer?.Stop();
-        _refreshTimer = null;
         if (_frameProvider != null)
         {
             _frameProvider.FrameAvailable -= OnFrameAvailable;
@@ -219,6 +199,15 @@ public class Apple2Display : Control
             return;
         }
         DrawBitmapScaled(context);
+    }
+
+    public void RequestRefresh()
+    {
+        // Ensure we have a frame to render before invalidating
+        if (_frameProvider != null && _lastFrame != null)
+        {
+            InvalidateVisual();
+        }
     }
 
     static private unsafe void RenderMonochromeLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Emulator;
 using System.Reflection.Metadata.Ecma335;
+using System.Collections.Concurrent;
 
 namespace Pandowdy.Core;
 
@@ -49,6 +50,24 @@ public sealed class VA2M : IDisposable
     }
 
     
+    // Queue for cross-thread emulator actions
+    private readonly ConcurrentQueue<Action> _pending = new();
+
+    private void Enqueue(Action action)
+    {
+        if (action != null)
+        {
+            _pending.Enqueue(action);
+        }
+    }
+
+    private void ProcessPending()
+    {
+        while (_pending.TryDequeue(out var act))
+        {
+            try { act(); } catch { }
+        }
+    }
 
     private void OnVBlank(object? sender, EventArgs e)
     {
@@ -152,6 +171,8 @@ public sealed class VA2M : IDisposable
     /// </summary>
     public void Clock()
     {
+        // Execute commands enqueued from other threads
+        ProcessPending();
         Bus.Clock();
         _throttleCycles++;
         if (ThrottleEnabled)
@@ -218,6 +239,8 @@ public sealed class VA2M : IDisposable
                     }
                 }
                 catch (OperationCanceledException) { break; }
+                // Execute queued commands on emulator thread before cycles
+                ProcessPending();
                 double want = cyclesPerTick + carry;
                 int cycles = (int)want;
                 carry = want - cycles;
@@ -231,6 +254,8 @@ public sealed class VA2M : IDisposable
             else
             {
                 const int FastBatch = 10_000;
+                // Execute queued commands on emulator thread before fast batch
+                ProcessPending();
                 for (int i = 0; i < FastBatch; i++)
                 {
                     Bus.Clock();
@@ -270,9 +295,17 @@ public sealed class VA2M : IDisposable
     /// High bit must be set.  Cleared by access of $C010.
     /// </summary>
     
-    public void InjectKey(byte ascii) => Bus.SetKeyValue((byte)(ascii | 0x80));
+    public void InjectKey(byte ascii)
+    {
+        // Enqueue to run on emulator thread
+        byte val = (byte)(ascii | 0x80);
+        Enqueue(() => Bus.SetKeyValue(val));
+    }
 
-    public void SetPushButton(byte num, bool pressed) => Bus.SetPushButton(num, pressed);
+    public void SetPushButton(byte num, bool pressed)
+    {
+        Enqueue(() => Bus.SetPushButton(num, pressed));
+    }
 
     /*    /// <summary>
         /// Load a ROM image into RAM at the specified base address (for early testing).

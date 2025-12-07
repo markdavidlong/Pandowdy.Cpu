@@ -32,6 +32,8 @@ public partial class MainWindow : Window // reverted base class
     private MenuItem? _scanLinesMenuItem;
     private Menu? _mainMenu;
     private Apple2Display? _screen;
+    private IRefreshTicker? _refreshTicker;
+    private IDisposable? _refreshSub;
     private bool _menuPointerActive; // true while pointer is over the menu bar
 
     private bool _capsLockEnabled = true; // default ON
@@ -43,6 +45,7 @@ public partial class MainWindow : Window // reverted base class
 
         var app = (App?)Application.Current;
         _machine = (VA2M)app!.Services.GetService(typeof(VA2M))!;
+        _refreshTicker = (IRefreshTicker?)app!.Services.GetService(typeof(IRefreshTicker));
 
         _outputTextBox = this.FindControl<TextBox>("OutputTextBox");
         _throttleMenuItem = this.FindControl<MenuItem>("ThrottleMenuItem");
@@ -95,11 +98,23 @@ public partial class MainWindow : Window // reverted base class
     {
         base.OnOpened(e);
         _screen?.Focus();
+        if (_refreshTicker != null && _screen != null)
+        {
+            _refreshTicker.Start();
+            _refreshSub = _refreshTicker.Stream.Subscribe(_ =>
+            {
+                // Request screen refresh; other synced tasks can also hook here
+                _screen.RequestRefresh();
+            });
+        }
         Dispatcher.UIThread.Post(() => OnEmuStartClicked(this, new RoutedEventArgs()));
     }
 
     protected override void OnClosed(EventArgs e)
     {
+        _refreshSub?.Dispose();
+        _refreshSub = null;
+        _refreshTicker?.Stop();
         StopEmulator();
         base.OnClosed(e);
     }
