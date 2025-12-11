@@ -79,20 +79,20 @@ namespace Pandowdy.Core
             IntCxRom,
             AltZp,
             SlotC3Rom,
-            Vid80, // TODO
-            AltChar, // TODO
-            Text, // TODO
-            Mixed, // TODO
+            Vid80,  
+            AltChar, 
+            Text,  
+            Mixed,  
             Page2,
             HiRes,
-            An0, // TODO
-            An1, // TODO
-            An2, // TODO
-            An3, // TODO
+            An0,  
+            An1,  
+            An2,  
+            An3, 
             Bank1,
             HighWrite,
             HighRead,
-            PreWrite // TODO
+            PreWrite  
         }
 
         private Dictionary<SoftSwitchId, SoftSwitch> _switches = [];
@@ -157,16 +157,17 @@ namespace Pandowdy.Core
         {
             foreach (var kvp in _switches)
             {
-                kvp.Value.Value = false;
+
+                kvp.Value.Value = (kvp.Key==SoftSwitchId.IntCxRom?true:false);
                 if (resetCounts)
                 {
                     kvp.Value.ResetCount();
                 }
+                TriggerResponder(kvp.Key, kvp.Value.Value);
             }
-            _switches[SoftSwitchId.IntCxRom].Value = true; // Default state
+            
 
             
-         //   DumpSoftSwitchStatus("ResetAllSwitches:");
         }
 
         public void Set(SoftSwitchId id, bool value)
