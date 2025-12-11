@@ -560,7 +560,7 @@ namespace Pandowdy.Core
             */
 
             // This will take the place of the card mechanism for now.
-            bool[] hasCard = [false, false, false, false, false, false, false, false]; // Slots 0-7 (0 -> unused)
+            bool[] hasCard = [false, true, true, true, true, true, true, true]; // Slots 0-7 (0 -> unused)
 
             // Each region from Region_C100_C1FF to Region_C200_C2FF and Region_C400_C4FF Region_C700_C7FF
             /// If INTCXROM is set, map to Internal Slot ROM (_int1-_int7)

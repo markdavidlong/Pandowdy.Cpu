@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 using System.Security.Cryptography.X509Certificates;
 
@@ -118,9 +119,32 @@ namespace Pandowdy.Core
             _switches[SoftSwitchId.HighWrite] = new SoftSwitch("HIGHWRITE");
             _switches[SoftSwitchId.HighRead] = new SoftSwitch("HIGHREAD");
             _switches[SoftSwitchId.PreWrite] = new SoftSwitch("PREWRITE");
+
+
+            
+         //   DumpSoftSwitchStatus("Init:"));
         }
 
         private HashSet<ISoftSwitchResponder> _responders = [];
+
+        public void DumpSoftSwitchStatus(string header = "")
+        {
+            // Cycle through all soft switches and use Debug.WriteLine to show the switch name and On or Off, depending on its value
+            if (!string.IsNullOrEmpty(header))
+            {
+                System.Diagnostics.Debug.WriteLine(header);
+            }
+            foreach (var kvp in _switches)
+            {
+                if (!string.IsNullOrEmpty(header))
+                {
+                    System.Diagnostics.Debug.Write("    ");
+                }
+                string status = kvp.Value.Value ? "On" : "Off";
+                System.Diagnostics.Debug.WriteLine($"{kvp.Value.Name}: {status} (Changes: {kvp.Value.Count})");
+            }
+
+        }
 
         public void AddResponder(ISoftSwitchResponder responder)
         {
@@ -139,6 +163,10 @@ namespace Pandowdy.Core
                     kvp.Value.ResetCount();
                 }
             }
+            _switches[SoftSwitchId.IntCxRom].Value = true; // Default state
+
+            
+         //   DumpSoftSwitchStatus("ResetAllSwitches:");
         }
 
         public void Set(SoftSwitchId id, bool value)
@@ -146,6 +174,7 @@ namespace Pandowdy.Core
             if (_switches.TryGetValue(id, out var softSwitch))
             {
                 softSwitch.Value = value;
+    //            Debug.WriteLine($"Set SoftSwitch {softSwitch.Name} to {(value ? "On" : "Off")}");
             }
             TriggerResponder(id, value);
         }

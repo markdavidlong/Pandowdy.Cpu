@@ -274,7 +274,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         if (address >= SPKR_ && address <= END_SPKR_RD_) // SPKR
         {
             // NOT IMPLEMENTED YET
-            Debug.WriteLine($"SPKR read not implemented yet (Read from {address:X4})");
+        //    Debug.WriteLine($"SPKR read not implemented yet (Read from {address:X4})");
             return 0;
         }
 
@@ -297,7 +297,8 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
                 return _currKey;
 
             case RD_LC_BANK1_:
-                return BuildHiBitVal(_softSwitches.Get(SoftSwitches.SoftSwitchId.Bank1), _currKey);
+                // This Soft Switch is inverted compared to others.  It is effectively RD_LC_BANK2 or RD_LC_BANK1`.
+                return (byte) (BuildHiBitVal(_softSwitches.Get(SoftSwitches.SoftSwitchId.Bank1), _currKey) ^ 0x80);
 
             case RD_LC_RAM:
                 return BuildHiBitVal(_softSwitches.Get(SoftSwitches.SoftSwitchId.HighRead), _currKey);
@@ -411,6 +412,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
                 return (byte) (_button0 ? 0x80 : 0x00);
 
             case BUTTON1_:
+
                 return (byte) (_button1 ? 0x80 : 0x00);
 
             case BUTTON2_:
@@ -774,6 +776,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         }
         lastPc = currPc;
 
+        // Execute a single CPU cycle
         _cpu!.Clock();
         _systemClock++;
         _VblankBlackoutCounter--;
@@ -792,8 +795,6 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
             {
                 VBlank?.Invoke(this, EventArgs.Empty);
             }
-
-            
         }
     }
 
@@ -811,8 +812,8 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     {
         ThrowIfDisposed();
 
-        _memoryPool.ResetRanges();
         _softSwitches.ResetAllSwitches();
+        _memoryPool.ResetRanges();
         _cpu!.Reset();
         _systemClock = 0;
         _nextVblankCycle = CyclesPerVBlank;
