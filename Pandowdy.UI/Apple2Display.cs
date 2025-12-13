@@ -90,9 +90,15 @@ public class Apple2Display : Control
         TextInput += OnTextInput;
     }
 
+    public const byte BrightFringeValue = 0xf0;
+    public const byte ReducedFringeValue = 0x40;
+
     public bool ForceMono { set; get; } = false;
     public bool ShowScanLines { get; set; } = true;
-    public byte NonLumaContrastMask { get; set; } = 0xe0;
+
+    public bool DefringeMixedText { get; set; } = false;
+
+    public bool UseNonLumaContrastMask { get; set; } = false;
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -112,6 +118,7 @@ public class Apple2Display : Control
         _frameProvider = provider;
         _frameProvider.FrameAvailable += OnFrameAvailable;
         _lastFrame = _frameProvider.GetFrame();
+        
     }
 
     private void OnFrameAvailable(object? sender, EventArgs e)
@@ -185,7 +192,15 @@ public class Apple2Display : Control
                         { break; }
                         if (_frameProvider.IsGraphics && !ForceMono)
                         {
-                            RenderNtscLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
+                            if (_frameProvider.IsMixed && DefringeMixedText && y>= 160)
+                            {
+                                RenderMonochromeLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
+                            }
+                            else
+                            {
+
+                                RenderNtscLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
+                            }
                         }
                         else
                         {
@@ -246,20 +261,25 @@ public class Apple2Display : Control
             {
 
                 byte bitval = (byte) ((bits[0] ? 0x08 : 0x00) +
-                        (bits[1] ? 0x04 : 0x00) +
                         (bits[2] ? 0x02 : 0x00) +
+                        (bits[1] ? 0x04 : 0x00) +
                         (bits[3] ? 0x01 : 0x00));
 
-                uint color = GetNTSCColorFromBits(bitval, phase); 
-                byte darkContrastForNonLumaPixel = NonLumaContrastMask; 
-                if (!bits[0])
-                { 
-                    color &= (uint) (0xff000000 | (0x010101 * (byte) darkContrastForNonLumaPixel)); // Darken RGB components for non-luma pixels
-                }
-                WritePixel(dst, stridePixels, xPos+3, outYTop, color);
+                uint color = GetNTSCColorFromBits(bitval, phase);
+                //byte darkContrastForNonLumaPixel = NonL;//(byte) (0xff >> (NonLumaContrastMask & 0x7)); 
+                //if (!bits[0])
+                //{
+                //    //color &= (uint) (0xff000000 | (0x010101 * (byte) darkContrastForNonLumaPixel)); // Darken RGB components for non-luma pixels
+                //    color &= (uint) ((0x0111111));
+                //    color += ((uint) 0xff << 24);
+                //}
+
+                byte alpha = (byte) (bits[0] ? 0xff: (UseNonLumaContrastMask? ReducedFringeValue:BrightFringeValue));
+
+                WritePixel(dst, stridePixels, xPos+3, outYTop, color,alpha);
                 uint dimColor = showScanLines ? (((color & 0x00fcfcfc) >> 2) | 0xff000000) : color; // 3/4 brightness when enabled
 
-                WritePixel(dst, stridePixels, xPos+3, outYTop + 1, dimColor);
+                WritePixel(dst, stridePixels, xPos + 3, outYTop + 1, dimColor,alpha);
             }
         }
     }
@@ -426,13 +446,19 @@ public class Apple2Display : Control
         Bitmap = new WriteableBitmap(new PixelSize(563, 384), new Vector(96, 96), PixelFormat.Bgra8888);
     }
 
-    private static unsafe void WritePixel(byte* basePtr, int width, int x, int y, uint rgba)
+    private static unsafe void WritePixel(byte* basePtr, int width, int x, int y, uint rgba, byte alpha =0xff)
     {
+        //alpha = (byte) (x & 0xff);
         int idx = (y * width + x) * 4;
-        basePtr[idx + 0] = (byte) (rgba & 0xFF);
-        basePtr[idx + 1] = (byte) ((rgba >> 8) & 0xFF);
-        basePtr[idx + 2] = (byte) ((rgba >> 16) & 0xFF);
-        basePtr[idx + 3] = 0xFF;
+        byte b = (byte)(rgba & 0xFF);
+        byte g = (byte)((rgba >> 8) & 0xFF);
+        byte r = (byte)((rgba >> 16) & 0xFF);
+        // Premultiply color channels by alpha
+        // Using integer math to avoid floating point
+        basePtr[idx + 0] = (byte)((b * alpha) / 255); // B
+        basePtr[idx + 1] = (byte)((g * alpha) / 255); // G
+        basePtr[idx + 2] = (byte)((r * alpha) / 255); // R
+        basePtr[idx + 3] = alpha;                      // A
     }
 
     private void DrawBitmapScaled(DrawingContext context)

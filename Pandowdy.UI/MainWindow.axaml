@@ -26,6 +26,10 @@
 				<MenuItem Header="_Test Disk Read" Click="OnTestDiskReadClicked" InputGesture="Ctrl+T" />
 				<Separator/>
 				<MenuItem x:Name="ScanLinesMenuItem" Header="_Scan Lines" ToggleType="CheckBox" Click="OnViewScanLinesClicked" InputGesture="Alt+S" />
+				<MenuItem x:Name="MonochromeMenuItem" Header="_Monochrome" ToggleType="CheckBox" Click="OnMonochromeClicked" InputGesture="Alt+M" />
+				<MenuItem x:Name="MonoMixedMenuItem" Header="_Monochrome Mixed Text" ToggleType="CheckBox" Click="OnMonoMixedClicked" InputGesture="Alt+X" />
+				<MenuItem x:Name="DecreaseContrastMenuItem" Header="_Decrease Color Fringing" ToggleType="CheckBox" Click="OnDecreaseContrastClicked" InputGesture="Alt+D"/>
+
 			</MenuItem>
 			<MenuItem Header="_Emulator">
 				<MenuItem Header="_Start" Click="OnEmuStartClicked" InputGesture="F5" />

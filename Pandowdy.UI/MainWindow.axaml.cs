@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using static DiskArc.Defs;
 using Pandowdy.UI.ViewModels; // ensure ViewModel type is visible
 using System.Text.Json;
+using System.Diagnostics;
 
 namespace Pandowdy.UI;
 
@@ -31,6 +32,10 @@ public partial class MainWindow : Window
     private MenuItem? _throttleMenuItem;
     private MenuItem? _capsLockMenuItem;
     private MenuItem? _scanLinesMenuItem;
+    private MenuItem? _monochromeMenuItem;
+    private MenuItem? _decreaseContrastMenuItem;
+    private MenuItem? _monoMixedMenuItem;
+
     private Menu? _mainMenu;
     private Apple2Display? _screen;
     private IRefreshTicker? _refreshTicker;
@@ -54,6 +59,10 @@ public partial class MainWindow : Window
         _throttleMenuItem = this.FindControl<MenuItem>("ThrottleMenuItem");
         _capsLockMenuItem = this.FindControl<MenuItem>("CapsLockMenuItem");
         _scanLinesMenuItem = this.FindControl<MenuItem>("ScanLinesMenuItem");
+        _monochromeMenuItem = this.FindControl<MenuItem>("MonochromeMenuItem");
+        _decreaseContrastMenuItem = this.FindControl<MenuItem>("DecreaseContrastMenuItem");
+        _monoMixedMenuItem = this.FindControl<MenuItem>("MonoMixedMenuItem");
+
         _mainMenu = this.FindControl<Menu>("MainMenu");
         mDiskReadTest = new DiskReadTestTemp(mAppHook, AppendText, this);
 
@@ -86,6 +95,16 @@ public partial class MainWindow : Window
         if (_scanLinesMenuItem != null && _screen != null)
         {
             _scanLinesMenuItem.IsChecked = _screen.ShowScanLines;
+        }
+
+        if (_monoMixedMenuItem != null && _screen != null)
+        {
+            _monoMixedMenuItem.IsChecked = _screen.DefringeMixedText;
+        }
+
+        if (_decreaseContrastMenuItem!= null && _screen != null)
+        {
+            _decreaseContrastMenuItem.IsChecked = _screen.UseNonLumaContrastMask;
         }
 
         // Manual activation of nested SystemStatus view model
@@ -271,6 +290,54 @@ public partial class MainWindow : Window
         _screen.InvalidateVisual();
     }
 
+    private void OnMonochromeClicked(object? sender, RoutedEventArgs e)
+    {
+        if (_screen == null)
+        {
+            return;
+        }
+        _screen.ForceMono = !_screen.ForceMono;
+        if (_monochromeMenuItem != null)
+        {
+            _monochromeMenuItem.IsChecked = _screen.ForceMono;
+        }
+        _screen.InvalidateVisual();
+    }
+
+    private void OnMonoMixedClicked(object? sender, RoutedEventArgs e)
+    {
+        if (_screen == null)
+        {
+            return;
+        }
+
+        _screen.DefringeMixedText = !_screen.DefringeMixedText;
+        if (_monochromeMenuItem != null)
+        {
+            _monochromeMenuItem.IsChecked = _screen.DefringeMixedText;
+        }
+
+        _screen.InvalidateVisual();
+    }
+
+
+    private void OnDecreaseContrastClicked(object? sender, RoutedEventArgs e)
+    {
+        if (_screen == null)
+        {
+            return;
+        }
+
+        _screen.UseNonLumaContrastMask = !_screen.UseNonLumaContrastMask;
+        if (_monochromeMenuItem != null)
+        {
+            _monochromeMenuItem.IsChecked = _screen.UseNonLumaContrastMask;
+        }
+        _screen.InvalidateVisual();
+    }
+
+
+
     private void StopEmulator()
     {
         if (_emuCts == null)
@@ -334,6 +401,15 @@ public partial class MainWindow : Window
                     return true;
                 case Key.S:
                     OnViewScanLinesClicked(this, new RoutedEventArgs());
+                    return true;
+                case Key.M:
+                    OnMonochromeClicked(this, new RoutedEventArgs());
+                    return true;
+                case Key.D:
+                    OnDecreaseContrastClicked(this, new RoutedEventArgs());
+                    return true;
+                case Key.X:
+                    OnMonoMixedClicked(this, new RoutedEventArgs());
                     return true;
                 case Key.F4:
                     Close();

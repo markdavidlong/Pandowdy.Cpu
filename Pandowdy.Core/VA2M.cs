@@ -245,7 +245,7 @@ public sealed class VA2M : IDisposable
         if (x >= 0 && x < 40 && y >= 0 && y < 24)
         {
 
-            if (text || (!text && !hires) || (mixed && y > 20))
+            if (text || (!text && !hires) || (mixed && y >= 20))
             {
                 int startAddr = page2 ? TextPage2Start : TextPage1Start;
 
