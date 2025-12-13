@@ -138,20 +138,6 @@ public sealed class VA2M : IDisposable
 
                     buf.Insert7BitLsbAt(col * 2 * 7, y, fontRow, true);
 
-                    //if (row < 16)
-                    //{
-                    //    var (a1, a2, a3, a4) = MakeGrColor((byte) (row % 16 ));
-                    //    if (col % 2 == 0) // Even -- Use A1 & A2
-                    //    {
-                    //        buf.SetByteAt(col * 14, y, (byte) a1);
-                    //        buf.SetByteAt((col * 14 + 7), y, (byte) a2);
-                    //    }
-                    //    else// Odd -- Use A3 & A4
-                    //    {
-                    //        buf.SetByteAt((col * 14), y, (byte) a3);
-                    //        buf.SetByteAt((col * 14 + 7), y, (byte) a4 );
-                    //    }
-                    //}
 
                 }
                 //DrawGrPattern(row, col, buf);
