@@ -67,7 +67,7 @@ public class Apple2Display : Control
   //  private ISystemStatusProvider? _status;
     //private bool _flagText, _flagMixed, _flagHiRes, _flagPage2;
 
-    public bool ShowScanLines { get; set; } = true;
+
 
     public Bitmap? Bitmap
     {
@@ -89,6 +89,10 @@ public class Apple2Display : Control
         KeyUp += OnKeyUp;
         TextInput += OnTextInput;
     }
+
+    public bool ForceMono { set; get; } = false;
+    public bool ShowScanLines { get; set; } = true;
+    public byte NonLumaContrastMask { get; set; } = 0xe0;
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -179,7 +183,7 @@ public class Apple2Display : Control
                         int outYTop = y * 2;
                         if (outYTop + 1 >= 384)
                         { break; }
-                        if (_frameProvider.IsGraphics)
+                        if (_frameProvider.IsGraphics && !ForceMono)
                         {
                             RenderNtscLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
                         }
@@ -227,7 +231,7 @@ public class Apple2Display : Control
     }
 
 
-    static private unsafe void RenderNtscLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
+    private unsafe void RenderNtscLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
     {
         for (int xPos = -3; xPos < lineData.Length; xPos++)
         {
@@ -247,10 +251,10 @@ public class Apple2Display : Control
                         (bits[3] ? 0x01 : 0x00));
 
                 uint color = GetNTSCColorFromBits(bitval, phase); 
-                const byte darkContrastForNonLumaPixel = 0xcf; 
+                byte darkContrastForNonLumaPixel = NonLumaContrastMask; 
                 if (!bits[0])
                 { 
-                    color &= 0xff000000 | (0x010101 * darkContrastForNonLumaPixel);
+                    color &= (uint) (0xff000000 | (0x010101 * (byte) darkContrastForNonLumaPixel)); // Darken RGB components for non-luma pixels
                 }
                 WritePixel(dst, stridePixels, xPos+3, outYTop, color);
                 uint dimColor = showScanLines ? (((color & 0x00fcfcfc) >> 2) | 0xff000000) : color; // 3/4 brightness when enabled

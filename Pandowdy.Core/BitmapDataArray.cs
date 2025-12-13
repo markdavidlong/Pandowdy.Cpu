@@ -41,6 +41,7 @@ namespace Pandowdy.Core
             }
             int index = y * rowBytes + (x >> 3);
             byte mask = (byte)(0x80 >> (x & 7));
+            
             data[index] |= mask;
         }
 
@@ -89,6 +90,53 @@ namespace Pandowdy.Core
             }
         }
 
+        public void InsertHgrByteAt(int x, int y, byte value, bool prevShift)
+        {
+            if (x < 0 || x >= stridePixels)
+            {
+                //       Debug.Assert(false, $"Insert7BitLsbAt: x {x} outside capacity 0..{stridePixels - 1}");
+                return;
+            }
+            if (y < 0 || y >= lines)
+            {
+                //      Debug.Assert(false, $"Insert7BitLsbAt: y {y} outside capacity 0..{lines - 1}");
+                return;
+            }
+            int px = x;
+            //    prevShift = false;
+
+
+
+            bool leftPixelOn = (x>0) && GetPixel(x-1, y);
+            bool shift = (value & 0x80) == 0x80;
+      
+
+            for (int bit = 0; bit < 7; bit++)
+            {
+                bool on = (value & (1 << bit)) != 0;
+
+                int p0 = px + (bit * 2) + (shift?1:0); 
+                int p1 = p0 + 1;
+                if (on)
+                {
+                    //if (shift && bit == 0 && leftPixelOn)
+                    //{
+                    //    SetPixel(p0 - 1, y);
+                    //}
+                    SetPixel(p0, y);
+                    SetPixel(p1, y);
+                    SetPixel(p1+1, y);
+                }
+                else
+                {
+                    if (bit > 0 || (prevShift == shift))
+                    {
+                        ClearPixel(p0, y);
+                    }
+                    ClearPixel(p1, y);
+                }
+            }
+        }
 
         public void Insert7BitLsbAt(int x, int y, byte value, bool expand = false)
         {
@@ -110,6 +158,8 @@ namespace Pandowdy.Core
                 {
                     int p0 = px + (bit * 2);
                     int p1 = p0 + 1;
+
+                    
                     if (on)
                     {
                         SetPixel(p0, y);
