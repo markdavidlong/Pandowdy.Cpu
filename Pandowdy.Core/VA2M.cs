@@ -47,6 +47,13 @@ public sealed class VA2M : IDisposable
         {
             vb.VBlank += OnVBlank;
         }
+
+        //for (byte x = 0; x < 16; x++)
+        //{
+        //    var (a, b, c, d) = MakeGrColor(x);
+        //    Debug.WriteLine($"GR Color {x:X2} = {a:X2} {b:X2} {c:X2} {d:X2}");
+        //    Debug.WriteLine($"GR Color {x:B8} = {a:B8} {b:B8} {c:B8} {d:B8}");
+        //
     }
 
     
@@ -85,14 +92,15 @@ public sealed class VA2M : IDisposable
             int col = col_row.Value.Item1;
             int row = col_row.Value.Item2;
 
+            byte ch = MemoryPool.ReadRawMain((ushort) addr);
+            var glyph = VideoFont.Glyph(ch); // returns span of 8 rows
+
             if (_sysStatusSink!.StateShow80Col)
             // if 80 cols
             {
                 byte ch1 = MemoryPool.ReadRawAux((ushort) addr);
                 var glyph1 = VideoFont.Glyph(ch1); // returns span of 8 rows
 
-                byte ch2 = MemoryPool.ReadRawMain((ushort) addr);
-                var glyph2 = VideoFont.Glyph(ch2); // returns span of 8 rows
 
                 for (int r = 0; r < 8; r++)  // 8 rows per glyph
                 {
@@ -101,7 +109,7 @@ public sealed class VA2M : IDisposable
                     { break; }
                     byte fontRow1 = (byte) ~glyph1[r]; // invert bits (was glyph ^ 0xff intent)
                                                        //  fontRow = (byte)((y / 8) % 16 * 0x11);
-                    byte fontRow2 = (byte) ~glyph2[r]; 
+                    byte fontRow2 = (byte) ~glyph[r]; 
                                                        
 
                     int baseX = col * 2;
@@ -115,25 +123,104 @@ public sealed class VA2M : IDisposable
             }
             else // 40 columns
             {
-                byte ch = MemoryPool.Read((ushort) addr);
-                var glyph = VideoFont.Glyph(ch); // returns span of 8 rows
+                //byte ch = MemoryPool.Read((ushort) addr);
+                //var glyph = VideoFont.Glyph(ch); // returns span of 8 rows
 
                 for (int r = 0; r < 8; r++)  // 8 rows per glyph
                 {
+            
+
                     int y = row * 8 + r;
                     if (y >= _frameSink.Height)
                     { break; }
                     byte fontRow = (byte) ~glyph[r]; // invert bits (was glyph ^ 0xff intent)
-                                                     //  fontRow = (byte)((y / 8) % 16 * 0x11);
+                                                    //  fontRow = (byte)((y / 8) % 16 * 0x11);
 
                     buf.Insert7BitLsbAt(col * 2 * 7, y, fontRow, true);
+
+                    //if (row < 16)
+                    //{
+                    //    var (a1, a2, a3, a4) = MakeGrColor((byte) (row % 16 ));
+                    //    if (col % 2 == 0) // Even -- Use A1 & A2
+                    //    {
+                    //        buf.SetByteAt(col * 14, y, (byte) a1);
+                    //        buf.SetByteAt((col * 14 + 7), y, (byte) a2);
+                    //    }
+                    //    else// Odd -- Use A3 & A4
+                    //    {
+                    //        buf.SetByteAt((col * 14), y, (byte) a3);
+                    //        buf.SetByteAt((col * 14 + 7), y, (byte) a4 );
+                    //    }
+                    //}
+
                 }
+                //DrawGrPattern(row, col, buf);
+            }
+
+            if (!_sysStatusSink!.StateTextMode && !_sysStatusSink!.StateHiRes)
+            {
+                if (row < 20 || !_sysStatusSink!.StateMixed)
+                {
+                    DrawGrBlock(ch, row, col, buf); 
+                }
+
             }
         }
         _frameSink.IsGraphics = !_sysStatusSink!.StateTextMode;
         _frameSink.IsMixed = _sysStatusSink!.StateMixed;
         _frameSink.CommitWritable();
     }
+
+
+
+    void DrawGrPattern(int row, int col, BitmapDataArray? buf)
+    {
+      //  var (a1, a2, a3, a4) = MakeGrColor((byte) (row % 16));
+       // int y = row * 8 + glyphRow;
+        if (row < 16)
+        {
+            DrawGrBlock((byte) (row % 16 * 0x11), row, col,buf);
+            //if (col % 2 == 0) // Even -- Use A1 & A2
+            //{
+            //    buf.SetByteAt(col * 14, y, (byte) a1);
+            //    buf.SetByteAt((col * 14 + 7), y, (byte) a2);
+            //}
+            //else// Odd -- Use A3 & A4
+            //{
+            //    buf.SetByteAt((col * 14), y, (byte) a3);
+            //    buf.SetByteAt((col * 14 + 7), y, (byte) a4);
+            //}
+        }
+    }
+
+
+    void DrawGrBlock(byte value, int row, int col, BitmapDataArray? buf)
+    {
+
+        for (int glyphRow = 0; glyphRow < 8; glyphRow++)
+        {
+            int y = row * 8 + glyphRow;
+
+            byte grcolor = (byte) (value & 0x0f);
+            if (glyphRow >= 4)
+            {
+                grcolor = (byte) (value >> 4);
+            }
+
+            var (a1, a2, a3, a4) = MakeGrColor(grcolor);
+            if (col % 2 == 0) // Even -- Use A1 & A2
+                {
+                    buf.SetByteAt(col * 14, y, (byte) a1);
+                    buf.SetByteAt((col * 14 + 7), y, (byte) a2);
+                }
+            else // Odd -- Use A3 & A4
+            {
+                buf.SetByteAt((col * 14), y, (byte) a3);
+                buf.SetByteAt((col * 14 + 7), y, (byte) a4);
+            }
+        }
+    }
+
 
     private static (int,int)? AddressToOffset(int address)
     {
@@ -434,4 +521,35 @@ public sealed class VA2M : IDisposable
     {
     }
 
+
+
+    private static (byte,byte,byte,byte) MakeGrColor(byte val)
+    {
+        int x = (val & 0x7f) * 0x11111111;
+
+        byte a = (byte) ((x >> 0) & 0x7f);
+        byte b = (byte) ((x >> 3) & 0x7f);
+        byte c = (byte) ((x >> 6) & 0x7f);
+        byte d = (byte) ((x >> 9) & 0x7f);
+
+        return (a, b,c,d);
+    }
+
+    private static (byte, byte, byte, byte) MakeGrColorOld(byte val)
+    {
+        byte nibble = (byte) (val & 0xf); // -> abcd
+
+        int d = (nibble & 0x8) >> 3;
+        int c = (nibble & 0x4) >> 2;
+        int b = (nibble & 0x2) >> 1;
+        int a = (nibble & 0x1);
+
+        //    0cbadcba       0badcbad    0adcbadc  0dcbadcb
+        int ocbadcba =  (c<<6) | (b<<5) | (a<<4) | (d<<3) | (c<<2) | (b<<1) | (a<<0);
+        int obadcbad =  (b << 6) | (a<<5) | (d<<4) | (c<<3) | (b<<2) | (a<<1) | (d<<0);
+        int oadcbadc =  (a<<6) | (d<<5) | (c<<4) | (b<<3) | (a<<2) | (d<<1) | (c<<0);
+        int odcbadcb =  (d<<6) | (c<<5) | (b<<4) | (a<<3) | (d<<2) | (c<<1) | (b<<0);
+
+        return ((byte)(ocbadcba << 0), (byte)(obadcbad << 0), (byte)(oadcbadc << 0), (byte)(odcbadcb << 0));
+    }
 }

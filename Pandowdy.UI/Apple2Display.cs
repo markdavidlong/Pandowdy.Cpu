@@ -75,7 +75,7 @@ public class Apple2Display : Control
         set => SetValue(BitmapProperty, value);
     }
 
-    private const double SourceWidth = 561;
+    private const double SourceWidth = 563;
     private const double SourceHeight = 384;
     private const double SourceAspect = SourceWidth / SourceHeight;
 
@@ -134,7 +134,7 @@ public class Apple2Display : Control
             const int numCols = 80;
             const int blockWidth = 7;
             const int blockHeight = 16;
-            const int bitmapWidth = 561;
+            const int bitmapWidth = 563;
             const int bitmapHeight = 384;
             var pixelData = new byte[bitmapWidth * bitmapHeight * 4];
             for (int y = 0; y < numRows * blockHeight; y++)
@@ -173,7 +173,7 @@ public class Apple2Display : Control
                 unsafe
                 {
                     byte* dst = (byte*) fb.Address;
-                    int stridePixels = 561;
+                    int stridePixels = 563;
                     for (int y = 0; y < _frameProvider.Height; y++)
                     {
                         int outYTop = y * 2;
@@ -213,15 +213,15 @@ public class Apple2Display : Control
     static private unsafe void RenderMonochromeLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
     {
         //for (int xByte = 0; xByte < 80; xByte++)
-        for (int xPos = 0; xPos < lineData.Length; xPos++)
+        for (int xPos = -3; xPos < lineData.Length; xPos++)
         {
-            bool on = lineData[xPos]; // simplified for full byte
+            bool on = xPos >=0 && lineData[xPos]; // simplified for full byte
             if (xPos <= stridePixels)
             {
                 uint color = on ? 0xFFFFFFFFu : 0xFF000000u;
                 uint dimColor = showScanLines ? (((color & 0x00fcfcfc) >> 2) | 0xff000000) : color; // 3/4 brightness when enabled
-                WritePixel(dst, stridePixels, xPos, outYTop, color);
-                WritePixel(dst, stridePixels, xPos, outYTop + 1, dimColor);
+                WritePixel(dst, stridePixels, xPos+3, outYTop, color);
+                WritePixel(dst, stridePixels, xPos+3, outYTop + 1, dimColor);
             }
         }
     }
@@ -229,13 +229,13 @@ public class Apple2Display : Control
 
     static private unsafe void RenderNtscLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
     {
-        for (int xPos = 0; xPos < lineData.Length; xPos++)
+        for (int xPos = -3; xPos < lineData.Length; xPos++)
         {
             var bits = new bool[4];
-            bits[0] = lineData[xPos + 0];
-            bits[1] = (xPos + 1 < lineData.Length) && lineData[xPos + 1];
-            bits[2] = (xPos + 2 < lineData.Length) && lineData[xPos + 2];
-            bits[3] = (xPos + 3 < lineData.Length) && lineData[xPos + 3];
+            bits[0] = xPos >= 0 && lineData[xPos + 0];
+            bits[1] = xPos + 1 >= 0 && (xPos + 1 < lineData.Length) && lineData[xPos + 1];
+            bits[2] = xPos + 2 >= 0 && (xPos + 2 < lineData.Length) && lineData[xPos + 2];
+            bits[3] = xPos + 3 >= 0 && (xPos + 3 < lineData.Length) && lineData[xPos + 3];
             var phase = (byte)(xPos % 4);
 
             if (xPos <= stridePixels)
@@ -246,11 +246,16 @@ public class Apple2Display : Control
                         (bits[2] ? 0x02 : 0x00) +
                         (bits[3] ? 0x01 : 0x00));
 
-                uint color = GetNTSCColorFromBits(bitval, phase); //on ? 0xFFFF0000u : 0xFF000000u;
-                WritePixel(dst, stridePixels, xPos, outYTop, color);
+                uint color = GetNTSCColorFromBits(bitval, phase); 
+                const byte darkContrastForNonLumaPixel = 0xcf; 
+                if (!bits[0])
+                { 
+                    color &= 0xff000000 | (0x010101 * darkContrastForNonLumaPixel);
+                }
+                WritePixel(dst, stridePixels, xPos+3, outYTop, color);
                 uint dimColor = showScanLines ? (((color & 0x00fcfcfc) >> 2) | 0xff000000) : color; // 3/4 brightness when enabled
 
-                WritePixel(dst, stridePixels, xPos, outYTop + 1, dimColor);
+                WritePixel(dst, stridePixels, xPos+3, outYTop + 1, dimColor);
             }
         }
     }
@@ -414,7 +419,7 @@ public class Apple2Display : Control
         {
             return;
         }
-        Bitmap = new WriteableBitmap(new PixelSize(561, 384), new Vector(96, 96), PixelFormat.Bgra8888);
+        Bitmap = new WriteableBitmap(new PixelSize(563, 384), new Vector(96, 96), PixelFormat.Bgra8888);
     }
 
     private static unsafe void WritePixel(byte* basePtr, int width, int x, int y, uint rgba)

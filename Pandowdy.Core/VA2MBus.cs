@@ -31,7 +31,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     private CPU? _cpu;
     private ulong _systemClock;
     private SoftSwitches _softSwitches = new();
-    private bool _isInVBlankBlackout = false;
+//    private bool _isInVBlankBlackout = false;
 
     public IMemory RAM => _memoryPool;
 

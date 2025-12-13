@@ -158,7 +158,7 @@ namespace Pandowdy.Core
             foreach (var kvp in _switches)
             {
 
-                kvp.Value.Value = (kvp.Key==SoftSwitchId.IntCxRom?true:false);
+                kvp.Value.Value = (kvp.Key==SoftSwitchId.IntCxRom);
                 if (resetCounts)
                 {
                     kvp.Value.ResetCount();

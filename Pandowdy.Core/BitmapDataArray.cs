@@ -6,9 +6,9 @@ namespace Pandowdy.Core
     public class BitmapDataArray
     {
         private const int lines = 192; // logical scanlines
-        private const int logicalPixels = 561; // visible pixel width
+        private const int logicalPixels = 560; // visible pixel width
         private const int rowBytes = (logicalPixels + 7) >> 3; // packed bytes per row
-        private const int stridePixels = rowBytes * 8; // capacity (allows small overscan past logicalPixels)
+        private const int stridePixels = rowBytes * 8 + 3; // capacity (allows small overscan past logicalPixels)
         private readonly byte[] data = new byte[lines * rowBytes];
 
         static BitmapDataArray()
@@ -66,7 +66,7 @@ namespace Pandowdy.Core
             if (x < 0 || x >= stridePixels - 7)
             {
          //       Debug.Assert(false, $"SetByteAt: x {x} outside capacity 0..{stridePixels - 8}");
-                return;
+        //        return;
             }
             if (y < 0 || y >= lines)
             {
@@ -77,7 +77,7 @@ namespace Pandowdy.Core
             for (int bit = 0; bit < 8; bit++)
             {
                 bool on = (value & (1 << (bit))) != 0;
-                int p = px + bit;
+                int p = px + (bit);
                 if (on)
                 {
                     SetPixel(p, y);
@@ -88,6 +88,7 @@ namespace Pandowdy.Core
                 }
             }
         }
+
 
         public void Insert7BitLsbAt(int x, int y, byte value, bool expand = false)
         {
