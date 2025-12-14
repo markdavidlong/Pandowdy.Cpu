@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Reflection;
 
 namespace Pandowdy.Core;
@@ -51,18 +52,23 @@ public static class VideoFont
         throw new InvalidOperationException("Enhanced video ROM resource not found for glyph composition.");
     }
 
-    public static byte[] Glyph(byte ch, bool flashState = false, bool altChar = false)
-        => FontData.AsSpan(ch * 8, 8).ToArray();
-
-    public static (byte[], byte[]) GetGlyphPair(byte ch, bool altCharSet = false)
+    public static byte[] Glyph(byte ch, bool flashOn, bool altChar)
+    {
+        if (!altChar)
+        {
+            if (ch >= 0x40 && ch < 0x80)
             {
-        if (!altCharSet)
-        {
-            return (Glyph(ch), Glyph(ch));
+                ch &= 0x3f;
+                if (!flashOn)
+                {
+                    ch |= 0x80;  
+                }
+                
+            }
         }
-        else
-        {
-            return (Glyph(ch), Glyph(ch));
-        }
+        return FontData.AsSpan(ch * 8, 8).ToArray();
+
     }
+
+
 }

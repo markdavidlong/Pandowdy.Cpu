@@ -31,6 +31,10 @@ public sealed class VA2M : IDisposable
     private readonly IFrameProvider? _frameSink; // optional DI-provided frame publisher
     private readonly ISystemStatusProvider? _sysStatusSink; // optional DI-provided status publisher
 
+    // Flash timer to toggle StateFlashOn at ~2.1 Hz
+    private Timer? _flashTimer;
+    private static readonly TimeSpan FlashPeriod = TimeSpan.FromMilliseconds(350);
+
     public VA2M() : this(null, null, null) { }
 
     public VA2M(IEmulatorState? stateSink, IFrameProvider? frameSink, ISystemStatusProvider? statusProvider = null)
@@ -47,6 +51,19 @@ public sealed class VA2M : IDisposable
         if (_frameSink is not null && Bus is VA2MBus vb)
         {
             vb.VBlank += OnVBlank;
+        }
+        // Start flash timer if status provider available
+        if (_sysStatusSink != null && _flashTimer == null)
+        {
+            _flashTimer = new Timer(_ =>
+            {
+                try
+                {
+                    Debug.WriteLine("Toggling StateFlashOn");
+                    _sysStatusSink?.Mutate(s => s.StateFlashOn = !s.StateFlashOn);
+                }
+                catch { }
+            }, null, FlashPeriod, FlashPeriod);
         }
     }
 
@@ -138,11 +155,11 @@ public sealed class VA2M : IDisposable
 
     private void RenderTextCell(int address, int row, int col, bool text80, BitmapDataArray buf)
     {
-        bool flashState = _sysStatusSink!.StateFlashOn;
+        bool flashOn = _sysStatusSink!.StateFlashOn;
         bool altChar = _sysStatusSink!.StateAltCharSet;
         
         byte ch = MemoryPool.Read((ushort) address);
-        var glyph = VideoFont.Glyph(ch, flashState, altChar); // returns span of 8 rows
+        var glyph = VideoFont.Glyph(ch, flashOn, altChar); // returns span of 8 rows
 
         if (!text80)
         {
@@ -160,7 +177,7 @@ public sealed class VA2M : IDisposable
         else
         {
             byte ch1 = MemoryPool.ReadRawAux((ushort) address);
-            var glyph1 = VideoFont.Glyph(ch1, flashState, altChar); // returns span of 8 rows
+            var glyph1 = VideoFont.Glyph(ch1, flashOn, altChar); // returns span of 8 rows
 
             for (int r = 0; r < 8; r++)  // 8 rows per glyph
             {
@@ -169,8 +186,8 @@ public sealed class VA2M : IDisposable
                 byte fontRow2 = (byte) ~glyph[r];
                 int baseX = col * 2;
                 {
-                    buf.Insert7BitLsbAt(col * 2 * 7, y, fontRow1, false);
-                    buf.Insert7BitLsbAt(col * 2 * 7 + 7, y, fontRow2, false);
+                    buf.Insert7BitLsbAt(baseX * 7, y, fontRow1, false);
+                    buf.Insert7BitLsbAt(baseX * 7 + 7, y, fontRow2, false);
                 }
             }
         }
@@ -245,7 +262,7 @@ public sealed class VA2M : IDisposable
         if (x >= 0 && x < 40 && y >= 0 && y < 24)
         {
 
-            if (text || (!text && !hires) || (mixed && y >= 20))
+            if (text || (!text && !hires) || (mixed && y > 20))
             {
                 int startAddr = page2 ? TextPage2Start : TextPage1Start;
 
@@ -564,6 +581,8 @@ public sealed class VA2M : IDisposable
 
     public void Dispose()
     {
+        _flashTimer?.Dispose();
+        _flashTimer = null;
     }
 
 

@@ -103,11 +103,8 @@ namespace Pandowdy.Core
                 return;
             }
             int px = x;
-            //    prevShift = false;
 
 
-
-            bool leftPixelOn = (x>0) && GetPixel(x-1, y);
             bool shift = (value & 0x80) == 0x80;
       
 
@@ -119,10 +116,6 @@ namespace Pandowdy.Core
                 int p1 = p0 + 1;
                 if (on)
                 {
-                    //if (shift && bit == 0 && leftPixelOn)
-                    //{
-                    //    SetPixel(p0 - 1, y);
-                    //}
                     SetPixel(p0, y);
                     SetPixel(p1, y);
                     SetPixel(p1+1, y);

@@ -44,7 +44,7 @@ public interface ISystemStatusProvider
     bool StateShow80Col { get; }
     bool StateAltCharSet { get; }
     bool StateFlashOn { get; }
-    int StateWriteCount { get; }
+    bool StatePrewrite { get; }
     bool StateUseBank1 { get; }
     bool StateHighRead { get; }
     bool StateHighWrite { get; }
@@ -78,7 +78,7 @@ public record SystemStatusSnapshot(
     bool StateShow80Col,
     bool StateAltCharSet,
     bool StateFlashOn,
-    int StateWriteCount,
+    bool StatePrewrite,
     bool StateUseBank1,
     bool StateHighRead,
     bool StateHighWrite
@@ -107,7 +107,7 @@ public sealed class SystemStatusProvider : ISystemStatusProvider
         StateShow80Col: false,
         StateAltCharSet: false,
         StateFlashOn: false,
-        StateWriteCount: 0,
+        StatePrewrite: false,
         StateUseBank1: false,
         StateHighRead: false,
         StateHighWrite: false);
@@ -137,8 +137,8 @@ public sealed class SystemStatusProvider : ISystemStatusProvider
     public bool StateTextMode => _current.StateTextMode;
     public bool StateShow80Col => _current.StateShow80Col;
     public bool StateAltCharSet => _current.StateAltCharSet;
-    public bool StateFlashOn => !_current.StateFlashOn;
-    public int StateWriteCount => _current.StateWriteCount;
+    public bool StateFlashOn => _current.StateFlashOn;
+    public bool StatePrewrite => _current.StatePrewrite;
     public bool StateUseBank1 => _current.StateUseBank1;
     public bool StateHighRead => _current.StateHighRead;
     public bool StateHighWrite => _current.StateHighWrite;
@@ -179,7 +179,7 @@ public sealed class SystemStatusSnapshotBuilder(SystemStatusSnapshot s)
     public bool StateShow80Col = s.StateShow80Col;
     public bool StateAltCharSet = s.StateAltCharSet;
     public bool StateFlashOn = s.StateFlashOn;
-    public int StateWriteCount = s.StateWriteCount;
+    public bool StatePrewrite= s.StatePrewrite;
     public bool StateUseBank1 = s.StateUseBank1;
     public bool StateHighRead = s.StateHighRead;
     public bool StateHighWrite = s.StateHighWrite;
@@ -188,7 +188,7 @@ public sealed class SystemStatusSnapshotBuilder(SystemStatusSnapshot s)
     public SystemStatusSnapshot Build() => new(
         State80Store, StateRamRd, StateRamWrt, StateIntCxRom, StateAltZp, StateSlotC3Rom,
         StatePb0, StatePb1, StatePb2, StateAnn0, StateAnn1, StateAnn2, StateAnn3,
-        StatePage2, StateHiRes, StateMixed, StateTextMode, StateShow80Col, StateAltCharSet, StateFlashOn, StateWriteCount, StateUseBank1, StateHighRead, StateHighWrite);
+        StatePage2, StateHiRes, StateMixed, StateTextMode, StateShow80Col, StateAltCharSet, StateFlashOn, StatePrewrite, StateUseBank1, StateHighRead, StateHighWrite);
 }
 
 //public interface IErrorProvider {

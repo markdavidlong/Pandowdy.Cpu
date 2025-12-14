@@ -101,7 +101,10 @@ public partial class MainWindow : Window
         {
             _monoMixedMenuItem.IsChecked = _screen.DefringeMixedText;
         }
-
+        if (_monochromeMenuItem!= null && _screen != null)
+        {
+            _monochromeMenuItem.IsChecked = _screen.ForceMono;
+        }
         if (_decreaseContrastMenuItem!= null && _screen != null)
         {
             _decreaseContrastMenuItem.IsChecked = _screen.UseNonLumaContrastMask;
@@ -113,7 +116,7 @@ public partial class MainWindow : Window
             // Activation no longer required after direct subscription change.
         }
 
-        RestoreWindowGeometryFromConfig();
+        RestoreSettingsFromConfigFile();
 
         // Track last normal bounds for saving/restoring unmaximized geometry
         _lastNormalBounds = Bounds;
@@ -157,7 +160,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        SaveWindowGeometryToConfig();
+        SaveSettingsToConfigFile();
         _refreshSub?.Dispose();
         _refreshSub = null;
         _refreshTicker?.Stop();
@@ -594,10 +597,14 @@ public partial class MainWindow : Window
 
     private sealed record WindowGeometry(int Left, int Top, int Width, int Height, int WindowState, int ScreenIndex,
         int NormalLeft, int NormalTop, int NormalWidth, int NormalHeight, int OffsetX, int OffsetY);
-    private sealed class WindowSizeConfig
+    private sealed class SettingsConfig
     {
         public int Width { get; set; }
         public int Height { get; set; }
+        public bool? CapsLockEnabled { get; set; }
+        public bool? ShowScanLines { get; set; }
+        public bool? MonoMixed { get; set; }
+        public bool? DecreaseContrast { get; set; }
     }
 
     private static string GetConfigPath()
@@ -605,10 +612,10 @@ public partial class MainWindow : Window
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var dir = Path.Combine(baseDir, "LydianScaleSoftware", "Pandowdy");
         Directory.CreateDirectory(dir);
-        return Path.Combine(dir, "window.json");
+        return Path.Combine(dir, "settings.json");
     }
 
-    private void RestoreWindowGeometryFromConfig()
+    private void RestoreSettingsFromConfigFile()
     {
         try
         {
@@ -618,7 +625,7 @@ public partial class MainWindow : Window
                 return;
             }
             var json = File.ReadAllText(path);
-            var data = JsonSerializer.Deserialize<WindowSizeConfig>(json);
+            var data = JsonSerializer.Deserialize<SettingsConfig>(json);
             if (data == null)
             {
                 return;
@@ -628,18 +635,58 @@ public partial class MainWindow : Window
                 Width = data.Width;
                 Height = data.Height;
             }
+            // Restore menu/feature states if present
+            if (data.CapsLockEnabled.HasValue)
+            {
+                _capsLockEnabled = data.CapsLockEnabled.Value;
+                if (_capsLockMenuItem != null)
+                {
+                    _capsLockMenuItem.IsChecked = _capsLockEnabled;
+                }
+            }
+            if (_screen != null)
+            {
+                if (data.ShowScanLines.HasValue)
+                {
+                    _screen.ShowScanLines = data.ShowScanLines.Value;
+                    if (_scanLinesMenuItem != null)
+                    {
+                        _scanLinesMenuItem.IsChecked = _screen.ShowScanLines;
+                    }
+                }
+                if (data.MonoMixed.HasValue)
+                {
+                    _screen.DefringeMixedText = data.MonoMixed.Value;
+                    if (_monoMixedMenuItem != null)
+                    {
+                        _monoMixedMenuItem.IsChecked = _screen.DefringeMixedText;
+                    }
+                }
+                if (data.DecreaseContrast.HasValue)
+                {
+                    _screen.UseNonLumaContrastMask = data.DecreaseContrast.Value;
+                    if (_decreaseContrastMenuItem != null)
+                    {
+                        _decreaseContrastMenuItem.IsChecked = _screen.UseNonLumaContrastMask;
+                    }
+                }
+            }
         }
         catch { }
     }
 
-    private void SaveWindowGeometryToConfig()
+    private void SaveSettingsToConfigFile()
     {
         try
         {
-            var data = new WindowSizeConfig
+            var data = new SettingsConfig
             {
                 Width = (int)Width,
-                Height = (int)Height
+                Height = (int)Height,
+                CapsLockEnabled = _capsLockEnabled,
+                ShowScanLines = _screen?.ShowScanLines,
+                MonoMixed = _screen?.DefringeMixedText,
+                DecreaseContrast = _screen?.UseNonLumaContrastMask,
             };
 #pragma warning disable CA1869 // Cache and reuse 'JsonSerializerOptions' instances
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
