@@ -45,7 +45,7 @@
 
 		<Grid DockPanel.Dock="Right" Background="Black" ColumnDefinitions="* Auto">
 			<Border Grid.Column="1" Padding="8" Margin="8" Background="#222" CornerRadius="4">
-				<Grid RowDefinitions="Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto auto auto auto auto auto Auto"
+				<Grid RowDefinitions="Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto auto auto auto auto auto Auto"
 					  ColumnDefinitions="Auto Auto"
 					  DataContext="{Binding SystemStatus}">
 					<TextBlock Text="80STORE" Grid.Row="0" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
@@ -84,10 +84,12 @@
 					<TextBlock Text="{Binding StateTextMode}" Grid.Row="16" Grid.Column="1" Foreground="White" />
 					<TextBlock Text="ALTCHAR" Grid.Row="17" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
 					<TextBlock Text="{Binding StateAltCharSet}" Grid.Row="17" Grid.Column="1" Foreground="White" />
-					<TextBlock Text="FLASH ON" Grid.Row="18" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-					<TextBlock Text="{Binding StateFlashOn}" Grid.Row="18" Grid.Column="1" Foreground="White" />
-					<TextBlock Text="Show 80 Col" Grid.Row="19" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-					<TextBlock Text="{Binding StateShow80Col}" Grid.Row="19" Grid.Column="1" Foreground="White" />
+
+					<TextBlock Text="Show 80 Col" Grid.Row="18" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
+					<TextBlock Text="{Binding StateShow80Col}" Grid.Row="18" Grid.Column="1" Foreground="White" />
+
+					<TextBlock Text="Bank 1" Grid.Row="19" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
+					<TextBlock Text="{Binding StateBank1}" Grid.Row="19" Grid.Column="1" Foreground="White" />
 
 					<TextBlock Text="High Read" Grid.Row="20" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
 					<TextBlock Text="{Binding StateHighRead}" Grid.Row="20" Grid.Column="1" Foreground="White" />
@@ -95,11 +97,11 @@
 					<TextBlock Text="High Write" Grid.Row="21" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
 					<TextBlock Text="{Binding StateHighWrite}" Grid.Row="21" Grid.Column="1" Foreground="White" />
 
-					<TextBlock Text="PreWrite" Grid.Row="21" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-					<TextBlock Text="{Binding StatePrewrite}" Grid.Row="21" Grid.Column="1" Foreground="White" />
+					<TextBlock Text="PreWrite" Grid.Row="22" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
+					<TextBlock Text="{Binding StatePrewrite}" Grid.Row="22" Grid.Column="1" Foreground="White" />
 
-					<TextBlock Text="Bank 1" Grid.Row="22" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-					<TextBlock Text="{Binding StateBank1}" Grid.Row="22" Grid.Column="1" Foreground="White" />
+					<TextBlock Text="FLASH ON" Grid.Row="23" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
+					<TextBlock Text="{Binding StateFlashOn}" Grid.Row="23" Grid.Column="1" Foreground="White" />
 				</Grid>
 			</Border>
 		</Grid>
