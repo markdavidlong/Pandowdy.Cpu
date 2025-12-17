@@ -475,90 +475,50 @@ public sealed class VA2M : IDisposable
         Enqueue(() => BuildStatusData());
     }
 
+    private static readonly System.Collections.Generic.IReadOnlyDictionary<SoftSwitches.SoftSwitchId, System.Action<SystemStatusSnapshotBuilder, bool>> _switchSetters
+        = new System.Collections.Generic.Dictionary<SoftSwitches.SoftSwitchId, System.Action<SystemStatusSnapshotBuilder, bool>>
+        {
+            { SoftSwitches.SoftSwitchId.Store80, (b,v) => b.State80Store = v },
+            { SoftSwitches.SoftSwitchId.RamRd, (b,v) => b.StateRamRd = v },
+            { SoftSwitches.SoftSwitchId.RamWrt, (b,v) => b.StateRamWrt = v },
+            { SoftSwitches.SoftSwitchId.IntCxRom, (b,v) => b.StateIntCxRom = v },
+            { SoftSwitches.SoftSwitchId.AltZp, (b,v) => b.StateAltZp = v },
+            { SoftSwitches.SoftSwitchId.SlotC3Rom, (b,v) => b.StateSlotC3Rom = v },
+            { SoftSwitches.SoftSwitchId.Vid80, (b,v) => b.StateShow80Col = v },
+            { SoftSwitches.SoftSwitchId.AltChar, (b,v) => b.StateAltCharSet = v },
+            { SoftSwitches.SoftSwitchId.Text, (b,v) => b.StateTextMode = v },
+            { SoftSwitches.SoftSwitchId.Mixed, (b,v) => b.StateMixed = v },
+            { SoftSwitches.SoftSwitchId.Page2, (b,v) => b.StatePage2 = v },
+            { SoftSwitches.SoftSwitchId.HiRes, (b,v) => b.StateHiRes = v },
+            { SoftSwitches.SoftSwitchId.An0, (b,v) => b.StateAnn0 = v },
+            { SoftSwitches.SoftSwitchId.An1, (b,v) => b.StateAnn1 = v },
+            { SoftSwitches.SoftSwitchId.An2, (b,v) => b.StateAnn2 = v },
+            { SoftSwitches.SoftSwitchId.An3, (b,v) => b.StateAnn3 = v },
+            { SoftSwitches.SoftSwitchId.Bank1, (b,v) => b.StateUseBank1 = v },
+            { SoftSwitches.SoftSwitchId.HighRead, (b,v) => b.StateHighRead = v },
+            { SoftSwitches.SoftSwitchId.HighWrite, (b,v) => b.StateHighWrite = v },
+        };
+
     private void BuildStatusData()
     {
-        // Access switches via concrete bus type
-      
         var switches = (Bus as VA2MBus)?.Switches;
         var data = switches!.GetSwitchList();
 
-        _sysStatusSink?.Mutate(s =>
+        _sysStatusSink?.Mutate(b =>
         {
-            // for each item in data, use a switch statement to set the corresponding property
             foreach (var item in data)
             {
-                switch (item.id)
+                if (_switchSetters.TryGetValue(item.id, out var setter))
                 {
-                    case SoftSwitches.SoftSwitchId.Store80:
-                        s.State80Store = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.RamRd:
-                        s.StateRamRd = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.RamWrt:
-                        s.StateRamWrt = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.IntCxRom:
-                        s.StateIntCxRom = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.AltZp:
-                        s.StateAltZp = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.SlotC3Rom:
-                        s.StateSlotC3Rom = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.Vid80:
-                        s.StateShow80Col = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.AltChar:
-                        s.StateAltCharSet = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.Text:
-                        s.StateTextMode = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.Mixed:
-                        s.StateMixed = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.Page2:
-                        s.StatePage2 = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.HiRes:
-                        s.StateHiRes = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.An0:
-                        s.StateAnn0 = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.An1:
-                        s.StateAnn1 = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.An2:
-                        s.StateAnn2 = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.An3:
-                        s.StateAnn3 = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.Bank1:
-                        s.StateUseBank1 = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.HighRead:
-                        s.StateHighRead = item.value;
-                        break;
-                    case SoftSwitches.SoftSwitchId.HighWrite:
-                        s.StateHighWrite = item.value;
-                        break;
-                    //prewrite
+                    setter(b, item.value);
                 }
             }
 
-            s.StatePb0 = (Bus as VA2MBus)!.GetPushButton(0);
-            s.StatePb1 = (Bus as VA2MBus)!.GetPushButton(1);
-            s.StatePb2 = (Bus as VA2MBus)!.GetPushButton(2);
-
-            //public bool StateFlashOn = s.StateFlashOn;
-            //public int StateWriteCount = s.StateWriteCount;
-
+            var vb = Bus as VA2MBus;
+            b.StatePb0 = vb!.GetPushButton(0);
+            b.StatePb1 = vb!.GetPushButton(1);
+            b.StatePb2 = vb!.GetPushButton(2);
         });
-
     }
 
     /*    /// <summary>
