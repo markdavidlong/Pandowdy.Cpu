@@ -60,14 +60,7 @@ public class Apple2Display : Control
 
 
     private IFrameProvider? _frameProvider;
-    //RTH private byte[]? _lastFrame;
     private BitmapDataArray? _lastFrame;
-    // Refresh cadence driven externally (MainWindow ticker)
-
-  //  private ISystemStatusProvider? _status;
-    //private bool _flagText, _flagMixed, _flagHiRes, _flagPage2;
-
-
 
     public Bitmap? Bitmap
     {
@@ -91,7 +84,7 @@ public class Apple2Display : Control
     }
 
     public const byte BrightFringeValue = 0xf0;
-    public const byte ReducedFringeValue = 0x40;
+    public const byte ReducedFringeValue = 0xB0;
 
     public bool ForceMono { set; get; } = false;
     public bool ShowScanLines { get; set; } = true;
@@ -190,21 +183,14 @@ public class Apple2Display : Control
                         int outYTop = y * 2;
                         if (outYTop + 1 >= 384)
                         { break; }
-                        if (_frameProvider.IsGraphics && !ForceMono)
+                        if (!_frameProvider.IsGraphics || ForceMono || 
+                            (_frameProvider.IsGraphics && _frameProvider.IsMixed && DefringeMixedText && y >= 160))
                         {
-                            if (_frameProvider.IsMixed && DefringeMixedText && y>= 160)
-                            {
-                                RenderMonochromeLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
-                            }
-                            else
-                            {
-
-                                RenderNtscLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
-                            }
+                            RenderMonochromeLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
                         }
                         else
                         {
-                            RenderMonochromeLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
+                            RenderNtscLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
                         }
                     }
                 }
@@ -222,7 +208,6 @@ public class Apple2Display : Control
 
     public void RequestRefresh()
     {
-        // Ensure we have a frame to render before invalidating
         if (_frameProvider != null && _lastFrame != null)
         {
             InvalidateVisual();
@@ -231,7 +216,6 @@ public class Apple2Display : Control
 
     static private unsafe void RenderMonochromeLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
     {
-        //for (int xByte = 0; xByte < 80; xByte++)
         for (int xPos = -3; xPos < lineData.Length; xPos++)
         {
             bool on = xPos >=0 && lineData[xPos]; // simplified for full byte
@@ -245,8 +229,7 @@ public class Apple2Display : Control
         }
     }
 
-
-    private unsafe void RenderNtscLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
+        private unsafe void RenderNtscLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
     {
         for (int xPos = -3; xPos < lineData.Length; xPos++)
         {
@@ -255,10 +238,31 @@ public class Apple2Display : Control
             bits[1] = xPos + 1 >= 0 && (xPos + 1 < lineData.Length) && lineData[xPos + 1];
             bits[2] = xPos + 2 >= 0 && (xPos + 2 < lineData.Length) && lineData[xPos + 2];
             bits[3] = xPos + 3 >= 0 && (xPos + 3 < lineData.Length) && lineData[xPos + 3];
+            bool neg1 = false;
+            bool neg2 = false;
+            bool neg3 = false;
             var phase = (byte)(xPos % 4);
 
             if (xPos <= stridePixels)
             {
+                int pixDist = 4;
+                if (bits[0])
+                {
+                    pixDist = 0;
+                }
+                else if (bits[1] || neg1)
+                {
+                    pixDist = 1;
+                }
+                else if (bits[2] || neg2)
+                {
+                    pixDist = 2;
+                }
+                else if (bits[3] || neg3)
+                {
+                    pixDist = 3;
+                }
+            
 
                 byte bitval = (byte) ((bits[0] ? 0x08 : 0x00) +
                         (bits[2] ? 0x02 : 0x00) +
@@ -266,20 +270,26 @@ public class Apple2Display : Control
                         (bits[3] ? 0x01 : 0x00));
 
                 uint color = GetNTSCColorFromBits(bitval, phase);
-                //byte darkContrastForNonLumaPixel = NonL;//(byte) (0xff >> (NonLumaContrastMask & 0x7)); 
-                //if (!bits[0])
-                //{
-                //    //color &= (uint) (0xff000000 | (0x010101 * (byte) darkContrastForNonLumaPixel)); // Darken RGB components for non-luma pixels
-                //    color &= (uint) ((0x0111111));
-                //    color += ((uint) 0xff << 24);
-                //}
 
-                byte alpha = (byte) (bits[0] ? 0xff: (UseNonLumaContrastMask? ReducedFringeValue:BrightFringeValue));
+                byte alpha = 0x00; // (byte) (bits[0] ? 0xff: (UseNonLumaContrastMask? ReducedFringeValue:BrightFringeValue));
+                byte[] alphas = [0xff, 0xc0, 0x90, 0x70, 0x50];
+                if (UseNonLumaContrastMask) 
+                { 
+                    alpha = alphas[pixDist]; 
+                }
+                else
+                { 
+                    alpha = 0xff; 
+                }
+
 
                 WritePixel(dst, stridePixels, xPos+3, outYTop, color,alpha);
                 uint dimColor = showScanLines ? (((color & 0x00fcfcfc) >> 2) | 0xff000000) : color; // 3/4 brightness when enabled
 
-                WritePixel(dst, stridePixels, xPos + 3, outYTop + 1, dimColor,alpha);
+                WritePixel(dst, stridePixels, xPos + 3, outYTop + 1, dimColor, alpha);
+                neg3 = neg2;
+                neg2 = neg1;
+                neg1 = bits[0];
             }
         }
     }

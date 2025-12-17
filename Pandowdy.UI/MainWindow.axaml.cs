@@ -601,10 +601,11 @@ public partial class MainWindow : Window
     {
         public int Width { get; set; }
         public int Height { get; set; }
-        public bool? CapsLockEnabled { get; set; }
+     //   public bool? CapsLockEnabled { get; set; }
         public bool? ShowScanLines { get; set; }
         public bool? MonoMixed { get; set; }
         public bool? DecreaseContrast { get; set; }
+        public bool? ForceMonochrome { get; set; }
     }
 
     private static string GetConfigPath()
@@ -636,14 +637,14 @@ public partial class MainWindow : Window
                 Height = data.Height;
             }
             // Restore menu/feature states if present
-            if (data.CapsLockEnabled.HasValue)
-            {
-                _capsLockEnabled = data.CapsLockEnabled.Value;
-                if (_capsLockMenuItem != null)
-                {
-                    _capsLockMenuItem.IsChecked = _capsLockEnabled;
-                }
-            }
+            //if (data.CapsLockEnabled.HasValue)
+            //{
+            //    _capsLockEnabled = data.CapsLockEnabled.Value;
+            //    if (_capsLockMenuItem != null)
+            //    {
+            //        _capsLockMenuItem.IsChecked = _capsLockEnabled;
+            //    }
+            //}
             if (_screen != null)
             {
                 if (data.ShowScanLines.HasValue)
@@ -660,6 +661,14 @@ public partial class MainWindow : Window
                     if (_monoMixedMenuItem != null)
                     {
                         _monoMixedMenuItem.IsChecked = _screen.DefringeMixedText;
+                    }
+                }
+                if (data.ForceMonochrome.HasValue)
+                {
+                    _screen.ForceMono = data.ForceMonochrome.Value;
+                    if (_monochromeMenuItem != null)
+                    {
+                        _monochromeMenuItem.IsChecked = _screen.ForceMono;
                     }
                 }
                 if (data.DecreaseContrast.HasValue)
@@ -683,10 +692,11 @@ public partial class MainWindow : Window
             {
                 Width = (int)Width,
                 Height = (int)Height,
-                CapsLockEnabled = _capsLockEnabled,
+           //     CapsLockEnabled = _capsLockEnabled,
                 ShowScanLines = _screen?.ShowScanLines,
                 MonoMixed = _screen?.DefringeMixedText,
                 DecreaseContrast = _screen?.UseNonLumaContrastMask,
+                ForceMonochrome = _screen?.ForceMono,
             };
 #pragma warning disable CA1869 // Cache and reuse 'JsonSerializerOptions' instances
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
