@@ -368,17 +368,6 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         _hookTable.InitializeDefault();
         InitIoReadHandlers();
         InitIoWriteHandlers();
-        //TODO: MOVE THE FLASH TIMER TO VA2M SYSTEM CLASS. It doesn't need to be in the bus.
-        //
-        //// Start flash timer if status provider available
-        //if (_status != null && _flashTimer == null)
-        //{
-        //    _flashTimer = new Timer(_ =>
-        //    {
-        //        if (_disposed) { return; }
-        //        _status!.Mutate(b => b.StateFlashOn = !b.StateFlashOn);
-        //    }, null, FlashPeriod, FlashPeriod);
-        //}
     }
 
     public void SetKeyValue(byte key)
@@ -399,26 +388,20 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
 
     public void SetPushButton(int num, bool pressed)
     {
-        //_status!.Mutate(b =>
-        //{
         switch (num)
         {
             case 0:
                 _button0 = pressed;
-                //b.StatePb0 = pressed;
                 break;
 
             case 1:
                 _button1 = pressed;
-                //b.StatePb1 = pressed;
                 break;
 
             case 2:
                 _button2 = pressed;
-                //b.StatePb2 = pressed;
                 break;
         }
-        //});
     }
 
     private void SetWriteOrPrewrite()
