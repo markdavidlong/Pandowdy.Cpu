@@ -115,6 +115,7 @@ namespace Pandowdy.EmuCore
         private bool _highWrite = false;
         private bool _bank1 = false;
         private bool _highRead = false;
+        private bool _preWrite = false;
 
 
         // Nullable maps allow unmapped / write-protected regions; instance (was static)
@@ -387,7 +388,7 @@ namespace Pandowdy.EmuCore
             var validWrite = WriteToRegion(range, address, value);
             if (!validWrite)
             {
-                Debug.WriteLine($"Write to unmapped address {address:X4} ignored."); return;
+           //     Debug.WriteLine($"Write to unmapped address {address:X4} ignored."); return;
             }
             MemoryWritten?.Invoke(this, new MemoryAccessEventArgs { Address = address, Value = value, Length = 1 });
 
@@ -462,15 +463,20 @@ namespace Pandowdy.EmuCore
             UpdateMemoryMappings();
         }
 
-        public void SetMixed(bool _) {  /* NA */ }
-        public void SetText(bool _) {  /* NA */ }
-        public void SetAn0(bool _) {  /* NA */ }
-        public void SetAn1(bool _) {  /* NA */ }
-        public void SetAn2(bool _) {  /* NA */ }
-        public void SetAn3(bool _) {  /* NA */ }
-        public void Set80Vid(bool _) {  /* NA */ }
-        public void SetAltChar(bool _) {  /* NA */ }
-        public void SetPreWrite(bool _) {  /* NA */ }
+        public void SetMixed(bool _) {  /* NA - display only */ }
+        public void SetText(bool _) {  /* NA - display only */ }
+        public void SetAn0(bool _) {  /* NA - display only */ }
+        public void SetAn1(bool _) {  /* NA - display only */ }
+        public void SetAn2(bool _) {  /* NA - display only */ }
+        public void SetAn3(bool _) {  /* NA - display only */ }
+        public void Set80Vid(bool _) {  /* NA - display only */ }
+        public void SetAltChar(bool _) {  /* NA - display only */ }
+        
+        public void SetPreWrite(bool enabled)
+        {
+            _preWrite = enabled;
+            UpdateMemoryMappings();
+        }
 
         public void UpdateMemoryMappings()
         {
@@ -517,6 +523,7 @@ namespace Pandowdy.EmuCore
             // Write:
             if (_highWrite)
             {
+ //               Debug.WriteLine("Setting _HighWrite");
                 if (_altZp) // Aux a8a/a8b + a9
                 { 
                     _writeRanges[Ranges.Region_D000_DFFF] = _bank1?_a8a:_a8b;
@@ -530,6 +537,7 @@ namespace Pandowdy.EmuCore
             }
             else
             {
+   //             Debug.WriteLine("Clearing _HighWrite");
                 _writeRanges[Ranges.Region_D000_DFFF] = null;
                 _writeRanges[Ranges.Region_E000_FFFF] = null;
             }
@@ -537,6 +545,8 @@ namespace Pandowdy.EmuCore
             // Read:
             if (_highRead)
             {
+    //            Debug.WriteLine("Setting _HighRead");
+
                 if (_altZp) // Aux a8a/a8b + a9
                 {
                     _readRanges[Ranges.Region_D000_DFFF] = _bank1?_a8a:_a8b;
@@ -550,6 +560,8 @@ namespace Pandowdy.EmuCore
             }
             else
             {
+    //            Debug.WriteLine("Clearing _HighRead");
+
                 _readRanges[Ranges.Region_D000_DFFF] = _rom1;
                 _readRanges[Ranges.Region_E000_FFFF] = _rom2;
             }

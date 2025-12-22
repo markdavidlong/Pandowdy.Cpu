@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Pandowdy.Core\Pandowdy.Core.csproj" />
+    <ProjectReference Include="..\Pandowdy.EmuCore\Pandowdy.EmuCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

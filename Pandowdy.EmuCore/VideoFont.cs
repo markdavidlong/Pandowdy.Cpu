@@ -23,8 +23,8 @@ public static class VideoFont
         // Resource name aligned with project embedding
         string[] candidates =
         [
-            "Pandowdy.Core.Resources.a2e_enh_video.rom",
-            "Pandowdy.Core.a2e_enh_video.rom",
+            "Pandowdy.EmuCore.Resources.a2e_enh_video.rom",
+            "Pandowdy.EmuCore.a2e_enh_video.rom",
             "a2e_enh_video.rom"
         ];
         foreach (var name in candidates)

@@ -1,5 +1,5 @@
 using System.Reflection;
-using Pandowdy.Core;
+using Pandowdy.EmuCore;
 using Xunit;
 
 namespace Pandowdy.Tests
@@ -10,7 +10,7 @@ namespace Pandowdy.Tests
         {
             MethodInfo? mi = typeof(VA2M).GetMethod("GetAddressForXY", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.NotNull(mi);
-            object? result = mi!.Invoke(null, new object[] { x, y, text, hires, mixed, page2, cellRowOffset });
+            object? result = mi!.Invoke(null, [x, y, text, hires, mixed, page2, cellRowOffset]);
             Assert.NotNull(result);
             return (int)result!;
         }

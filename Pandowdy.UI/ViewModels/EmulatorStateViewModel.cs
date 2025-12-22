@@ -1,6 +1,6 @@
 using System;
 using ReactiveUI;
-using Pandowdy.Core;
+using Pandowdy.EmuCore;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 

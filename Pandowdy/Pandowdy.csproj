@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>..\assets\ico\pandowdy.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.1" />
+    <PackageReference Include="Avalonia" Version="11.3.10" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.10" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.10" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.10" />
+    <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.8" />
+    <PackageReference Include="System.Reactive" Version="6.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pandowdy.UI\Pandowdy.UI.csproj" />
+    <ProjectReference Include="..\Pandowdy.EmuCore\Pandowdy.EmuCore.csproj" />
+    <ProjectReference Include="..\legacy\6502.NET\Emulator\Emulator.csproj" />
+    <ProjectReference Include="..\legacy\CiderPress2\CommonUtil\CommonUtil.csproj" />
+    <ProjectReference Include="..\legacy\CiderPress2\DiskArc\DiskArc.csproj" />
+    <ProjectReference Include="..\legacy\CiderPress2\FileConv\FileConv.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\assets\ico\pandowdy.ico">
+      <Link>assets\ico\pandowdy.ico</Link>
+      <Visible>true</Visible>
+    </None>
+  </ItemGroup>
+</Project>

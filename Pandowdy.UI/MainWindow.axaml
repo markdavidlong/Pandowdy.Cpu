@@ -47,8 +47,9 @@
 			</MenuItem>
 		</Menu>
 
-		<Grid DockPanel.Dock="Right" Background="Black" ColumnDefinitions="* Auto">
-			<Border Grid.Column="1" Padding="8" Margin="8" Background="#222" CornerRadius="4">
+		<!-- Right-side status panel sized to content only -->
+		<Grid DockPanel.Dock="Right" Background="Black" ColumnDefinitions="Auto">
+			<Border Padding="8" Margin="8" Background="#222" CornerRadius="4">
 				<Grid RowDefinitions="Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto auto auto auto auto auto Auto"
 					  ColumnDefinitions="Auto Auto"
 					  DataContext="{Binding SystemStatus}">
@@ -110,62 +111,14 @@
 			</Border>
 		</Grid>
 
-				<!--
-		<Grid DockPanel.Dock="Bottom" Background="Blue" ColumnDefinitions="* Auto">
-
-				
-		<ScrollViewer HorizontalScrollBarVisibility="Auto"
-					  VerticalScrollBarVisibility="Auto"
-					  IsVisible="True">
-			<TextBox x:Name="OutputTextBox"
-					 AcceptsReturn="True"
-					 TextWrapping="Wrap"
-					 IsReadOnly="True"
-					 FontFamily="Apple2Forever,Consolas,Courier New,monospace"
-					 FontSize="12"
-					 Padding="10"
-					 Background="Black"
-					 Foreground="Green"
-					 BorderThickness="0"
-					 LineHeight="14"
-					 SelectionBrush="DarkGreen"
-					 SelectionForegroundBrush="black" />
-		</ScrollViewer> 
-		</Grid>
-		-->
-		
-			<!-- Apple2TextScreen centered and scaled to fill available space -->
-			<local:Apple2Display x:Name="ScreenDisplay"
-							HorizontalAlignment="Center"
-							VerticalAlignment="Center" MinWidth="600" MinHeight="576"/>
-		
-
+		<!-- Apple2Display centered and fills remaining space -->
+		<local:Apple2Display x:Name="ScreenDisplay"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center" MinWidth="600" MinHeight="576"/>
 
 	</DockPanel>
 
 	<Window.Styles>
-		<!--
-		<Style Selector="TextBox#OutputTextBox">
-			<Setter Property="Template">
-				<ControlTemplate>
-					<Border Background="{TemplateBinding Background}"
-							BorderBrush="Transparent"
-							BorderThickness="0"
-							Padding="{TemplateBinding Padding}">
-						<TextPresenter x:Name="PART_TextPresenter"
-									   Text="{TemplateBinding Text}"
-									   CaretIndex="{TemplateBinding CaretIndex}"
-									   SelectionStart="{TemplateBinding SelectionStart}"
-									   SelectionEnd="{TemplateBinding SelectionEnd}"
-									   SelectionBrush="{TemplateBinding SelectionBrush}"
-									   SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
-									   TextAlignment="{TemplateBinding TextAlignment}"
-									   TextWrapping="{TemplateBinding TextWrapping}"
-									   LineHeight="{TemplateBinding LineHeight}"/>
-					</Border>
-				</ControlTemplate>
-			</Setter>
-		</Style>
-		-->
+		<!-- styles omitted -->
 	</Window.Styles>
 </Window>

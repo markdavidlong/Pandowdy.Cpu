@@ -1,26 +1,25 @@
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Reactive.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Threading;
 using Avalonia.Markup.Xaml;
-using CommonUtil;
-using Pandowdy.Core;
-using System;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-using Pandowdy.UI.ViewModels; // ensure ViewModel type is visible
-using System.Text.Json;
+using Avalonia.Threading;
 using ReactiveUI;
 using ReactiveUI.Avalonia;
-using System.Reactive.Linq;
+using Pandowdy.UI.ViewModels;
+using Pandowdy.EmuCore;
 
 namespace Pandowdy.UI;
 
 public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 {
-    private readonly AppHook mAppHook = new(new SimpleMessageLog());
+  //  private readonly AppHook mAppHook = new(new SimpleMessageLog());
     private DiskReadTestTemp? mDiskReadTest;
     private string mLastDiskPath = "E:\\develop\\Pandowdy";
 
@@ -80,7 +79,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             if (vm != null)
             {
                 var s1 = vm.WhenAnyValue(x => x.ThrottleEnabled)
-                    .Subscribe(v => { if (_machine != null) _machine.ThrottleEnabled = v; });
+                    .Subscribe(v => { if (_machine != null) { _machine.ThrottleEnabled = v; } });
                 disposables.Add(s1);
                 var s2 = vm.WhenAnyValue(x => x.CapsLockEnabled)
                     .ObserveOn(RxApp.MainThreadScheduler)
@@ -165,7 +164,6 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 {
                     // Request screen refresh; other synced tasks can also hook here
                     _screen.RequestRefresh();
-                    _machine!.GenerateStatusData();
                 });
         }
         Dispatcher.UIThread.Post(() => OnEmuStartClicked(this, new RoutedEventArgs()));
@@ -253,7 +251,6 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             }
             catch (Exception)
             {
-                // swallow or log
             }
         });
         _ = _emuTask.ContinueWith(t =>
@@ -268,7 +265,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     }
 
     private void OnEmuStopClicked(object? sender, RoutedEventArgs e) => StopEmulator();
-    private void OnEmuResetClicked(object? sender, RoutedEventArgs e) { if (_depsInjected) _machine?.UserReset(); }
+    private void OnEmuResetClicked(object? sender, RoutedEventArgs e) { if (_depsInjected) { _machine?.UserReset(); } }
 
     private void OnEmuStepOnceClicked(object? sender, RoutedEventArgs e)
     {

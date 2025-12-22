@@ -84,7 +84,7 @@ public record SystemStatusSnapshot(
     bool StateHighWrite
     );
 
-public sealed class SystemStatusProvider : ISystemStatusProvider
+public sealed class SystemStatusProvider : ISystemStatusProvider, ISoftSwitchResponder
 {
     private SystemStatusSnapshot _current = new(
         State80Store: false,
@@ -155,6 +155,28 @@ public sealed class SystemStatusProvider : ISystemStatusProvider
         _subject.OnNext(_current);
         Changed?.Invoke(this, _current);
     }
+
+    // ISoftSwitchResponder implementation - update snapshot via Mutate
+    public void Set80Store(bool store80) => Mutate(b => b.State80Store = store80);
+    public void SetRamRd(bool ramRd) => Mutate(b => b.StateRamRd = ramRd);
+    public void SetRamWrt(bool ramWrt) => Mutate(b => b.StateRamWrt = ramWrt);
+    public void SetIntCxRom(bool intCxRom) => Mutate(b => b.StateIntCxRom = intCxRom);
+    public void SetAltZp(bool altZp) => Mutate(b => b.StateAltZp = altZp);
+    public void SetSlotC3Rom(bool slotC3Rom) => Mutate(b => b.StateSlotC3Rom = slotC3Rom);
+    public void Set80Vid(bool vid) => Mutate(b => b.StateShow80Col = vid);
+    public void SetAltChar(bool altChar) => Mutate(b => b.StateAltCharSet = altChar);
+    public void SetText(bool text) => Mutate(b => b.StateTextMode = text);
+    public void SetMixed(bool mixed) => Mutate(b => b.StateMixed = mixed);
+    public void SetPage2(bool page2) => Mutate(b => b.StatePage2 = page2);
+    public void SetHiRes(bool hires) => Mutate(b => b.StateHiRes = hires);
+    public void SetAn0(bool an0) => Mutate(b => b.StateAnn0 = an0);
+    public void SetAn1(bool an1) => Mutate(b => b.StateAnn1 = an1);
+    public void SetAn2(bool an2) => Mutate(b => b.StateAnn2 = an2);
+    public void SetAn3(bool an3) => Mutate(b => b.StateAnn3 = an3);
+    public void SetBank1(bool enabled) => Mutate(b => b.StateUseBank1 = enabled);
+    public void SetHighWrite(bool enabled) => Mutate(b => b.StateHighWrite = enabled);
+    public void SetHighRead(bool enabled) => Mutate(b => b.StateHighRead = enabled);
+    public void SetPreWrite(bool enabled) => Mutate(b => b.StatePrewrite = enabled);
 }
 
 public sealed class SystemStatusSnapshotBuilder(SystemStatusSnapshot s)
@@ -233,5 +255,6 @@ public sealed class EmulatorStateProvider : IEmulatorState {
     public void RequestContinue() { /* placeholder */ }
     public void RequestStep() { /* placeholder */ }
 }
+
 
 

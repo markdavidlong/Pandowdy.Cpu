@@ -1,39 +1,35 @@
 using System;
+using System.Reactive.Linq;
 using Avalonia.Threading;
-using Pandowdy.Core;
+using Pandowdy.EmuCore;
 
-namespace Pandowdy.UI
+namespace Pandowdy.UI;
+
+public sealed class AvaloniaRefreshTicker : IRefreshTicker
 {
-    public sealed class AvaloniaRefreshTicker : IRefreshTicker
+    private readonly IObservable<DateTime> _stream;
+    private readonly IObserver<DateTime> _observer;
+
+    public AvaloniaRefreshTicker()
     {
-        private readonly DispatcherTimer _timer;
-        private readonly System.Reactive.Subjects.Subject<DateTime> _subject = new();
+        var subject = new System.Reactive.Subjects.Subject<DateTime>();
+        _observer = subject;
+        _stream = subject.AsObservable();
+    }
 
-        public AvaloniaRefreshTicker()
+    public IObservable<DateTime> Stream => _stream;
+
+    public void Start()
+    {
+        DispatcherTimer.Run(() =>
         {
-            _timer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(1000.0 / 60.0)
-            };
-            _timer.Tick += (_, __) => _subject.OnNext(DateTime.UtcNow);
-        }
+            _observer.OnNext(DateTime.UtcNow);
+            return true;
+        }, TimeSpan.FromSeconds(1.0/60.0));
+    }
 
-        public IObservable<DateTime> Stream => _subject;
-
-        public void Start()
-        {
-            if (!_timer.IsEnabled)
-            {
-                _timer.Start();
-            }
-        }
-
-        public void Stop()
-        {
-            if (_timer.IsEnabled)
-            {
-                _timer.Stop();
-            }
-        }
+    public void Stop()
+    {
+        // No-op for now; Avalonia timer will stop when app closes
     }
 }

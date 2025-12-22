@@ -1,12 +1,12 @@
 namespace Pandowdy.Tests
 {
-    using Pandowdy.Core;
+    using Pandowdy.EmuCore;
 
     public class TestMemoryPool
     {
 
 
-        public MemoryPool BuildPool()
+        static public MemoryPool BuildPool()
         {
             var pool = new MemoryPool();
             for (int i = 0; i < 65536; i++)

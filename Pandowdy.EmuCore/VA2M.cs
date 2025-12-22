@@ -37,9 +37,9 @@ public sealed class VA2M : IDisposable
         _stateSink = stateSink;
         _frameSink = frameSink;
         _sysStatusSink = statusProvider;
-        TryLoadEmbeddedRom("Pandowdy.Core.Resources.a2e_enh_c-f.rom");
+        TryLoadEmbeddedRom("Pandowdy.EmuCore.Resources.a2e_enh_c-f.rom");
         
-        Bus = new VA2MBus(MemoryPool);
+        Bus = new VA2MBus(MemoryPool, _sysStatusSink as ISoftSwitchResponder);
         _cpu = new CPU();
         Bus.Connect(_cpu);
         if (_frameSink is not null && Bus is VA2MBus vb)

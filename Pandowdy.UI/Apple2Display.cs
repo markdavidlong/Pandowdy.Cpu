@@ -1,19 +1,22 @@
 ﻿using System;
+using System.IO;
+using System.Reactive.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
-using Avalonia.Input;
-using Pandowdy.Core;
+using ReactiveUI;
+using Pandowdy.EmuCore;
 
 namespace Pandowdy.UI;
 
 
 /// <summary>
-/// Apple II text screen control rendering from emulator frame provider at fixed 60Hz.
-/// Legacy per-character incremental rendering removed.
+///
 /// </summary>
 public class Apple2Display : Control
 {

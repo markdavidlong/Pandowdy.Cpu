@@ -173,7 +173,14 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     {
         _memoryPool = mempool;
 
-        _softSwitches.AddResponder(responder ?? mempool);
+        // Always add the MemoryPool as a responder (it needs to update memory mappings)
+        _softSwitches.AddResponder(mempool);
+        
+        // Optionally add an additional responder (e.g., SystemStatusProvider for UI updates)
+        if (responder != null && responder != mempool)
+        {
+            _softSwitches.AddResponder(responder);
+        }
     }
 
     private readonly System.Collections.Generic.Dictionary<ushort, System.Func<byte>> _ioReadHandlers = [];

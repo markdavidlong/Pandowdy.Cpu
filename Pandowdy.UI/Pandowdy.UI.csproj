@@ -1,14 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
+    <OutputType>Library</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <!-- Enable unsafe code for direct bitmap pixel manipulation -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <!-- Point to actual icon source path -->
-    <ApplicationIcon>..\assets\ico\pandowdy.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -56,6 +54,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Pandowdy.EmuCore\Pandowdy.EmuCore.csproj" />
     <ProjectReference Include="..\legacy\6502.NET\Emulator\Emulator.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\CommonUtil\CommonUtil.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\DiskArc\DiskArc.csproj" />
