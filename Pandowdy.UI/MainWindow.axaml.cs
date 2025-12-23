@@ -23,20 +23,17 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     private DiskReadTestTemp? mDiskReadTest;
     private string mLastDiskPath = "E:\\develop\\Pandowdy";
 
-    private VA2M? _machine; // injected later via InjectDependencies
+    private VA2M? _machine; // injected via Initialize
     private CancellationTokenSource? _emuCts;
     private Task? _emuTask;
 
-    private Menu? _mainMenu;
-    private Apple2Display? _screen;
-    private SoftSwitchStatusPanel? _softSwitchStatusPanel;
-    private IRefreshTicker? _refreshTicker; // injected later
+    private IRefreshTicker? _refreshTicker; // injected via Initialize
     private IDisposable? _refreshSub;
     private bool _menuPointerActive; // true while pointer is over the menu bar
     private bool _depsInjected; // guard to ensure dependencies injected once
 
     private bool _capsLockEnabled = true; // default ON
-    public bool IsCapsLockEnabledForInput => _capsLockEnabled; // expose to Apple2TextScreen
+    public bool IsCapsLockEnabledForInput => _capsLockEnabled; // expose to Apple2Display
     
     private bool _showSoftSwitchStatus = true; // default visible
     public bool ShowSoftSwitchStatus
@@ -59,24 +56,33 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     public MainWindow()
     {
         InitializeComponent();
-        _mainMenu = this.FindControl<Menu>("MainMenu");
-        if (_mainMenu != null)
+        
+        // Setup menu interaction handlers using x:Name generated field or fallback
+        var mainMenu = GetMainMenu();
+        if (mainMenu != null)
         {
-            _mainMenu.PointerEntered += (_, __) => _menuPointerActive = true;
-            _mainMenu.PointerExited += (_, __) => _menuPointerActive = false;
+            mainMenu.PointerEntered += (_, __) => _menuPointerActive = true;
+            mainMenu.PointerExited += (_, __) => _menuPointerActive = false;
         }
-        _screen = this.FindControl<Apple2Display>("ScreenDisplay");
-        _softSwitchStatusPanel = this.FindControl<SoftSwitchStatusPanel>("SoftSwitchStatusPanel");
+        
+        // No FindControl calls needed - controls are available via x:Name fields (with fallback)
         // Defer attaching machine/frame until Initialize, which should be called next.
     }
 
     private void UpdateSoftSwitchStatusVisibility()
     {
-        if (_softSwitchStatusPanel != null)
+        var statusPanel = SoftSwitchStatusPanel ?? this.FindControl<SoftSwitchStatusPanel>("SoftSwitchStatusPanel");
+        if (statusPanel != null)
         {
-            _softSwitchStatusPanel.IsVisible = _showSoftSwitchStatus;
+            statusPanel.IsVisible = _showSoftSwitchStatus;
         }
     }
+    
+    // Helper method to get ScreenDisplay with fallback
+    private Apple2Display? GetScreenDisplay() => ScreenDisplay ?? this.FindControl<Apple2Display>("ScreenDisplay");
+    
+    // Helper method to get MainMenu with fallback
+    private Menu? GetMainMenu() => MainMenu ?? this.FindControl<Menu>("MainMenu");
 
     /// <summary>
     /// Initializes the MainWindow with all required dependencies.
@@ -86,7 +92,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     {
         if (_depsInjected)
         {
-            throw new InvalidOperationException("Dependencies already injected.");
+            throw new InvalidOperationException("Dependencies already initialized.");
         }
         _depsInjected = true;
         ViewModel = viewModel;
@@ -94,12 +100,23 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         _machine = machine;
         _refreshTicker = refreshTicker;
 
-        if (_screen != null)
+        // Initialize child controls with their dependencies
+        // Use x:Name generated field or fall back to FindControl if XAML compilation didn't generate it
+        var screenDisplay = ScreenDisplay ?? this.FindControl<Apple2Display>("ScreenDisplay");
+        if (screenDisplay != null)
         {
-            _screen.AttachMachine(_machine);
-            _screen.AttachFrameProvider(frameProvider);
-            _screen.Focus();
+            screenDisplay.AttachMachine(_machine);
+            screenDisplay.AttachFrameProvider(frameProvider);
+            screenDisplay.Focus();
         }
+        else
+        {
+            throw new InvalidOperationException("ScreenDisplay control not found. Ensure x:Name='ScreenDisplay' is set in XAML.");
+        }
+        
+        // Initialize status panel with its view model
+        var statusPanel = SoftSwitchStatusPanel ?? this.FindControl<SoftSwitchStatusPanel>("SoftSwitchStatusPanel");
+        statusPanel?.Initialize(viewModel.SystemStatus);
 
         this.WhenActivated(disposables =>
         {
@@ -120,11 +137,11 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     .ObserveOn(RxApp.MainThreadScheduler)
                     .Subscribe(v =>
                     {
-                        if (_screen != null)
+                        var screen = GetScreenDisplay();
+                        if (screen != null)
                         {
-                            _screen.ShowScanLines = v;
-                            _screen.RequestRefresh();
-                            // Invalidation handled by reactive pipeline
+                            screen.ShowScanLines = v;
+                            screen.RequestRefresh();
                         }
                     });
                 disposables.Add(s3);
@@ -132,11 +149,11 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     .ObserveOn(RxApp.MainThreadScheduler)
                     .Subscribe(v =>
                     {
-                        if (_screen != null)
+                        var screen = GetScreenDisplay();
+                        if (screen != null)
                         {
-                            _screen.ForceMono = v;
-                            _screen.RequestRefresh();
-                            // Invalidation handled by reactive pipeline
+                            screen.ForceMono = v;
+                            screen.RequestRefresh();
                         }
                     });
                 disposables.Add(s4);
@@ -144,11 +161,11 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     .ObserveOn(RxApp.MainThreadScheduler)
                     .Subscribe(v =>
                     {
-                        if (_screen != null)
+                        var screen = GetScreenDisplay();
+                        if (screen != null)
                         {
-                            _screen.UseNonLumaContrastMask = v;
-                            _screen.RequestRefresh();
-                            // Invalidation handled by reactive pipeline
+                            screen.UseNonLumaContrastMask = v;
+                            screen.RequestRefresh();
                         }
                     });
                 disposables.Add(s5);
@@ -156,11 +173,11 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     .ObserveOn(RxApp.MainThreadScheduler)
                     .Subscribe(v =>
                     {
-                        if (_screen != null)
+                        var screen = GetScreenDisplay();
+                        if (screen != null)
                         {
-                            _screen.DefringeMixedText = v;
-                            _screen.RequestRefresh();
-                            // Invalidation handled by reactive pipeline
+                            screen.DefringeMixedText = v;
+                            screen.RequestRefresh();
                         }
                     });
                 disposables.Add(s6);
@@ -186,8 +203,11 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     {
         base.OnOpened(e);
         if (!_depsInjected) { return; }
-        _screen?.Focus();
-        if (_refreshTicker != null && _screen != null)
+        
+        var screenDisplay = ScreenDisplay ?? this.FindControl<Apple2Display>("ScreenDisplay");
+        screenDisplay?.Focus();
+        
+        if (_refreshTicker != null && screenDisplay != null)
         {
             _refreshTicker.Start();
             _refreshSub = _refreshTicker.Stream
@@ -195,8 +215,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 .Subscribe(_ =>
                 {
                     // Signal screen that it's OK to render at 60Hz
-                    // Actual invalidation only happens if properties changed
-                    _screen.RequestRefresh();
+                    screenDisplay.RequestRefresh();
                 });
         }
         Dispatcher.UIThread.Post(() => OnEmuStartClicked(this, new RoutedEventArgs()));
@@ -217,7 +236,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         base.OnGotFocus(e);
         if (!_menuPointerActive)
         {
-            _screen?.Focus();
+            GetScreenDisplay()?.Focus();
         }
     }
 
@@ -226,17 +245,18 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         base.OnPointerPressed(e);
         if (!_menuPointerActive)
         {
-            _screen?.Focus();
+            GetScreenDisplay()?.Focus();
         }
     }
 
     private bool IsAnyMenuOpen()
     {
-        if (_mainMenu == null)
+        var mainMenu = GetMainMenu();
+        if (mainMenu == null)
         {
             return false;
         }
-        foreach (var item in _mainMenu.Items)
+        foreach (var item in mainMenu.Items)
         {
             if (item is MenuItem mi && mi.IsSubMenuOpen)
             {
@@ -248,11 +268,12 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
     private void CloseAllMenus()
     {
-        if (_mainMenu == null)
+        var mainMenu = GetMainMenu();
+        if (mainMenu == null)
         {
             return;
         }
-        foreach (var item in _mainMenu.Items)
+        foreach (var item in mainMenu.Items)
         {
             if (item is MenuItem mi)
             {
@@ -260,7 +281,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             }
         }
         _menuPointerActive = false;
-        _screen?.Focus();
+        GetScreenDisplay()?.Focus();
     }
 
     private async void OnEmuStartClicked(object? sender, RoutedEventArgs e)
@@ -431,7 +452,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             e.Handled = true;
             return;
         }
-        _screen?.Focus();
+        GetScreenDisplay()?.Focus();
     }
 
     protected override void OnKeyUp(KeyEventArgs e)
