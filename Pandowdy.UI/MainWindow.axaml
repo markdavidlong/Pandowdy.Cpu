@@ -24,7 +24,8 @@
 				<MenuItem x:Name="MonochromeMenuItem" Header="_Monochrome" ToggleType="CheckBox" IsChecked="{Binding ForceMonochrome}" Command="{Binding ToggleMonochrome}" InputGesture="Alt+M" />
 				<MenuItem x:Name="MonoMixedMenuItem" Header="_Monochrome Mixed Text" ToggleType="CheckBox" IsChecked="{Binding MonoMixed}" Command="{Binding ToggleMonoMixed}" InputGesture="Alt+X" />
 				<MenuItem x:Name="DecreaseContrastMenuItem" Header="_Decrease Color Fringing" ToggleType="CheckBox" IsChecked="{Binding DecreaseContrast}" Command="{Binding ToggleDecreaseContrast}" InputGesture="Alt+D"/>
-
+				<Separator/>
+				<MenuItem x:Name="ShowSoftSwitchStatusMenuItem" Header="Show SoftS_witch Status" ToggleType="CheckBox" IsChecked="{Binding ShowSoftSwitchStatus, RelativeSource={RelativeSource AncestorType=Window}}" Click="OnToggleSoftSwitchStatusClicked" InputGesture="Alt+W"/>
 			</MenuItem>
 			<MenuItem Header="_Emulator">
 				<MenuItem Header="_Start" Command="{Binding StartEmu}" InputGesture="F5" />
@@ -39,7 +40,7 @@
 		</Menu>
 
 		<!-- Right-side status panel sized to content only -->
-		<Grid DockPanel.Dock="Right" ColumnDefinitions="Auto">
+		<Grid  x:Name="SoftSwitchStatusPanel" DockPanel.Dock="Right" ColumnDefinitions="Auto">
 			<Border Padding="8" Margin="8" Background="#222" CornerRadius="4">
 				<Grid RowDefinitions="Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto auto auto auto auto auto Auto"
 					  ColumnDefinitions="Auto Auto"

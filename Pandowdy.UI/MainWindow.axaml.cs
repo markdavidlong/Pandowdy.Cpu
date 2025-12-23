@@ -29,6 +29,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
     private Menu? _mainMenu;
     private Apple2Display? _screen;
+    private Grid? _softSwitchStatusPanel;
     private IRefreshTicker? _refreshTicker; // injected later
     private IDisposable? _refreshSub;
     private bool _menuPointerActive; // true while pointer is over the menu bar
@@ -36,6 +37,20 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
     private bool _capsLockEnabled = true; // default ON
     public bool IsCapsLockEnabledForInput => _capsLockEnabled; // expose to Apple2TextScreen
+    
+    private bool _showSoftSwitchStatus = true; // default visible
+    public bool ShowSoftSwitchStatus
+    {
+        get => _showSoftSwitchStatus;
+        set
+        {
+            if (_showSoftSwitchStatus != value)
+            {
+                _showSoftSwitchStatus = value;
+                UpdateSoftSwitchStatusVisibility();
+            }
+        }
+    }
 
 
     // Parameterless ctor for XAML loader; no heavy work here. Ideally dependencies should be injected here, but 
@@ -51,7 +66,16 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             _mainMenu.PointerExited += (_, __) => _menuPointerActive = false;
         }
         _screen = this.FindControl<Apple2Display>("ScreenDisplay");
+        _softSwitchStatusPanel = this.FindControl<Grid>("SoftSwitchStatusPanel");
         // Defer attaching machine/frame until InjectDependencies, which should be called next.
+    }
+
+    private void UpdateSoftSwitchStatusVisibility()
+    {
+        if (_softSwitchStatusPanel != null)
+        {
+            _softSwitchStatusPanel.IsVisible = _showSoftSwitchStatus;
+        }
     }
 
     public void InjectDependencies(MainWindowViewModel viewModel, VA2M machine, IFrameProvider frameProvider, IRefreshTicker refreshTicker)
@@ -309,6 +333,14 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 if (data.DecreaseContrast.HasValue) { ViewModel.DecreaseContrast = data.DecreaseContrast.Value; }
                 if (data.ThrottleEnabled.HasValue) { ViewModel.ThrottleEnabled = data.ThrottleEnabled.Value; } else { ViewModel.ThrottleEnabled = true; }
             }
+            if (data.ShowSoftSwitchStatus.HasValue) 
+            { 
+                ShowSoftSwitchStatus = data.ShowSoftSwitchStatus.Value; 
+            }
+            else 
+            { 
+                ShowSoftSwitchStatus = true; 
+            }
         }
         catch { }
     }
@@ -326,6 +358,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 DecreaseContrast = ViewModel?.DecreaseContrast,
                 ForceMonochrome = ViewModel?.ForceMonochrome,
                 ThrottleEnabled = ViewModel?.ThrottleEnabled,
+                ShowSoftSwitchStatus = ShowSoftSwitchStatus,
             };
 #pragma warning disable CA1869 // Cache and reuse 'JsonSerializerOptions' instances
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
@@ -345,6 +378,11 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     }
 
     private void OnQuitClicked(object? sender, RoutedEventArgs e) => Close();
+    
+    private void OnToggleSoftSwitchStatusClicked(object? sender, RoutedEventArgs e)
+    {
+        ShowSoftSwitchStatus = !ShowSoftSwitchStatus;
+    }
 
     private static string GetConfigPath()
     {
@@ -363,6 +401,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         public bool? DecreaseContrast { get; set; }
         public bool? ForceMonochrome { get; set; }
         public bool? ThrottleEnabled { get; set; }
+        public bool? ShowSoftSwitchStatus { get; set; }
     }
 
     private void OnMainWindowKeyDown(object? sender, KeyEventArgs e)
@@ -438,6 +477,9 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     return true;
                 case Key.X:
                     ViewModel?.ToggleMonoMixed.Execute().Subscribe();
+                    return true;
+                case Key.W:
+                    ShowSoftSwitchStatus = !ShowSoftSwitchStatus;
                     return true;
                 case Key.F4:
                     Close();
