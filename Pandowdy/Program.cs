@@ -13,6 +13,8 @@ using IFrameProvider = Pandowdy.EmuCore.Interfaces.IFrameProvider;
 using IEmulatorState = Pandowdy.EmuCore.Interfaces.IEmulatorState;
 using ISystemStatusProvider = Pandowdy.EmuCore.Interfaces.ISystemStatusProvider;
 using IRefreshTicker = Pandowdy.EmuCore.Interfaces.IRefreshTicker;
+using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy
 {
@@ -55,10 +57,24 @@ namespace Pandowdy
                 })
                 .ConfigureServices((context, services) =>
                 {
+                    services.AddSingleton<Emulator.CPU>();
+
+
+
                     // EmuCore
+                    services.AddSingleton<MemoryPool>();
+                    services.AddSingleton<ICpu, CPUAdapter>();
                     services.AddSingleton<IFrameProvider, FrameProvider>();
                     services.AddSingleton<IEmulatorState, EmulatorStateProvider>();
-                    services.AddSingleton<ISystemStatusProvider, SystemStatusProvider>();
+                    
+                    // SystemStatusProvider implements both ISystemStatusProvider and ISoftSwitchResponder
+                    // Register the concrete type first
+                    services.AddSingleton<SystemStatusProvider>();
+                    // Then register both interfaces to point to the same instance
+                    services.AddSingleton<ISystemStatusProvider>(sp => sp.GetRequiredService<SystemStatusProvider>());
+                    services.AddSingleton<ISoftSwitchResponder>(sp => sp.GetRequiredService<SystemStatusProvider>());
+                    
+                    services.AddSingleton<IAppleIIBus,VA2MBus>();
 
                     // UI services
                     services.AddSingleton<IRefreshTicker, AvaloniaRefreshTicker>();
@@ -68,14 +84,16 @@ namespace Pandowdy
                     services.AddTransient<MainWindowViewModel>();
                     services.AddTransient<SystemStatusViewModel>();
 
+
+                    services.AddSingleton<VA2M>();
                     // Machine factory (singleton instance for now)
-                    services.AddSingleton(provider =>
-                    {
-                        var state = provider.GetRequiredService<IEmulatorState>();
-                        var frame = provider.GetRequiredService<IFrameProvider>();
-                        var sysStatus = provider.GetRequiredService<ISystemStatusProvider>();
-                        return new VA2M(state, frame, sysStatus);
-                    });
+                    //services.AddSingleton(provider =>
+                    //{
+                    //    var state = provider.GetRequiredService<IEmulatorState>();
+                    //    var frame = provider.GetRequiredService<IFrameProvider>();
+                    //    var sysStatus = provider.GetRequiredService<ISystemStatusProvider>();
+                    //    return new VA2M(state, frame, sysStatus);
+                    //});
                     
                     // MainWindow factory - encapsulates creation and initialization
                     services.AddSingleton<IMainWindowFactory, MainWindowFactory>();

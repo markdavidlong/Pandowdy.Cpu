@@ -1,4 +1,5 @@
 using System;
+using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Interfaces;
 
@@ -37,7 +38,7 @@ public interface ISystemStatusProvider
     bool StateFlashOn { get; }
     
     // Language card switches
-    bool StatePrewrite { get; }
+    bool StatePreWrite { get; }
     bool StateUseBank1 { get; }
     bool StateHighRead { get; }
     bool StateHighWrite { get; }

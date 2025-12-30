@@ -57,10 +57,10 @@ namespace Pandowdy.EmuCore
                 for (int r = 0; r < 8; r++)
                 {
                     ushort byteAddress = (ushort) (address + (r * 0x400));
-                    byte value = MemoryPool.Read(byteAddress);
+                    byte value = _memoryPool.Read(byteAddress);
                     int buffY = row * 8 + r;
                     bool prevShift = false;
-                    if (col != 0 && (MemoryPool.Read((ushort) (byteAddress - 1)) & 0x80) == 0x80)
+                    if (col != 0 && (_memoryPool.Read((ushort) (byteAddress - 1)) & 0x80) == 0x80)
                     {
                         prevShift = true;
                     }
@@ -79,7 +79,7 @@ namespace Pandowdy.EmuCore
             bool flashOn = _sysStatusSink.StateFlashOn;
             bool altChar = _sysStatusSink.StateAltCharSet;
 
-            byte ch = MemoryPool.Read((ushort) address);
+            byte ch = _memoryPool.Read((ushort) address);
             var glyph = VideoFont.Glyph(ch, flashOn, altChar); // returns span of 8 rows
 
             if (!text80)
@@ -97,7 +97,7 @@ namespace Pandowdy.EmuCore
             }
             else
             {
-                byte ch1 = MemoryPool.ReadRawAux((ushort) address);
+                byte ch1 = _memoryPool.ReadRawAux((ushort) address);
                 var glyph1 = VideoFont.Glyph(ch1, flashOn, altChar); // returns span of 8 rows
 
                 for (int r = 0; r < 8; r++)  // 8 rows per glyph
@@ -120,7 +120,7 @@ namespace Pandowdy.EmuCore
             // if 40 colunns
             if (!gr80)
             {
-                byte value = MemoryPool.Read((ushort) address);
+                byte value = _memoryPool.Read((ushort) address);
 
                 for (int glyphRow = 0; glyphRow < 8; glyphRow++)
                 {

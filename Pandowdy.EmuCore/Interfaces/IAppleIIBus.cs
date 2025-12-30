@@ -25,6 +25,7 @@ public interface IAppleIIBus : IBus
    // IAppleIIBus(IMemory RAM, ICPU cpu);
 
     public IMemory RAM { get; }
+    public ICpu Cpu { get; }
     public UInt64 SystemClockCounter { get; }
    // void Connect(CPU cpu);
     public Byte CpuRead(UInt16 address, bool readOnly = false);

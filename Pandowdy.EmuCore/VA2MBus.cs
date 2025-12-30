@@ -20,7 +20,9 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     //private readonly ISystemStatusProvider? _status;
 
     private readonly MemoryPool _memoryPool;
-    private ICpu? _cpu;
+    private ICpu _cpu;
+    
+    public ICpu Cpu { get => _cpu; }
 
   //  private int lastPc = 0;
   //  private AppleSoftHookTable? _hookTable;
@@ -47,9 +49,14 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     public event EventHandler? VBlank;
 
     // 2.1 Hz flash timer (approx every 476 ms)
-    private Timer? _flashTimer;
+  //  private Timer? _flashTimer;
 
     private static readonly TimeSpan FlashPeriod = TimeSpan.FromMilliseconds(476);
+
+
+    private readonly System.Collections.Generic.Dictionary<ushort, System.Func<byte>> _ioReadHandlers = [];
+    private readonly System.Collections.Generic.Dictionary<ushort, System.Action<byte>> _ioWriteHandlers = [];
+
 
     public const ushort IO_AREA_START = 0xC000;
     public const ushort IO_AREA_END = 0xCFFF;
@@ -164,8 +171,10 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     
     public SoftSwitches Switches => _softSwitches;
 
-    public VA2MBus(MemoryPool mempool, ISoftSwitchResponder responder, ICpu cpu)
+    public VA2MBus(MemoryPool mempool, ISystemStatusProvider responder, ICpu cpu)
     {
+        ArgumentNullException.ThrowIfNull(responder);
+        ArgumentNullException.ThrowIfNull(cpu);
         _memoryPool = mempool;
         _cpu = cpu;
         InitIoReadHandlers();
@@ -173,16 +182,12 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
 
         // Always add the MemoryPool as a responder (it needs to update memory mappings)
         _softSwitches.AddResponder(mempool);
-        
-        // Optionally add an additional responder (e.g., SystemStatusProvider for UI updates)
-        if (responder != null && responder != mempool)
+
+        if (responder != null)
         {
-            _softSwitches.AddResponder(responder);
+            _softSwitches.AddResponder(responder as ISoftSwitchResponder);
         }
     }
-
-    private readonly System.Collections.Generic.Dictionary<ushort, System.Func<byte>> _ioReadHandlers = [];
-    private readonly System.Collections.Generic.Dictionary<ushort, System.Action<byte>> _ioWriteHandlers = [];
 
     private void InitIoReadHandlers()
     {
@@ -568,9 +573,10 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         //lastPc = currPc;
 
         // Execute a single CPU cycle
-        _cpu!.Clock(this);
+        _cpu.Clock(this);
         _systemClock++;
         _VblankBlackoutCounter--;
+         
 
         if (_systemClock >= _nextVblankCycle)
         {
@@ -619,10 +625,10 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
 
         _disposed = true;
         VBlank = null;
-        _cpu = null;
+       // _cpu = null;
         //_hookTable = null;
-        _flashTimer?.Dispose();
-        _flashTimer = null;
+    //    _flashTimer?.Dispose();
+   //     _flashTimer = null;
     }
 
     private void ThrowIfDisposed()

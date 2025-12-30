@@ -133,16 +133,16 @@ namespace Pandowdy.EmuCore
             // Cycle through all soft switches and use Debug.WriteLine to show the switch name and On or Off, depending on its value
             if (!string.IsNullOrEmpty(header))
             {
-                System.Diagnostics.Debug.WriteLine(header);
+                Debug.WriteLine(header);
             }
             foreach (var kvp in _switches)
             {
                 if (!string.IsNullOrEmpty(header))
                 {
-                    System.Diagnostics.Debug.Write("    ");
+                    Debug.Write("    ");
                 }
                 string status = kvp.Value.Value ? "On" : "Off";
-                System.Diagnostics.Debug.WriteLine($"{kvp.Value.Name}: {status} (Changes: {kvp.Value.Count})");
+                Debug.WriteLine($"{kvp.Value.Name}: {status} (Changes: {kvp.Value.Count})");
             }
 
         }
@@ -176,7 +176,6 @@ namespace Pandowdy.EmuCore
             if (_switches.TryGetValue(id, out var softSwitch))
             {
                 softSwitch.Value = value;
-    //            Debug.WriteLine($"Set SoftSwitch {softSwitch.Name} to {(value ? "On" : "Off")}");
             }
             TriggerResponder(id, value);
         }

@@ -5,21 +5,22 @@ using System.Collections.Immutable;
 using Emulator;
 using System.Collections.Concurrent;
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore;
 
 public partial class VA2M : IDisposable
 {
-    public MemoryPool MemoryPool { get; private set; } = new MemoryPool();
+    public MemoryPool _memoryPool { get; }//private set; } = new MemoryPool();
 
-    public IAppleIIBus Bus { get; }
+    public IAppleIIBus _bus { get; }
 
-    private readonly ICpu _cpu;
+ //   private readonly ICpu _cpu;
     private readonly Stopwatch _throttleSw = Stopwatch.StartNew();
     private long _throttleCycles;
     public bool ThrottleEnabled { get; set; } = true;
     public double TargetHz { get; set; } = 1_023_000d;
-    public ulong SystemClock => Bus.SystemClockCounter;
+    public ulong SystemClock => _bus.SystemClockCounter;
 
 
     private readonly IEmulatorState _stateSink; 
@@ -31,22 +32,27 @@ public partial class VA2M : IDisposable
     private static readonly TimeSpan FlashPeriod = TimeSpan.FromMilliseconds(1000/2.1);
     private int _pendingFlashToggle; // 0/1 flag set by timer, consumed on VBlank
 
-    public VA2M(IEmulatorState stateSink, IFrameProvider frameSink, ISystemStatusProvider statusProvider )
+    public VA2M(IEmulatorState stateSink, IFrameProvider frameSink, ISystemStatusProvider statusProvider, IAppleIIBus bus, MemoryPool memoryPool )
     {
         ArgumentNullException.ThrowIfNull(stateSink);
         ArgumentNullException.ThrowIfNull(frameSink);
         ArgumentNullException.ThrowIfNull(statusProvider);
+        ArgumentNullException.ThrowIfNull(bus);
+        ArgumentNullException.ThrowIfNull(memoryPool);
+
 
 
         _stateSink = stateSink;
         _frameSink = frameSink;
         _sysStatusSink = statusProvider;
+        _bus = bus;
+        _memoryPool = memoryPool;
         TryLoadEmbeddedRom("Pandowdy.EmuCore.Resources.a2e_enh_c-f.rom");
         
-        _cpu = new CPUAdapter(new CPU());
-        Bus = new VA2MBus(MemoryPool, _sysStatusSink as ISoftSwitchResponder, _cpu);
+   //     _cpu = new CPUAdapter(new CPU());
+    //   Bus = new VA2MBus(MemoryPool, _sysStatusSink as ISoftSwitchResponder, _cpu);
         //Bus.Connect(_cpu);
-        if (Bus is VA2MBus vb)
+        if (_bus is VA2MBus vb)
         {
             vb.VBlank += OnVBlank;
         }
@@ -110,7 +116,7 @@ public partial class VA2M : IDisposable
         {
             using var ms = new MemoryStream();
             s.CopyTo(ms);
-            MemoryPool.InstallApple2ROM(ms.ToArray());
+            _memoryPool.InstallApple2ROM(ms.ToArray());
         }
     }
 
@@ -122,7 +128,7 @@ public partial class VA2M : IDisposable
     {
         // Execute commands enqueued from other threads
         ProcessPending();
-        Bus.Clock();
+        _bus.Clock();
         _throttleCycles++;
         if (ThrottleEnabled)
         {
@@ -160,7 +166,7 @@ public partial class VA2M : IDisposable
     {
         //Enqueue(() =>
         {
-            Bus.Reset();
+            _bus.Reset();
             _throttleCycles = 0;
             _throttleSw.Restart();
         }
@@ -172,7 +178,7 @@ public partial class VA2M : IDisposable
        // Enqueue(() =>
         {
             Debug.WriteLine("Calling UserReset() in VA2M");
-            (Bus as VA2MBus)!.UserReset();
+            (_bus as VA2MBus)!.UserReset();
             //_throttleCycles = 0;
             //_throttleSw.Restart();
         }
@@ -212,7 +218,7 @@ public partial class VA2M : IDisposable
                 carry = want - cycles;
                 for (int i = 0; i < cycles; i++)
                 {
-                    Bus.Clock();
+                    _bus.Clock();
                     _throttleCycles++;
                 }
                 PublishState();
@@ -224,7 +230,7 @@ public partial class VA2M : IDisposable
                     ProcessPending();
                 for (int i = 0; i < FastBatch; i++)
                 {
-                    Bus.Clock();
+                    _bus.Clock();
                     _throttleCycles++;
                     if (ct.IsCancellationRequested)
                     {
@@ -243,9 +249,9 @@ public partial class VA2M : IDisposable
 
     private void PublishState()
     {
-        int lineNum = (int)(Bus.CpuRead(0x75) + (Bus.CpuRead(0x76) << 8));
+        int lineNum = (int)(_bus.CpuRead(0x75) + (_bus.CpuRead(0x76) << 8));
         int? basicLine = lineNum < 0xFA00 ? lineNum : null;
-        var snapshot = new StateSnapshot((ushort)_cpu.PC, (byte)_cpu.SP, Bus.SystemClockCounter, basicLine, true, false);
+        var snapshot = new StateSnapshot((ushort) _bus.Cpu.PC, (byte)_bus.Cpu.SP, _bus.SystemClockCounter, basicLine, true, false);
         _stateSink.Update(snapshot);
     }
 
@@ -260,12 +266,12 @@ public partial class VA2M : IDisposable
     {
         // Enqueue to run on emulator thread
         byte val = (byte)(ascii | 0x80);
-        Enqueue(() => Bus.SetKeyValue(val));
+        Enqueue(() => _bus.SetKeyValue(val));
     }
 
     public void SetPushButton(byte num, bool pressed)
     {
-        Enqueue(() => Bus.SetPushButton(num, pressed));
+        Enqueue(() => _bus.SetPushButton(num, pressed));
     }
 
     public void GenerateStatusData()
@@ -299,7 +305,7 @@ public partial class VA2M : IDisposable
 
     private void BuildStatusData()
     {
-        var switches = (Bus as VA2MBus)?.Switches;
+        var switches = (_bus as VA2MBus)?.Switches;
         var data = switches!.GetSwitchList();
 
         _sysStatusSink.Mutate(b =>
@@ -312,7 +318,7 @@ public partial class VA2M : IDisposable
                 }
             }
 
-            var vb = Bus as VA2MBus;
+            var vb = _bus as VA2MBus;
             b.StatePb0 = vb!.GetPushButton(0);
             b.StatePb1 = vb!.GetPushButton(1);
             b.StatePb2 = vb!.GetPushButton(2);
@@ -345,13 +351,13 @@ public partial class VA2M : IDisposable
         while (_pending.TryDequeue(out _)) { }
         
         // Dispose bus (which handles VBlank event cleanup)
-        if (Bus is IDisposable disposableBus)
+        if (_bus is IDisposable disposableBus)
         {
             disposableBus.Dispose();
         }
         
         // Dispose memory pool
-        MemoryPool?.Dispose();
+      //  MemoryPool?.Dispose();
         
         // Note: _cpu doesn't implement IDisposable in legacy 6502.NET library
     }

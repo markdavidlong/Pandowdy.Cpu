@@ -1,9 +1,7 @@
 using Pandowdy.EmuCore.Interfaces;
 
-namespace Pandowdy.EmuCore;
+namespace Pandowdy.EmuCore.Services;
 
-// Service implementations and supporting record types.
-// Interfaces have been moved to Pandowdy.EmuCore.Interfaces namespace.
 
 public record SystemStatusSnapshot(
     bool State80Store,
@@ -86,7 +84,7 @@ public sealed class SystemStatusProvider : ISystemStatusProvider, ISoftSwitchRes
     public bool StateShow80Col => _current.StateShow80Col;
     public bool StateAltCharSet => _current.StateAltCharSet;
     public bool StateFlashOn => _current.StateFlashOn;
-    public bool StatePrewrite => _current.StatePrewrite;
+    public bool StatePreWrite => _current.StatePrewrite;
     public bool StateUseBank1 => _current.StateUseBank1;
     public bool StateHighRead => _current.StateHighRead;
     public bool StateHighWrite => _current.StateHighWrite;
@@ -159,38 +157,4 @@ public sealed class SystemStatusSnapshotBuilder(SystemStatusSnapshot s)
         StatePb0, StatePb1, StatePb2, StateAnn0, StateAnn1, StateAnn2, StateAnn3,
         StatePage2, StateHiRes, StateMixed, StateTextMode, StateShow80Col, StateAltCharSet, StateFlashOn, StatePrewrite, StateUseBank1, StateHighRead, StateHighWrite);
 }
-
-public record StateSnapshot(ushort PC, byte SP, ulong Cycles, int? LineNumber, bool IsRunning, bool IsPaused);
-
-public sealed class FrameProvider : IFrameProvider {
-    private const int W = 80;
-    private const int H = 192;
-    private BitmapDataArray _front = new();
-    private BitmapDataArray _back = new ();
-    public int Width => W;
-    public int Height => H;
-    public event EventHandler? FrameAvailable;
-    public bool IsGraphics { get;  set; } = false;
-    public bool IsMixed { get; set; } = false;
-    public BitmapDataArray GetFrame() => _front;
-    public BitmapDataArray BorrowWritable() => _back;
-    public void CommitWritable() {
-        (_back, _front) = (_front, _back);
-        FrameAvailable?.Invoke(this, EventArgs.Empty);
-    }
-}
-
-public sealed class EmulatorStateProvider : IEmulatorState {
-    private readonly System.Reactive.Subjects.BehaviorSubject<StateSnapshot> _subject = new(new StateSnapshot(0,0,0,null,false,false));
-    public IObservable<StateSnapshot> Stream => _subject;
-    public StateSnapshot GetCurrent() => _subject.Value;
-    public void Update(StateSnapshot snapshot) => _subject.OnNext(snapshot);
-    public void RequestPause() { /* placeholder */ }
-    public void RequestContinue() { /* placeholder */ }
-    public void RequestStep() { /* placeholder */ }
-}
-
-
-
-
 
