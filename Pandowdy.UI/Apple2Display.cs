@@ -72,6 +72,14 @@ public class Apple2Display : Control
     private const double SourceHeight = 384;
     private const double SourceAspect = SourceWidth / SourceHeight;
 
+    private int _activeBitPlane = 0;
+
+    public int ActiveBitPlane
+    {
+        get => _activeBitPlane;
+        set => _activeBitPlane = value;
+    }
+
     public Apple2Display()
     {
         Bitmap = CreateCheckerboardBitmap;
@@ -186,11 +194,11 @@ public class Apple2Display : Control
                         if (!_frameProvider.IsGraphics || ForceMono || 
                             (_frameProvider.IsGraphics && _frameProvider.IsMixed && DefringeMixedText && y >= 160))
                         {
-                            RenderMonochromeLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
+                            RenderMonochromeLine(dst, stridePixels, outYTop, _lastFrame.GetBitplaneSpanForRow(y, ActiveBitPlane), ShowScanLines);
                         }
                         else
                         {
-                            RenderNtscLine(dst, stridePixels, outYTop, _lastFrame.GetPixelSpan(0, y, BitmapDataArray.Width), ShowScanLines);
+                            RenderNtscLine(dst, stridePixels, outYTop, _lastFrame.GetBitplaneSpanForRow(y, ActiveBitPlane), ShowScanLines);
                         }
                     }
                 }

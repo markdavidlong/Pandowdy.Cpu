@@ -48,6 +48,37 @@ namespace Pandowdy.EmuCore
         }
 
 
+        private static void InsertHgrByteAt(BitmapDataArray buf, int x, int y, byte value, bool prevShift, int bitplane)
+        {
+            int px = x;
+
+
+            bool shift = (value & 0x80) == 0x80;
+
+
+            for (int bit = 0; bit < 7; bit++)
+            {
+                bool on = (value & (1 << bit)) != 0;
+
+                int p0 = px + (bit * 2) + (shift ? 1 : 0);
+                int p1 = p0 + 1;
+                if (on)
+                {
+                    buf.SetPixel(p0, y, bitplane);
+                    if (p1 < 560){ buf.SetPixel(p1, y, bitplane); }
+                    if (p1 < 559) { buf.SetPixel(p1 + 1, y, bitplane); }
+                }
+                else
+                {
+                    if (bit > 0 || (prevShift == shift))
+                    {
+                        if (p0 < 560) { buf.ClearPixel(p0, y, bitplane); }
+                    }
+                    if (p1 < 560) { buf.ClearPixel(p1, y, bitplane); }
+                }
+            }
+        }
+
         private void RenderHiresCell(int address, int row, int col, bool gr80, BitmapDataArray buf)
         {
             // Render either 7 or 14 pixels, based on the state of gr80
@@ -64,7 +95,7 @@ namespace Pandowdy.EmuCore
                     {
                         prevShift = true;
                     }
-                    buf.InsertHgrByteAt(col * 2 * 7, buffY, value, prevShift);
+                    InsertHgrByteAt(buf, col * 2 * 7, buffY, value, prevShift, 0);
                 }
             }
 
@@ -73,6 +104,45 @@ namespace Pandowdy.EmuCore
             //       look up the aux and main values at that address
             //       write aux/main into buffer unexpanded
         }
+
+        private static void Insert7BitLsbAt(BitmapDataArray buf, int bitplane, int x, int y, byte value, bool expand = false)
+        {
+            int px = x;
+            for (int bit = 0; bit < 7; bit++)
+            {
+                bool on = (value & (1 << bit)) != 0;
+                if (expand)
+                {
+                    int p0 = px + (bit * 2);
+                    int p1 = p0 + 1;
+
+
+                    if (on)
+                    {
+                        buf.SetPixel(p0, y, bitplane);
+                        buf.SetPixel(p1, y, bitplane);
+                    }
+                    else
+                    {
+                        buf.ClearPixel(p0, y, bitplane);
+                        buf.ClearPixel(p1, y, bitplane);
+                    }
+                }
+                else
+                {
+                    int p = px + bit;
+                    if (on)
+                    {
+                        buf.SetPixel(p, y, bitplane);
+                    }
+                    else
+                    {
+                        buf.ClearPixel(p, y, bitplane);
+                    }
+                }
+            }
+        }
+
 
         private void RenderTextCell(int address, int row, int col, bool text80, BitmapDataArray buf)
         {
@@ -91,8 +161,7 @@ namespace Pandowdy.EmuCore
                     byte fontRow = (byte) ~glyph[r]; // invert bits (was glyph ^ 0xff intent)
                                                      //  fontRow = (byte)((y / 8) % 16 * 0x11);
 
-                    buf.Insert7BitLsbAt(col * 2 * 7, buffY, fontRow, true);
-
+                    Insert7BitLsbAt(buf, 0, col * 2 * 7, buffY, fontRow, true);
                 }
             }
             else
@@ -107,9 +176,29 @@ namespace Pandowdy.EmuCore
                     byte fontRow2 = (byte) ~glyph[r];
                     int baseX = col * 2;
                     {
-                        buf.Insert7BitLsbAt(baseX * 7, y, fontRow1, false);
-                        buf.Insert7BitLsbAt(baseX * 7 + 7, y, fontRow2, false);
+                        Insert7BitLsbAt(buf, 0, baseX * 7, y, fontRow1, false);
+                        Insert7BitLsbAt(buf, 0, baseX * 7 + 7, y, fontRow2, false);
                     }
+                }
+            }
+        }
+
+
+        private static void SetByteAt(BitmapDataArray buf, int x, int y, byte value, int bitplane)
+        {
+
+            int px = x;
+            for (int bit = 0; bit < 7; bit++)
+            {
+                bool on = (value & (1 << (bit))) != 0;
+                int p = px + (bit);
+                if (on)
+                {
+                    buf.SetPixel(p, y, bitplane);
+                }
+                else
+                {
+                    buf.ClearPixel(p, y, bitplane);
                 }
             }
         }
@@ -135,13 +224,13 @@ namespace Pandowdy.EmuCore
                     var (a1, a2, a3, a4) = MakeGrColor(grcolor);
                     if (col % 2 == 0) // Even -- Use A1 & A2
                     {
-                        buf.SetByteAt(col * 14, y, (byte) a1);
-                        buf.SetByteAt((col * 14 + 7), y, (byte) a2);
+                        SetByteAt(buf,col * 14, y, (byte) a1,0);
+                        SetByteAt(buf,col * 14 + 7, y, (byte) a2,0);
                     }
                     else // Odd -- Use A3 & A4
                     {
-                        buf.SetByteAt((col * 14), y, (byte) a3);
-                        buf.SetByteAt((col * 14 + 7), y, (byte) a4);
+                        SetByteAt(buf,col * 14, y, (byte) a3,0);
+                        SetByteAt(buf,col * 14 + 7, y, (byte) a4,0);
                     }
                 }
             }

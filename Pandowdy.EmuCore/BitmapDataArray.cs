@@ -1,274 +1,211 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace Pandowdy.EmuCore
 {
     public class BitmapDataArray
     {
-        private const int lines = 192; // logical scanlines
-        private const int logicalPixels = 560; // visible pixel width
-        private const int rowBytes = (logicalPixels + 7) >> 3; // packed bytes per row
-        private const int stridePixels = rowBytes * 8 + 3; // capacity (allows small overscan past logicalPixels)
-        private readonly byte[] data = new byte[lines * rowBytes];
+        private const int _height = 192; // logical scanlines
+        private const int _width = 560; // visible pixel width
 
-        static BitmapDataArray()
+        private readonly BitField16[] _data;
+
+        static public int Width => _width;
+        static public int Height => _height;
+
+
+        public BitmapDataArray()
         {
-            Debug.Assert(rowBytes == ((logicalPixels + 7) >> 3), "rowBytes round-up calculation mismatch");
-            Debug.Assert(stridePixels >= logicalPixels, "Stride capacity must cover logical pixel width");
+            _data = new BitField16[_height * _width];
         }
 
         public void Clear()
         {
-            Array.Clear(data, 0, data.Length);
+            Array.Clear(_data, 0, _data.Length);
         }
 
-        public void SetPixel(int x, int y)
+        private static int CalcOffset(int x, int y)
         {
-            if (x < 0 || x >= stridePixels)
+            return x + y * _width;
+        }
+
+        private static void CheckXY(int x, int y)
+        {
+            if (x < 0 || x >= _width)
             {
-              //  Debug.Assert(false, $"SetPixel: x {x} outside capacity 0..{stridePixels - 1}");
-                return;
+                throw new ArgumentOutOfRangeException(nameof(x), $"X value {x} is outside the width range of 0-{_width - 1}.");
             }
-            if (y < 0 || y >= lines)
+            if (y < 0 || y >= _height)
             {
-         //       Debug.Assert(false, $"SetPixel: y {y} outside capacity 0..{lines - 1}");
-                return;
+                throw new ArgumentOutOfRangeException(nameof(x), $"Y value {y} is outside the height range of 0-{_height - 1}.");
             }
-            if (x >= logicalPixels)
+        }
+        private static void CheckRow(int row)
+        {
+            if (row < 0 || row >= _height)
             {
-      //          Debug.Assert(false, $"SetPixel: x {x} in overscan region >= {logicalPixels}");
-                return;
+                throw new ArgumentOutOfRangeException(nameof(row), $"Row value {row} is outside the height range of 0-{_height - 1}.");
             }
-            int index = y * rowBytes + (x >> 3);
-            byte mask = (byte)(0x80 >> (x & 7));
+        }
+
+        public void SetPixel(int x, int y, int bitplane)
+        {
+            CheckXY(x, y);
+            _data[CalcOffset(x, y)].SetBit(bitplane, true);
+        }
+
+        public void ClearPixel(int x, int y, int bitplane)
+        {
+            CheckXY(x, y);
+            _data[CalcOffset(x, y)].SetBit(bitplane, false);
+        }
+
+        public bool GetPixel(int x, int y, int bitplane)
+        {
+            CheckXY(x, y);
+            return _data[CalcOffset(x, y)].GetBit(bitplane);
+        }
+
+
+        // TODO: This should be moved to the GR renderer
+        //public void SetByteAt(int x, int y, byte value, int bitplane)
+        //{
+
+        //    int px = x;
+        //    for (int bit = 0; bit < 8; bit++)
+        //    {
+        //        bool on = (value & (1 << (bit))) != 0;
+        //        int p = px + (bit);
+        //        CheckXY(p, y);
+        //        if (on)
+        //        {
+        //            SetPixel(p, y,bitplane);
+        //        }
+        //        else
+        //        {
+        //            ClearPixel(p, y, bitplane);
+        //        }
+        //    }
+        //}
+
+
+
+
+        //TODO: This should be moved to the HGR renderer
+        //public void InsertHgrByteAt(int x, int y, byte value, bool prevShift, int bitplane)
+        //{
+        //    CheckXY(x, y);
+        //    int px = x;
+
+
+        //    bool shift = (value & 0x80) == 0x80;
+
+
+        //    for (int bit = 0; bit < 7; bit++)
+        //    {
+        //        bool on = (value & (1 << bit)) != 0;
+
+        //        int p0 = px + (bit * 2) + (shift ? 1 : 0);
+        //        int p1 = p0 + 1;
+        //        if (on)
+        //        {
+        //            SetPixel(p0, y);
+        //            SetPixel(p1, y);
+        //            SetPixel(p1 + 1, y);
+        //        }
+        //        else
+        //        {
+        //            if (bit > 0 || (prevShift == shift))
+        //            {
+        //                ClearPixel(p0, y);
+        //            }
+        //            ClearPixel(p1, y);
+        //        }
+        //    }
+        //}
+
+
+        //TODO: This should be moved to the text renderer
+        //public void Insert7BitLsbAt(int x, int y, byte value, bool expand = false)
+        //{
+        //    CheckXY(x, y);
+
+        //    int px = x;
+        //    for (int bit = 0; bit < 8; bit++)
+        //    {
+        //        bool on = (value & (1 << bit)) != 0;
+        //        if (expand)
+        //        {
+        //            int p0 = px + (bit * 2);
+        //            int p1 = p0 + 1;
+
+
+        //            if (on)
+        //            {
+        //                SetPixel(p0, y);
+        //                SetPixel(p1, y);
+        //            }
+        //            else
+        //            {
+        //                ClearPixel(p0, y);
+        //                ClearPixel(p1, y);
+        //            }
+        //        }
+        //        else
+        //        {
+        //            int p = px + bit;
+        //            if (on)
+        //            {
+        //                SetPixel(p, y);
+        //            }
+        //            else
+        //            {
+        //                ClearPixel(p, y);
+        //            }
+        //        }
+        //    }
+        //}
+
+
+
+
+
+
+        //public Span<BitField16> GeBitplaneSpan(int x, int y, int length)
+        //{
+
+        //    Span<bool> span = new bool[length];
+        //    for (int i = 0; i < length; i++)
+        //    {
+        //        span[i] = GetPixel(x + i, y);
+        //    }
+        //    return span;
+        //}
+
+        public ReadOnlySpan<bool> GetBitplaneSpanForRow(int row, int bitplane)
+        {
+            CheckRow(row);
+            var raw = GetRowDataSpan(row);
+            bool[] pixels = new bool[raw.Length];
+            int offset = 0;
             
-            data[index] |= mask;
+            foreach (var val in raw)
+            {
+                pixels[offset++] = val.GetBit(bitplane);
+            }
+            return new ReadOnlySpan<bool>(pixels);
+
         }
 
-        public void SetDoublePixel(int x, int y)
+        public ReadOnlySpan<BitField16> GetRowDataSpan(int row)
         {
-            if (x < 0 || x >= stridePixels / 2)
+            if (row < 0 || row >= _height)
             {
-         //       Debug.Assert(false, $"SetDoublePixel: x {x} outside capacity 0..{(stridePixels / 2) - 1}");
-                return;
+                throw new ArgumentOutOfRangeException(nameof(row), $"row must be between 0 and {_height - 1} inclusive.");
             }
-            if (y < 0 || y >= lines)
-            {
-          //      Debug.Assert(false, $"SetDoublePixel: y {y} outside capacity 0..{lines - 1}");
-                return;
-            }
-            int px = x; // doubled space origin
-            SetPixel(px, y);
-            SetPixel(px + 1, y);
+            return new ReadOnlySpan<BitField16>(_data, row * _width, _width);
         }
 
-        public void SetByteAt(int x, int y, byte value)
-        {
-            if (x < 0 || x >= stridePixels - 7)
-            {
-         //       Debug.Assert(false, $"SetByteAt: x {x} outside capacity 0..{stridePixels - 8}");
-        //        return;
-            }
-            if (y < 0 || y >= lines)
-            {
-          //      Debug.Assert(false, $"SetByteAt: y {y} outside capacity 0..{lines - 1}");
-                return;
-            }
-            int px = x;
-            for (int bit = 0; bit < 8; bit++)
-            {
-                bool on = (value & (1 << (bit))) != 0;
-                int p = px + (bit);
-                if (on)
-                {
-                    SetPixel(p, y);
-                }
-                else
-                {
-                    ClearPixel(p, y);
-                }
-            }
-        }
-
-        public void InsertHgrByteAt(int x, int y, byte value, bool prevShift)
-        {
-            if (x < 0 || x >= stridePixels)
-            {
-                //       Debug.Assert(false, $"Insert7BitLsbAt: x {x} outside capacity 0..{stridePixels - 1}");
-                return;
-            }
-            if (y < 0 || y >= lines)
-            {
-                //      Debug.Assert(false, $"Insert7BitLsbAt: y {y} outside capacity 0..{lines - 1}");
-                return;
-            }
-            int px = x;
-
-
-            bool shift = (value & 0x80) == 0x80;
-      
-
-            for (int bit = 0; bit < 7; bit++)
-            {
-                bool on = (value & (1 << bit)) != 0;
-
-                int p0 = px + (bit * 2) + (shift?1:0); 
-                int p1 = p0 + 1;
-                if (on)
-                {
-                    SetPixel(p0, y);
-                    SetPixel(p1, y);
-                    SetPixel(p1+1, y);
-                }
-                else
-                {
-                    if (bit > 0 || (prevShift == shift))
-                    {
-                        ClearPixel(p0, y);
-                    }
-                    ClearPixel(p1, y);
-                }
-            }
-        }
-
-        public void Insert7BitLsbAt(int x, int y, byte value, bool expand = false)
-        {
-            if (x < 0 || x >= stridePixels)
-            {
-         //       Debug.Assert(false, $"Insert7BitLsbAt: x {x} outside capacity 0..{stridePixels - 1}");
-                return;
-            }
-            if (y < 0 || y >= lines)
-            {
-          //      Debug.Assert(false, $"Insert7BitLsbAt: y {y} outside capacity 0..{lines - 1}");
-                return;
-            }
-            int px = x;
-            for (int bit = 0; bit < 8; bit++)
-            {
-                bool on = (value & (1 << bit)) != 0;
-                if (expand)
-                {
-                    int p0 = px + (bit * 2);
-                    int p1 = p0 + 1;
-
-                    
-                    if (on)
-                    {
-                        SetPixel(p0, y);
-                        SetPixel(p1, y);
-                    }
-                    else
-                    {
-                        ClearPixel(p0, y);
-                        ClearPixel(p1, y);
-                    }
-                }
-                else
-                {
-                    int p = px + bit;
-                    if (on)
-                    {
-                        SetPixel(p, y);
-                    }
-                    else
-                    {
-                        ClearPixel(p, y);
-                    }
-                }
-            }
-        }
-
-        public void ClearDoublePixel(int x, int y)
-        {
-            if (x < 0 || x >= stridePixels / 2)
-            {
-         //       Debug.Assert(false, $"ClearDoublePixel: x {x} outside capacity 0..{(stridePixels / 2) - 1}");
-                return;
-            }
-            if (y < 0 || y >= lines)
-            {
-          //      Debug.Assert(false, $"ClearDoublePixel: y {y} outside capacity 0..{lines - 1}");
-                return;
-            }
-            int px = x;
-            ClearPixel(px, y);
-            ClearPixel(px + 1, y);
-        }
-
-        public void ClearPixel(int x, int y)
-        {
-            if (x < 0 || x >= stridePixels)
-            {
-    //            Debug.Assert(false, $"ClearPixel: x {x} outside capacity 0..{stridePixels - 1}");
-                return;
-            }
-            if (y < 0 || y >= lines)
-            {
-   //             Debug.Assert(false, $"ClearPixel: y {y} outside capacity 0..{lines - 1}");
-                return;
-            }
-            if (x >= logicalPixels)
-            {
-    //            Debug.Assert(false, $"ClearPixel: x {x} in overscan region >= {logicalPixels}");
-                return;
-            }
-            int index = y * rowBytes + (x >> 3);
-            byte mask = (byte)(0x80 >> (x & 7));
-            data[index] &= (byte)~mask;
-        }
-
-        public bool GetPixel(int x, int y)
-        {
-            if (x < 0 || x >= stridePixels)
-            {
-                return false;
-   //             throw new ArgumentOutOfRangeException(nameof(x), $"x must be between 0 and {stridePixels - 1} inclusive.");
-            }
-            if (y < 0 || y >= lines)
-            {
-                return false;
-              //  throw new ArgumentOutOfRangeException(nameof(y), $"y must be between 0 and {lines - 1} inclusive.");
-            }
-            if (x >= logicalPixels)
-            {
-                return false;
-            }
-            int index = y * rowBytes + (x >> 3);
-            byte mask = (byte)(0x80 >> (x & 7));
-            return (data[index] & mask) != 0;
-        }
-
-        public Span<bool> GetPixelSpan(int x, int y, int length)
-        {
-            if (x < 0 || x + length > stridePixels)
-            {
-                throw new ArgumentOutOfRangeException(nameof(x), $"Range must fit within 0..{stridePixels - 1}.");
-            }
-            if (y < 0 || y >= lines)
-            {
-                throw new ArgumentOutOfRangeException(nameof(y), $"y must be between 0 and {lines - 1} inclusive.");
-            }
-            Span<bool> span = new bool[length];
-            for (int i = 0; i < length; i++)
-            {
-                span[i] = GetPixel(x + i, y);
-            }
-            return span;
-        }
-
-        public ReadOnlySpan<byte> GetRowDataSpan(int row)
-        {
-            if (row < 0 || row >= lines)
-            {
-                throw new ArgumentOutOfRangeException(nameof(row), $"row must be between 0 and {lines - 1} inclusive.");
-            }
-            return new ReadOnlySpan<byte>(data, row * rowBytes, rowBytes);
-        }
-
-        static public int Width => logicalPixels;
-        static public int CapacityWidth => stridePixels;
-        static public int Height => lines;
-        static public int RowByteCount => rowBytes;
     }
 }
