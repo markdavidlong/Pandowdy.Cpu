@@ -63,10 +63,17 @@ namespace Pandowdy
 
                     // EmuCore
                     services.AddSingleton<MemoryPool>();
+                   // services.AddSingleton<IMemory>(sp => sp.GetRequiredService<MemoryPool>());
+                    services.AddSingleton<IDirectMemoryPoolReader>(sp => sp.GetRequiredService<MemoryPool>());
+
                     services.AddSingleton<ICpu, CPUAdapter>();
                     services.AddSingleton<IFrameProvider, FrameProvider>();
                     services.AddSingleton<IEmulatorState, EmulatorStateProvider>();
                     services.AddSingleton<ICharacterRomProvider, CharacterRomProvider>();
+                    services.AddSingleton<IDisplayBitmapRenderer, LegacyBitmapRenderer>();
+
+                    services.AddSingleton<IVideoSubsystem, VideoSubsystem>();
+
 
                     // SystemStatusProvider implements both ISystemStatusProvider and ISoftSwitchResponder
                     // Register the concrete type first

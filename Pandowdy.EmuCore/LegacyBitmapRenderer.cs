@@ -1,20 +1,39 @@
-﻿namespace Pandowdy.EmuCore
+﻿using Pandowdy.EmuCore.Interfaces;
+
+namespace Pandowdy.EmuCore
 {
-
-
-    public partial class VA2M
+    public class LegacyBitmapRenderer : IDisplayBitmapRenderer
     {
-        /*
-        const int _bitplane = 10;
+        
+        ICharacterRomProvider _charRomProvider;
+
+        public LegacyBitmapRenderer(ICharacterRomProvider charRomProvider)
+        {
+            ArgumentNullException.ThrowIfNull(charRomProvider);
+            _charRomProvider = charRomProvider;
+        }
+
+        private RenderContext _context;
+
+        public void Render(RenderContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+
+            _context = context;
+
+            RenderScreen(context.FrameBuffer);
+        }
+
+
 
         private void RenderScreen(BitmapDataArray buf)
         {
-            bool text = _sysStatusSink.StateTextMode;
-            bool hires = _sysStatusSink.StateHiRes;
-            bool mixed = _sysStatusSink.StateMixed;
-            bool page2 = _sysStatusSink.StatePage2;
-            bool text80col = _sysStatusSink.StateShow80Col;
-            bool gr80col = text80col && !_sysStatusSink.StateAnn3_DGR;
+            bool text = _context.SystemStatus.StateTextMode;
+            bool hires = _context.SystemStatus.StateHiRes;
+            bool mixed = _context.SystemStatus.StateMixed;
+            bool page2 = _context.SystemStatus.StatePage2;
+            bool text80col = _context.SystemStatus.StateShow80Col;
+            bool gr80col = text80col && !_context.SystemStatus.StateAnn3_DGR;
 
             for (int row = 0; row < 24; row++)
             {
@@ -63,16 +82,20 @@
                 if (on)
                 {
                     buf.SetPixel(p0, y, bitplane);
-                    if (p1 < 560){ buf.SetPixel(p1, y, bitplane); }
-                    if (p1 < 559) { buf.SetPixel(p1 + 1, y, bitplane); }
+                    if (p1 < 560)
+                    { buf.SetPixel(p1, y, bitplane); }
+                    if (p1 < 559)
+                    { buf.SetPixel(p1 + 1, y, bitplane); }
                 }
                 else
                 {
                     if (bit > 0 || (prevShift == shift))
                     {
-                        if (p0 < 560) { buf.ClearPixel(p0, y, bitplane); }
+                        if (p0 < 560)
+                        { buf.ClearPixel(p0, y, bitplane); }
                     }
-                    if (p1 < 560) { buf.ClearPixel(p1, y, bitplane); }
+                    if (p1 < 560)
+                    { buf.ClearPixel(p1, y, bitplane); }
                 }
             }
         }
@@ -86,10 +109,10 @@
                 for (int r = 0; r < 8; r++)
                 {
                     ushort byteAddress = (ushort) (address + (r * 0x400));
-                    byte value = MemoryPool.Read(byteAddress);
+                    byte value = _context.Memory.ReadRawMain(byteAddress);
                     int buffY = row * 8 + r;
                     bool prevShift = false;
-                    if (col != 0 && (MemoryPool.Read((ushort) (byteAddress - 1)) & 0x80) == 0x80)
+                    if (col != 0 && (_context.Memory.ReadRawMain((ushort) (byteAddress - 1)) & 0x80) == 0x80)
                     {
                         prevShift = true;
                     }
@@ -144,10 +167,10 @@
 
         private void RenderTextCell(int address, int row, int col, bool text80, BitmapDataArray buf)
         {
-            bool flashOn = _sysStatusSink.StateFlashOn;
-            bool altChar = _sysStatusSink.StateAltCharSet;
+            bool flashOn = _context.SystemStatus.StateFlashOn;
+            bool altChar = _context.SystemStatus.StateAltCharSet;
 
-            byte ch = MemoryPool.Read((ushort) address);
+            byte ch = _context.Memory.ReadRawMain((ushort) address);
             var glyph = _charRomProvider.GetGlyph(ch, flashOn, altChar); // returns span of 8 rows
 
             if (!text80)
@@ -164,7 +187,7 @@
             }
             else
             {
-                byte ch1 = MemoryPool.ReadRawAux((ushort) address);
+                byte ch1 = _context.Memory.ReadRawAux((ushort) address);
                 var glyph1 = _charRomProvider.GetGlyph(ch1, flashOn, altChar); // returns span of 8 rows
 
                 for (int r = 0; r < 8; r++)  // 8 rows per glyph
@@ -207,7 +230,7 @@
             // if 40 colunns
             if (!gr80)
             {
-                byte value = MemoryPool.Read((ushort) address);
+                byte value = _context.Memory.ReadRawMain((ushort) address);
 
                 for (int glyphRow = 0; glyphRow < 8; glyphRow++)
                 {
@@ -222,13 +245,13 @@
                     var (a1, a2, a3, a4) = MakeGrColor(grcolor);
                     if (col % 2 == 0) // Even -- Use A1 & A2
                     {
-                        SetByteAt(buf,col * 14, y, (byte) a1,_bitplane);
-                        SetByteAt(buf,col * 14 + 7, y, (byte) a2,_bitplane);
+                        SetByteAt(buf, col * 14, y, (byte) a1, _bitplane);
+                        SetByteAt(buf, col * 14 + 7, y, (byte) a2, _bitplane);
                     }
                     else // Odd -- Use A3 & A4
                     {
-                        SetByteAt(buf,col * 14, y, (byte) a3,_bitplane);
-                        SetByteAt(buf,col * 14 + 7, y, (byte) a4,_bitplane);
+                        SetByteAt(buf, col * 14, y, (byte) a3, _bitplane);
+                        SetByteAt(buf, col * 14 + 7, y, (byte) a4, _bitplane);
                     }
                 }
             }
@@ -286,6 +309,8 @@
             }
             return retval;
         }
-        */
+
+
+
     }
 }

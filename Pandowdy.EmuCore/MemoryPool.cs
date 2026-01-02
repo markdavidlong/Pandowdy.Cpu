@@ -1,7 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using Emulator;
-using System.Threading;
+﻿using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore

@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Pandowdy.EmuCore.Interfaces
+﻿namespace Pandowdy.EmuCore.Interfaces
 {
     /// <summary>
     /// Provides access to the Apple II character ROM for text rendering

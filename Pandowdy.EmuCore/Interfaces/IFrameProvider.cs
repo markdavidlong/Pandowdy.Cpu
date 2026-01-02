@@ -1,5 +1,3 @@
-using System;
-
 namespace Pandowdy.EmuCore.Interfaces;
 
 /// <summary>

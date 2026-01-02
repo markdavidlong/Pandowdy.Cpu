@@ -1,8 +1,6 @@
 using System.Reflection;
 using System.Diagnostics;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using Emulator;
 using System.Collections.Concurrent;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
@@ -26,28 +24,28 @@ public partial class VA2M : IDisposable
     private readonly IEmulatorState _stateSink; 
     private readonly IFrameProvider _frameSink; 
     private readonly ISystemStatusProvider _sysStatusSink;
-    private readonly ICharacterRomProvider _charRomProvider;
+    private readonly IVideoSubsystem _videoSubsystem;
 
     // Flash timer to toggle StateFlashOn at ~2.1 Hz
     private Timer? _flashTimer;
     private static readonly TimeSpan FlashPeriod = TimeSpan.FromMilliseconds(1000/2.1);
     private int _pendingFlashToggle; // 0/1 flag set by timer, consumed on VBlank
 
-    public VA2M(IEmulatorState stateSink, IFrameProvider frameSink, ISystemStatusProvider statusProvider, IAppleIIBus bus, MemoryPool memoryPool, ICharacterRomProvider charRomProvider )
+    public VA2M(IEmulatorState stateSink, IFrameProvider frameSink, ISystemStatusProvider statusProvider, IAppleIIBus bus, MemoryPool memoryPool, IVideoSubsystem videoSubsystem )
     {
         ArgumentNullException.ThrowIfNull(stateSink);
         ArgumentNullException.ThrowIfNull(frameSink);
         ArgumentNullException.ThrowIfNull(statusProvider);
         ArgumentNullException.ThrowIfNull(bus);
         ArgumentNullException.ThrowIfNull(memoryPool);
-        ArgumentNullException.ThrowIfNull(charRomProvider);
+        ArgumentNullException.ThrowIfNull(videoSubsystem);
 
 
 
         _stateSink = stateSink;
         _frameSink = frameSink;
         _sysStatusSink = statusProvider;
-        _charRomProvider = charRomProvider;
+        _videoSubsystem = videoSubsystem;
         Bus = bus;
         MemoryPool = memoryPool;
         TryLoadEmbeddedRom("Pandowdy.EmuCore.Resources.a2e_enh_c-f.rom");
@@ -99,14 +97,10 @@ public partial class VA2M : IDisposable
         {
             _sysStatusSink.Mutate(s => s.StateFlashOn = !s.StateFlashOn);
         }
-        var buf = _frameSink.BorrowWritable();
-        buf.Clear();
 
-        RenderScreen(buf);
+        var renderContext = _videoSubsystem.AllocateRenderContext();
+        _videoSubsystem.RenderFrame(renderContext);
 
-        _frameSink.IsGraphics = !_sysStatusSink.StateTextMode;
-        _frameSink.IsMixed = _sysStatusSink.StateMixed;
-        _frameSink.CommitWritable();
     }
 
 
