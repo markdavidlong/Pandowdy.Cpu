@@ -1,4 +1,4 @@
-﻿using Emulator;
+using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore

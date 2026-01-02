@@ -9,15 +9,15 @@ namespace Pandowdy.UI;
 /// Source: a2e_enh_video.rom (4096 bytes, but using first 2048 bytes)
 /// 
 /// The ROM file contains two font sets (4096 bytes total):
-/// - First half (0-2047): 256 characters × 8 bytes = 2048 bytes (used)
-/// - Second half (2048-4095): 256 characters × 8 bytes = 2048 bytes (reserved)
+/// - First half (0-2047): 256 characters Ã— 8 bytes = 2048 bytes (used)
+/// - Second half (2048-4095): 256 characters Ã— 8 bytes = 2048 bytes (reserved)
 /// </summary>
 public static class Apple2Font
 {
     /// <summary>
     /// Apple II Enhanced Video ROM font data (2048 bytes).
     /// Each character occupies 8 bytes of bitmap data (7 pixels wide, 8 pixels tall).
-    /// 256 characters × 8 bytes = 2048 bytes total.
+    /// 256 characters Ã— 8 bytes = 2048 bytes total.
     /// </summary>
     public static readonly byte[] FontData;
 

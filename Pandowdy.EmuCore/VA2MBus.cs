@@ -313,7 +313,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         _ioWriteHandlers[CLRAN3_] = _ => _softSwitches.Set(SoftSwitches.SoftSwitchId.An3, false);
         _ioWriteHandlers[SETAN3_] = _ => _softSwitches.Set(SoftSwitches.SoftSwitchId.An3, true);
 
-        // Banked block writes (unrolled) — note write-path semantics differ from read-path
+        // Banked block writes (unrolled) â€” note write-path semantics differ from read-path
         _ioWriteHandlers[B2_RD_RAM_NO_WRT_] = _ => ApplyBankIoWriteFlags(false, B2_RD_RAM_NO_WRT_);
         _ioWriteHandlers[B2_RD_RAM_NO_WRT_ALT_] = _ => ApplyBankIoWriteFlags(false, B2_RD_RAM_NO_WRT_ALT_);
         _ioWriteHandlers[B2_RD_ROM_WRT_RAM_] = _ => ApplyBankIoWriteFlags(false, B2_RD_ROM_WRT_RAM_);

@@ -1,4 +1,4 @@
-﻿# 🧭 Git Strategy
+# 🧭 Git Strategy
 
 This document outlines the branching model and release workflow for the project.
 

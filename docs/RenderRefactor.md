@@ -1,4 +1,4 @@
-﻿# Rendering Refactoring Plan
+# Rendering Refactoring Plan
 
 ## Overview
 

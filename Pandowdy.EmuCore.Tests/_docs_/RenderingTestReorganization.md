@@ -81,7 +81,7 @@ Tests for the 16-bit bitfield structure used to store pixel data.
 
 ### 2. BitmapDataArrayTests.cs (18 tests)
 
-Tests for the 560×192 pixel array.
+Tests for the 560Ã—192 pixel array.
 
 **Tests**:
 - `Dimensions_Are560x192` - Static dimensions

@@ -1,4 +1,4 @@
-﻿using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore.Services
 {

@@ -2,6 +2,15 @@
 
 This file provides guidance for AI assistants working in the Pandowdy Apple IIe emulator codebase.
 
+## Miscellaneous Utilities
+
+The `misc_utils/` directory (at solution root level, not in any project) contains utility scripts:
+- `convert-to-utf8.ps1` - Convert C# files to UTF-8 without BOM
+- `convert-md-to-utf8.ps1` - Convert Markdown files to UTF-8 without BOM
+- `convert-axaml-to-utf8.ps1` - Convert AXAML files to UTF-8 without BOM
+
+These scripts are maintenance tools and not part of the build process.
+
 ## Git Best Practices
 
 ### File Operations

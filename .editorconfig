@@ -1,6 +1,15 @@
 root = true
 
+# All files
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+
 [*.cs]
+# Encoding
+charset = utf-8
+
 # Always require braces for control flow statements
 csharp_prefer_braces = always:error
 # Enforce analyzer IDE0011 (add braces) as error
@@ -9,3 +18,15 @@ dotnet_diagnostic.IDE0011.severity = error
 dotnet_style_allow_embedded_statements_on_same_line_experimental = false:error
 # Disallow expression-bodied members for methods to keep braces obvious (optional)
 dotnet_style_prefer_expression_bodied_methods = false:suggestion
+
+# Markdown files
+[*.md]
+charset = utf-8
+trim_trailing_whitespace = false
+insert_final_newline = true
+
+# XAML and Avalonia XAML files
+[*.{xaml,axaml}]
+charset = utf-8
+indent_size = 2
+insert_final_newline = true

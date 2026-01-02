@@ -108,7 +108,7 @@ The following scenarios indicate **fundamental system misconfiguration**:
    - **Cannot recover** - must fail immediately
 
 2. **Invalid Apple II Dimensions**
-   - Width must be 560 pixels (80 characters × 7 pixels/char)
+   - Width must be 560 pixels (80 characters Ã— 7 pixels/char)
    - Height must be 192 scanlines
    - Wrong dimensions = incompatible with Apple II software
    - **Cannot recover** - must fail immediately

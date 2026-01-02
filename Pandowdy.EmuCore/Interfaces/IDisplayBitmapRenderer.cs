@@ -1,4 +1,4 @@
-﻿namespace Pandowdy.EmuCore.Interfaces
+namespace Pandowdy.EmuCore.Interfaces
 {
     public interface IDisplayBitmapRenderer
     {

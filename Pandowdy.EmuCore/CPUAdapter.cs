@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 

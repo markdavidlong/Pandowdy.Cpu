@@ -152,7 +152,7 @@ Total:  1,920 characters
 
 ### Relationship
 ```
-1 character = 7 pixels wide × 8 pixels tall
+1 character = 7 pixels wide Ã— 8 pixels tall
 CharWidth = PixelWidth / 7
 CharWidth = 560 / 7 = 80
 ```
@@ -251,8 +251,8 @@ Build Status:      Success ?
 ### Memory Layout
 ```
 FrameProvider
-??? _front: BitmapDataArray (560×192)
-??? _back:  BitmapDataArray (560×192)
+??? _front: BitmapDataArray (560Ã—192)
+??? _back:  BitmapDataArray (560Ã—192)
 ??? CharWidth:  80 (read-only property)
 ??? PixelWidth: 560 (read-only property)
 ??? Height:     192 (read-only property)
