@@ -1,7 +1,4 @@
-using Pandowdy.EmuCore;
-using Xunit;
-
-namespace Pandowdy.Tests;
+namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
 /// Tests for BitField16 struct - a 16-bit bitfield used for pixel data storage.

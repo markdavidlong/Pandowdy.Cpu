@@ -1,9 +1,7 @@
-using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 using System.Reactive.Linq;
-using Xunit;
 
-namespace Pandowdy.Tests.Services;
+namespace Pandowdy.EmuCore.Tests.Services;
 
 /// <summary>
 /// Comprehensive tests for EmulatorStateProvider - manages emulator state

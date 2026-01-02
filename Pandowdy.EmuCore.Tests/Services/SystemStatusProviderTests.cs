@@ -1,7 +1,6 @@
 using Pandowdy.EmuCore.Services;
-using Xunit;
 
-namespace Pandowdy.Tests.Services;
+namespace Pandowdy.EmuCore.Tests.Services;
 
 /// <summary>
 /// Unit tests for SystemStatusProvider, which manages Apple II system state

@@ -1,10 +1,6 @@
-using Pandowdy.EmuCore;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
-using Pandowdy.Tests.Helpers;
-using Xunit;
+using Pandowdy.EmuCore.Tests.Helpers;
 
-namespace Pandowdy.Tests;
+namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
 /// Unit tests for VA2M, the main Apple II emulator class.

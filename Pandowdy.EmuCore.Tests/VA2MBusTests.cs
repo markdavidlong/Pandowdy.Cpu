@@ -1,10 +1,8 @@
 using Emulator;
-using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
-using Xunit;
 
-namespace Pandowdy.Tests;
+namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
 /// Comprehensive tests for VA2MBus - the central Apple II bus coordinator.

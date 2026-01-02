@@ -1,10 +1,7 @@
 using Emulator;
-using Pandowdy.EmuCore;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.Tests.Helpers;
-using Xunit;
+using Pandowdy.EmuCore.Tests.Helpers;
 
-namespace Pandowdy.Tests;
+namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
 /// Comprehensive tests for CPUAdapter - the adapter between the external

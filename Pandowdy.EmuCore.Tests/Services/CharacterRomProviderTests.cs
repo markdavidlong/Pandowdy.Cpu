@@ -1,9 +1,6 @@
-using Pandowdy.EmuCore;
-using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
-using Xunit;
 
-namespace Pandowdy.Tests.Services;
+namespace Pandowdy.EmuCore.Tests.Services;
 
 /// <summary>
 /// Tests for CharacterRomProvider - provides access to Apple IIe Enhanced character ROM.

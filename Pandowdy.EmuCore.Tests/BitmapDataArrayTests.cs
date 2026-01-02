@@ -1,7 +1,4 @@
-using Pandowdy.EmuCore;
-using Xunit;
-
-namespace Pandowdy.Tests;
+namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
 /// Tests for BitmapDataArray - the 560×192 pixel array that stores Apple II display data.

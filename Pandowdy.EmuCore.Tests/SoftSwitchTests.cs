@@ -1,8 +1,6 @@
-using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
-using Xunit;
 
-namespace Pandowdy.Tests;
+namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
 /// Comprehensive tests for SoftSwitch-related classes:

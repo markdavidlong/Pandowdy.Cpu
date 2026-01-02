@@ -1,9 +1,7 @@
 using System.Reflection;
-using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Services;
-using Xunit;
 
-namespace Pandowdy.Tests.Services;
+namespace Pandowdy.EmuCore.Tests.Services;
 
 /// <summary>
 /// Unit tests for LegacyBitmapRenderer, which handles rendering of Apple II

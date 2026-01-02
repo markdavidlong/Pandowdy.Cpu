@@ -1,9 +1,8 @@
-using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 using Emulator;
 
-namespace Pandowdy.Tests.Helpers;
+namespace Pandowdy.EmuCore.Tests.Helpers;
 
 /// <summary>
 /// Test helpers and builders for creating VA2M test instances with mock dependencies.

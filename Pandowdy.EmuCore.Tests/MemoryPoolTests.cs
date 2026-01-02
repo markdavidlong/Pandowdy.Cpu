@@ -1,7 +1,4 @@
-using Pandowdy.EmuCore;
-using Xunit;
-
-namespace Pandowdy.Tests;
+namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
 /// Comprehensive tests for MemoryPool, covering Apple IIe memory banking,
