@@ -72,7 +72,7 @@ public class Apple2Display : Control
     private const double SourceHeight = 384;
     private const double SourceAspect = SourceWidth / SourceHeight;
 
-    private int _activeBitPlane = 0;
+    private int _activeBitPlane = 10;
 
     public int ActiveBitPlane
     {

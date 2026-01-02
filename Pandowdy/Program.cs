@@ -66,7 +66,8 @@ namespace Pandowdy
                     services.AddSingleton<ICpu, CPUAdapter>();
                     services.AddSingleton<IFrameProvider, FrameProvider>();
                     services.AddSingleton<IEmulatorState, EmulatorStateProvider>();
-                    
+                    services.AddSingleton<ICharacterRomProvider, CharacterRomProvider>();
+
                     // SystemStatusProvider implements both ISystemStatusProvider and ISoftSwitchResponder
                     // Register the concrete type first
                     services.AddSingleton<SystemStatusProvider>();

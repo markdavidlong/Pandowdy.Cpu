@@ -6,8 +6,11 @@ using System.Threading.Tasks;
 
 namespace Pandowdy.EmuCore
 {
+
+
     public partial class VA2M
     {
+        const int _bitplane = 10;
 
         private void RenderScreen(BitmapDataArray buf)
         {
@@ -95,7 +98,7 @@ namespace Pandowdy.EmuCore
                     {
                         prevShift = true;
                     }
-                    InsertHgrByteAt(buf, col * 2 * 7, buffY, value, prevShift, 0);
+                    InsertHgrByteAt(buf, col * 2 * 7, buffY, value, prevShift, _bitplane);
                 }
             }
 
@@ -150,7 +153,7 @@ namespace Pandowdy.EmuCore
             bool altChar = _sysStatusSink.StateAltCharSet;
 
             byte ch = MemoryPool.Read((ushort) address);
-            var glyph = VideoFont.Glyph(ch, flashOn, altChar); // returns span of 8 rows
+            var glyph = _charRomProvider.GetGlyph(ch, flashOn, altChar); // returns span of 8 rows
 
             if (!text80)
             {
@@ -161,13 +164,13 @@ namespace Pandowdy.EmuCore
                     byte fontRow = (byte) ~glyph[r]; // invert bits (was glyph ^ 0xff intent)
                                                      //  fontRow = (byte)((y / 8) % 16 * 0x11);
 
-                    Insert7BitLsbAt(buf, 0, col * 2 * 7, buffY, fontRow, true);
+                    Insert7BitLsbAt(buf, _bitplane, col * 2 * 7, buffY, fontRow, true);
                 }
             }
             else
             {
                 byte ch1 = MemoryPool.ReadRawAux((ushort) address);
-                var glyph1 = VideoFont.Glyph(ch1, flashOn, altChar); // returns span of 8 rows
+                var glyph1 = _charRomProvider.GetGlyph(ch1, flashOn, altChar); // returns span of 8 rows
 
                 for (int r = 0; r < 8; r++)  // 8 rows per glyph
                 {
@@ -176,8 +179,8 @@ namespace Pandowdy.EmuCore
                     byte fontRow2 = (byte) ~glyph[r];
                     int baseX = col * 2;
                     {
-                        Insert7BitLsbAt(buf, 0, baseX * 7, y, fontRow1, false);
-                        Insert7BitLsbAt(buf, 0, baseX * 7 + 7, y, fontRow2, false);
+                        Insert7BitLsbAt(buf, _bitplane, baseX * 7, y, fontRow1, false);
+                        Insert7BitLsbAt(buf, _bitplane, baseX * 7 + 7, y, fontRow2, false);
                     }
                 }
             }
@@ -224,13 +227,13 @@ namespace Pandowdy.EmuCore
                     var (a1, a2, a3, a4) = MakeGrColor(grcolor);
                     if (col % 2 == 0) // Even -- Use A1 & A2
                     {
-                        SetByteAt(buf,col * 14, y, (byte) a1,0);
-                        SetByteAt(buf,col * 14 + 7, y, (byte) a2,0);
+                        SetByteAt(buf,col * 14, y, (byte) a1,_bitplane);
+                        SetByteAt(buf,col * 14 + 7, y, (byte) a2,_bitplane);
                     }
                     else // Odd -- Use A3 & A4
                     {
-                        SetByteAt(buf,col * 14, y, (byte) a3,0);
-                        SetByteAt(buf,col * 14 + 7, y, (byte) a4,0);
+                        SetByteAt(buf,col * 14, y, (byte) a3,_bitplane);
+                        SetByteAt(buf,col * 14 + 7, y, (byte) a4,_bitplane);
                     }
                 }
             }
@@ -272,7 +275,7 @@ namespace Pandowdy.EmuCore
             if (x >= 0 && x < 40 && y >= 0 && y < 24)
             {
 
-                if (text || (!text && !hires) || (mixed && y > 20))
+                if (text || (!text && !hires) || (mixed && y >= 20))
                 {
                     int startAddr = page2 ? TextPage2Start : TextPage1Start;
 
