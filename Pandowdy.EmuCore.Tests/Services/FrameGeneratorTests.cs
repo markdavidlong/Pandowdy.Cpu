@@ -639,21 +639,14 @@ public class FrameGeneratorTests
     {
         // Arrange
         var fixture = new FrameGeneratorFixture();
-        var executionOrder = new List<string>();
         var context = fixture.FrameGenerator.AllocateRenderContext();
 
-        // Track execution order by checking state at each step
-        bool bufferWasClearedBeforeRender = false;
-        bool rendererCalledBeforeCommit = false;
 
         // Set a pixel to verify it's cleared
         context.FrameBuffer.SetPixel(100, 100, 0);
 
         // Custom renderer that checks state
-        var trackingRenderer = new TestRenderer
-        {
-            ShouldDrawPattern = true
-        };
+
         var trackingFixture = new FrameGeneratorFixture();
         var trackingContext = trackingFixture.FrameGenerator.AllocateRenderContext();
         trackingContext.FrameBuffer.SetPixel(100, 100, 0);

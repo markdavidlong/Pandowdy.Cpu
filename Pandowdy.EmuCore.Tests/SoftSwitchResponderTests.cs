@@ -82,7 +82,9 @@ namespace Pandowdy.EmuCore.Tests
             public bool StatePb2 { get => false; }
             public bool StateFlashOn { get => false; }
 
+#pragma warning disable CS0067 // Event is never used - test stub doesn't need to raise events
             public event EventHandler<SystemStatusSnapshot>? Changed;
+#pragma warning restore CS0067
             public SystemStatusSnapshot Current { get => null!; }
             public IObservable<SystemStatusSnapshot> Stream { get => null!; }
             public void Mutate(Action<SystemStatusSnapshotBuilder> _) { }
@@ -590,7 +592,7 @@ namespace Pandowdy.EmuCore.Tests
         {
             // Arrange
             var stub = new StubSoftSwitchResponderAndSystemStatusProvider();
-            var bus = CreateBus(stub, out _);
+            CreateBus(stub, out _);
 
             // Assert - Verify stub defaults (responder not yet invoked)
             Assert.False(stub.Store80, "80STORE should default to OFF");

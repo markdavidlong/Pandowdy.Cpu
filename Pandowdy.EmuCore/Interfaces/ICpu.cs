@@ -167,16 +167,6 @@ namespace Pandowdy.EmuCore.Interfaces
         void Reset(IAppleIIBus bus);
 
         /// <summary>
-        /// Returns a string representation of the CPU state.
-        /// </summary>
-        /// <returns>A formatted string showing current register values and status flags</returns>
-        /// <remarks>
-        /// Typically displays PC, A, X, Y, SP, and Status flags in a human-readable format,
-        /// useful for debugging and tracing CPU execution.
-        /// </remarks>
-        string ToString();
-
-        /// <summary>
         /// Writes a byte to memory at the specified address.
         /// </summary>
         /// <param name="address">The 16-bit memory address to write to ($0000-$FFFF)</param>

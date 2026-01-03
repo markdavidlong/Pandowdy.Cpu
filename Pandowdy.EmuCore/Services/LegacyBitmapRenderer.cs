@@ -90,7 +90,7 @@ namespace Pandowdy.EmuCore.Services
         // legacy code where all helpers were static and accessed context via a shared
         // field. Ideally, context should be passed as a parameter to each helper method.
         // This will be cleaned up in the replacement renderer implementation.
-        private RenderContext _context;
+        private RenderContext? _context;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LegacyBitmapRenderer"/> class.
@@ -160,12 +160,12 @@ namespace Pandowdy.EmuCore.Services
         private void RenderScreen(BitmapDataArray buf)
         {
             // Read soft switch states for this frame
-            bool text = _context.SystemStatus.StateTextMode;
-            bool hires = _context.SystemStatus.StateHiRes;
-            bool mixed = _context.SystemStatus.StateMixed;
-            bool page2 = _context.SystemStatus.StatePage2;
-            bool text80col = _context.SystemStatus.StateShow80Col;
-            bool gr80col = text80col && !_context.SystemStatus.StateAnn3_DGR;
+            bool text = _context!.SystemStatus.StateTextMode;
+            bool hires = _context!.SystemStatus.StateHiRes;
+            bool mixed = _context!.SystemStatus.StateMixed;
+            bool page2 = _context!.SystemStatus.StatePage2;
+            bool text80col = _context!.SystemStatus.StateShow80Col;
+            bool gr80col = text80col && !_context!.SystemStatus.StateAnn3_DGR;
 
             // Iterate through all 24 rows × 40 columns
             for (int row = 0; row < 24; row++)
@@ -313,12 +313,12 @@ namespace Pandowdy.EmuCore.Services
                 for (int r = 0; r < 8; r++)
                 {
                     ushort byteAddress = (ushort)(address + (r * 0x400));
-                    byte value = _context.Memory.ReadRawMain(byteAddress);
+                    byte value = _context!.Memory.ReadRawMain(byteAddress);
                     int buffY = row * 8 + r;
                     
                     // Check previous byte's phase bit for color fringing
                     bool prevShift = false;
-                    if (col != 0 && (_context.Memory.ReadRawMain((ushort)(byteAddress - 1)) & 0x80) == 0x80)
+                    if (col != 0 && (_context!.Memory.ReadRawMain((ushort)(byteAddress - 1)) & 0x80) == 0x80)
                     {
                         prevShift = true;
                     }
@@ -412,10 +412,10 @@ namespace Pandowdy.EmuCore.Services
         /// </remarks>
         private void RenderTextCell(int address, int row, int col, bool text80, BitmapDataArray buf)
         {
-            bool flashOn = _context.SystemStatus.StateFlashOn;
-            bool altChar = _context.SystemStatus.StateAltCharSet;
+            bool flashOn = _context!.SystemStatus.StateFlashOn;
+            bool altChar = _context!.SystemStatus.StateAltCharSet;
 
-            byte ch = _context.Memory.ReadRawMain((ushort)address);
+            byte ch = _context!.Memory.ReadRawMain((ushort)address);
             var glyph = _charRomProvider.GetGlyph(ch, flashOn, altChar);
 
             if (!text80)
@@ -432,7 +432,7 @@ namespace Pandowdy.EmuCore.Services
             else
             {
                 // 80-column text: render aux and main characters side-by-side
-                byte ch1 = _context.Memory.ReadRawAux((ushort)address);
+                byte ch1 = _context!.Memory.ReadRawAux((ushort)address);
                 var glyph1 = _charRomProvider.GetGlyph(ch1, flashOn, altChar);
 
                 for (int r = 0; r < 8; r++)
@@ -508,7 +508,7 @@ namespace Pandowdy.EmuCore.Services
             if (!gr80)
             {
                 // 40-column lo-res
-                byte value = _context.Memory.ReadRawMain((ushort)address);
+                byte value = _context!.Memory.ReadRawMain((ushort)address);
 
                 for (int glyphRow = 0; glyphRow < 8; glyphRow++)
                 {

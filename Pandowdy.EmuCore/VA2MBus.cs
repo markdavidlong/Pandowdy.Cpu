@@ -449,9 +449,9 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         // Always add the MemoryPool as a responder (it needs to update memory mappings)
         _softSwitches.AddResponder(mempool);
 
-        if (responder != null)
+        if (responder is ISoftSwitchResponder softSwitchResponder)
         {
-            _softSwitches.AddResponder(responder as ISoftSwitchResponder);
+            _softSwitches.AddResponder(softSwitchResponder);
         }
     }
 
@@ -547,7 +547,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <remarks>
     /// <para>
     /// <strong>Language Card Banking:</strong> The Apple IIe language card allows RAM to be mapped
-    /// into the $D000-$FFFF space normally occupied by ROM. Two banks are available ($D000-$DFFF only),
+    /// into the $D000-$FFFF space normally occupied by ROM. Two banks are available ($D000-$DFFF) only,
     /// and reading/writing can be independently controlled.
     /// </para>
     /// <para>

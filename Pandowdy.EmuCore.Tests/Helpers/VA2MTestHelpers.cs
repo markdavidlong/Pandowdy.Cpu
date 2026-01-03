@@ -84,7 +84,7 @@ public static class VA2MTestHelpers
     /// <summary>
     /// Factory method to create a VA2MBuilder with default test dependencies.
     /// </summary>
-    public static VA2MBuilder CreateBuilder() => new VA2MBuilder();
+    public static VA2MBuilder CreateBuilder() => new();
 }
 
 /// <summary>
@@ -92,8 +92,8 @@ public static class VA2MTestHelpers
 /// </summary>
 public class TestEmulatorState : IEmulatorState
 {
-    private StateSnapshot _current = new StateSnapshot(0, 0, 0, null, false, false);
-    private readonly List<StateSnapshot> _history = new();
+    private StateSnapshot _current = new(0, 0, 0, null, false, false);
+    private readonly List<StateSnapshot> _history = [];
 
     public IObservable<StateSnapshot> Stream => throw new NotImplementedException("Use GetCurrent() for testing");
 
@@ -201,7 +201,7 @@ public class TestAppleIIBus : IAppleIIBus
 
     // Test helpers
     public byte GetKeyValue() => _keyValue;
-    public bool GetPushButton(int num) => num >= 0 && num < 3 ? _pushButtons[num] : false;
+    public bool GetPushButton(int num) => num >= 0 && num < 3 && _pushButtons[num];
     public int ResetCount => _resetCount;
 }
 
@@ -234,6 +234,11 @@ public class TestCpu : ICpu
     public bool IsInstructionComplete() => true;
     public byte Read(ushort address) => 0;
     public void Write(ushort address, byte data) { }
+
+    public override string ToString()
+    {
+        return $"PC:{PC:X4} A:{A:X2} X:{X:X2} Y:{Y:X2} SP:{SP:X2}";
+    }
 }
 
 /// <summary>

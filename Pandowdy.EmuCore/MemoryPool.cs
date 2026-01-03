@@ -229,7 +229,9 @@ namespace Pandowdy.EmuCore
         /// Currently not implemented (no reads trigger this event). Reserved for future
         /// use by debuggers or profilers that need to track memory access patterns.
         /// </remarks>
+#pragma warning disable CS0067 // Event is never used - reserved for future debugger/profiler support
         public event EventHandler<MemoryAccessEventArgs>? MemoryRead;
+#pragma warning restore CS0067
 
 
         //Methods from IDirectMemoryPoolReader:

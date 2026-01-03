@@ -83,12 +83,16 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <summary>
     /// Temporary disk read test functionality (will be removed in future refactoring).
     /// </summary>
+#pragma warning disable CS0169 // Field is never used - reserved for future disk image support
     private DiskReadTestTemp? mDiskReadTest;
+#pragma warning restore CS0169
     
     /// <summary>
     /// Last used directory path for disk file operations.
     /// </summary>
+#pragma warning disable CS0414 // Field is assigned but never used - reserved for future disk image support
     private string mLastDiskPath = "E:\\develop\\Pandowdy";
+#pragma warning restore CS0414
 
     /// <summary>
     /// Apple IIe emulator machine instance (injected via Initialize).
