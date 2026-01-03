@@ -56,6 +56,34 @@ if (condition)
 if (condition) DoSomething(); // Also incorrect
 ```
 
+### Property Formatting
+- **Multi-line format for properties with non-default accessors** (getters/setters with logic or access modifiers)
+- **Single-line format ONLY for simple auto-properties** with default `{ get; set; }`
+
+### Examples
+```csharp
+// Correct: Multi-line for properties with logic or private setters
+public bool ThrottleEnabled
+{
+    get => _throttleEnabled;
+    set => this.RaiseAndSetIfChanged(ref _throttleEnabled, value);
+}
+
+public string Name
+{
+    get => _name;
+    private set => _name = value;
+}
+
+// Correct: Single-line for simple auto-properties
+public string Title { get; set; }
+public int Count { get; init; }
+public bool IsEnabled { get; set; } = true;
+
+// Incorrect: Single-line for properties with logic (hard to read)
+public bool ThrottleEnabled { get => _throttleEnabled; set => this.RaiseAndSetIfChanged(ref _throttleEnabled, value); }
+```
+
 ### Other Style Guidelines
 - Use `var` for local variables when type is obvious
 - Prefer expression-bodied members for simple one-liners

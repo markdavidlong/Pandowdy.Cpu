@@ -89,6 +89,10 @@ public static class Apple2Font
     /// </summary>
     /// <param name="charCode">ASCII character code (0-255)</param>
     /// <returns>8-byte array containing the character bitmap (7 pixels wide, 8 pixels tall)</returns>
+    /// <remarks>
+    /// Each byte represents one row of the character, with bits 0-6 representing the 7 pixels
+    /// (bit 0 = leftmost pixel, bit 6 = rightmost pixel). Bit 7 is unused.
+    /// </remarks>
     public static byte[] GetCharacterBitmap(byte charCode)
     {
         var bitmap = new byte[8];
@@ -100,8 +104,18 @@ public static class Apple2Font
     /// Gets a single row of pixels for a character.
     /// </summary>
     /// <param name="charCode">ASCII character code (0-255)</param>
-    /// <param name="row">Row index (0-7)</param>
-    /// <returns>Byte representing 7 pixels (bits 0-6)</returns>
+    /// <param name="row">Row index (0-7, where 0 is top row)</param>
+    /// <returns>Byte representing 7 pixels (bits 0-6, where bit 0 is leftmost)</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if row is not in range 0-7.</exception>
+    /// <remarks>
+    /// <para>
+    /// This is more efficient than <see cref="GetCharacterBitmap"/> when only a single row
+    /// is needed for rendering or analysis.
+    /// </para>
+    /// <para>
+    /// <strong>Bit Layout:</strong> Bit 0 (LSB) = leftmost pixel, Bit 6 = rightmost pixel, Bit 7 = unused.
+    /// </para>
+    /// </remarks>
     public static byte GetCharacterRow(byte charCode, int row)
     {
         if (row < 0 || row > 7)

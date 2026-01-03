@@ -8,30 +8,23 @@ using DiskArc;
 using DiskArc.Multi;
 using static DiskArc.Defs;
 
-namespace Pandowdy.UI;
+namespace Pandowdy.UI._hold_;
 
 /// <summary>
 /// Temporary class for testing disk read functionality.
 /// Contains methods extracted from MainWindow for testing purposes.
 /// </summary>
-public class DiskReadTestTemp
+/// <remarks>
+/// Constructor.
+/// </remarks>
+/// <param name="appHook">Application hook for DiskArc operations.</param>
+/// <param name="appendText">Callback to append text to output.</param>
+/// <param name="window">Reference to the window for file dialogs.</param>
+public class DiskReadTestTemp(AppHook appHook, Action<string> appendText, Window window)
 {
-    private readonly AppHook mAppHook;
-    private readonly Action<string> mAppendText;
-    private readonly Window mWindow;
-
-    /// <summary>
-    /// Constructor.
-    /// </summary>
-    /// <param name="appHook">Application hook for DiskArc operations.</param>
-    /// <param name="appendText">Callback to append text to output.</param>
-    /// <param name="window">Reference to the window for file dialogs.</param>
-    public DiskReadTestTemp(AppHook appHook, Action<string> appendText, Window window)
-    {
-        mAppHook = appHook;
-        mAppendText = appendText;
-        mWindow = window;
-    }
+    private readonly AppHook mAppHook = appHook;
+    private readonly Action<string> mAppendText = appendText;
+    private readonly Window mWindow = window;
 
     /// <summary>
     /// Shows a file picker dialog to select a disk image or archive file.
@@ -144,14 +137,14 @@ public class DiskReadTestTemp
             mAppendText("Failed to analyze disk image\n");
             return false;
         }
-        if (diskImage.Contents is IFileSystem)
+        if (diskImage.Contents is IFileSystem system)
         {
-            PrintFileSystemContents((IFileSystem) diskImage.Contents);
+            PrintFileSystemContents(system);
             return true;
         }
-        else if (diskImage.Contents is IMultiPart)
+        else if (diskImage.Contents is IMultiPart multiPart)
         {
-            return HandleMultiPart((IMultiPart) diskImage.Contents);
+            return HandleMultiPart(multiPart);
         }
         else
         {
@@ -170,8 +163,7 @@ public class DiskReadTestTemp
             sb.Clear();
             sb.AppendFormat("  start={0,-9} count={1,-9}",
                 part.StartOffset / BLOCK_SIZE, part.Length / BLOCK_SIZE);
-            var apmPart = part as APM_Partition;
-            if (apmPart != null)
+            if (part is APM_Partition apmPart)
             {
                 sb.AppendFormat(" name='{0}' type='{1}'",
                     apmPart.PartitionName, apmPart.PartitionType);

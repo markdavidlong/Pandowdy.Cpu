@@ -11,36 +11,95 @@ using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.UI;
 
-
 /// <summary>
-///
+/// Custom Avalonia control for rendering Apple IIe video output with NTSC color emulation.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <strong>Purpose:</strong> Provides hardware-accurate rendering of Apple IIe video modes including
+/// text, low-res graphics, hi-res graphics, and mixed modes with authentic NTSC color artifact
+/// simulation or monochrome display.
+/// </para>
+/// <para>
+/// <strong>Rendering Features:</strong>
+/// <list type="bullet">
+/// <item>NTSC color artifact emulation (16 colors from 4-bit patterns)</item>
+/// <item>Monochrome mode (green/amber phosphor simulation)</item>
+/// <item>Scanline effect for CRT authenticity</item>
+/// <item>Aspect ratio preservation with letterboxing</item>
+/// <item>Double-scanline rendering (192 → 384 vertical resolution)</item>
+/// </list>
+/// </para>
+/// <para>
+/// <strong>Keyboard Handling:</strong> Captures keyboard input and translates it to Apple IIe
+/// key codes, including support for control characters, arrow keys, and caps lock emulation.
+/// </para>
+/// <para>
+/// <strong>Frame Source:</strong> Receives rendered frames from IFrameProvider (560x192 pixels)
+/// and scales them to display resolution (563x384 with padding).
+/// </para>
+/// <para>
+/// <strong>Performance:</strong> Uses unsafe pointer operations for fast pixel writes during
+/// NTSC color generation and scanline rendering.
+/// </para>
+/// </remarks>
 public class Apple2Display : Control
 {
+    /// <summary>
+    /// Styled property for the bitmap being displayed.
+    /// </summary>
     public static readonly StyledProperty<Bitmap?> BitmapProperty =
         AvaloniaProperty.Register<Apple2Display, Bitmap?>(nameof(Bitmap), null);
 
+    /// <summary>
+    /// Flag to suppress next TextInput event (used when handling special keys).
+    /// </summary>
     private bool _suppressNextTextInput;
+    
+    /// <summary>
+    /// Reference to the emulator machine for keyboard input injection.
+    /// </summary>
     private VA2M? _machine;
 
-    // RGBA color constants
+    #region NTSC Color Constants
+
+    // RGBA color constants for NTSC color artifact emulation
+    // These colors match the Apple IIe's NTSC color output
+    
+    /// <summary>Black color (NTSC color 0).</summary>
     private const UInt32 BlackColor = 0xFF000000;
+    /// <summary>Magenta color (NTSC artifact color).</summary>
     private const UInt32 MagentaColor = 0xFF930B7C;
+    /// <summary>Dark blue color (NTSC artifact color).</summary>
     private const UInt32 DarkBlueColor = 0xFF1F35D3;
+    /// <summary>Purple/violet color (NTSC artifact color).</summary>
     private const UInt32 PurpleColor = 0xFFBB36FF;
+    /// <summary>Dark green color (NTSC artifact color).</summary>
     private const UInt32 DarkGreenColor = 0xFF00760C;
+    /// <summary>Gray color (NTSC artifact color).</summary>
     private const UInt32 GrayColor = 0xFF7E7E7E;
+    /// <summary>Medium blue color (NTSC artifact color).</summary>
     private const UInt32 BlueColor = 0xFF07A5FF;
+    /// <summary>Light blue color (NTSC artifact color).</summary>
     private const UInt32 LightBlueColor = 0xFF6AB6FF;
+    /// <summary>Brown/orange color (NTSC artifact color).</summary>
     private const UInt32 BrownColor = 0xFF7B3F00;
+    /// <summary>Orange color (NTSC artifact color).</summary>
     private const UInt32 OrangeColor = 0xFFFF6A00;
+    /// <summary>Gray 2 color (NTSC artifact color, same as Gray).</summary>
     private const UInt32 Gray2Color = 0xFF7E7E7E;
+    /// <summary>Pink color (NTSC artifact color).</summary>
     private const UInt32 PinkColor = 0xFFFF9ACD;
+    /// <summary>Bright green color (NTSC artifact color).</summary>
     private const UInt32 GreenColor = 0xFF00FF00;
+    /// <summary>Yellow color (NTSC artifact color).</summary>
     private const UInt32 YellowColor = 0xFFFFFF00;
+    /// <summary>Aqua/cyan color (NTSC artifact color).</summary>
     private const UInt32 AquaColor = 0xFF00FFFF;
+    /// <summary>White color (NTSC color 15).</summary>
     private const UInt32 WhiteColor = 0xFFFFFFFF;
 
+    // Alternative color palette (commented out for future experimentation)
     //private const UInt32 BlackColor = 0xFF000000;
     //private const UInt32 MagentaColor = 0xFFE31E60;
     //private const UInt32 DarkBlueColor = 0xFF604EBD;
@@ -58,28 +117,169 @@ public class Apple2Display : Control
     //private const UInt32 AquaColor = 0xFF72FFD0;
     //private const UInt32 WhiteColor = 0xFFFFFFFF;
 
+    #endregion
 
+    #region Frame Provider and Rendering State
+
+    /// <summary>
+    /// Frame provider supplying rendered video frames from the emulator.
+    /// </summary>
     private IFrameProvider? _frameProvider;
+    
+    /// <summary>
+    /// Most recently received frame data (560x192 bitmap).
+    /// </summary>
     private BitmapDataArray? _lastFrame;
 
+    #endregion
+
+    #region Public Properties
+
+    /// <summary>
+    /// Gets or sets the bitmap being displayed.
+    /// </summary>
+    /// <value>WriteableBitmap containing the rendered Apple IIe screen, or null.</value>
     public Bitmap? Bitmap
     {
         get => GetValue(BitmapProperty);
         set => SetValue(BitmapProperty, value);
     }
 
+    /// <summary>
+    /// Bright fringe alpha value for color artifact anti-aliasing.
+    /// </summary>
+    public const byte BrightFringeValue = 0xf0;
+    
+    /// <summary>
+    /// Reduced fringe alpha value for softer color artifact edges.
+    /// </summary>
+    public const byte ReducedFringeValue = 0xB0;
+
+    /// <summary>
+    /// Gets or sets whether to force monochrome (green/amber) display mode.
+    /// </summary>
+    /// <value>True to render in monochrome, false for NTSC color.</value>
+    /// <remarks>
+    /// When true, all output is rendered in monochrome regardless of video mode.
+    /// Simulates green or amber phosphor monitors common with the Apple IIe.
+    /// </remarks>
+    public bool ForceMono { set; get; } = false;
+    
+    /// <summary>
+    /// Gets or sets whether to show CRT scanline effect.
+    /// </summary>
+    /// <value>True to show scanlines (3/4 brightness on odd lines), false for smooth rendering.</value>
+    /// <remarks>
+    /// When enabled, alternating scanlines are rendered at 3/4 brightness to simulate
+    /// the appearance of a CRT monitor with visible scanlines.
+    /// </remarks>
+    public bool ShowScanLines { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether to defringe mixed text area in mixed graphics mode.
+    /// </summary>
+    /// <value>True to render bottom 4 text lines in monochrome, false for full color.</value>
+    /// <remarks>
+    /// <para>
+    /// Mixed mode displays graphics with 4 lines of text at the bottom (lines 20-23).
+    /// Color artifacts on text can reduce readability.
+    /// </para>
+    /// <para>
+    /// When enabled, the bottom 4 text lines (y >= 160) are rendered in monochrome
+    /// for improved clarity while keeping graphics in color.
+    /// </para>
+    /// </remarks>
+    public bool DefringeMixedText { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets whether to use non-luma contrast masking for color fringing.
+    /// </summary>
+    /// <value>True to use alpha blending for color fringe reduction, false for full opacity.</value>
+    /// <remarks>
+    /// <para>
+    /// When enabled, pixels adjacent to color transitions are rendered with reduced alpha
+    /// (transparency) to soften color artifacts and improve text readability.
+    /// </para>
+    /// <para>
+    /// Uses graduated alpha values (0xff, 0xc0, 0x90, 0x70, 0x50) based on distance from
+    /// lit pixels to create smooth color transitions.
+    /// </para>
+    /// </remarks>
+    public bool UseNonLumaContrastMask { get; set; } = false;
+
+    #endregion
+
+    #region Display Constants
+
+    /// <summary>
+    /// Source bitmap width (563 pixels).
+    /// </summary>
     private const double SourceWidth = 563;
+    
+    /// <summary>
+    /// Source bitmap height (384 pixels, double-scanned from 192).
+    /// </summary>
     private const double SourceHeight = 384;
+    
+    /// <summary>
+    /// Source aspect ratio (563:384 ≈ 1.466).
+    /// </summary>
     private const double SourceAspect = SourceWidth / SourceHeight;
 
+    #endregion
+
+    #region Bit Plane Selection
+
+    /// <summary>
+    /// Backing field for ActiveBitPlane property.
+    /// </summary>
     private int _activeBitPlane = 0;
 
+    /// <summary>
+    /// Gets or sets which bit plane to render (for debugging double-hires modes).
+    /// </summary>
+    /// <value>Bit plane index (0 for main, 1 for auxiliary).</value>
+    /// <remarks>
+    /// <para>
+    /// The Apple IIe can use both main and auxiliary memory for double hi-res graphics
+    /// (560x192 resolution). This property allows selecting which plane to visualize.
+    /// </para>
+    /// <para>
+    /// <strong>Typical Values:</strong>
+    /// <list type="bullet">
+    /// <item>0: Main memory bit plane (normal operation)</item>
+    /// <item>1: Auxiliary memory bit plane (for debugging or special effects)</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
     public int ActiveBitPlane
     {
         get => _activeBitPlane;
         set => _activeBitPlane = value;
     }
 
+    #endregion
+
+    #region Constructor
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Apple2Display"/> control.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Initialization:</strong>
+    /// <list type="bullet">
+    /// <item>Creates checkerboard placeholder bitmap</item>
+    /// <item>Enables keyboard focus for input handling</item>
+    /// <item>Registers event handlers for keyboard input</item>
+    /// <item>Sets up focus change visualization</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Keyboard Events:</strong> Registers handlers for KeyDown, KeyUp, and TextInput
+    /// to capture and translate keyboard input to Apple IIe key codes.
+    /// </para>
+    /// </remarks>
     public Apple2Display()
     {
         Bitmap = CreateCheckerboardBitmap;
@@ -91,16 +291,17 @@ public class Apple2Display : Control
         TextInput += OnTextInput;
     }
 
-    public const byte BrightFringeValue = 0xf0;
-    public const byte ReducedFringeValue = 0xB0;
+    #endregion
 
-    public bool ForceMono { set; get; } = false;
-    public bool ShowScanLines { get; set; } = true;
+    #region Lifecycle Methods
 
-    public bool DefringeMixedText { get; set; } = false;
-
-    public bool UseNonLumaContrastMask { get; set; } = false;
-
+    /// <summary>
+    /// Called when the control is detached from the visual tree.
+    /// </summary>
+    /// <param name="e">Visual tree attachment event arguments.</param>
+    /// <remarks>
+    /// Unsubscribes from frame provider events to prevent memory leaks.
+    /// </remarks>
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
@@ -110,6 +311,24 @@ public class Apple2Display : Control
         }
     }
 
+    #endregion
+
+    #region Frame Provider Attachment
+
+    /// <summary>
+    /// Attaches a frame provider to supply video frames for rendering.
+    /// </summary>
+    /// <param name="provider">Frame provider supplying rendered emulator output.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Subscription Management:</strong> If a frame provider is already attached,
+    /// unsubscribes from its events before subscribing to the new provider.
+    /// </para>
+    /// <para>
+    /// <strong>Initial Frame:</strong> Retrieves the current frame immediately to ensure
+    /// the display shows content even before the first frame event fires.
+    /// </para>
+    /// </remarks>
     public void AttachFrameProvider(IFrameProvider provider)
     {
         if (_frameProvider != null)
@@ -119,14 +338,41 @@ public class Apple2Display : Control
         _frameProvider = provider;
         _frameProvider.FrameAvailable += OnFrameAvailable;
         _lastFrame = _frameProvider.GetFrame();
-        
     }
 
+    /// <summary>
+    /// Handles frame available events from the frame provider.
+    /// </summary>
+    /// <param name="sender">Event sender (frame provider).</param>
+    /// <param name="e">Event arguments (unused).</param>
+    /// <remarks>
+    /// <para>
+    /// Retrieves the latest frame and stores it for rendering. The actual redraw is
+    /// deferred to the next render cycle triggered by the UI refresh timer.
+    /// </para>
+    /// <para>
+    /// <strong>Performance Note:</strong> Does not call InvalidateVisual() here to avoid
+    /// excessive redraws. The UI refresh timer (60 Hz) controls the actual render frequency.
+    /// </para>
+    /// </remarks>
     private void OnFrameAvailable(object? sender, EventArgs e)
     {
         _lastFrame = _frameProvider?.GetFrame(); // redraw deferred to timer
     }
 
+    #endregion
+
+    #region Layout Overrides
+
+    /// <summary>
+    /// Measures the desired size of the control.
+    /// </summary>
+    /// <param name="availableSize">Available size from parent layout.</param>
+    /// <returns>Desired size maintaining 563:384 aspect ratio.</returns>
+    /// <remarks>
+    /// If available size is infinite, returns a baseline size of 700x525 pixels
+    /// (maintaining approximately the correct aspect ratio).
+    /// </remarks>
     protected override Size MeasureOverride(Size availableSize)
     {
         if (double.IsInfinity(availableSize.Width) || double.IsInfinity(availableSize.Height))
@@ -136,8 +382,31 @@ public class Apple2Display : Control
         return availableSize;
     }
 
+    /// <summary>
+    /// Arranges the control within the final size allocated by parent layout.
+    /// </summary>
+    /// <param name="finalSize">Final size allocated to the control.</param>
+    /// <returns>The final size (same as input).</returns>
     protected override Size ArrangeOverride(Size finalSize) => finalSize;
 
+    #endregion
+
+    #region Checkerboard Bitmap Creation
+
+    /// <summary>
+    /// Creates a checkerboard pattern bitmap used as a placeholder before frames are available.
+    /// </summary>
+    /// <value>563x384 bitmap with alternating 7x16 pixel blocks.</value>
+    /// <remarks>
+    /// <para>
+    /// The checkerboard pattern consists of 24 rows by 80 columns of 7x16 pixel blocks,
+    /// matching the Apple IIe's text mode character cell layout (80 columns x 24 rows).
+    /// </para>
+    /// <para>
+    /// <strong>Colors:</strong> Alternates between dark gray (64) and lighter gray (80)
+    /// in a checkerboard pattern.
+    /// </para>
+    /// </remarks>
     private static Bitmap CreateCheckerboardBitmap
     {
         get
@@ -173,6 +442,34 @@ public class Apple2Display : Control
         }
     }
 
+    #endregion
+
+    #region Rendering Methods
+
+    /// <summary>
+    /// Renders the control's visual content.
+    /// </summary>
+    /// <param name="context">Drawing context for rendering operations.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Rendering Pipeline:</strong>
+    /// <list type="number">
+    /// <item>Ensure bitmap is allocated (563x384 WriteableBitmap)</item>
+    /// <item>Lock bitmap for unsafe pointer access</item>
+    /// <item>For each scanline (192 lines): Render line twice (double-scan to 384 lines)</item>
+    /// <item>Choose monochrome or NTSC rendering based on mode and settings</item>
+    /// <item>Apply scanline effect if enabled (3/4 brightness on odd lines)</item>
+    /// <item>Draw scaled bitmap with aspect ratio preservation</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Rendering Mode Selection:</strong>
+    /// <list type="bullet">
+    /// <item><strong>Monochrome:</strong> ForceMono, non-graphics mode, or mixed text area with DefringeMixedText</item>
+    /// <item><strong>NTSC Color:</strong> Graphics mode without monochrome override</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -214,6 +511,15 @@ public class Apple2Display : Control
         DrawBitmapScaled(context);
     }
 
+    /// <summary>
+    /// Requests an immediate visual refresh of the display.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Triggers InvalidateVisual() if a frame provider and frame data are available.
+    /// Typically called by the UI refresh timer (60 Hz).
+    /// </para>
+    /// </remarks>
     public void RequestRefresh()
     {
         if (_frameProvider != null && _lastFrame != null)
@@ -222,6 +528,26 @@ public class Apple2Display : Control
         }
     }
 
+    /// <summary>
+    /// Renders a scanline in monochrome mode (green/amber phosphor simulation).
+    /// </summary>
+    /// <param name="dst">Pointer to destination bitmap buffer.</param>
+    /// <param name="stridePixels">Width of bitmap in pixels.</param>
+    /// <param name="outYTop">Y coordinate of top output scanline.</param>
+    /// <param name="lineData">Source line data (560 booleans, true = pixel lit).</param>
+    /// <param name="showScanLines">True to render odd scanline at 3/4 brightness.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Rendering:</strong> Each input pixel becomes a white or black output pixel.
+    /// The scanline is rendered twice vertically (double-scan), with the second line
+    /// optionally dimmed for CRT scanline effect.
+    /// </para>
+    /// <para>
+    /// <strong>Scanline Effect:</strong> When enabled, odd scanlines (outYTop + 1) are
+    /// rendered at 3/4 brightness by shifting RGB channels right by 2 bits (divide by 4,
+    /// keeping 3/4 of original value).
+    /// </para>
+    /// </remarks>
     static private unsafe void RenderMonochromeLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
     {
         for (int xPos = -3; xPos < lineData.Length; xPos++)
@@ -237,7 +563,37 @@ public class Apple2Display : Control
         }
     }
 
-        private unsafe void RenderNtscLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
+    /// <summary>
+    /// Renders a scanline with NTSC color artifact emulation.
+    /// </summary>
+    /// <param name="dst">Pointer to destination bitmap buffer.</param>
+    /// <param name="stridePixels">Width of bitmap in pixels.</param>
+    /// <param name="outYTop">Y coordinate of top output scanline.</param>
+    /// <param name="lineData">Source line data (560 booleans, true = pixel lit).</param>
+    /// <param name="showScanLines">True to render odd scanline at 3/4 brightness.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>NTSC Color Artifact Emulation:</strong> The Apple IIe generates colors by
+    /// manipulating NTSC chroma subcarrier phase. This method simulates that by examining
+    /// 4-bit pixel patterns and their phase alignment.
+    /// </para>
+    /// <para>
+    /// <strong>Algorithm:</strong>
+    /// <list type="number">
+    /// <item>Examine 4 consecutive pixels (bits[0..3])</item>
+    /// <item>Calculate 4-bit value and phase (xPos mod 4)</item>
+    /// <item>Look up NTSC color from pattern + phase</item>
+    /// <item>Apply alpha blending for color fringing if enabled</item>
+    /// <item>Render top scanline, then dimmed bottom scanline</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Color Fringing:</strong> When UseNonLumaContrastMask is enabled, pixels near
+    /// color transitions are rendered with reduced alpha for softer edges and improved text
+    /// readability.
+    /// </para>
+    /// </remarks>
+    private unsafe void RenderNtscLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
     {
         bool neg1 = false;
         bool neg2 = false;
@@ -302,6 +658,32 @@ public class Apple2Display : Control
         }
     }
 
+    /// <summary>
+    /// Maps a 4-bit pixel pattern and phase to an NTSC color value.
+    /// </summary>
+    /// <param name="bitval">4-bit pixel value (0-15) from current and next 3 pixels.</param>
+    /// <param name="phase">Horizontal phase (0-3) determining color from bit pattern.</param>
+    /// <returns>32-bit RGBA color value.</returns>
+    /// <remarks>
+    /// <para>
+    /// <strong>NTSC Color Generation:</strong> The Apple IIe generates 16 colors from 4-bit
+    /// patterns by manipulating NTSC chroma phase. The same bit pattern produces different
+    /// colors depending on horizontal position (phase).
+    /// </para>
+    /// <para>
+    /// <strong>Color Table:</strong> Contains all 16 colors x 4 phases = 64 possible combinations.
+    /// Patterns are grouped by bit value with phase variations producing color shifts.
+    /// </para>
+    /// <para>
+    /// <strong>Example:</strong> Pattern 0001 (bit 0 set) produces:
+    /// <list type="bullet">
+    /// <item>Phase 0: Brown</item>
+    /// <item>Phase 1: (different color based on subcarrier alignment)</item>
+    /// <item>Phase 2: (different color)</item>
+    /// <item>Phase 3: Dark Green (wraps to next phase cycle)</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
     static UInt32 GetNTSCColorFromBits(byte bitval, byte phase)
     {
         phase %= 4;
@@ -454,7 +836,19 @@ public class Apple2Display : Control
         return WhiteColor;
     }
 
-
+    /// <summary>
+    /// Ensures a WriteableBitmap is allocated for rendering the current frame.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// If Bitmap is not a WriteableBitmap or is null, creates a new 563x384 WriteableBitmap
+    /// in BGRA8888 format at 96 DPI.
+    /// </para>
+    /// <para>
+    /// WriteableBitmap is required for unsafe pointer-based pixel writing used in
+    /// RenderMonochromeLine and RenderNtscLine.
+    /// </para>
+    /// </remarks>
     private void EnsureBitmapForFrame()
     {
         if (Bitmap is WriteableBitmap)
@@ -464,6 +858,25 @@ public class Apple2Display : Control
         Bitmap = new WriteableBitmap(new PixelSize(563, 384), new Vector(96, 96), PixelFormat.Bgra8888);
     }
 
+    /// <summary>
+    /// Writes a single pixel to the bitmap buffer with alpha blending support.
+    /// </summary>
+    /// <param name="basePtr">Pointer to bitmap buffer base.</param>
+    /// <param name="width">Width of bitmap in pixels.</param>
+    /// <param name="x">X coordinate of pixel.</param>
+    /// <param name="y">Y coordinate of pixel.</param>
+    /// <param name="rgba">32-bit RGBA color value.</param>
+    /// <param name="alpha">Alpha value (0-255, default 255 = opaque).</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Premultiplied Alpha:</strong> Color channels are premultiplied by alpha before
+    /// writing to support proper alpha blending. Uses integer math to avoid floating point overhead.
+    /// </para>
+    /// <para>
+    /// <strong>Pixel Format:</strong> Writes in BGRA order (Blue, Green, Red, Alpha) to match
+    /// Avalonia's Bgra8888 pixel format.
+    /// </para>
+    /// </remarks>
     private static unsafe void WritePixel(byte* basePtr, int width, int x, int y, uint rgba, byte alpha =0xff)
     {
         //alpha = (byte) (x & 0xff);
@@ -479,6 +892,24 @@ public class Apple2Display : Control
         basePtr[idx + 3] = alpha;                      // A
     }
 
+    /// <summary>
+    /// Draws the bitmap scaled to fit the control while preserving aspect ratio.
+    /// </summary>
+    /// <param name="context">Drawing context for render operations.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Scaling Strategy:</strong>
+    /// <list type="bullet">
+    /// <item>Calculate available space (control bounds minus 30px padding on all sides)</item>
+    /// <item>Determine which dimension is constraining (width or height)</item>
+    /// <item>Scale to fit constraining dimension while preserving 563:384 aspect ratio</item>
+    /// <item>Center in available space (letterbox/pillarbox as needed)</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Padding:</strong> 30 pixels on all sides provides visual separation from control edges.
+    /// </para>
+    /// </remarks>
     private void DrawBitmapScaled(DrawingContext context)
     {
         const double padding = 30;
@@ -512,10 +943,30 @@ public class Apple2Display : Control
         }
     }
 
+    #endregion
+
+    #region Machine Attachment and Keyboard Support
+
+    /// <summary>
+    /// Determines if a key is a function key (F1-F24).
+    /// </summary>
+    /// <param name="key">Key to check.</param>
+    /// <returns>True if key is between F1 and F24 inclusive.</returns>
     private static bool IsFunctionKey(Key key) => key >= Key.F1 && key <= Key.F24;
 
+    /// <summary>
+    /// Attaches the emulator machine for keyboard input injection.
+    /// </summary>
+    /// <param name="machine">VA2M emulator instance to receive keyboard input.</param>
     public void AttachMachine(VA2M machine) => _machine = machine;
 
+    /// <summary>
+    /// Gets whether caps lock emulation is enabled from the parent MainWindow.
+    /// </summary>
+    /// <returns>True if caps lock is enabled, false otherwise.</returns>
+    /// <remarks>
+    /// Walks up the visual tree to find the MainWindow and queries its IsCapsLockEnabledForInput property.
+    /// </remarks>
     private bool GetCapsLockEnabled()
     {
         var tl = TopLevel.GetTopLevel(this);
@@ -526,8 +977,34 @@ public class Apple2Display : Control
         return false;
     }
 
+    /// <summary>
+    /// Gets whether caps lock emulation is currently enabled.
+    /// </summary>
     private bool IsCapsLockEnabled => GetCapsLockEnabled();
 
+    /// <summary>
+    /// Handles text input events for standard character input.
+    /// </summary>
+    /// <param name="sender">Event sender (this control).</param>
+    /// <param name="e">Text input event arguments containing input text.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Processing:</strong>
+    /// <list type="number">
+    /// <item>Check if input should be suppressed (after Alt or F-key)</item>
+    /// <item>Convert newline to carriage return (Apple IIe convention)</item>
+    /// <item>Apply caps lock if enabled and character is lowercase letter</item>
+    /// <item>Inject ASCII character with high bit set (Apple IIe key latch format)</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Caps Lock Emulation:</strong> When enabled, converts lowercase letters (a-z)
+    /// to uppercase (A-Z) by subtracting 32 from ASCII value.
+    /// </para>
+    /// <para>
+    /// <strong>High Bit:</strong> Apple IIe keyboard latch requires bit 7 set (OR with 0x80).
+    /// </para>
+    /// </remarks>
     private void OnTextInput(object? sender, TextInputEventArgs e)
     {
         if (_machine == null)
@@ -558,6 +1035,30 @@ public class Apple2Display : Control
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Handles key down events for special keys and control characters.
+    /// </summary>
+    /// <param name="sender">Event sender (this control).</param>
+    /// <param name="e">Key event arguments containing key and modifiers.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Special Key Handling:</strong>
+    /// <list type="bullet">
+    /// <item><strong>Alt + key, F-keys:</strong> Suppresses next TextInput event (menu shortcuts)</item>
+    /// <item><strong>Ctrl + A-Z:</strong> Generates control characters (0x01-0x1A)</item>
+    /// <item><strong>Arrow keys:</strong> Up=0x0B, Down=0x0A, Left=0x08, Right=0x15</item>
+    /// <item><strong>Delete:</strong> 0x7F (DEL character)</item>
+    /// <item><strong>Backspace:</strong> 0x08 (normal), 0x7F (with Shift)</item>
+    /// <item><strong>Enter:</strong> 0x0D (carriage return)</item>
+    /// <item><strong>Tab:</strong> 0x09</item>
+    /// <item><strong>Escape:</strong> 0x1B</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Apple IIe Control Characters:</strong> Matches Apple IIe keyboard behavior
+    /// where Ctrl + letter produces ASCII control characters.
+    /// </para>
+    /// </remarks>
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (_machine == null)
@@ -596,6 +1097,15 @@ public class Apple2Display : Control
         }
     }
 
+    /// <summary>
+    /// Handles key up events to clear text input suppression flag.
+    /// </summary>
+    /// <param name="sender">Event sender (this control).</param>
+    /// <param name="e">Key event arguments containing released key.</param>
+    /// <remarks>
+    /// Clears the _suppressNextTextInput flag when Alt or function keys are released,
+    /// allowing normal text input to resume.
+    /// </remarks>
     private void OnKeyUp(object? sender, KeyEventArgs e)
     {
         if ((e.Key == Key.LeftAlt || e.Key == Key.RightAlt) || IsFunctionKey(e.Key))
@@ -603,5 +1113,7 @@ public class Apple2Display : Control
             _suppressNextTextInput = false;
         }
     }
+
+    #endregion
 }
 
