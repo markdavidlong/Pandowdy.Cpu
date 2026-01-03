@@ -76,6 +76,13 @@ The `VA2MBus` class currently manages:
       - True random (least accurate but simple)
     - Critical for some copy-protection schemes and games
 
+12. **Game Controller Port Expansion** (Planned)
+    - Need to be able to set and query values for game controllers 0-3.
+      - Emulate Joysticks, Paddles, Koala Pad, etc. (All take X,Y from 0-255, so set a byte, read from I/O space like the keyboard handler)
+      - The annuciators and game port strobe might possibly ought to be in this area too.
+    - Public API: `SetGameController(int num, byte value)`, `GetGameController(int num)`
+      - In AppleSoft, if you use PDL(n) values > 3 you start triggering unrelated soft switches. This is probably an artifact of AppleSoft using unchecked bounds.
+
 ## Slot Architecture Notes
 
 The Apple IIe expansion slot system adds significant complexity:
@@ -125,7 +132,7 @@ public interface IFloatingBusStrategy
 
 // Implementations:
 // - VideoScannerFloatingBus (most accurate, returns video memory)
-// - LastBusValueFloatingBus (returns last data bus value)
+// - LastBusValueFloatingBus (returns last data bus value) - May need to adapt MemoryPool, etc. to retain last value read or written
 // - RandomFloatingBus (simple but inaccurate)
 // - DeterministicFloatingBus (for testing, returns predictable pattern)
 ```
@@ -138,6 +145,9 @@ Potential slot manager to handle:
 - Floating bus fallback
 - INTCXROM switch behavior (internal ROM vs slot ROMs)
 - SLOTC3ROM special case (slot 3 independent control)
+- Keep track of the last card selected (CARDSEL) via usage to enable mapping ext. ROM into $C800-$C8FF, etc.
+- Map card ROM into $C800-$CFFF when $CFFF is accessed
+
 
 ## Potential Refactoring Options
 
@@ -311,3 +321,5 @@ Any refactoring must preserve:
 ---
 
 *This document serves as a reference for future refactoring decisions. The analysis and options are preserved for when the need arises.*
+
+

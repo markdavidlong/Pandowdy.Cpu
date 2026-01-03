@@ -42,11 +42,6 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
 
     public event EventHandler? VBlank;
 
-    // 2.1 Hz flash timer (approx every 476 ms)
-  //  private Timer? _flashTimer;
-
-    private static readonly TimeSpan FlashPeriod = TimeSpan.FromMilliseconds(476);
-
 
     private readonly System.Collections.Generic.Dictionary<ushort, System.Func<byte>> _ioReadHandlers = [];
     private readonly System.Collections.Generic.Dictionary<ushort, System.Action<byte>> _ioWriteHandlers = [];
@@ -367,13 +362,6 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     public void Connect(Emulator.CPU _)
     {
         throw new NotSupportedException("This should not be called. Connect is deprecated.");
-    ////    ThrowIfDisposed();
-    //    //_cpu = cpu;
-    //    //_cpu.Connect(this);
-    ////    _hookTable ??= new AppleSoftHookTable();
-    ////    _hookTable.InitializeDefault();
-    //    //InitIoReadHandlers();
-    //    //InitIoWriteHandlers();
     }
 
     public void SetKeyValue(byte key)
@@ -620,10 +608,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
 
         _disposed = true;
         VBlank = null;
-       // _cpu = null;
-        //_hookTable = null;
-    //    _flashTimer?.Dispose();
-   //     _flashTimer = null;
+
     }
 
     private void ThrowIfDisposed()
