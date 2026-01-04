@@ -1,5 +1,6 @@
-using Pandowdy.EmuCore.Tests.Helpers;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Tests.Helpers;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -406,7 +407,7 @@ public class VA2MTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var memoryPool = new MemoryPool(statusProvider);
+        var memoryPool = new MemoryPool(statusProvider, new TestLanguageCard());
         var va2m = VA2MTestHelpers.CreateBuilder()
             .WithMemoryPool(memoryPool)
             .Build();

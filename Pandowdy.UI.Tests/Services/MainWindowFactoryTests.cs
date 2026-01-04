@@ -1,8 +1,11 @@
+using Avalonia;
+using Avalonia.Headless;
 using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
-using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.ViewModels;
+using Pandowdy.UI.Interfaces;
+using Emulator;
 using System.Reactive.Subjects;
 
 namespace Pandowdy.UI.Tests.Services;
@@ -72,7 +75,7 @@ public class MainWindowFactoryTests
         {
             // Create core dependencies
             var statusProvider = new SystemStatusProvider();
-            var memoryPool = new MemoryPool(statusProvider);
+            var memoryPool = new MemoryPool(statusProvider, new TestLanguageCard());
             var stateProvider = new EmulatorStateProvider();
             var cpu = new CPUAdapter(new Emulator.CPU());
             var frameProvider = new FrameProvider();
@@ -301,4 +304,19 @@ public class MainWindowFactoryTests
     }
 
     #endregion
+
+    /// <summary>
+    /// Mock Language Card for UI tests that don't need full Language Card functionality.
+    /// </summary>
+    private class TestLanguageCard : ILanguageCard
+    {
+        public int Size => 0x3000;
+        public byte Read(ushort address) => 0xFF;
+        public void Write(ushort address, byte value) { }
+        public byte this[ushort address]
+        {
+            get => 0xFF;
+            set { }
+        }
+    }
 }

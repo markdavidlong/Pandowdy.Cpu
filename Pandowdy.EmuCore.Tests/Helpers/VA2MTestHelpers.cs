@@ -28,7 +28,7 @@ public static class VA2MTestHelpers
             _frameProvider = new TestFrameProvider();
             _systemStatusProvider = new SystemStatusProvider();
             _bus = new TestAppleIIBus();
-            _memoryPool = new MemoryPool(_systemStatusProvider);
+            _memoryPool = new MemoryPool(_systemStatusProvider, new TestLanguageCard());
             _frameGenerator = new TestFrameGenerator();
         }
 
@@ -149,7 +149,7 @@ public class TestFrameProvider : IFrameProvider
 public class TestAppleIIBus : IAppleIIBus
 {
     private readonly TestCpu _cpu = new();
-    private readonly MemoryPool _memory = new(new SystemStatusProvider());
+    private readonly MemoryPool _memory = new(new SystemStatusProvider(), new TestLanguageCard());
     private ulong _clockCounter = 0;
     private byte _keyValue = 0;
     private readonly bool[] _pushButtons = new bool[3];
@@ -254,7 +254,7 @@ public class TestFrameGenerator : IFrameGenerator
         var statusProvider = new SystemStatusProvider();
         return new RenderContext(
             new BitmapDataArray(),
-            new MemoryPool(statusProvider),
+            new MemoryPool(statusProvider, new TestLanguageCard()),
             statusProvider
         );
     }

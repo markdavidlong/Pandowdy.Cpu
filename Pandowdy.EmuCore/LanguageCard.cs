@@ -56,7 +56,7 @@ namespace Pandowdy.EmuCore
         ISystemRam? auxRam, 
         IMemory systemRom, 
         IFloatingBusProvider floatingBus,
-        ISystemStatusProvider status) : IMemory
+        ISystemStatusProvider status) : ILanguageCard
     {
         /// <summary>
         /// Required size for RAM banks (16KB total).

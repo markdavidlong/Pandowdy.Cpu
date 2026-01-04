@@ -1,4 +1,7 @@
 using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Tests.Helpers;
+using Emulator;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -23,7 +26,8 @@ public class MemoryPoolTests
     private static (MemoryPool Pool, SystemStatusProvider Status) BuildPool()
     {
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var langCard = new TestLanguageCard();
+        var pool = new MemoryPool(statusProvider, langCard);
         
         // Fill main and aux memory
         for (int i = 0; i < 65536; i++)
@@ -792,7 +796,8 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var langCard = LanguageCardTestFactory.CreateTestLanguageCard(statusProvider);
+        var pool = new MemoryPool(statusProvider, langCard);
         statusProvider.Mutate(b =>
         {
             b.StateUseBank1 = true;
@@ -824,7 +829,8 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var langCard = LanguageCardTestFactory.CreateTestLanguageCard(statusProvider);
+        var pool = new MemoryPool(statusProvider, langCard);
         statusProvider.Mutate(b =>
         {
             b.StateUseBank1 = false;  // Select Bank 2
@@ -851,13 +857,15 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
         byte[] testRom = new byte[0x4000]; // 16K ROM
         for (int i = 0; i < testRom.Length; i++)
         {
             testRom[i] = (byte)((i + 0x10) & 0xFF);
         }
-        pool.InstallApple2ROM(testRom);
+        
+        var langCard = LanguageCardTestFactory.CreateTestLanguageCard(statusProvider, testRom);
+        var pool = new MemoryPool(statusProvider, langCard);
+        pool.InstallApple2ROM(testRom); // Install I/O and slot ROM portions
         
         statusProvider.Mutate(b =>
         {
@@ -866,7 +874,9 @@ public class MemoryPoolTests
         });
 
         // Act - Read from ROM regions
+        // $D000 maps to ROM offset $1000
         byte valueD000 = pool.Read(0xD000);
+        // $E000 maps to ROM offset $2000  
         byte valueE000 = pool.Read(0xE000);
 
         // Assert - Should read from ROM
@@ -879,7 +889,8 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var langCard = LanguageCardTestFactory.CreateTestLanguageCard(statusProvider);
+        var pool = new MemoryPool(statusProvider, langCard);
         statusProvider.Mutate(b =>
         {
             b.StateUseBank1 = true;
@@ -907,7 +918,8 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var langCard = LanguageCardTestFactory.CreateTestLanguageCard(statusProvider);
+        var pool = new MemoryPool(statusProvider, langCard);
         statusProvider.Mutate(b =>
         {
             b.StateHighRead = true;
@@ -940,7 +952,8 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var langCard = LanguageCardTestFactory.CreateTestLanguageCard(statusProvider);
+        var pool = new MemoryPool(statusProvider, langCard);
         statusProvider.Mutate(b =>
         {
             b.StateHighRead = true;
@@ -948,22 +961,38 @@ public class MemoryPoolTests
             b.StateUseBank1 = true;
         });
 
-        // Act - Write to main language card
-        statusProvider.Mutate(b => b.StateAltZp = false);
+        // Act - Write to main language card (RAMWRT = false)
+        statusProvider.Mutate(b =>
+        {
+            b.StateAltZp = false; // Zero page selection (not Language Card!)
+            b.StateRamWrt = false; // Language Card uses main RAM
+        });
         pool.Write(0xD000, 0xAA);
         pool.Write(0xE000, 0xBB);
 
-        // Write to aux language card
-        statusProvider.Mutate(b => b.StateAltZp = true);
+        // Write to aux language card (RAMWRT = true)
+        statusProvider.Mutate(b =>
+        {
+            b.StateAltZp = true; // Zero page selection (not Language Card!)
+            b.StateRamWrt = true; // Language Card uses aux RAM
+        });
         pool.Write(0xD000, 0xCC);
         pool.Write(0xE000, 0xDD);
 
-        // Assert - Verify isolation
-        statusProvider.Mutate(b => b.StateAltZp = false);
+        // Assert - Verify isolation (RAMRD controls reads)
+        statusProvider.Mutate(b =>
+        {
+            b.StateAltZp = false;
+            b.StateRamRd = false; // Read from main
+        });
         Assert.Equal(0xAA, pool.Read(0xD000));
         Assert.Equal(0xBB, pool.Read(0xE000));
 
-        statusProvider.Mutate(b => b.StateAltZp = true);
+        statusProvider.Mutate(b =>
+        {
+            b.StateAltZp = true;
+            b.StateRamRd = true; // Read from aux
+        });
         Assert.Equal(0xCC, pool.Read(0xD000));
         Assert.Equal(0xDD, pool.Read(0xE000));
     }
@@ -977,7 +1006,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         statusProvider.Mutate(b => b.StateAltZp = false);
 
         // Act
@@ -1002,7 +1031,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         statusProvider.Mutate(b => b.StateAltZp = true);
 
         // Act
@@ -1027,7 +1056,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
 
         // Act - Write to main ZP
         statusProvider.Mutate(b => b.StateAltZp = false);
@@ -1063,7 +1092,6 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
         byte[] testRom = new byte[0x4000]; // 16K ROM
         
         for (int i = 0; i < testRom.Length; i++)
@@ -1071,17 +1099,25 @@ public class MemoryPoolTests
             testRom[i] = (byte)(i & 0xFF);
         }
 
-        // Act
-        pool.InstallApple2ROM(testRom);
+        // Extract the Language Card ROM portion ($D000-$FFFF maps to ROM offsets $1000-$3FFF)
+        byte[] langCardRom = new byte[0x4000];
+        Array.Copy(testRom, 0, langCardRom, 0, 0x4000); // Copy full ROM to Language Card
+        
+        var langCard = LanguageCardTestFactory.CreateTestLanguageCard(statusProvider, langCardRom);
+        var pool = new MemoryPool(statusProvider, langCard);
 
-        // Assert - Verify ROM accessible at $D000-$FFFF
+        // Act
+        pool.InstallApple2ROM(testRom); // This installs I/O and internal ROM slots
+
+        // Assert - Verify ROM accessible at $D000-$FFFF through Language Card
         statusProvider.Mutate(b => b.StateHighRead = false); // Read from ROM
         
-        Assert.Equal(0x00, pool.Read(0xD000));
-        Assert.Equal(0x01, pool.Read(0xD001));
-        Assert.Equal(0xFF, pool.Read(0xD0FF));
-        Assert.Equal(0x00, pool.Read(0xE000));
-        Assert.Equal(0x01, pool.Read(0xE001));
+        // Language Card ROM starts at offset $1000 in the ROM image
+        Assert.Equal(testRom[0x1000], pool.Read(0xD000));
+        Assert.Equal(testRom[0x1001], pool.Read(0xD001));
+        Assert.Equal(testRom[0x10FF], pool.Read(0xD0FF));
+        Assert.Equal(testRom[0x2000], pool.Read(0xE000));
+        Assert.Equal(testRom[0x2001], pool.Read(0xE001));
     }
 
     [Fact]
@@ -1089,7 +1125,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         byte[] wrongSizeRom = new byte[0x3000]; // Wrong size
 
         // Act & Assert
@@ -1102,7 +1138,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         byte[] testRom = new byte[0x4000];
         
         for (int i = 0; i < testRom.Length; i++)
@@ -1130,7 +1166,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         
         // Change settings
         statusProvider.Mutate(b =>
@@ -1168,7 +1204,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
 
         // Assert
         Assert.Equal(0x10000, pool.Size);
@@ -1179,7 +1215,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
 
         // Act
         pool[0x1000] = 0x42;
@@ -1195,7 +1231,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         statusProvider.Mutate(b =>
         {
             b.StateRamRd = true;
@@ -1250,7 +1286,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         bool eventRaised = false;
         ushort capturedAddress = 0;
         byte? capturedValue = null;
@@ -1276,7 +1312,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         bool eventRaised = false;
 
         pool.MemoryWritten += (sender, args) => eventRaised = true;
@@ -1293,7 +1329,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         int eventCount = 0;
         var addresses = new List<ushort>();
 
@@ -1318,7 +1354,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         object? capturedSender = null;
 
         pool.MemoryWritten += (sender, args) => capturedSender = sender;
@@ -1335,7 +1371,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         bool eventRaised = false;
 
         pool.MemoryWritten += (sender, args) => eventRaised = true;
@@ -1354,7 +1390,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         int subscriber1Count = 0;
         int subscriber2Count = 0;
         byte? subscriber1Value = null;
@@ -1391,7 +1427,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         ushort capturedAddress = 0;
         byte? capturedValue = null;
 
@@ -1414,7 +1450,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         ushort capturedAddress = 0;
 
         pool.MemoryWritten += (sender, args) => capturedAddress = args.Address;
@@ -1431,7 +1467,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         ushort capturedAddress = 0;
 
         pool.MemoryWritten += (sender, args) => capturedAddress = args.Address;
@@ -1448,7 +1484,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
         var writtenAddresses = new List<ushort>();
 
         pool.MemoryWritten += (sender, args) => writtenAddresses.Add(args.Address);
@@ -1482,7 +1518,7 @@ public class MemoryPoolTests
     {
         // Arrange
         var statusProvider = new SystemStatusProvider();
-        var pool = new MemoryPool(statusProvider);
+        var pool = new MemoryPool(statusProvider, new TestLanguageCard());
 
         // Act & Assert - Should not throw
         pool.Dispose();

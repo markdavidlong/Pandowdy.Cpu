@@ -354,7 +354,8 @@ namespace Pandowdy.EmuCore
             Region_C700_C7FF = 0xC700,
             Region_C800_CFFF = 0xC800,
             Region_D000_DFFF = 0xD000,
-            Region_E000_FFFF = 0xE000
+            Region_E000_FFFF = 0xE000,
+            Region_NA = 0xFFFFFF
         }
 
 
@@ -419,10 +420,14 @@ namespace Pandowdy.EmuCore
 
         ISystemStatusProvider _status;
 
-        public MemoryPool(ISystemStatusProvider status, int poolSize = 0x27F00, bool randomInit = false)
+        ILanguageCard _langCard;
+
+        public MemoryPool(ISystemStatusProvider status, ILanguageCard langCard, int poolSize = 0x27F00, bool randomInit = false)
         {
             ArgumentNullException.ThrowIfNull(status);
+            ArgumentNullException.ThrowIfNull(langCard);
             _status = status;
+            _langCard = langCard;
 
             // Subscribe to memory mapping changes
             _status.MemoryMappingChanged += OnMemoryMappingChanged;
@@ -610,8 +615,10 @@ namespace Pandowdy.EmuCore
 
         public byte ReadMapped(ushort address) => address switch
         {
-            >= (ushort) Ranges.Region_E000_FFFF => ReadFromRegion(Ranges.Region_E000_FFFF, address),
-            >= (ushort) Ranges.Region_D000_DFFF => ReadFromRegion(Ranges.Region_D000_DFFF, address),
+            //>= (ushort) Ranges.Region_E000_FFFF => ReadFromRegion(Ranges.Region_E000_FFFF, address),
+            //>= (ushort) Ranges.Region_D000_DFFF => ReadFromRegion(Ranges.Region_D000_DFFF, address),
+            >= (ushort) Ranges.Region_E000_FFFF => _langCard.Read(address),
+            >= (ushort) Ranges.Region_D000_DFFF => _langCard.Read(address),
             >= (ushort) Ranges.Region_C800_CFFF => ReadFromRegion(Ranges.Region_C800_CFFF, address),
             >= (ushort) Ranges.Region_C700_C7FF => ReadFromRegion(Ranges.Region_C700_C7FF, address),
             >= (ushort) Ranges.Region_C600_C6FF => ReadFromRegion(Ranges.Region_C600_C6FF, address),
@@ -635,8 +642,10 @@ namespace Pandowdy.EmuCore
 
             var range = address switch
             {
-                >= (ushort) Ranges.Region_E000_FFFF => Ranges.Region_E000_FFFF,
-                >= (ushort) Ranges.Region_D000_DFFF => Ranges.Region_D000_DFFF,
+              //  >= (ushort) Ranges.Region_E000_FFFF => Ranges.Region_E000_FFFF,
+              //  >= (ushort) Ranges.Region_D000_DFFF => Ranges.Region_D000_DFFF,
+                >= (ushort) Ranges.Region_E000_FFFF => Ranges.Region_NA,
+                >= (ushort) Ranges.Region_D000_DFFF => Ranges.Region_NA,
                 >= (ushort) Ranges.Region_C800_CFFF => Ranges.Region_C800_CFFF,
                 >= (ushort) Ranges.Region_C700_C7FF => Ranges.Region_C700_C7FF,
                 >= (ushort) Ranges.Region_C600_C6FF => Ranges.Region_C600_C6FF,
@@ -654,7 +663,15 @@ namespace Pandowdy.EmuCore
                 >= (ushort) Ranges.Region_0200_03FF => Ranges.Region_0200_03FF,
                 _ => Ranges.Region_0000_01FF
             };
-            var validWrite = WriteToRegion(range, address, value);
+            var validWrite = true;
+            if (range != Ranges.Region_NA)
+            {
+                validWrite = WriteToRegion(range, address, value);
+            }
+            else
+            {
+                _langCard.Write(address, value);
+            }
             if (!validWrite)
             {
            //     Debug.WriteLine($"Write to unmapped address {address:X4} ignored."); return;

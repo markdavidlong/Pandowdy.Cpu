@@ -1,6 +1,7 @@
 using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Tests.Helpers;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -37,7 +38,7 @@ public class VA2MBusTests
         public VA2MBusFixture()
         {
             StatusProvider = new SystemStatusProvider();
-            MemoryPool = new MemoryPool(StatusProvider);
+            MemoryPool = new MemoryPool(StatusProvider, new TestLanguageCard());
             Cpu = new CPUAdapter(new CPU());
             Bus = new VA2MBus(MemoryPool, StatusProvider, Cpu);
         }
@@ -52,7 +53,7 @@ public class VA2MBusTests
     {
         // Arrange
         var status = new SystemStatusProvider();
-        var mempool = new MemoryPool(status);
+        var mempool = new MemoryPool(status, new TestLanguageCard());
         var cpu = new CPUAdapter(new CPU());
 
         // Act
@@ -69,7 +70,7 @@ public class VA2MBusTests
     {
         // Arrange
         var status = new SystemStatusProvider();
-        var mempool = new MemoryPool(status);
+        var mempool = new MemoryPool(status, new TestLanguageCard());
         var cpu = new CPUAdapter(new CPU());
 
         // Act & Assert
@@ -81,7 +82,7 @@ public class VA2MBusTests
     {
         // Arrange
         var status = new SystemStatusProvider();
-        var mempool = new MemoryPool(status);
+        var mempool = new MemoryPool(status, new TestLanguageCard());
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => new VA2MBus(mempool, status, null!));

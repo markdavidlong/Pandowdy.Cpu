@@ -87,7 +87,7 @@ namespace Pandowdy
                     services.AddKeyedTransient<ISystemRam>("48K", (sp, key) => new MemoryBlock(0xC000));
                     
                     // Language Card - uses two 16KB RAM blocks
-                    services.AddSingleton<LanguageCard>(sp =>
+                    services.AddSingleton<ILanguageCard,LanguageCard>(sp =>
                     {
                         var mainRam = sp.GetRequiredKeyedService<ISystemRam>("16K");    // 16KB main RAM
                         var auxRam = sp.GetRequiredKeyedService<ISystemRam>("16K");     // 16KB aux RAM
