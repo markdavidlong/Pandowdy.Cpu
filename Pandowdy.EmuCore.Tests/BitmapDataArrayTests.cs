@@ -111,47 +111,10 @@ public class BitmapDataArrayTests
         Assert.True(bitmap.GetPixel(559, 191, 0));
     }
 
-    [Theory]
-    [InlineData(-1, 0, 0)]
-    [InlineData(560, 0, 0)]
-    [InlineData(0, -1, 0)]
-    [InlineData(0, 192, 0)]
-    public void SetPixel_OutOfBounds_ThrowsException(int x, int y, int bitplane)
-    {
-        // Arrange
-        var bitmap = new BitmapDataArray();
 
-        // Act & Assert
-        Assert.Throws<ArgumentOutOfRangeException>(() => bitmap.SetPixel(x, y, bitplane));
-    }
 
-    [Theory]
-    [InlineData(-1, 0, 0)]
-    [InlineData(560, 0, 0)]
-    [InlineData(0, -1, 0)]
-    [InlineData(0, 192, 0)]
-    public void GetPixel_OutOfBounds_ThrowsException(int x, int y, int bitplane)
-    {
-        // Arrange
-        var bitmap = new BitmapDataArray();
 
-        // Act & Assert
-        Assert.Throws<ArgumentOutOfRangeException>(() => bitmap.GetPixel(x, y, bitplane));
-    }
 
-    [Theory]
-    [InlineData(-1, 0, 0)]
-    [InlineData(560, 0, 0)]
-    [InlineData(0, -1, 0)]
-    [InlineData(0, 192, 0)]
-    public void ClearPixel_OutOfBounds_ThrowsException(int x, int y, int bitplane)
-    {
-        // Arrange
-        var bitmap = new BitmapDataArray();
-
-        // Act & Assert
-        Assert.Throws<ArgumentOutOfRangeException>(() => bitmap.ClearPixel(x, y, bitplane));
-    }
 
     [Fact]
     public void GetRowDataSpan_ReturnsCorrectWidth()

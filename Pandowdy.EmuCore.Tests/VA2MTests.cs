@@ -204,6 +204,7 @@ public class VA2MTests
 
         // Act
         va2m.Reset();
+        va2m.Clock(); // Process pending queue
 
         // Assert
         Assert.Equal(1, testBus.ResetCount);
@@ -219,15 +220,21 @@ public class VA2MTests
             .Build();
 
         // Advance clock
-        testBus.Clock();
-        testBus.Clock();
-        testBus.Clock();
+        va2m.Clock();
+        va2m.Clock();
+        va2m.Clock();
+        Assert.Equal(3UL, va2m.SystemClock); // Verify we're at 3 cycles
 
         // Act
-        va2m.Reset();
+        va2m.Reset(); // Enqueues reset operation
+        
+        // Process pending queue - this will execute the reset AND increment bus clock by 1
+        // After reset executes: SystemClock = 0
+        // After Bus.Clock() in va2m.Clock(): SystemClock = 1
+        va2m.Clock();
 
-        // Assert
-        Assert.Equal(0UL, va2m.SystemClock);
+        // Assert - Clock is at 1 because va2m.Clock() both processes reset and increments
+        Assert.Equal(1UL, va2m.SystemClock);
     }
 
     #endregion
@@ -528,7 +535,7 @@ public class VA2MTests
         va2m.Reset();
         for (int i = 0; i < 100; i++)
         {
-            va2m.Clock();
+            va2m.Clock(); // First Clock() processes the Reset, subsequent ones execute normally
         }
 
         // Assert
