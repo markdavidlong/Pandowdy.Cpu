@@ -133,11 +133,6 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// Caps lock emulation state (default ON for Apple IIe authenticity).
     /// </summary>
     private bool _capsLockEnabled = true;
-    
-    /// <summary>
-    /// Soft switch status panel visibility state (default visible).
-    /// </summary>
-    private bool _showSoftSwitchStatus = true;
 
     #endregion
 
@@ -152,27 +147,6 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// The Apple IIe keyboard was uppercase-only, so this defaults to true for authenticity.
     /// </remarks>
     public bool IsCapsLockEnabledForInput => _capsLockEnabled;
-    
-    /// <summary>
-    /// Gets or sets whether the soft switch status panel is visible.
-    /// </summary>
-    /// <value>True to show the panel, false to hide it.</value>
-    /// <remarks>
-    /// Controls the visibility of the panel displaying Apple IIe soft switch states
-    /// (memory mapping, video modes, pushbuttons, etc.). Persisted to settings file.
-    /// </remarks>
-    public bool ShowSoftSwitchStatus
-    {
-        get => _showSoftSwitchStatus;
-        set
-        {
-            if (_showSoftSwitchStatus != value)
-            {
-                _showSoftSwitchStatus = value;
-                UpdateSoftSwitchStatusVisibility();
-            }
-        }
-    }
 
     #endregion
 
@@ -393,6 +367,13 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                         }
                     });
                 disposables.Add(s6);
+                var s7 = vm.WhenAnyValue(x => x.ShowSoftSwitchStatus)
+                    .ObserveOn(RxApp.MainThreadScheduler)
+                    .Subscribe(v =>
+                    {
+                        UpdateSoftSwitchStatusVisibility(v);
+                    });
+                disposables.Add(s7);
 
                 // Bridge emulator commands to actions
                 var c1 = vm.StartEmu.Subscribe(_ => OnEmuStartClicked(this, new RoutedEventArgs()));
@@ -424,16 +405,17 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <summary>
     /// Updates the visibility of the soft switch status panel based on current setting.
     /// </summary>
+    /// <param name="isVisible">Whether the panel should be visible.</param>
     /// <remarks>
     /// Finds the SoftSwitchStatusPanel control via x:Name or FindControl fallback and
-    /// sets its IsVisible property to match _showSoftSwitchStatus.
+    /// sets its IsVisible property to match the provided value.
     /// </remarks>
-    private void UpdateSoftSwitchStatusVisibility()
+    private void UpdateSoftSwitchStatusVisibility(bool isVisible)
     {
         var statusPanel = SoftSwitchStatusPanel ?? this.FindControl<SoftSwitchStatusPanel>("SoftSwitchStatusPanel");
         if (statusPanel != null)
         {
-            statusPanel.IsVisible = _showSoftSwitchStatus;
+            statusPanel.IsVisible = isVisible;
         }
     }
     
@@ -711,8 +693,20 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <param name="sender">Event sender (menu item or command).</param>
     /// <param name="e">Routed event arguments.</param>
     /// <remarks>
-    /// Calls machine.UserReset() which performs a warm reset of the Apple IIe
-    /// (similar to pressing Ctrl+Reset on real hardware). Does not stop/restart the emulator thread.
+    /// <para>
+    /// <strong>Thread Safety:</strong> Calls machine.UserReset() which enqueues the reset
+    /// operation for execution on the emulator thread at the next instruction boundary.
+    /// This is safe to call from the UI thread.
+    /// </para>
+    /// <para>
+    /// <strong>Warm Reset:</strong> Performs a warm reset of the Apple IIe (similar to
+    /// pressing Ctrl+Reset on real hardware). Preserves memory contents and continues timing.
+    /// Does not stop/restart the emulator thread.
+    /// </para>
+    /// <para>
+    /// <strong>Instruction Atomicity:</strong> The reset will be deferred until the current
+    /// CPU instruction completes, maintaining 6502 atomic instruction guarantees.
+    /// </para>
     /// </remarks>
     private void OnEmuResetClicked(object? sender, RoutedEventArgs e) 
     { 
@@ -823,14 +817,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 if (data.ForceMonochrome.HasValue) { ViewModel.ForceMonochrome = data.ForceMonochrome.Value; }
                 if (data.DecreaseContrast.HasValue) { ViewModel.DecreaseContrast = data.DecreaseContrast.Value; }
                 if (data.ThrottleEnabled.HasValue) { ViewModel.ThrottleEnabled = data.ThrottleEnabled.Value; } else { ViewModel.ThrottleEnabled = true; }
-            }
-            if (data.ShowSoftSwitchStatus.HasValue) 
-            { 
-                ShowSoftSwitchStatus = data.ShowSoftSwitchStatus.Value; 
-            }
-            else 
-            { 
-                ShowSoftSwitchStatus = true; 
+                if (data.ShowSoftSwitchStatus.HasValue) { ViewModel.ShowSoftSwitchStatus = data.ShowSoftSwitchStatus.Value; } else { ViewModel.ShowSoftSwitchStatus = true; }
             }
         }
         catch { }
@@ -874,7 +861,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 DecreaseContrast = ViewModel?.DecreaseContrast,
                 ForceMonochrome = ViewModel?.ForceMonochrome,
                 ThrottleEnabled = ViewModel?.ThrottleEnabled,
-                ShowSoftSwitchStatus = ShowSoftSwitchStatus,
+                ShowSoftSwitchStatus = ViewModel?.ShowSoftSwitchStatus,
             };
 #pragma warning disable CA1869 // Cache and reuse 'JsonSerializerOptions' instances
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
@@ -939,19 +926,6 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// Closes the window, triggering the OnClosed event which handles cleanup and settings save.
     /// </remarks>
     private void OnQuitClicked(object? sender, RoutedEventArgs e) => Close();
-    
-    /// <summary>
-    /// Handles the View > Soft Switch Status menu command.
-    /// </summary>
-    /// <param name="sender">Event sender (menu item).</param>
-    /// <param name="e">Routed event arguments.</param>
-    /// <remarks>
-    /// Toggles the visibility of the soft switch status panel.
-    /// </remarks>
-    private void OnToggleSoftSwitchStatusClicked(object? sender, RoutedEventArgs e)
-    {
-        ShowSoftSwitchStatus = !ShowSoftSwitchStatus;
-    }
 
     /// <summary>
     /// Handles key down events at the window level (before routing to child controls).
@@ -1114,7 +1088,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     ViewModel?.ToggleMonoMixed.Execute().Subscribe();
                     return true;
                 case Key.W:
-                    ShowSoftSwitchStatus = !ShowSoftSwitchStatus;
+                    ViewModel?.ToggleSoftSwitchStatus.Execute().Subscribe();
                     return true;
                 case Key.F4:
                     Close();

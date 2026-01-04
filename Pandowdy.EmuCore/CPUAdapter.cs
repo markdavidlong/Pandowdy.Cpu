@@ -53,7 +53,8 @@ namespace Pandowdy.EmuCore
     /// </para>
     /// <para>
     /// <strong>Connection Pattern:</strong> The legacy CPU uses a "Connect-Execute-Disconnect"
-    /// pattern:
+    /// pattern for each bus operation. The bus connection is temporary and scoped to the
+    /// operation lifetime:
     /// <code>
     /// _oldCpu.Connect(bus);    // Connect to bus
     /// _oldCpu.Clock();         // Execute operation
@@ -61,6 +62,13 @@ namespace Pandowdy.EmuCore
     /// </code>
     /// This pattern is repeated for every bus operation (Clock, Reset, interrupts), adding
     /// overhead compared to a native implementation that would hold a bus reference.
+    /// </para>
+    /// <para>
+    /// <strong>Thread Safety:</strong> Thread safety is guaranteed by VA2M's command queue
+    /// architecture. All CPU operations are serialized on the emulator thread and executed
+    /// at instruction boundaries via ProcessPending(). This ensures the Connect-Disconnect
+    /// pattern cannot be interrupted by operations from other threads, eliminating race
+    /// conditions.
     /// </para>
     /// <para>
     /// <strong>Performance Considerations:</strong> The connection overhead is minimal but
@@ -200,12 +208,19 @@ namespace Pandowdy.EmuCore
         /// <strong>Connection Pattern:</strong> Uses the Connect-Execute-Disconnect pattern
         /// required by the legacy CPU. The bus connection is temporary and released after reset.
         /// </para>
+        /// <para>
+        /// <strong>Thread Safety:</strong> Thread safety is guaranteed by VA2M's command queue,
+        /// which ensures this method executes serially on the emulator thread at instruction
+        /// boundaries. No race conditions can occur.
+        /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Reset(IAppleIIBus bus)
         {
+            ArgumentNullException.ThrowIfNull(bus);
             _oldCpu.Connect(bus);
             _oldCpu.Reset();
-            _oldCpu.Connect(null);  // Disconnect after reset
+            _oldCpu.Connect(null);
         }
 
         /// <summary>
@@ -230,6 +245,7 @@ namespace Pandowdy.EmuCore
         /// <strong>Direct Delegation:</strong> Simply forwards to the wrapped CPU's method.
         /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsInstructionComplete()
         {
             return _oldCpu.IsInstructionComplete();
@@ -261,12 +277,19 @@ namespace Pandowdy.EmuCore
         /// <strong>Connection Pattern:</strong> Uses the Connect-Execute-Disconnect pattern
         /// required by the legacy CPU.
         /// </para>
+        /// <para>
+        /// <strong>Thread Safety:</strong> Thread safety is guaranteed by VA2M's command queue,
+        /// which ensures this method executes serially on the emulator thread at instruction
+        /// boundaries.
+        /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void InterruptRequest(IAppleIIBus bus)
         {
+            ArgumentNullException.ThrowIfNull(bus);
             _oldCpu.Connect(bus);
             _oldCpu.InterruptRequest();
-            _oldCpu.Connect(null);  // Disconnect after IRQ
+            _oldCpu.Connect(null);
         }
 
         /// <summary>
@@ -295,12 +318,19 @@ namespace Pandowdy.EmuCore
         /// <strong>Connection Pattern:</strong> Uses the Connect-Execute-Disconnect pattern
         /// required by the legacy CPU.
         /// </para>
+        /// <para>
+        /// <strong>Thread Safety:</strong> Thread safety is guaranteed by VA2M's command queue,
+        /// which ensures this method executes serially on the emulator thread at instruction
+        /// boundaries.
+        /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void NonMaskableInterrupt(IAppleIIBus bus)
         {
+            ArgumentNullException.ThrowIfNull(bus);
             _oldCpu.Connect(bus);
             _oldCpu.NonMaskableInterrupt();
-            _oldCpu.Connect(null);  // Disconnect after NMI
+            _oldCpu.Connect(null);
         }
 
         /// <summary>
@@ -328,12 +358,20 @@ namespace Pandowdy.EmuCore
         /// so the connection overhead is most noticeable here. The native replacement will
         /// eliminate this overhead.
         /// </para>
+        /// <para>
+        /// <strong>Thread Safety:</strong> Thread safety is guaranteed by VA2M's architecture.
+        /// This method is only ever called from the emulator thread (via Bus.Clock() in VA2M.RunAsync()
+        /// or VA2M.Clock()). All external operations are queued and executed at instruction boundaries
+        /// via ProcessPending(), ensuring serial execution with no race conditions.
+        /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clock(IAppleIIBus bus)
         {
+            ArgumentNullException.ThrowIfNull(bus);
             _oldCpu.Connect(bus);
             _oldCpu.Clock();
-            _oldCpu.Connect(null);  // Disconnect after each clock cycle
+            _oldCpu.Connect(null);
         }
 
         /// <summary>

@@ -25,7 +25,7 @@
 				<MenuItem x:Name="MonoMixedMenuItem" Header="_Monochrome Mixed Text" ToggleType="CheckBox" IsChecked="{Binding MonoMixed}" Command="{Binding ToggleMonoMixed}" InputGesture="Alt+X" />
 				<MenuItem x:Name="DecreaseContrastMenuItem" Header="_Decrease Color Fringing" ToggleType="CheckBox" IsChecked="{Binding DecreaseContrast}" Command="{Binding ToggleDecreaseContrast}" InputGesture="Alt+D"/>
 				<Separator/>
-				<MenuItem x:Name="ShowSoftSwitchStatusMenuItem" Header="Show SoftS_witch Status" ToggleType="CheckBox" IsChecked="{Binding ShowSoftSwitchStatus, RelativeSource={RelativeSource AncestorType=local:MainWindow}}" Click="OnToggleSoftSwitchStatusClicked" InputGesture="Alt+W"/>
+				<MenuItem x:Name="ShowSoftSwitchStatusMenuItem" Header="Show SoftS_witch Status" ToggleType="CheckBox" IsChecked="{Binding ShowSoftSwitchStatus}" Command="{Binding ToggleSoftSwitchStatus}" InputGesture="Alt+W"/>
 			</MenuItem>
 			<MenuItem Header="_Emulator">
 				<MenuItem Header="_Start" Command="{Binding StartEmu}" InputGesture="F5" />

@@ -293,6 +293,31 @@ public sealed class MainWindowViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _monoMixed, value);
     }
 
+    /// <summary>
+    /// Backing field for ShowSoftSwitchStatus property.
+    /// </summary>
+    private bool _showSoftSwitchStatus = true;
+    
+    /// <summary>
+    /// Gets or sets whether the soft switch status panel is visible.
+    /// </summary>
+    /// <value>True to show the status panel, false to hide it.</value>
+    /// <remarks>
+    /// <para>
+    /// Controls the visibility of the right-side panel displaying Apple IIe soft switch
+    /// states (memory mapping, video modes, ROM selection, annunciators, pushbuttons).
+    /// </para>
+    /// <para>
+    /// Users can toggle this to maximize screen space for the display or show detailed
+    /// system status for debugging and learning.
+    /// </para>
+    /// </remarks>
+    public bool ShowSoftSwitchStatus
+    {
+        get => _showSoftSwitchStatus;
+        set => this.RaiseAndSetIfChanged(ref _showSoftSwitchStatus, value);
+    }
+
     #endregion
 
     #region Display Options Toggle Commands
@@ -356,6 +381,16 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// which the view observes to control mixed mode color rendering.
     /// </remarks>
     public ReactiveCommand<Unit, Unit> ToggleMonoMixed { get; }
+    
+    /// <summary>
+    /// Gets the command to toggle soft switch status panel visibility on/off.
+    /// </summary>
+    /// <value>Command that inverts the ShowSoftSwitchStatus property.</value>
+    /// <remarks>
+    /// Bound to menu item or keyboard shortcut. Updates <see cref="ShowSoftSwitchStatus"/>
+    /// which the view observes to control status panel visibility.
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> ToggleSoftSwitchStatus { get; }
 
     #endregion
 
@@ -421,6 +456,7 @@ public sealed class MainWindowViewModel : ReactiveObject
         ToggleMonochrome = ReactiveCommand.Create(() => { ForceMonochrome = !ForceMonochrome; });
         ToggleDecreaseContrast = ReactiveCommand.Create(() => { DecreaseContrast = !DecreaseContrast; });
         ToggleMonoMixed = ReactiveCommand.Create(() => { MonoMixed = !MonoMixed; });
+        ToggleSoftSwitchStatus = ReactiveCommand.Create(() => { ShowSoftSwitchStatus = !ShowSoftSwitchStatus; });
 
         // Initialize placeholder emulator commands (view handles actual logic)
         StartEmu = ReactiveCommand.Create(() => { });

@@ -961,17 +961,17 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
             _currKey &= 0x7f; // Clear high byte;
             return;
         }
-        if (address >= TAPEOUT_ && address <= TAPEOUT_ + 0x0F)
+        if (address >= TAPEOUT_ && address <= END_TAPEOUT_RD_)
         {
             Debug.WriteLine($"TAPEOUT not implemented yet (Write to {address:X4})");
             return;
         }
-        if (address >= SPKR_ && address <= KEYSTRB_ + 0x0F)
+        if (address >= SPKR_ && address <= END_SPKR_RD_ )
         {
-            Debug.WriteLine($"SPKR not implemented yet (Write to {address:X4})");
+         //   Debug.WriteLine($"SPKR not implemented yet (Write to {address:X4})");
             return;
         }
-        if (address >= STROBE_ && address <= STROBE_ + 0x0F)
+        if (address >= STROBE_ && address <= END_STROBE_RD_)
         {
             Debug.WriteLine($"STROBE not implemented yet (Write to {address:X4})");
             return;

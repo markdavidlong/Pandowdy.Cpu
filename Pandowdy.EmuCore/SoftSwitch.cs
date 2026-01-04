@@ -64,6 +64,7 @@
 //------------------------------------------------------------------------------
 
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore
@@ -82,7 +83,7 @@ namespace Pandowdy.EmuCore
     /// useful for debugging and performance analysis.
     /// </para>
     /// </remarks>
-    public sealed class SoftSwitch(string name) : CountableBool
+    public sealed class SoftSwitch(string name) // : CountableBool
     {
         /// <summary>
         /// Gets the human-readable name of this soft switch (e.g., "80STORE", "RAMRD", "TEXT").
@@ -90,11 +91,27 @@ namespace Pandowdy.EmuCore
         /// <value>The switch name, typically matching Apple IIe documentation conventions.</value>
         public string Name { get; private set; } = name;
 
+        public bool Value { get; set; }
+
+        public int Count { get => 0;  }
+
+        public void ResetCount() { }
+
+        public void Clear() { }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Set(bool val = true) { Value = val; }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Get() { return Value; }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Toggle() { Value = !Value; }
+
         /// <summary>
         /// Returns a string representation of the soft switch showing its name and current state.
         /// </summary>
         /// <returns>A string in the format "SwitchName: True/False".</returns>
-        public override string ToString() => $"{Name}: {base.Value}";
+       // public override string ToString() => $"{Name}: {base.Value}";
     }
 
     /// <summary>

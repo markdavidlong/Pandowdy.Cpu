@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Pandowdy.EmuCore
 {
     /// <summary>
@@ -94,6 +96,7 @@ namespace Pandowdy.EmuCore
         /// index and the valid range (0-15 bits).
         /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void CheckIndex(int index)
         {
             if ((uint)index >= BitWidth)
@@ -133,6 +136,7 @@ namespace Pandowdy.EmuCore
         /// </code>
         /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly bool GetBit(int index)
         {
             CheckIndex(index);
@@ -181,6 +185,7 @@ namespace Pandowdy.EmuCore
         /// compiles to a handful of CPU instructions. Highly efficient for managing packed flags.
         /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetBit(int index, bool state)
         {
             CheckIndex(index);

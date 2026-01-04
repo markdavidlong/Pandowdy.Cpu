@@ -491,11 +491,17 @@ public class Apple2Display : Control
                         if (!_frameProvider.IsGraphics || ForceMono || 
                             (_frameProvider.IsGraphics && _frameProvider.IsMixed && DefringeMixedText && y >= 160))
                         {
-                            RenderMonochromeLine(dst, stridePixels, outYTop, _lastFrame.GetBitplaneSpanForRow(y, ActiveBitPlane), ShowScanLines);
+                            RenderMonochromeLine(dst, stridePixels, outYTop,
+                              //  _lastFrame.GetBitplaneSpanForRow(y, ActiveBitPlane),
+                              _lastFrame.GetRowDataSpan(y),
+                                ShowScanLines);
                         }
                         else
                         {
-                            RenderNtscLine(dst, stridePixels, outYTop, _lastFrame.GetBitplaneSpanForRow(y, ActiveBitPlane), ShowScanLines);
+                            RenderNtscLine(dst, stridePixels, outYTop,
+                                //_lastFrame.GetBitplaneSpanForRow(y, ActiveBitPlane),
+                                _lastFrame.GetRowDataSpan(y),
+                                ShowScanLines);
                         }
                     }
                 }
@@ -548,11 +554,11 @@ public class Apple2Display : Control
     /// keeping 3/4 of original value).
     /// </para>
     /// </remarks>
-    static private unsafe void RenderMonochromeLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
+    static private unsafe void RenderMonochromeLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<BitField16> lineData, bool showScanLines)
     {
         for (int xPos = -3; xPos < lineData.Length; xPos++)
         {
-            bool on = xPos >=0 && lineData[xPos]; // simplified for full byte
+            bool on = xPos >=0 && ((lineData[xPos].Value & 0x01) == 0x01); // simplified for full byte
             if (xPos <= stridePixels)
             {
                 uint color = on ? 0xFFFFFFFFu : 0xFF000000u;
@@ -593,7 +599,9 @@ public class Apple2Display : Control
     /// readability.
     /// </para>
     /// </remarks>
-    private unsafe void RenderNtscLine(byte* dst, int stridePixels, int outYTop, ReadOnlySpan<bool> lineData, bool showScanLines)
+    private unsafe void RenderNtscLine(byte* dst, int stridePixels, int outYTop,
+ReadOnlySpan<BitField16> lineData,
+bool showScanLines)
     {
         bool neg1 = false;
         bool neg2 = false;
@@ -601,10 +609,10 @@ public class Apple2Display : Control
         for (int xPos = -3; xPos < lineData.Length; xPos++)
         {
             var bits = new bool[4];
-            bits[0] = xPos >= 0 && lineData[xPos + 0];
-            bits[1] = xPos + 1 >= 0 && (xPos + 1 < lineData.Length) && lineData[xPos + 1];
-            bits[2] = xPos + 2 >= 0 && (xPos + 2 < lineData.Length) && lineData[xPos + 2];
-            bits[3] = xPos + 3 >= 0 && (xPos + 3 < lineData.Length) && lineData[xPos + 3];
+            bits[0] = xPos >= 0 && ((lineData[xPos].Value & 0x01) == 0x01);
+            bits[1] = xPos + 1 >= 0 && (xPos + 1 < lineData.Length) && ((lineData[xPos+1].Value & 0x01) == 0x01);
+            bits[2] = xPos + 2 >= 0 && (xPos + 2 < lineData.Length) && ((lineData[xPos + 2].Value & 0x01) == 0x01);
+            bits[3] = xPos + 3 >= 0 && (xPos + 3 < lineData.Length) && ((lineData[xPos + 3].Value & 0x01) == 0x01);
             var phase = (byte)(xPos % 4);
 
             if (xPos <= stridePixels)

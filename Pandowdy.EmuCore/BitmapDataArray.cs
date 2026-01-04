@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Pandowdy.EmuCore
 {
     /// <summary>
@@ -131,6 +133,7 @@ namespace Pandowdy.EmuCore
         /// to prepare for rendering.
         /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
             Array.Clear(_data, 0, _data.Length);
@@ -160,7 +163,12 @@ namespace Pandowdy.EmuCore
         /// Pixel (100, 50) → offset 100 + (50 × 560) = 28,100
         /// </code>
         /// </para>
+        /// <para>
+        /// <strong>Performance:</strong> Marked with <see cref="MethodImplOptions.AggressiveInlining"/>
+        /// to ensure the JIT compiler inlines this hot-path method, eliminating method call overhead.
+        /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int CalcOffset(int x, int y)
         {
             return x + y * _width;
@@ -179,6 +187,7 @@ namespace Pandowdy.EmuCore
         /// which coordinate is out of range. Called by all pixel access methods before
         /// touching the underlying array.
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void CheckXY(int x, int y)
         {
             if (x < 0 || x >= _width)
@@ -202,6 +211,7 @@ namespace Pandowdy.EmuCore
         /// Used by row-based access methods (<see cref="GetRowDataSpan"/>, <see cref="GetBitplaneSpanForRow"/>)
         /// which operate on entire scanlines rather than individual pixels.
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void CheckRow(int row)
         {
             if (row < 0 || row >= _height)
@@ -236,9 +246,10 @@ namespace Pandowdy.EmuCore
         /// </code>
         /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetPixel(int x, int y, int bitplane)
         {
-            CheckXY(x, y);
+         //   CheckXY(x, y);
             _data[CalcOffset(x, y)].SetBit(bitplane, true);
         }
 
@@ -268,9 +279,10 @@ namespace Pandowdy.EmuCore
         /// </code>
         /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ClearPixel(int x, int y, int bitplane)
         {
-            CheckXY(x, y);
+         //   CheckXY(x, y);
             _data[CalcOffset(x, y)].SetBit(bitplane, false);
         }
 
@@ -301,9 +313,10 @@ namespace Pandowdy.EmuCore
         /// </code>
         /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool GetPixel(int x, int y, int bitplane)
         {
-            CheckXY(x, y);
+        //    CheckXY(x, y);
             return _data[CalcOffset(x, y)].GetBit(bitplane);
         }
 
@@ -349,7 +362,7 @@ namespace Pandowdy.EmuCore
         /// </remarks>
         public ReadOnlySpan<bool> GetBitplaneSpanForRow(int row, int bitplane)
         {
-            CheckRow(row);
+           // CheckRow(row);
             var raw = GetRowDataSpan(row);
             bool[] pixels = new bool[_width];
             
@@ -401,6 +414,7 @@ namespace Pandowdy.EmuCore
         /// </code>
         /// </para>
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ReadOnlySpan<BitField16> GetRowDataSpan(int row)
         {
             if (row < 0 || row >= _height)

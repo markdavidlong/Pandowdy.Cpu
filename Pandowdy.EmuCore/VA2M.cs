@@ -130,6 +130,26 @@ public class VA2M : IDisposable
     private long _throttleCycles;
     
     /// <summary>
+    /// Stopwatch for measuring effective MHz performance.
+    /// </summary>
+    private readonly Stopwatch _perfSw = Stopwatch.StartNew();
+    
+    /// <summary>
+    /// Cycle count at last performance measurement.
+    /// </summary>
+    private long _perfLastCycles;
+    
+    /// <summary>
+    /// Last time performance was reported (in ticks).
+    /// </summary>
+    private long _perfLastReportTicks;
+    
+    /// <summary>
+    /// Performance reporting interval (5 seconds).
+    /// </summary>
+    private static readonly TimeSpan PerfReportInterval = TimeSpan.FromSeconds(5);
+    
+    /// <summary>
     /// Gets or sets whether throttling is enabled to maintain Apple IIe speed.
     /// </summary>
     /// <remarks>
@@ -318,12 +338,33 @@ public class VA2M : IDisposable
     /// </list>
     /// </para>
     /// <para>
+    /// <strong>Instruction Atomicity:</strong> On the 6502, instruction execution is guaranteed
+    /// to be atomic - no interrupts or external events can occur in the middle of an instruction.
+    /// This method respects this guarantee by checking <see cref="ICpu.IsInstructionComplete"/>
+    /// before processing pending actions. If an instruction is in progress, pending actions are
+    /// deferred until the instruction completes.
+    /// </para>
+    /// <para>
+    /// <strong>Why This Matters:</strong> Without this check, a reset or interrupt command
+    /// enqueued from the UI thread could execute while the CPU is mid-instruction, leaving
+    /// registers in an undefined state and causing unpredictable behavior. The 6502 hardware
+    /// ensures this never happens, and our emulation must preserve this guarantee.
+    /// </para>
+    /// <para>
     /// <strong>Exception Handling:</strong> Exceptions in actions are caught and logged
     /// to prevent one bad command from crashing the emulator.
     /// </para>
     /// </remarks>
     private void ProcessPending()
     {
+        // Only process pending commands at instruction boundaries to maintain 6502 atomicity.
+        // Without this check, a Reset() or InterruptRequest() from another thread could
+        // execute mid-instruction, violating the 6502's atomic instruction guarantee.
+        if (Bus.Cpu != null && !Bus.Cpu.IsInstructionComplete())
+        {
+            return;
+        }
+
         while (_pending.TryDequeue(out var act))
         {
             try { act(); } catch { Debug.WriteLine($"Exception during ProcessPending()"); }
@@ -525,6 +566,7 @@ public class VA2M : IDisposable
     /// <item>Clear keyboard latch</item>
     /// <item>Reset cycle counter to zero</item>
     /// <item>Restart throttle stopwatch</item>
+    /// <item>Reset performance measurement counters</item>
     /// </list>
     /// </para>
     /// <para>
@@ -539,13 +581,17 @@ public class VA2M : IDisposable
     /// </remarks>
     public void Reset()
     {
-        //Enqueue(() =>
+        Enqueue(() =>
         {
             Bus.Reset();
             _throttleCycles = 0;
             _throttleSw.Restart();
+            
+            // Reset performance tracking
+            _perfLastCycles = 0;
+            _perfLastReportTicks = _perfSw.ElapsedTicks;
         }
-        //);
+        );
     }
 
     /// <summary>
@@ -578,20 +624,24 @@ public class VA2M : IDisposable
     /// UserReset() is a warm reset that preserves memory and timing state.
     /// </para>
     /// <para>
-    /// <strong>Implementation Note:</strong> Delegates to VA2MBus.UserReset() which handles
-    /// the CPU reset while preserving other state.
+    /// <strong>Thread Safety:</strong> This method is thread-safe. It enqueues the reset
+    /// operation which will be executed on the emulator thread at the next instruction boundary
+    /// (via ProcessPending). This ensures the reset doesn't interrupt a CPU instruction in progress,
+    /// maintaining 6502 atomic instruction guarantees.
+    /// </para>
+    /// <para>
+    /// <strong>Implementation Note:</strong> The reset command is enqueued and will be processed
+    /// at the next safe point (instruction boundary) on the emulator thread. This prevents
+    /// race conditions and undefined behavior from resetting the CPU mid-instruction.
     /// </para>
     /// </remarks>
     public void UserReset()
     {
-       // Enqueue(() =>
+        Enqueue(() =>
         {
             Debug.WriteLine("Calling UserReset() in VA2M");
             (Bus as VA2MBus)!.UserReset();
-            //_throttleCycles = 0;
-            //_throttleSw.Restart();
-        }
-   //     );
+        });
     }
 
     /// <summary>
@@ -649,6 +699,8 @@ public class VA2M : IDisposable
     /// </remarks>
     public async Task RunAsync(CancellationToken ct, double ticksPerSecond = 1000d)
     {
+        Thread.CurrentThread.Name = "Apple IIe Emulator";
+
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ticksPerSecond);
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1.0 / ticksPerSecond));
         double cyclesPerTick = TargetHz / ticksPerSecond;
@@ -737,10 +789,67 @@ public class VA2M : IDisposable
         int? basicLine = lineNum < 0xFA00 ? lineNum : null;
         var snapshot = new StateSnapshot((ushort) Bus.Cpu.PC, (byte)Bus.Cpu.SP, Bus.SystemClockCounter, basicLine, true, false);
         _stateSink.Update(snapshot);
+        
+        // Report performance metrics every 5 seconds
+        ReportPerformanceMetrics();
     }
 
-
-
+    /// <summary>
+    /// Reports effective MHz performance metrics every 5 seconds.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Metrics Calculated:</strong>
+    /// <list type="bullet">
+    /// <item><strong>Effective MHz:</strong> Actual CPU cycles executed per second</item>
+    /// <item><strong>Target MHz:</strong> Configured target frequency (normally 1.023 MHz)</item>
+    /// <item><strong>Accuracy:</strong> Percentage of target frequency achieved (throttled mode)</item>
+    /// <item><strong>Throttle State:</strong> Whether throttling is currently enabled</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Use Cases:</strong>
+    /// <list type="bullet">
+    /// <item>Monitor throttling accuracy in normal operation</item>
+    /// <item>Measure maximum performance in fast mode</item>
+    /// <item>Detect performance issues or system load problems</item>
+    /// <item>Verify timing calibration</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    private void ReportPerformanceMetrics()
+    {
+        long currentTicks = _perfSw.ElapsedTicks;
+        long ticksSinceLastReport = currentTicks - _perfLastReportTicks;
+        
+        // Check if 5 seconds have elapsed
+        if (ticksSinceLastReport < Stopwatch.Frequency * 5)
+        {
+            return;
+        }
+        
+        // Calculate effective MHz
+        long currentCycles = _throttleCycles;
+        long cyclesSinceLastReport = currentCycles - _perfLastCycles;
+        double secondsElapsed = (double)ticksSinceLastReport / Stopwatch.Frequency;
+        double effectiveMhz = (cyclesSinceLastReport / secondsElapsed) / 1_000_000.0;
+        
+        // Calculate accuracy percentage if throttled
+        string accuracyInfo = "";
+        if (ThrottleEnabled)
+        {
+            double targetMhz = TargetHz / 1_000_000.0;
+            double accuracyPercent = (effectiveMhz / targetMhz) * 100.0;
+            accuracyInfo = $" (Target: {targetMhz:F3} MHz, Accuracy: {accuracyPercent:F2}%)";
+        }
+        
+        Debug.WriteLine($"[VA2M Performance] Effective MHz: {effectiveMhz:F3}{accuracyInfo} | Throttle: {(ThrottleEnabled ? "ON" : "OFF")} | Total Cycles: {currentCycles:N0}");
+        
+        // Update for next report
+        _perfLastReportTicks = currentTicks;
+        _perfLastCycles = currentCycles;
+    }
+    
     /// <summary>
     /// Inject a keyboard value into the machine as if a key was latched at $C000.
     /// High bit must be set.  Cleared by access of $C010.
