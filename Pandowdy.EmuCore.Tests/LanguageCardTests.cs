@@ -72,8 +72,8 @@ public class LanguageCardTests
 
     private class TestFixture
     {
-        public IMemory MainRam { get; }
-        public IMemory AuxRam { get; }
+        public ISystemRam MainRam { get; }
+        public ISystemRam AuxRam { get; }
         public IMemory SystemRom { get; }
         public MockFloatingBusProvider FloatingBus { get; }
         public MockSystemStatusProvider Status { get; }

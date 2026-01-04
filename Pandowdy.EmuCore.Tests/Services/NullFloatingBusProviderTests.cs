@@ -1,9 +1,9 @@
 using Xunit;
 using Emulator;
-using Pandowdy.EmuCore;
+using Pandowdy.EmuCore.Services;
 using Pandowdy.EmuCore.Interfaces;
 
-namespace Pandowdy.EmuCore.Tests;
+namespace Pandowdy.EmuCore.Tests.Services;
 
 /// <summary>
 /// Tests for the NullFloatingBusProvider class - simple floating bus implementation.

@@ -4,18 +4,17 @@ namespace Pandowdy.EmuCore
 {
     public static class Utility
     {
-
-
         /// <summary>
         /// Validates that an IMemory instance is a given size.
         /// </summary>
+        /// <typeparam name="T">The type implementing IMemory.</typeparam>
         /// <param name="memory">The memory instance to validate.</param>
         /// <param name="paramName">The parameter name for exception messages.</param>
         /// <param name="expectedSize">The expected size of the memory in bytes.</param>
         /// <returns>The validated memory instance.</returns>
         /// <exception cref="ArgumentNullException">Thrown if memory is null.</exception>
-        /// <exception cref="ArgumentException">Thrown if memory size is not exactly 16KB.</exception>
-        public static IMemory ValidateIMemorySize(IMemory memory, string paramName, UInt16 expectedSize)
+        /// <exception cref="ArgumentException">Thrown if memory size does not match expected size.</exception>
+        public static T ValidateIMemorySize<T>(T memory, string paramName, UInt16 expectedSize) where T : IMemory
         {
             ArgumentNullException.ThrowIfNull(memory, paramName);
 
@@ -29,6 +28,5 @@ namespace Pandowdy.EmuCore
 
             return memory;
         }
-
     }
 }

@@ -1,4 +1,5 @@
 using Emulator;
+using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore
 {
@@ -78,7 +79,7 @@ namespace Pandowdy.EmuCore
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown if <paramref name="size"/> is less than 1 or greater than 65,536 (0x10000).
     /// </exception>
-    public class MemoryBlock(int size) : IMemory
+    public class MemoryBlock(int size) : ISystemRam
     {
         /// <summary>
         /// Maximum allowed memory size in bytes (64KB - the full 16-bit address space).

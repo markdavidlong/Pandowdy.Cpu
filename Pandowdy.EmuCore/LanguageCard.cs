@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 using Emulator;
 using Pandowdy.EmuCore.Interfaces;
@@ -53,8 +52,8 @@ namespace Pandowdy.EmuCore
     /// </para>
     /// </remarks>
     public class LanguageCard(
-        IMemory mainRam, 
-        IMemory? auxRam, 
+        ISystemRam mainRam,
+        ISystemRam? auxRam, 
         IMemory systemRom, 
         IFloatingBusProvider floatingBus,
         ISystemStatusProvider status) : IMemory
@@ -69,8 +68,8 @@ namespace Pandowdy.EmuCore
         /// </summary>
         private const int RequiredRomSize = 0x4000; // 16KB
 
-        private readonly IMemory _mainRam = Utility.ValidateIMemorySize(mainRam, nameof(mainRam), RequiredRamSize);
-        private readonly IMemory? _auxRam = auxRam != null ? Utility.ValidateIMemorySize(auxRam, nameof(auxRam), RequiredRamSize) : null;
+        private readonly ISystemRam _mainRam = Utility.ValidateIMemorySize(mainRam, nameof(mainRam), RequiredRamSize);
+        private readonly ISystemRam? _auxRam = auxRam != null ? Utility.ValidateIMemorySize(auxRam, nameof(auxRam), RequiredRamSize) : null;
         private readonly IMemory _systemRom = Utility.ValidateIMemorySize(systemRom, nameof(systemRom), RequiredRomSize);
         private readonly IFloatingBusProvider _floatingBus = floatingBus ?? throw new ArgumentNullException(nameof(floatingBus));
         private readonly ISystemStatusProvider _status = status ?? throw new ArgumentNullException(nameof(status));

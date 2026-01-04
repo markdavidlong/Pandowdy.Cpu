@@ -1,8 +1,5 @@
-using System;
-using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore

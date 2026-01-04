@@ -2,6 +2,7 @@ using System;
 using Xunit;
 using Emulator;
 using Pandowdy.EmuCore;
+using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -20,7 +21,10 @@ public class UtilityTests
         ushort expectedSize = 0x4000;
 
         // Act
-        IMemory result = Utility.ValidateIMemorySize(memory, "testMemory", expectedSize);
+        // Use ISystemRam to test the generic constraint works with derived interfaces
+#pragma warning disable CA1859 // Use concrete types when possible for improved performance
+        ISystemRam result = Utility.ValidateIMemorySize(memory, "testMemory", expectedSize);
+#pragma warning restore CA1859
 
         // Assert
         Assert.NotNull(result);
@@ -32,7 +36,7 @@ public class UtilityTests
     public void ValidateIMemorySize_WithNullMemory_ThrowsArgumentNullException()
     {
         // Arrange
-        IMemory? memory = null;
+        MemoryBlock? memory = null;
         ushort expectedSize = 0x4000;
 
         // Act & Assert
@@ -91,7 +95,10 @@ public class UtilityTests
         var memory = new MemoryBlock(size);
 
         // Act
-        IMemory result = Utility.ValidateIMemorySize(memory, "testMemory", size);
+        // Use ISystemRam to verify generic constraint works with derived interfaces
+#pragma warning disable CA1859 // Use concrete types when possible for improved performance
+        ISystemRam result = Utility.ValidateIMemorySize(memory, "testMemory", size);
+#pragma warning restore CA1859
 
         // Assert
         Assert.NotNull(result);
@@ -106,7 +113,10 @@ public class UtilityTests
         memory[0x0100] = 0x42; // Set a value
 
         // Act
-        IMemory result = Utility.ValidateIMemorySize(memory, "testMemory", 0x1000);
+        // Use ISystemRam to verify reference preservation works with interface types
+#pragma warning disable CA1859 // Use concrete types when possible for improved performance
+        ISystemRam result = Utility.ValidateIMemorySize(memory, "testMemory", 0x1000);
+#pragma warning restore CA1859
 
         // Assert - Should be same instance
         Assert.Same(memory, result);
@@ -155,7 +165,10 @@ public class UtilityTests
         var mainRam = new MemoryBlock(0x4000);
 
         // Act
-        IMemory result = Utility.ValidateIMemorySize(mainRam, nameof(mainRam), 0x4000);
+        // Use ISystemRam to match LanguageCard's actual usage
+#pragma warning disable CA1859 // Use concrete types when possible for improved performance
+        ISystemRam result = Utility.ValidateIMemorySize(mainRam, nameof(mainRam), 0x4000);
+#pragma warning restore CA1859
 
         // Assert
         Assert.NotNull(result);
@@ -169,7 +182,10 @@ public class UtilityTests
         var auxRam = new MemoryBlock(0x4000);
 
         // Act
-        IMemory result = Utility.ValidateIMemorySize(auxRam, nameof(auxRam), 0x4000);
+        // Use ISystemRam to match LanguageCard's actual usage
+#pragma warning disable CA1859 // Use concrete types when possible for improved performance
+        ISystemRam result = Utility.ValidateIMemorySize(auxRam, nameof(auxRam), 0x4000);
+#pragma warning restore CA1859
 
         // Assert
         Assert.NotNull(result);
@@ -177,17 +193,20 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_SystemRom_12KB()
+    public void ValidateIMemorySize_SystemRom_16KB()
     {
-        // Arrange - Simulate SystemRomProvider validation
-        var systemRom = new MemoryBlock(0x3000);
+        // Arrange - Simulate SystemRomProvider validation (now 16KB, not 12KB)
+        var systemRom = new MemoryBlock(0x4000);
 
         // Act
-        IMemory result = Utility.ValidateIMemorySize(systemRom, nameof(systemRom), 0x3000);
+        // Use IMemory to test base interface compatibility
+#pragma warning disable CA1859 // Use concrete types when possible for improved performance
+        IMemory result = Utility.ValidateIMemorySize(systemRom, nameof(systemRom), 0x4000);
+#pragma warning restore CA1859
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(0x3000, result.Size);
+        Assert.Equal(0x4000, result.Size);
     }
 
     [Fact]
@@ -198,7 +217,10 @@ public class UtilityTests
         var memoryPool = new MemoryBlock(0xFFFF);
 
         // Act
-        IMemory result = Utility.ValidateIMemorySize(memoryPool, nameof(memoryPool), 0xFFFF);
+        // Use ISystemRam to test with derived interface
+#pragma warning disable CA1859 // Use concrete types when possible for improved performance
+        ISystemRam result = Utility.ValidateIMemorySize(memoryPool, nameof(memoryPool), 0xFFFF);
+#pragma warning restore CA1859
 
         // Assert
         Assert.NotNull(result);
@@ -212,7 +234,7 @@ public class UtilityTests
         var memory = new MemoryBlock(0x2000);
 
         // Act - Chain validation result directly
-        IMemory validated = Utility.ValidateIMemorySize(
+        var validated = Utility.ValidateIMemorySize(
             Utility.ValidateIMemorySize(memory, "param1", 0x2000),
             "param2",
             0x2000);
@@ -233,7 +255,7 @@ public class UtilityTests
         ushort expectedSize = 1;
 
         // Act
-        IMemory result = Utility.ValidateIMemorySize(memory, "testMemory", expectedSize);
+        var result = Utility.ValidateIMemorySize(memory, "testMemory", expectedSize);
 
         // Assert
         Assert.NotNull(result);
@@ -248,7 +270,7 @@ public class UtilityTests
         ushort expectedSize = 0xFFFF;
 
         // Act
-        IMemory result = Utility.ValidateIMemorySize(memory, "testMemory", expectedSize);
+        var result = Utility.ValidateIMemorySize(memory, "testMemory", expectedSize);
 
         // Assert
         Assert.NotNull(result);
@@ -289,19 +311,21 @@ public class UtilityTests
         // This test documents how LanguageCard uses ValidateIMemorySize
         
         // Arrange - Simulating LanguageCard constructor
-        IMemory mainRam = new MemoryBlock(0x4000);
-        IMemory auxRam = new MemoryBlock(0x4000);
-        IMemory systemRom = new MemoryBlock(0x3000);
+        var mainRam = new MemoryBlock(0x4000);
+        var auxRam = new MemoryBlock(0x4000);
+        var systemRom = new MemoryBlock(0x4000);
 
-        // Act - Validation as done in LanguageCard
-        var validatedMain = Utility.ValidateIMemorySize(mainRam, "mainRam", 0x4000);
-        var validatedAux = Utility.ValidateIMemorySize(auxRam, "auxRam", 0x4000);
-        var validatedRom = Utility.ValidateIMemorySize(systemRom, "systemRom", 0x3000);
+        // Act - Validation as done in LanguageCard (using interface types)
+#pragma warning disable CA1859 // Use concrete types when possible for improved performance
+        ISystemRam validatedMain = Utility.ValidateIMemorySize(mainRam, "mainRam", 0x4000);
+        ISystemRam validatedAux = Utility.ValidateIMemorySize(auxRam, "auxRam", 0x4000);
+        IMemory validatedRom = Utility.ValidateIMemorySize(systemRom, "systemRom", 0x4000);
+#pragma warning restore CA1859
 
         // Assert
         Assert.Equal(0x4000, validatedMain.Size);
         Assert.Equal(0x4000, validatedAux.Size);
-        Assert.Equal(0x3000, validatedRom.Size);
+        Assert.Equal(0x4000, validatedRom.Size);
     }
 
     [Fact]

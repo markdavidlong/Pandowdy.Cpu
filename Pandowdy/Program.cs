@@ -6,9 +6,10 @@ using Microsoft.Extensions.Logging;
 using Pandowdy.UI;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.EmuCore;
-using Pandowdy.UI.ViewModels;
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.UI.ViewModels;
 using Pandowdy.EmuCore.Services;
+using Emulator;
 
 namespace Pandowdy
 {
@@ -53,8 +54,6 @@ namespace Pandowdy
                 {
                     services.AddSingleton<Emulator.CPU>();
 
-
-
                     // EmuCore
                     services.AddSingleton<MemoryPool>();
                    // services.AddSingleton<IMemory>(sp => sp.GetRequiredService<MemoryPool>());
@@ -68,13 +67,36 @@ namespace Pandowdy
 
                     services.AddSingleton<IFrameGenerator, FrameGenerator>();
 
-
                     // SystemStatusProvider implements both ISystemStatusProvider and ISoftSwitchResponder
                     // Register the concrete type first
                     services.AddSingleton<SystemStatusProvider>();
                     // Then register both interfaces to point to the same instance
                     services.AddSingleton<ISystemStatusProvider>(sp => sp.GetRequiredService<SystemStatusProvider>());
                     services.AddSingleton<ISoftSwitchResponder>(sp => sp.GetRequiredService<SystemStatusProvider>());
+                    
+                    // Floating Bus Provider
+                    services.AddSingleton<IFloatingBusProvider, NullFloatingBusProvider>();
+                    
+                    // System ROM Provider - loads embedded ROM
+                    services.AddSingleton<ISystemRomProvider>(sp => 
+                        new SystemRomProvider("res:Pandowdy.EmuCore.Resources.a2e_enh_c-f.rom"));
+                    
+                    // System RAM - Keyed by descriptive size names
+                    // Transient lifetime ensures each request gets a new instance
+                    services.AddKeyedTransient<ISystemRam>("16K", (sp, key) => new MemoryBlock(0x4000));
+                    services.AddKeyedTransient<ISystemRam>("48K", (sp, key) => new MemoryBlock(0xC000));
+                    
+                    // Language Card - uses two 16KB RAM blocks
+                    services.AddSingleton<LanguageCard>(sp =>
+                    {
+                        var mainRam = sp.GetRequiredKeyedService<ISystemRam>("16K");    // 16KB main RAM
+                        var auxRam = sp.GetRequiredKeyedService<ISystemRam>("16K");     // 16KB aux RAM
+                        var systemRom = sp.GetRequiredService<ISystemRomProvider>();
+                        var floatingBus = sp.GetRequiredService<IFloatingBusProvider>();
+                        var status = sp.GetRequiredService<ISystemStatusProvider>();
+                        
+                        return new LanguageCard(mainRam, auxRam, systemRom, floatingBus, status);
+                    });
                     
                     services.AddSingleton<IAppleIIBus,VA2MBus>();
 
@@ -86,16 +108,7 @@ namespace Pandowdy
                     services.AddTransient<MainWindowViewModel>();
                     services.AddTransient<SystemStatusViewModel>();
 
-
                     services.AddSingleton<VA2M>();
-                    // Machine factory (singleton instance for now)
-                    //services.AddSingleton(provider =>
-                    //{
-                    //    var state = provider.GetRequiredService<IEmulatorState>();
-                    //    var frame = provider.GetRequiredService<IFrameProvider>();
-                    //    var sysStatus = provider.GetRequiredService<ISystemStatusProvider>();
-                    //    return new VA2M(state, frame, sysStatus);
-                    //});
                     
                     // MainWindow factory - encapsulates creation and initialization
                     services.AddSingleton<IMainWindowFactory, MainWindowFactory>();
