@@ -37,6 +37,8 @@
 // refactoring will improve maintainability without sacrificing performance.
 //------------------------------------------------------------------------------
 
+using System.ComponentModel;
+using System.Diagnostics;
 using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
@@ -157,7 +159,7 @@ namespace Pandowdy.EmuCore
     /// The refactoring will maintain performance while improving maintainability.
     /// </para>
     /// </remarks>
-    public sealed class MemoryPool : IMemory, IMemoryAccessNotifier, IDirectMemoryPoolReader, ISoftSwitchResponder, IDisposable
+    public sealed class MemoryPool : IMemory, IMemoryAccessNotifier, IDirectMemoryPoolReader,  IDisposable
     {
         //Methods from IMemory:
         
@@ -356,120 +358,6 @@ namespace Pandowdy.EmuCore
         }
 
 
-        // Soft switch state (Apple IIe memory management)
-        
-        /// <summary>
-        /// RAMRD soft switch - controls auxiliary memory selection for reads.
-        /// </summary>
-        /// <remarks>
-        /// When true, reads from most address ranges access auxiliary memory instead of main
-        /// memory. Exceptions: Zero page (controlled by ALTZP) and regions affected by 80STORE.
-        /// </remarks>
-        private bool _ramRd = false;
-        
-        /// <summary>
-        /// RAMWRT soft switch - controls auxiliary memory selection for writes.
-        /// </summary>
-        /// <remarks>
-        /// When true, writes to most address ranges go to auxiliary memory instead of main
-        /// memory. Exceptions: Zero page (controlled by ALTZP) and regions affected by 80STORE.
-        /// </remarks>
-        private bool _ramWrt = false;
-        
-        /// <summary>
-        /// ALTZP soft switch - controls auxiliary zero page and stack selection.
-        /// </summary>
-        /// <remarks>
-        /// When true, $0000-$01FF (zero page + stack) access auxiliary memory. This is
-        /// independent of RAMRD/RAMWRT and affects both reads and writes. Critical for
-        /// programs that use auxiliary memory as their primary memory space.
-        /// </remarks>
-        private bool _altZp = false;
-        
-        /// <summary>
-        /// 80STORE soft switch - enables page 2 selection for text and hi-res pages.
-        /// </summary>
-        /// <remarks>
-        /// When true, PAGE2 controls which physical memory is accessed for text page 1
-        /// ($0400-$07FF) and optionally hi-res page 1 ($2000-$3FFF, if HIRES is true).
-        /// Used for 80-column text mode where main and aux memory are interleaved.
-        /// </remarks>
-        private bool _80Store = false;
-        
-        /// <summary>
-        /// HIRES soft switch - enables hi-res graphics mode.
-        /// </summary>
-        /// <remarks>
-        /// When true AND 80STORE is true, PAGE2 controls which memory is accessed for
-        /// $2000-$3FFF. Used for double hi-res graphics where main and aux memory provide
-        /// 16 colors instead of 6.
-        /// </remarks>
-        private bool _hires = false;
-        
-        /// <summary>
-        /// PAGE2 soft switch - selects page 2 for video display and memory access.
-        /// </summary>
-        /// <remarks>
-        /// Primary effect is video display (show page 1 vs page 2). When 80STORE is enabled,
-        /// also controls which memory bank is accessed for text and hi-res pages. PAGE2=false
-        /// uses main memory, PAGE2=true uses auxiliary memory.
-        /// </remarks>
-        private bool _page2 = false;
-        
-        /// <summary>
-        /// INTCXROM soft switch - enables internal ROM in $C100-$C7FF range.
-        /// </summary>
-        /// <remarks>
-        /// When true, $C100-$C7FF accesses internal ROM (peripheral diagnostics, etc.)
-        /// instead of slot ROMs. When false, each slot's ROM is accessible in its 256-byte
-        /// region. Exception: SLOTC3ROM can override for slot 3.
-        /// </remarks>
-        private bool _intCxRom = false;
-        
-        /// <summary>
-        /// SLOTC3ROM soft switch - enables slot 3 ROM even when INTCXROM is set.
-        /// </summary>
-        /// <remarks>
-        /// When true, slot 3 ROM ($C300-$C3FF) is accessible even if INTCXROM is true.
-        /// Allows the 80-column firmware to remain accessible while using internal ROM
-        /// for other slots. When false, INTCXROM controls all slots uniformly.
-        /// </remarks>
-        private bool _slotC3Rom = false;
-
-        // Language Card soft switches (bank switching for $D000-$FFFF)
-        
-        /// <summary>
-        /// Language Card write enable - allows writes to $D000-$FFFF.
-        /// </summary>
-        /// <remarks>
-        /// When false, $D000-$FFFF is write-protected (ROM behavior). When true, writes go
-        /// to RAM (main or auxiliary depending on ALTZP). The Language Card required two
-        /// sequential accesses to enable writes (PREWRITE then HIGHWRITE) to prevent
-        /// accidental ROM overwrites.
-        /// </remarks>
-        private bool _highWrite = false;
-        
-        /// <summary>
-        /// Language Card bank selection - selects bank 1 vs bank 2 for $D000-$DFFF.
-        /// </summary>
-        /// <remarks>
-        /// The Language Card has two 4KB banks for $D000-$DFFF. Bank 1 is typically used
-        /// for the main program, bank 2 for alternate code or data. $E000-$FFFF always
-        /// accesses the same 8KB region regardless of bank selection.
-        /// </remarks>
-        private bool _bank1 = false;
-        
-        /// <summary>
-        /// Language Card read enable - reads from RAM instead of ROM for $D000-$FFFF.
-        /// </summary>
-        /// <remarks>
-        /// When false, $D000-$FFFF reads from ROM (monitor, reset vector). When true, reads
-        /// from RAM (main or auxiliary depending on ALTZP), allowing programs to use the
-        /// Language Card's 16KB RAM space.
-        /// </remarks>
-        private bool _highRead = false;
-        
-   
         // Nullable maps allow unmapped / write-protected regions; instance (was static)
         private readonly Dictionary<Ranges, Memory<byte>?> _readRanges = [];
 
@@ -775,88 +663,23 @@ namespace Pandowdy.EmuCore
 
         }
 
-        public void SetRamRd(bool ramRd)
-        {
-            _ramRd = ramRd;
-            UpdateMemoryMappings();
-        }
-
-        public void SetRamWrt(bool ramWrt)
-        {
-            _ramWrt = ramWrt;
-            UpdateMemoryMappings();
-        }
-
-        public void SetAltZp(bool altZp)
-        {
-            _altZp = altZp;
-            UpdateMemoryMappings();
-        }
-
-        public void Set80Store(bool store80)
-        {
-            _80Store = store80;
-            UpdateMemoryMappings();
-        }
-
-        public void SetHiRes(bool hires)
-        {
-            _hires = hires;
-            UpdateMemoryMappings();
-        }
-
-        public void SetPage2(bool page2)
-        {
-            _page2 = page2;
-            UpdateMemoryMappings();
-        }
-
-        public void SetIntCxRom(bool intCxRom)
-        {           
-            _intCxRom = intCxRom;
-            
-            UpdateMemoryMappings();
-        }
-
-        public void SetSlotC3Rom(bool slotC3Rom)
-        {
-            _slotC3Rom = slotC3Rom;
-            UpdateMemoryMappings();
-        }
-
-
-        public void SetHighWrite(bool enabled)
-        {
-            _highWrite = enabled;
-            UpdateMemoryMappings();
-        }
-
-
-        public void SetBank1(bool enabled)
-        {
-            _bank1 = enabled;
-            UpdateMemoryMappings();
-        }
-
-        public void SetHighRead(bool enabled)
-        {
-            _highRead = enabled;
-            UpdateMemoryMappings();
-        }
-
-        public void SetMixed(bool _) {  /* NA - display only */ }
-        public void SetText(bool _) {  /* NA - display only */ }
-        public void SetAn0(bool _) {  /* NA - display only */ }
-        public void SetAn1(bool _) {  /* NA - display only */ }
-        public void SetAn2(bool _) {  /* NA - display only */ }
-        public void SetAn3(bool _) {  /* NA - display only */ }
-        public void Set80Vid(bool _) {  /* NA - display only */ }
-        public void SetAltChar(bool _) {  /* NA - display only */ }
-        public void SetPreWrite(bool _) {  /* NA */ }
+  
 
 
         public void UpdateMemoryMappings()
         {
+            bool _altZp = _status.StateAltZp;
+            bool _ramRd = _status.StateRamRd;
+            bool _ramWrt = _status.StateRamWrt;
+            bool _80Store = _status.State80Store;
+            bool _page2 = _status.StatePage2;
+            bool _highWrite = _status.StateHighWrite;
+            bool _highRead = _status.StateHighRead;
+            bool _bank1 = _status.StateUseBank1;
+            bool _hires = _status.StateHiRes;
+            bool _intCxRom = _status.StateIntCxRom;
+            bool _slotC3Rom = _status.StateSlotC3Rom;
+
             _mappingLock.EnterWriteLock();
             try
             {

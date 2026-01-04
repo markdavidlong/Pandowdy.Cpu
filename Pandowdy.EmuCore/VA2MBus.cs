@@ -446,8 +446,6 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         InitIoReadHandlers();
         InitIoWriteHandlers();
 
-        // Always add the MemoryPool as a responder (it needs to update memory mappings)
-        _softSwitches.AddResponder(mempool);
 
         if (statusProvider is ISoftSwitchResponder softSwitchResponder)
         {

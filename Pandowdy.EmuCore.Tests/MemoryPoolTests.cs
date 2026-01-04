@@ -19,7 +19,8 @@ public class MemoryPoolTests
     /// - Internal ROM slots filled with 'I'
     /// - Slot ROM filled with 'S'
     /// </summary>
-    private static MemoryPool BuildPool()
+    /// <returns>A tuple containing the MemoryPool and its associated SystemStatusProvider</returns>
+    private static (MemoryPool Pool, SystemStatusProvider Status) BuildPool()
     {
         var statusProvider = new SystemStatusProvider();
         var pool = new MemoryPool(statusProvider);
@@ -49,7 +50,7 @@ public class MemoryPoolTests
             }
         }
         
-        return pool;
+        return (pool, statusProvider);
     }
 
     #endregion
@@ -60,7 +61,7 @@ public class MemoryPoolTests
     public void ReadPool_ReturnsCorrectValues()
     {
         // Arrange
-        var pool = BuildPool();
+        var (pool, _) = BuildPool();
 
         // Act & Assert - Main memory range
         for (ushort i = 0x200; i < 48 * 1024; i++)
@@ -79,7 +80,7 @@ public class MemoryPoolTests
     public void Read_MainMemory_ReturnsMainValues()
     {
         // Arrange
-        var pool = BuildPool();
+        var (pool, _) = BuildPool();
 
         // Act & Assert
         for (ushort i = 0x200; i < 48 * 1024; i++)
@@ -92,8 +93,8 @@ public class MemoryPoolTests
     public void Read_AuxMemory_WithRamRdEnabled()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.SetRamRd(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b => b.StateRamRd = true);
 
         // Act & Assert
         for (ushort i = 0x200; i < 48 * 1024; i++)
@@ -110,9 +111,12 @@ public class MemoryPoolTests
     public void Store80Off_RamRdOff_ReadsMainMemory()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(false);
-        pool.SetRamRd(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = false;
+            b.StateRamRd = false;
+        });
 
         // Test various HIRES/PAGE2 combinations
         var testCases = new[]
@@ -126,8 +130,11 @@ public class MemoryPoolTests
         foreach (var (hires, page2) in testCases)
         {
             // Act
-            pool.SetHiRes(hires);
-            pool.SetPage2(page2);
+            status.Mutate(b =>
+            {
+                b.StateHiRes = hires;
+                b.StatePage2 = page2;
+            });
 
             // Assert - All regions should read from main (1)
             Assert.Equal(1, pool.Read(0x0200));
@@ -141,9 +148,12 @@ public class MemoryPoolTests
     public void Store80Off_RamRdOn_ReadsAuxMemory()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(false);
-        pool.SetRamRd(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = false;
+            b.StateRamRd = true;
+        });
 
         // Test various HIRES/PAGE2 combinations
         var testCases = new[]
@@ -157,8 +167,11 @@ public class MemoryPoolTests
         foreach (var (hires, page2) in testCases)
         {
             // Act
-            pool.SetHiRes(hires);
-            pool.SetPage2(page2);
+            status.Mutate(b =>
+            {
+                b.StateHiRes = hires;
+                b.StatePage2 = page2;
+            });
 
             // Assert - All regions should read from aux (2)
             Assert.Equal(2, pool.Read(0x0200));
@@ -176,11 +189,14 @@ public class MemoryPoolTests
     public void Store80On_RamRdOff_HiResOff_Page2Off()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamRd(false);
-        pool.SetHiRes(false);
-        pool.SetPage2(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamRd = false;
+            b.StateHiRes = false;
+            b.StatePage2 = false;
+        });
 
         // Assert - All main: M, M, M, M
         Assert.Equal(1, pool.Read(0x0200));
@@ -193,11 +209,14 @@ public class MemoryPoolTests
     public void Store80On_RamRdOff_HiResOff_Page2On()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamRd(false);
-        pool.SetHiRes(false);
-        pool.SetPage2(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamRd = false;
+            b.StateHiRes = false;
+            b.StatePage2 = true;
+        });
 
         // Assert - M, A, M, M (text page 2 switches to aux)
         Assert.Equal(1, pool.Read(0x0200));
@@ -210,11 +229,14 @@ public class MemoryPoolTests
     public void Store80On_RamRdOff_HiResOn_Page2Off()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamRd(false);
-        pool.SetHiRes(true);
-        pool.SetPage2(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamRd = false;
+            b.StateHiRes = true;
+            b.StatePage2 = false;
+        });
 
         // Assert - All main: M, M, M, M
         Assert.Equal(1, pool.Read(0x0200));
@@ -227,11 +249,14 @@ public class MemoryPoolTests
     public void Store80On_RamRdOff_HiResOn_Page2On()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamRd(false);
-        pool.SetHiRes(true);
-        pool.SetPage2(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamRd = false;
+            b.StateHiRes = true;
+            b.StatePage2 = true;
+        });
 
         // Assert - M, A, A, M (text and hires page 2 switch to aux)
         Assert.Equal(1, pool.Read(0x0200));
@@ -244,11 +269,14 @@ public class MemoryPoolTests
     public void Store80On_RamRdOn_HiResOff_Page2Off()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamRd(true);
-        pool.SetHiRes(false);
-        pool.SetPage2(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamRd = true;
+            b.StateHiRes = false;
+            b.StatePage2 = false;
+        });
 
         // Assert - A, M, A, A (text page 1 stays main when 80STORE on)
         Assert.Equal(2, pool.Read(0x0200));
@@ -261,11 +289,14 @@ public class MemoryPoolTests
     public void Store80On_RamRdOn_HiResOff_Page2On()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamRd(true);
-        pool.SetHiRes(false);
-        pool.SetPage2(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamRd = true;
+            b.StateHiRes = false;
+            b.StatePage2 = true;
+        });
 
         // Assert - All aux: A, A, A, A
         Assert.Equal(2, pool.Read(0x0200));
@@ -278,11 +309,14 @@ public class MemoryPoolTests
     public void Store80On_RamRdOn_HiResOn_Page2Off()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamRd(true);
-        pool.SetHiRes(true);
-        pool.SetPage2(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamRd = true;
+            b.StateHiRes = true;
+            b.StatePage2 = false;
+        });
 
         // Assert - A, M, M, A (text page 1 and hires page 1 stay main)
         Assert.Equal(2, pool.Read(0x0200));
@@ -295,11 +329,14 @@ public class MemoryPoolTests
     public void Store80On_RamRdOn_HiResOn_Page2On()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamRd(true);
-        pool.SetHiRes(true);
-        pool.SetPage2(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamRd = true;
+            b.StateHiRes = true;
+            b.StatePage2 = true;
+        });
 
         // Assert - All aux: A, A, A, A
         Assert.Equal(2, pool.Read(0x0200));
@@ -316,9 +353,12 @@ public class MemoryPoolTests
     public void Store80Off_RamWrtOff_WritesToMainMemory()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(false);
-        pool.SetRamWrt(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = false;
+            b.StateRamWrt = false;
+        });
 
         var testCases = new[]
         {
@@ -331,8 +371,11 @@ public class MemoryPoolTests
         foreach (var (hires, page2, value) in testCases)
         {
             // Act
-            pool.SetHiRes(hires);
-            pool.SetPage2(page2);
+            status.Mutate(b =>
+            {
+                b.StateHiRes = hires;
+                b.StatePage2 = page2;
+            });
             pool.Write(0x0200, value);
             pool.Write(0x0400, value);
             pool.Write(0x2000, value);
@@ -356,9 +399,12 @@ public class MemoryPoolTests
     public void Store80Off_RamWrtOn_WritesToAuxMemory()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(false);
-        pool.SetRamWrt(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = false;
+            b.StateRamWrt = true;
+        });
 
         var testCases = new[]
         {
@@ -372,8 +418,11 @@ public class MemoryPoolTests
         foreach (var (hires, page2, value) in testCases)
         {
             // Act
-            pool.SetHiRes(hires);
-            pool.SetPage2(page2);
+            status.Mutate(b =>
+            {
+                b.StateHiRes = hires;
+                b.StatePage2 = page2;
+            });
             pool.Write(0x0200, value);
             pool.Write(0x0400, value);
             pool.Write(0x2000, value);
@@ -401,11 +450,14 @@ public class MemoryPoolTests
     public void Store80On_RamWrtOff_HiResOff_Page2Off_WritesToMain()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamWrt(false);
-        pool.SetHiRes(false);
-        pool.SetPage2(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamWrt = false;
+            b.StateHiRes = false;
+            b.StatePage2 = false;
+        });
 
         // Act
         pool.Write(0x0200, 23);
@@ -430,11 +482,14 @@ public class MemoryPoolTests
     public void Store80On_RamWrtOff_HiResOff_Page2On_WritesToMixed()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamWrt(false);
-        pool.SetHiRes(false);
-        pool.SetPage2(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamWrt = false;
+            b.StateHiRes = false;
+            b.StatePage2 = true;
+        });
 
         // Act
         pool.Write(0x0200, 33);
@@ -458,11 +513,14 @@ public class MemoryPoolTests
     public void Store80On_RamWrtOff_HiResOn_Page2Off_WritesToMain()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamWrt(false);
-        pool.SetHiRes(true);
-        pool.SetPage2(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamWrt = false;
+            b.StateHiRes = true;
+            b.StatePage2 = false;
+        });
 
         // Act
         pool.Write(0x0200, 23);
@@ -486,11 +544,14 @@ public class MemoryPoolTests
     public void Store80On_RamWrtOff_HiResOn_Page2On_WritesToMixed()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamWrt(false);
-        pool.SetHiRes(true);
-        pool.SetPage2(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamWrt = false;
+            b.StateHiRes = true;
+            b.StatePage2 = true;
+        });
 
         // Act
         pool.Write(0x0200, 33);
@@ -514,11 +575,14 @@ public class MemoryPoolTests
     public void Store80On_RamWrtOn_HiResOff_Page2Off_WritesToMixed()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamWrt(true);
-        pool.SetHiRes(false);
-        pool.SetPage2(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamWrt = true;
+            b.StateHiRes = false;
+            b.StatePage2 = false;
+        });
 
         // Act
         pool.Write(0x0200, 33);
@@ -542,11 +606,14 @@ public class MemoryPoolTests
     public void Store80On_RamWrtOn_HiResOff_Page2On_WritesToAux()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamWrt(true);
-        pool.SetHiRes(false);
-        pool.SetPage2(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamWrt = true;
+            b.StateHiRes = false;
+            b.StatePage2 = true;
+        });
 
         // Act
         pool.Write(0x0200, 33);
@@ -570,11 +637,14 @@ public class MemoryPoolTests
     public void Store80On_RamWrtOn_HiResOn_Page2Off_WritesToMixed()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamWrt(true);
-        pool.SetHiRes(true);
-        pool.SetPage2(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamWrt = true;
+            b.StateHiRes = true;
+            b.StatePage2 = false;
+        });
 
         // Act
         pool.Write(0x0200, 33);
@@ -598,11 +668,14 @@ public class MemoryPoolTests
     public void Store80On_RamWrtOn_HiResOn_Page2On_WritesToAux()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.Set80Store(true);
-        pool.SetRamWrt(true);
-        pool.SetHiRes(true);
-        pool.SetPage2(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StateRamWrt = true;
+            b.StateHiRes = true;
+            b.StatePage2 = true;
+        });
 
         // Act
         pool.Write(0x0200, 33);
@@ -630,9 +703,12 @@ public class MemoryPoolTests
     public void IntCxRom_On_SlotC3Rom_Off_UsesInternalROM()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.SetIntCxRom(true);
-        pool.SetSlotC3Rom(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.StateIntCxRom = true;
+            b.StateSlotC3Rom = false;
+        });
 
         // Assert - All slots use internal ROM
         Assert.Equal((byte)'I', pool.Read(0xC100));
@@ -648,9 +724,12 @@ public class MemoryPoolTests
     public void IntCxRom_On_SlotC3Rom_On_UsesInternalROM()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.SetIntCxRom(true);
-        pool.SetSlotC3Rom(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.StateIntCxRom = true;
+            b.StateSlotC3Rom = true;
+        });
 
         // Assert - All slots use internal ROM (INTCXROM overrides)
         Assert.Equal((byte)'I', pool.Read(0xC100));
@@ -666,9 +745,12 @@ public class MemoryPoolTests
     public void IntCxRom_Off_SlotC3Rom_Off_UsesSlotROMExceptC3()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.SetIntCxRom(false);
-        pool.SetSlotC3Rom(false);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.StateIntCxRom = false;
+            b.StateSlotC3Rom = false;
+        });
 
         // Assert - Slots use slot ROM, but C3 uses internal
         Assert.Equal((byte)'S', pool.Read(0xC100));
@@ -684,9 +766,12 @@ public class MemoryPoolTests
     public void IntCxRom_Off_SlotC3Rom_On_UsesSlotROM()
     {
         // Arrange
-        var pool = BuildPool();
-        pool.SetIntCxRom(false);
-        pool.SetSlotC3Rom(true);
+        var (pool, status) = BuildPool();
+        status.Mutate(b =>
+        {
+            b.StateIntCxRom = false;
+            b.StateSlotC3Rom = true;
+        });
 
         // Assert - All slots use slot ROM (including C3)
         Assert.Equal((byte)'S', pool.Read(0xC100));
@@ -708,10 +793,13 @@ public class MemoryPoolTests
         // Arrange
         var statusProvider = new SystemStatusProvider();
         var pool = new MemoryPool(statusProvider);
-        pool.SetBank1(true);
-        pool.SetHighRead(true);
-        pool.SetHighWrite(true);
-        pool.SetAltZp(false);
+        statusProvider.Mutate(b =>
+        {
+            b.StateUseBank1 = true;
+            b.StateHighRead = true;
+            b.StateHighWrite = true;
+            b.StateAltZp = false;
+        });
 
         // Act - Write to Bank 1
         pool.Write(0xD000, 0x42);
@@ -722,12 +810,12 @@ public class MemoryPoolTests
         Assert.Equal(0x44, pool.Read(0xE000));
         
         // Switch to Bank 2 and write different values
-        pool.SetBank1(false);
+        statusProvider.Mutate(b => b.StateUseBank1 = false);
         pool.Write(0xD000, 0x52);
         Assert.Equal(0x52, pool.Read(0xD000));
         
         // Switch back to Bank 1 - original value should remain
-        pool.SetBank1(true);
+        statusProvider.Mutate(b => b.StateUseBank1 = true);
         Assert.Equal(0x42, pool.Read(0xD000));
     }
 
@@ -737,10 +825,13 @@ public class MemoryPoolTests
         // Arrange
         var statusProvider = new SystemStatusProvider();
         var pool = new MemoryPool(statusProvider);
-        pool.SetBank1(false);  // Select Bank 2
-        pool.SetHighRead(true);
-        pool.SetHighWrite(true);
-        pool.SetAltZp(false);
+        statusProvider.Mutate(b =>
+        {
+            b.StateUseBank1 = false;  // Select Bank 2
+            b.StateHighRead = true;
+            b.StateHighWrite = true;
+            b.StateAltZp = false;
+        });
 
         // Act
         pool.Write(0xD000, 0x52);
@@ -768,8 +859,11 @@ public class MemoryPoolTests
         }
         pool.InstallApple2ROM(testRom);
         
-        pool.SetHighRead(false);  // Read from ROM
-        pool.SetHighWrite(false);
+        statusProvider.Mutate(b =>
+        {
+            b.StateHighRead = false;  // Read from ROM
+            b.StateHighWrite = false;
+        });
 
         // Act - Read from ROM regions
         byte valueD000 = pool.Read(0xD000);
@@ -786,22 +880,25 @@ public class MemoryPoolTests
         // Arrange
         var statusProvider = new SystemStatusProvider();
         var pool = new MemoryPool(statusProvider);
-        pool.SetBank1(true);
-        pool.SetHighRead(true);
-        pool.SetHighWrite(true);
-        pool.SetAltZp(false);
+        statusProvider.Mutate(b =>
+        {
+            b.StateUseBank1 = true;
+            b.StateHighRead = true;
+            b.StateHighWrite = true;
+            b.StateAltZp = false;
+        });
 
         // Pre-fill with known value
         pool.Write(0xD000, 0x99);
         
         // Disable writing
-        pool.SetHighWrite(false);
+        statusProvider.Mutate(b => b.StateHighWrite = false);
 
         // Act - Attempt write (should be ignored)
         pool.Write(0xD000, 0x11);
 
         // Assert - Original value should remain
-        pool.SetHighRead(true);
+        statusProvider.Mutate(b => b.StateHighRead = true);
         Assert.Equal(0x99, pool.Read(0xD000));
     }
 
@@ -811,26 +908,29 @@ public class MemoryPoolTests
         // Arrange
         var statusProvider = new SystemStatusProvider();
         var pool = new MemoryPool(statusProvider);
-        pool.SetHighRead(true);
-        pool.SetHighWrite(true);
-        pool.SetAltZp(false);
+        statusProvider.Mutate(b =>
+        {
+            b.StateHighRead = true;
+            b.StateHighWrite = true;
+            b.StateAltZp = false;
+        });
 
         // Act - Write to Bank 1
-        pool.SetBank1(true);
+        statusProvider.Mutate(b => b.StateUseBank1 = true);
         pool.Write(0xD000, 0xB1);
         pool.Write(0xD100, 0xB1);
 
         // Write to Bank 2
-        pool.SetBank1(false);
+        statusProvider.Mutate(b => b.StateUseBank1 = false);
         pool.Write(0xD000, 0xB2);
         pool.Write(0xD100, 0xB2);
 
         // Assert - Verify isolation
-        pool.SetBank1(true);
+        statusProvider.Mutate(b => b.StateUseBank1 = true);
         Assert.Equal(0xB1, pool.Read(0xD000));
         Assert.Equal(0xB1, pool.Read(0xD100));
 
-        pool.SetBank1(false);
+        statusProvider.Mutate(b => b.StateUseBank1 = false);
         Assert.Equal(0xB2, pool.Read(0xD000));
         Assert.Equal(0xB2, pool.Read(0xD100));
     }
@@ -841,26 +941,29 @@ public class MemoryPoolTests
         // Arrange
         var statusProvider = new SystemStatusProvider();
         var pool = new MemoryPool(statusProvider);
-        pool.SetHighRead(true);
-        pool.SetHighWrite(true);
-        pool.SetBank1(true);
+        statusProvider.Mutate(b =>
+        {
+            b.StateHighRead = true;
+            b.StateHighWrite = true;
+            b.StateUseBank1 = true;
+        });
 
         // Act - Write to main language card
-        pool.SetAltZp(false);
+        statusProvider.Mutate(b => b.StateAltZp = false);
         pool.Write(0xD000, 0xAA);
         pool.Write(0xE000, 0xBB);
 
         // Write to aux language card
-        pool.SetAltZp(true);
+        statusProvider.Mutate(b => b.StateAltZp = true);
         pool.Write(0xD000, 0xCC);
         pool.Write(0xE000, 0xDD);
 
         // Assert - Verify isolation
-        pool.SetAltZp(false);
+        statusProvider.Mutate(b => b.StateAltZp = false);
         Assert.Equal(0xAA, pool.Read(0xD000));
         Assert.Equal(0xBB, pool.Read(0xE000));
 
-        pool.SetAltZp(true);
+        statusProvider.Mutate(b => b.StateAltZp = true);
         Assert.Equal(0xCC, pool.Read(0xD000));
         Assert.Equal(0xDD, pool.Read(0xE000));
     }
@@ -875,7 +978,7 @@ public class MemoryPoolTests
         // Arrange
         var statusProvider = new SystemStatusProvider();
         var pool = new MemoryPool(statusProvider);
-        pool.SetAltZp(false);
+        statusProvider.Mutate(b => b.StateAltZp = false);
 
         // Act
         pool.Write(0x00, 0x11);
@@ -900,7 +1003,7 @@ public class MemoryPoolTests
         // Arrange
         var statusProvider = new SystemStatusProvider();
         var pool = new MemoryPool(statusProvider);
-        pool.SetAltZp(true);
+        statusProvider.Mutate(b => b.StateAltZp = true);
 
         // Act
         pool.Write(0x00, 0x55);
@@ -927,25 +1030,25 @@ public class MemoryPoolTests
         var pool = new MemoryPool(statusProvider);
 
         // Act - Write to main ZP
-        pool.SetAltZp(false);
+        statusProvider.Mutate(b => b.StateAltZp = false);
         pool.Write(0x00, 0x11);
         pool.Write(0x80, 0x22);
         pool.Write(0xFF, 0x33);
 
         // Write to aux ZP
-        pool.SetAltZp(true);
+        statusProvider.Mutate(b => b.StateAltZp = true);
         pool.Write(0x00, 0x44);
         pool.Write(0x80, 0x55);
         pool.Write(0xFF, 0x66);
 
         // Assert - Main ZP preserved
-        pool.SetAltZp(false);
+        statusProvider.Mutate(b => b.StateAltZp = false);
         Assert.Equal(0x11, pool.Read(0x00));
         Assert.Equal(0x22, pool.Read(0x80));
         Assert.Equal(0x33, pool.Read(0xFF));
 
         // Aux ZP preserved
-        pool.SetAltZp(true);
+        statusProvider.Mutate(b => b.StateAltZp = true);
         Assert.Equal(0x44, pool.Read(0x00));
         Assert.Equal(0x55, pool.Read(0x80));
         Assert.Equal(0x66, pool.Read(0xFF));
@@ -972,7 +1075,7 @@ public class MemoryPoolTests
         pool.InstallApple2ROM(testRom);
 
         // Assert - Verify ROM accessible at $D000-$FFFF
-        pool.SetHighRead(false); // Read from ROM
+        statusProvider.Mutate(b => b.StateHighRead = false); // Read from ROM
         
         Assert.Equal(0x00, pool.Read(0xD000));
         Assert.Equal(0x01, pool.Read(0xD001));
@@ -1011,7 +1114,7 @@ public class MemoryPoolTests
         pool.InstallApple2ROM(testRom);
 
         // Assert - Verify internal ROM slots loaded
-        pool.SetIntCxRom(true);
+        statusProvider.Mutate(b => b.StateIntCxRom = true);
         
         Assert.Equal(0x11, pool.Read(0xC100));
         Assert.Equal(0x12, pool.Read(0xC200));
@@ -1030,11 +1133,14 @@ public class MemoryPoolTests
         var pool = new MemoryPool(statusProvider);
         
         // Change settings
-        pool.SetRamRd(true);
-        pool.Set80Store(true);
-        pool.SetHighRead(true);
-        pool.SetHighWrite(true);
-        pool.SetAltZp(true);
+        statusProvider.Mutate(b =>
+        {
+            b.StateRamRd = true;
+            b.State80Store = true;
+            b.StateHighRead = true;
+            b.StateHighWrite = true;
+            b.StateAltZp = true;
+        });
         
         pool.Write(0x00, 0xAA);
         pool.Write(0xD000, 0xBB);
@@ -1043,11 +1149,14 @@ public class MemoryPoolTests
         pool.ResetRanges();
         
         // Reset soft switches manually
-        pool.SetRamRd(false);
-        pool.Set80Store(false);
-        pool.SetHighRead(false);
-        pool.SetHighWrite(false);
-        pool.SetAltZp(false);
+        statusProvider.Mutate(b =>
+        {
+            b.StateRamRd = false;
+            b.State80Store = false;
+            b.StateHighRead = false;
+            b.StateHighWrite = false;
+            b.StateAltZp = false;
+        });
         
         // Assert
         pool.Write(0x1000, 0xCC);
@@ -1087,8 +1196,11 @@ public class MemoryPoolTests
         // Arrange
         var statusProvider = new SystemStatusProvider();
         var pool = new MemoryPool(statusProvider);
-        pool.SetRamRd(true);
-        pool.SetRamWrt(true);
+        statusProvider.Mutate(b =>
+        {
+            b.StateRamRd = true;
+            b.StateRamWrt = true;
+        });
 
         // Act
         pool[0x1000] = 0x55;
@@ -1229,7 +1341,7 @@ public class MemoryPoolTests
         pool.MemoryWritten += (sender, args) => eventRaised = true;
 
         // Act - Attempt to write to write-protected ROM region
-        pool.SetHighWrite(false);
+        statusProvider.Mutate(b => b.StateHighWrite = false);
         pool.Write(0xD000, 0x42); // Write-protected
 
         // Assert - Event still raised even though write is ignored
@@ -1342,14 +1454,17 @@ public class MemoryPoolTests
         pool.MemoryWritten += (sender, args) => writtenAddresses.Add(args.Address);
 
         // Act - Write with different mappings
-        pool.SetRamWrt(false);
+        statusProvider.Mutate(b => b.StateRamWrt = false);
         pool.Write(0x1000, 0x01);
 
-        pool.SetRamWrt(true);
+        statusProvider.Mutate(b => b.StateRamWrt = true);
         pool.Write(0x1000, 0x02);
 
-        pool.Set80Store(true);
-        pool.SetPage2(true);
+        statusProvider.Mutate(b =>
+        {
+            b.State80Store = true;
+            b.StatePage2 = true;
+        });
         pool.Write(0x0400, 0x03);
 
         // Assert - All writes should trigger events
