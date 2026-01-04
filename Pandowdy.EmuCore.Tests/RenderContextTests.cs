@@ -129,7 +129,9 @@ public class RenderContextTests
 
         public SystemStatusSnapshot Current => _current;
         public event EventHandler<SystemStatusSnapshot>? Changed;
+#pragma warning disable CS0067 // Event is never used - test stub doesn't need to raise the event
         public event EventHandler<SystemStatusSnapshot>? MemoryMappingChanged;
+#pragma warning restore CS0067
         public IObservable<SystemStatusSnapshot> Stream => _subject;
 
         public void Mutate(Action<SystemStatusSnapshotBuilder> mutator)
@@ -216,15 +218,19 @@ public class RenderContextTests
         // Arrange
         var frameBuffer = new BitmapDataArray();
         var memReader = new TestMemoryReader();
-        
+
         // Act - Text mode OFF
-        var statusProvider1 = new TestStatusProvider();
-        statusProvider1.StateTextMode = false;
+        var statusProvider1 = new TestStatusProvider
+        {
+            StateTextMode = false
+        };
         var context1 = new RenderContext(frameBuffer, memReader, statusProvider1);
 
         // Act - Text mode ON
-        var statusProvider2 = new TestStatusProvider();
-        statusProvider2.StateTextMode = true;
+        var statusProvider2 = new TestStatusProvider
+        {
+            StateTextMode = true
+        };
         var context2 = new RenderContext(frameBuffer, memReader, statusProvider2);
 
         // Assert
@@ -240,12 +246,16 @@ public class RenderContextTests
         var memReader = new TestMemoryReader();
 
         // Act
-        var statusProvider1 = new TestStatusProvider();
-        statusProvider1.StateMixed = false;
+        var statusProvider1 = new TestStatusProvider
+        {
+            StateMixed = false
+        };
         var context1 = new RenderContext(frameBuffer, memReader, statusProvider1);
 
-        var statusProvider2 = new TestStatusProvider();
-        statusProvider2.StateMixed = true;
+        var statusProvider2 = new TestStatusProvider
+        {
+            StateMixed = true
+        };
         var context2 = new RenderContext(frameBuffer, memReader, statusProvider2);
 
         // Assert
@@ -261,12 +271,16 @@ public class RenderContextTests
         var memReader = new TestMemoryReader();
 
         // Act
-        var statusProvider1 = new TestStatusProvider();
-        statusProvider1.StateHiRes = false;
+        var statusProvider1 = new TestStatusProvider
+        {
+            StateHiRes = false
+        };
         var context1 = new RenderContext(frameBuffer, memReader, statusProvider1);
 
-        var statusProvider2 = new TestStatusProvider();
-        statusProvider2.StateHiRes = true;
+        var statusProvider2 = new TestStatusProvider
+        {
+            StateHiRes = true
+        };
         var context2 = new RenderContext(frameBuffer, memReader, statusProvider2);
 
         // Assert
@@ -282,12 +296,16 @@ public class RenderContextTests
         var memReader = new TestMemoryReader();
 
         // Act
-        var statusProvider1 = new TestStatusProvider();
-        statusProvider1.StatePage2 = false;
+        var statusProvider1 = new TestStatusProvider
+        {
+            StatePage2 = false
+        };
         var context1 = new RenderContext(frameBuffer, memReader, statusProvider1);
 
-        var statusProvider2 = new TestStatusProvider();
-        statusProvider2.StatePage2 = true;
+        var statusProvider2 = new TestStatusProvider
+        {
+            StatePage2 = true
+        };
         var context2 = new RenderContext(frameBuffer, memReader, statusProvider2);
 
         // Assert
@@ -507,11 +525,13 @@ public class RenderContextTests
         // Arrange
         var frameBuffer = new BitmapDataArray();
         var memReader = new TestMemoryReader();
-        var statusProvider = new TestStatusProvider();
-        statusProvider.StateTextMode = true;
-        statusProvider.StateMixed = true;
-        statusProvider.StateHiRes = true;
-        statusProvider.StatePage2 = true;
+        var statusProvider = new TestStatusProvider
+        {
+            StateTextMode = true,
+            StateMixed = true,
+            StateHiRes = true,
+            StatePage2 = true
+        };
 
         var context = new RenderContext(frameBuffer, memReader, statusProvider);
 
@@ -571,13 +591,14 @@ public class RenderContextTests
         // Arrange
         var frameBuffer = new BitmapDataArray();
         var memReader = new TestMemoryReader();
-        var statusProvider = new TestStatusProvider();
-        
-        // Set specific states
-        statusProvider.StateTextMode = false;
-        statusProvider.StateMixed = true;
-        statusProvider.StateHiRes = false;
-        statusProvider.StatePage2 = true;
+        var statusProvider = new TestStatusProvider
+        {
+            // Set specific states
+            StateTextMode = false,
+            StateMixed = true,
+            StateHiRes = false,
+            StatePage2 = true
+        };
 
         var context = new RenderContext(frameBuffer, memReader, statusProvider);
 

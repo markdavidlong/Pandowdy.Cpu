@@ -93,7 +93,7 @@ namespace Pandowdy.EmuCore.Tests
 
         private static VA2MBus CreateBus(StubSoftSwitchResponderAndSystemStatusProvider stub, out MemoryPool mem)
         {
-            mem = new MemoryPool();
+            mem = new MemoryPool(stub);
             ICpu cpu = new CPUAdapter(new Emulator.CPU());
             var bus = new VA2MBus(mem, stub, cpu);
             return bus;

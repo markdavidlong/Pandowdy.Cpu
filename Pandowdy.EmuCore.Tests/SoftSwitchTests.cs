@@ -31,10 +31,11 @@ public class SoftSwitchTests
     public void CountableVariable_SetValue_IncrementsCount()
     {
         // Arrange
-        var variable = new CountableVariable<int>(0);
-
-        // Act
-        variable.Value = 10;
+        var variable = new CountableVariable<int>(0)
+        {
+            // Act
+            Value = 10
+        };
 
         // Assert
         Assert.Equal(10, variable.Value);
@@ -45,10 +46,11 @@ public class SoftSwitchTests
     public void CountableVariable_SetSameValue_DoesNotIncrementCount()
     {
         // Arrange
-        var variable = new CountableVariable<int>(42);
-
-        // Act
-        variable.Value = 42;
+        var variable = new CountableVariable<int>(42)
+        {
+            // Act
+            Value = 42
+        };
         variable.Value = 42;
         variable.Value = 42;
 
@@ -61,10 +63,11 @@ public class SoftSwitchTests
     public void CountableVariable_MultipleChanges_TracksCount()
     {
         // Arrange
-        var variable = new CountableVariable<string>("initial");
-
-        // Act
-        variable.Value = "first";
+        var variable = new CountableVariable<string>("initial")
+        {
+            // Act
+            Value = "first"
+        };
         variable.Value = "second";
         variable.Value = "third";
 
@@ -77,8 +80,10 @@ public class SoftSwitchTests
     public void CountableVariable_ResetCount_ClearsCount()
     {
         // Arrange
-        var variable = new CountableVariable<int>(0);
-        variable.Value = 1;
+        var variable = new CountableVariable<int>(0)
+        {
+            Value = 1
+        };
         variable.Value = 2;
         variable.Value = 3;
         Assert.Equal(3, variable.Count);
@@ -95,8 +100,10 @@ public class SoftSwitchTests
     public void CountableVariable_ToString_ReturnsValueAndCount()
     {
         // Arrange
-        var variable = new CountableVariable<int>(42);
-        variable.Value = 99;
+        var variable = new CountableVariable<int>(42)
+        {
+            Value = 99
+        };
 
         // Act
         var result = variable.ToString();
@@ -124,8 +131,10 @@ public class SoftSwitchTests
     public void CountableVariable_ToDebugString_ReturnsDetails()
     {
         // Arrange
-        var variable = new CountableVariable<int>(10);
-        variable.Value = 20;
+        var variable = new CountableVariable<int>(10)
+        {
+            Value = 20
+        };
         variable.Value = 30;
 
         // Act
@@ -144,10 +153,11 @@ public class SoftSwitchTests
     public void CountableVariable_ChangeTracking_WorksCorrectly(int initial, int newValue, int expectedCount)
     {
         // Arrange
-        var variable = new CountableVariable<int>(initial);
-
-        // Act
-        variable.Value = newValue;
+        var variable = new CountableVariable<int>(initial)
+        {
+            // Act
+            Value = newValue
+        };
 
         // Assert
         Assert.Equal(expectedCount, variable.Count);
@@ -157,10 +167,11 @@ public class SoftSwitchTests
     public void CountableVariable_WithComplexType_TracksChanges()
     {
         // Arrange
-        var variable = new CountableVariable<List<int>>(new List<int> { 1, 2, 3 });
-
-        // Act
-        variable.Value = new List<int> { 4, 5, 6 };
+        var variable = new CountableVariable<List<int>>(new List<int> { 1, 2, 3 })
+        {
+            // Act
+            Value = new List<int> { 4, 5, 6 }
+        };
         variable.Value = new List<int> { 7, 8, 9 };
 
         // Assert
@@ -383,10 +394,11 @@ public class SoftSwitchTests
     public void SoftSwitch_SetValue_ChangesState()
     {
         // Arrange
-        var softSwitch = new SoftSwitch("RAMRD");
-
-        // Act
-        softSwitch.Value = true;
+        var softSwitch = new SoftSwitch("RAMRD")
+        {
+            // Act
+            Value = true
+        };
 
         // Assert
         Assert.True(softSwitch.Value);
@@ -457,10 +469,11 @@ public class SoftSwitchTests
     public void SoftSwitch_StateTransitions_TrackedCorrectly()
     {
         // Arrange
-        var softSwitch = new SoftSwitch("MIXED");
-
-        // Act - Simulate typical soft switch usage
-        softSwitch.Value = true;  // Enable
+        var softSwitch = new SoftSwitch("MIXED")
+        {
+            // Act - Simulate typical soft switch usage
+            Value = true  // Enable
+        };
         softSwitch.Value = false; // Disable
         softSwitch.Value = true;  // Enable again
 

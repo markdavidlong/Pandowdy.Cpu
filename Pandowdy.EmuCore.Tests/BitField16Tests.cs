@@ -21,10 +21,11 @@ public class BitField16Tests
     public void SetValue_UpdatesValue()
     {
         // Arrange
-        var bitfield = new BitField16();
-
-        // Act
-        bitfield.Value = 0x1234;
+        var bitfield = new BitField16
+        {
+            // Act
+            Value = 0x1234
+        };
 
         // Assert
         Assert.Equal(0x1234, bitfield.Value);

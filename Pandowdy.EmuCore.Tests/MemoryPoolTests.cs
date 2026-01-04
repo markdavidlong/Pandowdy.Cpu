@@ -1,3 +1,5 @@
+using Pandowdy.EmuCore.Services;
+
 namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
@@ -19,7 +21,8 @@ public class MemoryPoolTests
     /// </summary>
     private static MemoryPool BuildPool()
     {
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         
         // Fill main and aux memory
         for (int i = 0; i < 65536; i++)
@@ -703,7 +706,8 @@ public class MemoryPoolTests
     public void LanguageCard_Bank1_ReadWrite_WithBankSwitching()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         pool.SetBank1(true);
         pool.SetHighRead(true);
         pool.SetHighWrite(true);
@@ -731,7 +735,8 @@ public class MemoryPoolTests
     public void LanguageCard_Bank2_ReadWrite()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         pool.SetBank1(false);  // Select Bank 2
         pool.SetHighRead(true);
         pool.SetHighWrite(true);
@@ -754,7 +759,8 @@ public class MemoryPoolTests
     public void LanguageCard_ReadDisabled_ReadsFromROM()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         byte[] testRom = new byte[0x4000]; // 16K ROM
         for (int i = 0; i < testRom.Length; i++)
         {
@@ -778,7 +784,8 @@ public class MemoryPoolTests
     public void LanguageCard_WriteDisabled_ProtectsRAM()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         pool.SetBank1(true);
         pool.SetHighRead(true);
         pool.SetHighWrite(true);
@@ -802,7 +809,8 @@ public class MemoryPoolTests
     public void LanguageCard_Bank1VsBank2_Isolation()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         pool.SetHighRead(true);
         pool.SetHighWrite(true);
         pool.SetAltZp(false);
@@ -831,7 +839,8 @@ public class MemoryPoolTests
     public void LanguageCard_WithAltZp_UsesAuxMemory()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         pool.SetHighRead(true);
         pool.SetHighWrite(true);
         pool.SetBank1(true);
@@ -864,7 +873,8 @@ public class MemoryPoolTests
     public void AltZp_Off_UsesMainZeroPage()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         pool.SetAltZp(false);
 
         // Act
@@ -888,7 +898,8 @@ public class MemoryPoolTests
     public void AltZp_On_UsesAuxZeroPage()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         pool.SetAltZp(true);
 
         // Act
@@ -912,7 +923,8 @@ public class MemoryPoolTests
     public void AltZp_Switching_IsolatesMemory()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
 
         // Act - Write to main ZP
         pool.SetAltZp(false);
@@ -947,7 +959,8 @@ public class MemoryPoolTests
     public void InstallApple2ROM_LoadsCorrectly()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         byte[] testRom = new byte[0x4000]; // 16K ROM
         
         for (int i = 0; i < testRom.Length; i++)
@@ -972,7 +985,8 @@ public class MemoryPoolTests
     public void InstallApple2ROM_WrongSize_ThrowsException()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         byte[] wrongSizeRom = new byte[0x3000]; // Wrong size
 
         // Act & Assert
@@ -984,7 +998,8 @@ public class MemoryPoolTests
     public void InstallApple2ROM_LoadsInternalROMSlots()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         byte[] testRom = new byte[0x4000];
         
         for (int i = 0; i < testRom.Length; i++)
@@ -1011,7 +1026,8 @@ public class MemoryPoolTests
     public void ResetRanges_RestoresDefaultMappings()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         
         // Change settings
         pool.SetRamRd(true);
@@ -1042,7 +1058,8 @@ public class MemoryPoolTests
     public void Size_Returns64K()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
 
         // Assert
         Assert.Equal(0x10000, pool.Size);
@@ -1052,7 +1069,8 @@ public class MemoryPoolTests
     public void Indexer_ReadWrite()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
 
         // Act
         pool[0x1000] = 0x42;
@@ -1067,7 +1085,8 @@ public class MemoryPoolTests
     public void Indexer_WorksWithSoftSwitches()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         pool.SetRamRd(true);
         pool.SetRamWrt(true);
 
@@ -1118,7 +1137,8 @@ public class MemoryPoolTests
     public void MemoryWritten_Event_RaisedOnWrite()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         bool eventRaised = false;
         ushort capturedAddress = 0;
         byte? capturedValue = null;
@@ -1143,7 +1163,8 @@ public class MemoryPoolTests
     public void MemoryWritten_Event_NotRaisedOnRead()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         bool eventRaised = false;
 
         pool.MemoryWritten += (sender, args) => eventRaised = true;
@@ -1159,7 +1180,8 @@ public class MemoryPoolTests
     public void MemoryWritten_Event_MultipleWrites()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         int eventCount = 0;
         var addresses = new List<ushort>();
 
@@ -1183,7 +1205,8 @@ public class MemoryPoolTests
     public void MemoryWritten_Event_SenderIsMemoryPool()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         object? capturedSender = null;
 
         pool.MemoryWritten += (sender, args) => capturedSender = sender;
@@ -1199,7 +1222,8 @@ public class MemoryPoolTests
     public void MemoryWritten_Event_NotRaisedOnWriteProtectedRegion()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         bool eventRaised = false;
 
         pool.MemoryWritten += (sender, args) => eventRaised = true;
@@ -1217,7 +1241,8 @@ public class MemoryPoolTests
     public void MemoryWritten_Event_MultipleSubscribers()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         int subscriber1Count = 0;
         int subscriber2Count = 0;
         byte? subscriber1Value = null;
@@ -1253,7 +1278,8 @@ public class MemoryPoolTests
     public void MemoryWritten_Event_ZeroPageWrite()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         ushort capturedAddress = 0;
         byte? capturedValue = null;
 
@@ -1275,7 +1301,8 @@ public class MemoryPoolTests
     public void MemoryWritten_Event_TextPageWrite()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         ushort capturedAddress = 0;
 
         pool.MemoryWritten += (sender, args) => capturedAddress = args.Address;
@@ -1291,7 +1318,8 @@ public class MemoryPoolTests
     public void MemoryWritten_Event_HiResPageWrite()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         ushort capturedAddress = 0;
 
         pool.MemoryWritten += (sender, args) => capturedAddress = args.Address;
@@ -1307,7 +1335,8 @@ public class MemoryPoolTests
     public void MemoryWritten_Event_WithDifferentMemoryMappings()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
         var writtenAddresses = new List<ushort>();
 
         pool.MemoryWritten += (sender, args) => writtenAddresses.Add(args.Address);
@@ -1337,7 +1366,8 @@ public class MemoryPoolTests
     public void Dispose_ReleasesResources()
     {
         // Arrange
-        var pool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var pool = new MemoryPool(statusProvider);
 
         // Act & Assert - Should not throw
         pool.Dispose();

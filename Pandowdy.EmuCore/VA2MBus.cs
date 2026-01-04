@@ -416,7 +416,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// Initializes a new instance of the VA2MBus class.
     /// </summary>
     /// <param name="mempool">Memory pool managing 128KB Apple IIe memory space.</param>
-    /// <param name="responder">System status provider implementing ISoftSwitchResponder for status updates.</param>
+    /// <param name="statusProvider">System status provider implementing ISoftSwitchResponder for status updates.</param>
     /// <param name="cpu">CPU instance (6502 emulator) to connect to this bus.</param>
     /// <exception cref="ArgumentNullException">Thrown if any parameter is null.</exception>
     /// <remarks>
@@ -436,10 +436,10 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// of I/O space behavior.
     /// </para>
     /// </remarks>
-    public VA2MBus(MemoryPool mempool, ISystemStatusProvider responder, ICpu cpu)
+    public VA2MBus(MemoryPool mempool, ISystemStatusProvider statusProvider, ICpu cpu)
     {
-        ArgumentNullException.ThrowIfNull(responder);
-        ArgumentNullException.ThrowIfNull(responder);
+        ArgumentNullException.ThrowIfNull(mempool);
+        ArgumentNullException.ThrowIfNull(statusProvider);
         ArgumentNullException.ThrowIfNull(cpu);
         _memoryPool = mempool;
         _cpu = cpu;
@@ -449,7 +449,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         // Always add the MemoryPool as a responder (it needs to update memory mappings)
         _softSwitches.AddResponder(mempool);
 
-        if (responder is ISoftSwitchResponder softSwitchResponder)
+        if (statusProvider is ISoftSwitchResponder softSwitchResponder)
         {
             _softSwitches.AddResponder(softSwitchResponder);
         }

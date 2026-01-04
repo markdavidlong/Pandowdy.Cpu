@@ -53,10 +53,11 @@ public class FrameProviderTests
     public void IsGraphics_CanBeSet()
     {
         // Arrange
-        var provider = new FrameProvider();
-
-        // Act
-        provider.IsGraphics = true;
+        var provider = new FrameProvider
+        {
+            // Act
+            IsGraphics = true
+        };
 
         // Assert
         Assert.True(provider.IsGraphics);
@@ -66,10 +67,11 @@ public class FrameProviderTests
     public void IsMixed_CanBeSet()
     {
         // Arrange
-        var provider = new FrameProvider();
-
-        // Act
-        provider.IsMixed = true;
+        var provider = new FrameProvider
+        {
+            // Act
+            IsMixed = true
+        };
 
         // Assert
         Assert.True(provider.IsMixed);

@@ -39,6 +39,7 @@
 
 using Emulator;
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore
 {
@@ -528,8 +529,16 @@ namespace Pandowdy.EmuCore
         private readonly Memory<byte> _s6ext;
         private readonly Memory<byte> _s7ext;
 
-        public MemoryPool(int poolSize = 0x27F00, bool randomInit = false)
+        ISystemStatusProvider _status;
+
+        public MemoryPool(ISystemStatusProvider status, int poolSize = 0x27F00, bool randomInit = false)
         {
+            ArgumentNullException.ThrowIfNull(status);
+            _status = status;
+
+            // Subscribe to memory mapping changes
+            _status.MemoryMappingChanged += OnMemoryMappingChanged;
+
             _pool = new byte[poolSize];
             if (randomInit)
             {
@@ -599,6 +608,11 @@ namespace Pandowdy.EmuCore
 
             SetDefaultReadRanges();
             SetDefaultWriteRanges();
+        }
+
+        private void OnMemoryMappingChanged(object? sender, SystemStatusSnapshot e)
+        {
+            UpdateMemoryMappings();
         }
 
         public void ResetRanges()
@@ -949,6 +963,12 @@ namespace Pandowdy.EmuCore
 
         public void Dispose()
         {
+            // Unsubscribe from events
+            if (_status != null)
+            {
+                _status.MemoryMappingChanged -= OnMemoryMappingChanged;
+            }
+
             // Dispose logic if needed
             _mappingLock?.Dispose();
         }

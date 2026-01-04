@@ -278,7 +278,9 @@ public class FrameGeneratorTests
 
         public SystemStatusSnapshot Current => _current;
         public event EventHandler<SystemStatusSnapshot>? Changed;
+#pragma warning disable CS0067 // Event is never used - test stub doesn't need to raise the event
         public event EventHandler<SystemStatusSnapshot>? MemoryMappingChanged;
+#pragma warning restore CS0067
         public IObservable<SystemStatusSnapshot> Stream => _subject;
 
         public void Mutate(Action<SystemStatusSnapshotBuilder> mutator)

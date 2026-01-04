@@ -1,4 +1,5 @@
 using Pandowdy.EmuCore.Tests.Helpers;
+using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -397,7 +398,8 @@ public class VA2MTests
     public void MemoryPool_IsAccessibleAfterConstruction()
     {
         // Arrange
-        var memoryPool = new MemoryPool();
+        var statusProvider = new SystemStatusProvider();
+        var memoryPool = new MemoryPool(statusProvider);
         var va2m = VA2MTestHelpers.CreateBuilder()
             .WithMemoryPool(memoryPool)
             .Build();
@@ -544,7 +546,7 @@ public class VA2MTests
             .Build();
 
         // Act - Simulate typing "HELLO"
-        byte[] keys = { 0x48, 0x45, 0x4C, 0x4C, 0x4F }; // H E L L O
+        byte[] keys = [0x48, 0x45, 0x4C, 0x4C, 0x4F]; // H E L L O
         foreach (var key in keys)
         {
             va2m.InjectKey(key);

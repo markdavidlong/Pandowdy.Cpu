@@ -71,8 +71,8 @@ public class MainWindowFactoryTests
         public MainWindowFactoryFixture()
         {
             // Create core dependencies
-            var memoryPool = new MemoryPool();
             var statusProvider = new SystemStatusProvider();
+            var memoryPool = new MemoryPool(statusProvider);
             var stateProvider = new EmulatorStateProvider();
             var cpu = new CPUAdapter(new Emulator.CPU());
             var frameProvider = new FrameProvider();
@@ -184,6 +184,10 @@ public class MainWindowFactoryTests
 
     #region Factory Method Tests
 
+    // Suppress xUnit1004 for intentionally skipped tests that document behavior
+    // but cannot run in headless test environment (require full Avalonia Application context)
+#pragma warning disable xUnit1004 // Test methods should not be skipped
+
     [Fact(Skip = "ReactiveWindow requires full Application context for WhenActivated - not supported in headless mode")]
     public void Create_ReturnsMainWindowInstance()
     {
@@ -249,6 +253,8 @@ public class MainWindowFactoryTests
         Assert.NotNull(window.ViewModel);
         Assert.NotNull(window.DataContext);
     }
+
+#pragma warning restore xUnit1004 // Test methods should not be skipped
 
     #endregion
 

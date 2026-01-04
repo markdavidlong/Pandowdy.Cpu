@@ -36,8 +36,8 @@ public class VA2MBusTests
 
         public VA2MBusFixture()
         {
-            MemoryPool = new MemoryPool();
             StatusProvider = new SystemStatusProvider();
+            MemoryPool = new MemoryPool(StatusProvider);
             Cpu = new CPUAdapter(new CPU());
             Bus = new VA2MBus(MemoryPool, StatusProvider, Cpu);
         }
@@ -51,8 +51,8 @@ public class VA2MBusTests
     public void Constructor_WithValidParameters_InitializesSuccessfully()
     {
         // Arrange
-        var mempool = new MemoryPool();
         var status = new SystemStatusProvider();
+        var mempool = new MemoryPool(status);
         var cpu = new CPUAdapter(new CPU());
 
         // Act
@@ -68,7 +68,8 @@ public class VA2MBusTests
     public void Constructor_NullStatusProvider_ThrowsArgumentNullException()
     {
         // Arrange
-        var mempool = new MemoryPool();
+        var status = new SystemStatusProvider();
+        var mempool = new MemoryPool(status);
         var cpu = new CPUAdapter(new CPU());
 
         // Act & Assert
@@ -79,8 +80,8 @@ public class VA2MBusTests
     public void Constructor_NullCpu_ThrowsArgumentNullException()
     {
         // Arrange
-        var mempool = new MemoryPool();
         var status = new SystemStatusProvider();
+        var mempool = new MemoryPool(status);
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => new VA2MBus(mempool, status, null!));
@@ -491,10 +492,7 @@ public class VA2MBusTests
         // Arrange
         var fixture = new VA2MBusFixture();
         
-        // Act - Read initial state (note: might not default to true after constructor)
-        var initialValue = fixture.Bus.CpuRead(VA2MBus.RD_INTCXROM_);
-        
-        // Set it explicitly
+        // Act - Set INTCXROM explicitly
         fixture.Bus.CpuWrite(VA2MBus.INTCXROM_, 0);
         var valueOn = fixture.Bus.CpuRead(VA2MBus.RD_INTCXROM_);
         
@@ -985,16 +983,16 @@ public class VA2MBusTests
         
         // Act - Test write handlers
         fixture.Bus.CpuWrite(VA2MBus.B2_RD_RAM_NO_WRT_, 0);
-        var flags = (
+        var (StateHighRead, StateHighWrite, StatePreWrite) = (
             fixture.StatusProvider.StateHighRead,
             fixture.StatusProvider.StateHighWrite,
             fixture.StatusProvider.StatePreWrite
         );
 
         // Assert
-        Assert.True(flags.StateHighRead);
-        Assert.False(flags.StateHighWrite);
-        Assert.False(flags.StatePreWrite);
+        Assert.True(StateHighRead);
+        Assert.False(StateHighWrite);
+        Assert.False(StatePreWrite);
     }
 
     [Fact]
