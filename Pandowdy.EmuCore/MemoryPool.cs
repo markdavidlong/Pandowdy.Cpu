@@ -41,759 +41,758 @@ using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 
-namespace Pandowdy.EmuCore
+namespace Pandowdy.EmuCore;
+
+/// <summary>
+/// Event arguments for memory access notifications to non-UI consumers.
+/// </summary>
+/// <remarks>
+/// Used to notify observers (debuggers, trace logs, etc.) when memory is read or written.
+/// The <see cref="Value"/> is null for read notifications, non-null for write notifications.
+/// </remarks>
+public sealed class MemoryAccessEventArgs : EventArgs
 {
     /// <summary>
-    /// Event arguments for memory access notifications to non-UI consumers.
+    /// Gets the 16-bit address that was accessed ($0000-$FFFF).
     /// </summary>
+    public ushort Address { get; init; }
+    
+    /// <summary>
+    /// Gets the byte value that was written, or null if this was a read operation.
+    /// </summary>
+    public byte? Value { get; init; }
+}
+
+/// <summary>
+/// Manages Apple IIe memory (128KB RAM + ROM/I/O) using a slice-based pool architecture.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>⚠️ PERFORMANCE-OPTIMIZED DESIGN:</strong> This class uses a single backing
+/// array with memory slices to implement the Apple IIe's complex memory architecture.
+/// While fast, this design trades clarity for performance and will be refactored to
+/// improve maintainability in the future.
+/// </para>
+/// <para>
+/// <strong>Apple IIe Memory Architecture:</strong> The Apple IIe has 128KB of RAM
+/// (64KB main + 64KB auxiliary) plus 16KB of ROM and 4KB of I/O space. Memory is
+/// accessed through a 16-bit address space ($0000-$FFFF), but the actual physical
+/// memory accessed depends on soft switch settings.
+/// </para>
+/// <para>
+/// <strong>Memory Layout:</strong>
+/// <code>
+/// Pool Layout (163,072 bytes total):
+/// 
+/// Main Memory (64KB):
+///   $0000-$01FF: _m1  (512B)  - Zero Page + Stack
+///   $0200-$03FF: _m2  (512B)  - Input Buffer
+///   $0400-$07FF: _m3  (1KB)   - Text Page 1
+///   $0800-$1FFF: _m4  (6KB)   - Main RAM
+///   $2000-$3FFF: _m5  (8KB)   - Hi-Res Page 1
+///   $4000-$5FFF: _m6  (8KB)   - Hi-Res Page 2
+///   $6000-$BFFF: _m7  (24KB)  - Main RAM
+///   $C000-$CFFF: _m8a (4KB)   - Language Card Bank 1
+///   $D000-$DFFF: _m8b (4KB)   - Language Card Bank 2
+///   $E000-$FFFF: _m9  (8KB)   - Language Card High
+/// 
+/// Auxiliary Memory (64KB):
+///   $0000-$01FF: _a1  (512B)  - Aux Zero Page + Stack
+///   $0200-$03FF: _a2  (512B)  - Aux Input Buffer
+///   $0400-$07FF: _a3  (1KB)   - Aux Text Page 1
+///   $0800-$1FFF: _a4  (6KB)   - Aux RAM
+///   $2000-$3FFF: _a5  (8KB)   - Aux Hi-Res Page 1
+///   $4000-$5FFF: _a6  (8KB)   - Aux Hi-Res Page 2
+///   $6000-$BFFF: _a7  (24KB)  - Aux RAM
+///   $C000-$CFFF: _a8a (4KB)   - Aux Language Card Bank 1
+///   $D000-$DFFF: _a8b (4KB)   - Aux Language Card Bank 2
+///   $E000-$FFFF: _a9  (8KB)   - Aux Language Card High
+/// 
+/// ROM/I/O (16KB + 4KB):
+///   $C000-$C0FF: _io      (256B) - I/O Space
+///   $C100-$C7FF: _int1-7  (7×256B) - Internal ROM (per slot)
+///   $C800-$CFFF: _intext  (2KB)  - Extended Internal ROM
+///   $D000-$DFFF: _rom1    (4KB)  - Monitor ROM Bank 1
+///   $E000-$FFFF: _rom2    (8KB)  - Monitor ROM Bank 2 + Reset Vector
+/// 
+/// Slot ROMs (7 × 256B + 7 × 2KB extensions):
+///   $C100-$C7FF: _s1-7    (7×256B) - Slot ROM (1 page per slot)
+///   $C800-$CFFF: _s1ext-7 (7×2KB)  - Slot ROM extensions
+/// </code>
+/// </para>
+/// <para>
+/// <strong>Soft Switch Mapping:</strong> The Apple IIe uses soft switches to control
+/// which physical memory is mapped into the 64KB address space:
+/// <list type="bullet">
+/// <item><strong>RAMRD/RAMWRT:</strong> Select main vs auxiliary RAM for reads/writes</item>
+/// <item><strong>ALTZP:</strong> Select main vs auxiliary zero page and stack</item>
+/// <item><strong>80STORE:</strong> Page 2 selection for text/hi-res pages</item>
+/// <item><strong>HIRES:</strong> Hi-res page selection when 80STORE is active</item>
+/// <item><strong>PAGE2:</strong> Select page 1 vs page 2 for video</item>
+/// <item><strong>INTCXROM:</strong> Internal ROM vs slot ROMs ($C100-$C7FF)</item>
+/// <item><strong>SLOTC3ROM:</strong> Slot 3 ROM vs internal ROM</item>
+/// <item><strong>Language Card:</strong> Bank switching for $D000-$FFFF</item>
+/// </list>
+/// </para>
+/// <para>
+/// <strong>Slice-Based Performance:</strong> All memory regions are sliced from a single
+/// backing array. Mapping updates change which slices are active for each address range,
+/// providing fast remapping without copying data. Read/write operations use switch
+/// expressions for efficient address-to-slice lookup.
+/// </para>
+/// <para>
+/// <strong>Thread Safety:</strong> Memory mapping updates (soft switch changes) use a
+/// <see cref="ReaderWriterLockSlim"/> to allow concurrent reads while serializing
+/// mapping updates. This is important since the bus is accessed from the CPU thread
+/// while soft switches may be toggled from UI or I/O operations.
+/// </para>
+/// <para>
+/// <strong>Future Refactoring:</strong> This class will be refactored to improve clarity:
+/// <list type="bullet">
+/// <item>Explicit memory region classes instead of generic slices</item>
+/// <item>Strategy pattern for soft switch mapping rules</item>
+/// <item>Better separation between physical memory and address space</item>
+/// <item>Clearer documentation of Apple IIe memory model</item>
+/// </list>
+/// The refactoring will maintain performance while improving maintainability.
+/// </para>
+/// </remarks>
+public sealed class MemoryPool : IMemory, IMemoryAccessNotifier, IDirectMemoryPoolReader,  IDisposable
+{
+    //Methods from IMemory:
+    
+    /// <summary>
+    /// Gets the size of the addressable memory space (always 64KB for 6502).
+    /// </summary>
+    /// <value>65,536 bytes ($0000-$FFFF).</value>
     /// <remarks>
-    /// Used to notify observers (debuggers, trace logs, etc.) when memory is read or written.
-    /// The <see cref="Value"/> is null for read notifications, non-null for write notifications.
+    /// The 6502 has a 16-bit address bus, providing 64KB of address space. The actual
+    /// physical memory may be larger (128KB main+aux + ROM), but it's accessed through
+    /// this 64KB window via soft switch-controlled bank switching.
     /// </remarks>
-    public sealed class MemoryAccessEventArgs : EventArgs
-    {
-        /// <summary>
-        /// Gets the 16-bit address that was accessed ($0000-$FFFF).
-        /// </summary>
-        public ushort Address { get; init; }
-        
-        /// <summary>
-        /// Gets the byte value that was written, or null if this was a read operation.
-        /// </summary>
-        public byte? Value { get; init; }
-    }
+    public System.Int32 Size { get => 0x10000;  } // 64k addressable space
 
     /// <summary>
-    /// Manages Apple IIe memory (128KB RAM + ROM/I/O) using a slice-based pool architecture.
+    /// Reads a byte from the specified address in the mapped memory space.
+    /// </summary>
+    /// <param name="address">16-bit address to read from ($0000-$FFFF).</param>
+    /// <returns>Byte value at the mapped physical location for this address.</returns>
+    /// <remarks>
+    /// The physical memory accessed depends on current soft switch states (RAMRD, ALTZP,
+    /// etc.). This method delegates to <see cref="ReadMapped"/> which performs the
+    /// region-based lookup.
+    /// </remarks>
+    public byte Read(ushort address) => ReadMapped(address);
+    
+    /// <summary>
+    /// Writes a byte to the specified address in the mapped memory space.
+    /// </summary>
+    /// <param name="address">16-bit address to write to ($0000-$FFFF).</param>
+    /// <param name="value">Byte value to write.</param>
+    /// <remarks>
+    /// The physical memory accessed depends on current soft switch states (RAMWRT, ALTZP,
+    /// etc.). Write-protected regions (ROM, unmapped I/O) are silently ignored. This method
+    /// delegates to <see cref="WriteMapped"/>.
+    /// </remarks>
+    public void Write (ushort address, byte value) => WriteMapped(address, value);
+
+    /// <summary>
+    /// Gets or sets a byte at the specified address (indexer syntax).
+    /// </summary>
+    /// <param name="address">16-bit address ($0000-$FFFF).</param>
+    /// <returns>Byte value at the mapped physical location.</returns>
+    /// <remarks>
+    /// Provides array-like syntax for memory access: <c>memory[0x1000] = 0x42;</c>
+    /// Delegates to <see cref="ReadMapped"/> and <see cref="WriteMapped"/>.
+    /// </remarks>
+    public byte this[ushort address]
+    {
+        get => ReadMapped(address);
+        set => WriteMapped(address, value);
+    }
+
+    //Methods from IMemoryAccessNotifier:
+
+    /// <summary>
+    /// Event raised when memory is written to.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// <strong>⚠️ PERFORMANCE-OPTIMIZED DESIGN:</strong> This class uses a single backing
-    /// array with memory slices to implement the Apple IIe's complex memory architecture.
-    /// While fast, this design trades clarity for performance and will be refactored to
-    /// improve maintainability in the future.
-    /// </para>
-    /// <para>
-    /// <strong>Apple IIe Memory Architecture:</strong> The Apple IIe has 128KB of RAM
-    /// (64KB main + 64KB auxiliary) plus 16KB of ROM and 4KB of I/O space. Memory is
-    /// accessed through a 16-bit address space ($0000-$FFFF), but the actual physical
-    /// memory accessed depends on soft switch settings.
-    /// </para>
-    /// <para>
-    /// <strong>Memory Layout:</strong>
-    /// <code>
-    /// Pool Layout (163,072 bytes total):
-    /// 
-    /// Main Memory (64KB):
-    ///   $0000-$01FF: _m1  (512B)  - Zero Page + Stack
-    ///   $0200-$03FF: _m2  (512B)  - Input Buffer
-    ///   $0400-$07FF: _m3  (1KB)   - Text Page 1
-    ///   $0800-$1FFF: _m4  (6KB)   - Main RAM
-    ///   $2000-$3FFF: _m5  (8KB)   - Hi-Res Page 1
-    ///   $4000-$5FFF: _m6  (8KB)   - Hi-Res Page 2
-    ///   $6000-$BFFF: _m7  (24KB)  - Main RAM
-    ///   $C000-$CFFF: _m8a (4KB)   - Language Card Bank 1
-    ///   $D000-$DFFF: _m8b (4KB)   - Language Card Bank 2
-    ///   $E000-$FFFF: _m9  (8KB)   - Language Card High
-    /// 
-    /// Auxiliary Memory (64KB):
-    ///   $0000-$01FF: _a1  (512B)  - Aux Zero Page + Stack
-    ///   $0200-$03FF: _a2  (512B)  - Aux Input Buffer
-    ///   $0400-$07FF: _a3  (1KB)   - Aux Text Page 1
-    ///   $0800-$1FFF: _a4  (6KB)   - Aux RAM
-    ///   $2000-$3FFF: _a5  (8KB)   - Aux Hi-Res Page 1
-    ///   $4000-$5FFF: _a6  (8KB)   - Aux Hi-Res Page 2
-    ///   $6000-$BFFF: _a7  (24KB)  - Aux RAM
-    ///   $C000-$CFFF: _a8a (4KB)   - Aux Language Card Bank 1
-    ///   $D000-$DFFF: _a8b (4KB)   - Aux Language Card Bank 2
-    ///   $E000-$FFFF: _a9  (8KB)   - Aux Language Card High
-    /// 
-    /// ROM/I/O (16KB + 4KB):
-    ///   $C000-$C0FF: _io      (256B) - I/O Space
-    ///   $C100-$C7FF: _int1-7  (7×256B) - Internal ROM (per slot)
-    ///   $C800-$CFFF: _intext  (2KB)  - Extended Internal ROM
-    ///   $D000-$DFFF: _rom1    (4KB)  - Monitor ROM Bank 1
-    ///   $E000-$FFFF: _rom2    (8KB)  - Monitor ROM Bank 2 + Reset Vector
-    /// 
-    /// Slot ROMs (7 × 256B + 7 × 2KB extensions):
-    ///   $C100-$C7FF: _s1-7    (7×256B) - Slot ROM (1 page per slot)
-    ///   $C800-$CFFF: _s1ext-7 (7×2KB)  - Slot ROM extensions
-    /// </code>
-    /// </para>
-    /// <para>
-    /// <strong>Soft Switch Mapping:</strong> The Apple IIe uses soft switches to control
-    /// which physical memory is mapped into the 64KB address space:
-    /// <list type="bullet">
-    /// <item><strong>RAMRD/RAMWRT:</strong> Select main vs auxiliary RAM for reads/writes</item>
-    /// <item><strong>ALTZP:</strong> Select main vs auxiliary zero page and stack</item>
-    /// <item><strong>80STORE:</strong> Page 2 selection for text/hi-res pages</item>
-    /// <item><strong>HIRES:</strong> Hi-res page selection when 80STORE is active</item>
-    /// <item><strong>PAGE2:</strong> Select page 1 vs page 2 for video</item>
-    /// <item><strong>INTCXROM:</strong> Internal ROM vs slot ROMs ($C100-$C7FF)</item>
-    /// <item><strong>SLOTC3ROM:</strong> Slot 3 ROM vs internal ROM</item>
-    /// <item><strong>Language Card:</strong> Bank switching for $D000-$FFFF</item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// <strong>Slice-Based Performance:</strong> All memory regions are sliced from a single
-    /// backing array. Mapping updates change which slices are active for each address range,
-    /// providing fast remapping without copying data. Read/write operations use switch
-    /// expressions for efficient address-to-slice lookup.
-    /// </para>
-    /// <para>
-    /// <strong>Thread Safety:</strong> Memory mapping updates (soft switch changes) use a
-    /// <see cref="ReaderWriterLockSlim"/> to allow concurrent reads while serializing
-    /// mapping updates. This is important since the bus is accessed from the CPU thread
-    /// while soft switches may be toggled from UI or I/O operations.
-    /// </para>
-    /// <para>
-    /// <strong>Future Refactoring:</strong> This class will be refactored to improve clarity:
-    /// <list type="bullet">
-    /// <item>Explicit memory region classes instead of generic slices</item>
-    /// <item>Strategy pattern for soft switch mapping rules</item>
-    /// <item>Better separation between physical memory and address space</item>
-    /// <item>Clearer documentation of Apple IIe memory model</item>
-    /// </list>
-    /// The refactoring will maintain performance while improving maintainability.
-    /// </para>
+    /// Consumers (debuggers, trace logs, memory viewers) can subscribe to this event
+    /// to monitor memory writes. The event includes the address and value written.
+    /// Only fires for successful writes (not write-protected regions).
     /// </remarks>
-    public sealed class MemoryPool : IMemory, IMemoryAccessNotifier, IDirectMemoryPoolReader,  IDisposable
-    {
-        //Methods from IMemory:
-        
-        /// <summary>
-        /// Gets the size of the addressable memory space (always 64KB for 6502).
-        /// </summary>
-        /// <value>65,536 bytes ($0000-$FFFF).</value>
-        /// <remarks>
-        /// The 6502 has a 16-bit address bus, providing 64KB of address space. The actual
-        /// physical memory may be larger (128KB main+aux + ROM), but it's accessed through
-        /// this 64KB window via soft switch-controlled bank switching.
-        /// </remarks>
-        public System.Int32 Size { get => 0x10000;  } // 64k addressable space
+    public event EventHandler<MemoryAccessEventArgs>? MemoryWritten;
 
-        /// <summary>
-        /// Reads a byte from the specified address in the mapped memory space.
-        /// </summary>
-        /// <param name="address">16-bit address to read from ($0000-$FFFF).</param>
-        /// <returns>Byte value at the mapped physical location for this address.</returns>
-        /// <remarks>
-        /// The physical memory accessed depends on current soft switch states (RAMRD, ALTZP,
-        /// etc.). This method delegates to <see cref="ReadMapped"/> which performs the
-        /// region-based lookup.
-        /// </remarks>
-        public byte Read(ushort address) => ReadMapped(address);
-        
-        /// <summary>
-        /// Writes a byte to the specified address in the mapped memory space.
-        /// </summary>
-        /// <param name="address">16-bit address to write to ($0000-$FFFF).</param>
-        /// <param name="value">Byte value to write.</param>
-        /// <remarks>
-        /// The physical memory accessed depends on current soft switch states (RAMWRT, ALTZP,
-        /// etc.). Write-protected regions (ROM, unmapped I/O) are silently ignored. This method
-        /// delegates to <see cref="WriteMapped"/>.
-        /// </remarks>
-        public void Write (ushort address, byte value) => WriteMapped(address, value);
-
-        /// <summary>
-        /// Gets or sets a byte at the specified address (indexer syntax).
-        /// </summary>
-        /// <param name="address">16-bit address ($0000-$FFFF).</param>
-        /// <returns>Byte value at the mapped physical location.</returns>
-        /// <remarks>
-        /// Provides array-like syntax for memory access: <c>memory[0x1000] = 0x42;</c>
-        /// Delegates to <see cref="ReadMapped"/> and <see cref="WriteMapped"/>.
-        /// </remarks>
-        public byte this[ushort address]
-        {
-            get => ReadMapped(address);
-            set => WriteMapped(address, value);
-        }
-
-        //Methods from IMemoryAccessNotifier:
-
-        /// <summary>
-        /// Event raised when memory is written to.
-        /// </summary>
-        /// <remarks>
-        /// Consumers (debuggers, trace logs, memory viewers) can subscribe to this event
-        /// to monitor memory writes. The event includes the address and value written.
-        /// Only fires for successful writes (not write-protected regions).
-        /// </remarks>
-        public event EventHandler<MemoryAccessEventArgs>? MemoryWritten;
-
-        /// <summary>
-        /// Event raised when memory is read from.
-        /// </summary>
-        /// <remarks>
-        /// Currently not implemented (no reads trigger this event). Reserved for future
-        /// use by debuggers or profilers that need to track memory access patterns.
-        /// </remarks>
+    /// <summary>
+    /// Event raised when memory is read from.
+    /// </summary>
+    /// <remarks>
+    /// Currently not implemented (no reads trigger this event). Reserved for future
+    /// use by debuggers or profilers that need to track memory access patterns.
+    /// </remarks>
 #pragma warning disable CS0067 // Event is never used - reserved for future debugger/profiler support
-        public event EventHandler<MemoryAccessEventArgs>? MemoryRead;
+    public event EventHandler<MemoryAccessEventArgs>? MemoryRead;
 #pragma warning restore CS0067
 
 
-        //Methods from IDirectMemoryPoolReader:
-
-        /// <summary>
-        /// Reads directly from the main memory bank, bypassing soft switch mapping.
-        /// </summary>
-        /// <param name="address">Physical address in the pool (0-65535 for main bank).</param>
-        /// <returns>Byte value at the physical location.</returns>
-        /// <remarks>
-        /// <para>
-        /// <strong>Direct Access:</strong> This method bypasses the soft switch mapping system
-        /// and reads directly from the physical main memory bank. Used by debuggers, memory
-        /// viewers, and video renderers that need to see actual RAM contents regardless of
-        /// current bank switching.
-        /// </para>
-        /// <para>
-        /// <strong>Example:</strong> The video renderer needs to read from hi-res page 2 even
-        /// if PAGE2 is off, so it uses this method instead of the normal <see cref="Read"/> method.
-        /// </para>
-        /// </remarks>
-        public byte ReadRawMain(int address) => _systemRam.ReadRawMain(address);
-        
-        /// <summary>
-        /// Reads directly from the auxiliary memory bank, bypassing soft switch mapping.
-        /// </summary>
-        /// <param name="address">Physical address in the pool (0-65535 for aux bank).</param>
-        /// <returns>Byte value at the physical location.</returns>
-        /// <remarks>
-        /// <para>
-        /// <strong>Direct Access:</strong> Reads from the auxiliary 64KB bank (offset 0x10000
-        /// in the pool). Used for 80-column display, double hi-res graphics, and debugging.
-        /// </para>
-        /// <para>
-        /// <strong>Example:</strong> 80-column text mode interleaves main and auxiliary memory
-        /// for each character position, so the renderer uses this method to access aux memory
-        /// directly.
-        /// </para>
-        /// </remarks>
-        public byte ReadRawAux(int address) => _pool[(address & 0xffff) | 0x10000];
-
-
-
-        /// <summary>
-        /// The backing store - single contiguous byte array containing all memory regions.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// <strong>Size:</strong> 163,072 bytes (0x27F00):
-        /// <list type="bullet">
-        /// <item>Main RAM: 64KB (offset 0x00000)</item>
-        /// <item>Auxiliary RAM: 64KB (offset 0x10000)</item>
-        /// <item>ROM/I/O: 16KB + 4KB (offset 0x20000)</item>
-        /// <item>Slot ROMs: ~19KB (offset 0x24000)</item>
-        /// </list>
-        /// </para>
-        /// <para>
-        /// <strong>Performance:</strong> Single allocation eliminates GC pressure and provides
-        /// cache-friendly memory layout. All Memory&lt;byte&gt; slices reference this array.
-        /// </para>
-        /// </remarks>
-        private readonly byte[] _pool;
-        
-        /// <summary>
-        /// Gets the backing store array (for advanced/debugging use).
-        /// </summary>
-        /// <remarks>
-        /// Exposes the raw pool for scenarios that need direct memory access (save states,
-        /// memory dumps, advanced debugging). Use with caution - modifying the pool directly
-        /// bypasses all soft switch logic and mapping.
-        /// </remarks>
-        public byte[] Pool => _pool;
-
-        /// <summary>
-        /// Memory address ranges used for region-based mapping.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// <strong>Purpose:</strong> The Apple IIe's 64KB address space is divided into
-        /// regions based on how soft switches affect them. Each range has independent
-        /// mapping rules.
-        /// </para>
-        /// <para>
-        /// <strong>Region Boundaries:</strong>
-        /// <list type="bullet">
-        /// <item>$0000-$01FF: Zero page + Stack (ALTZP controls)</item>
-        /// <item>$0200-$03FF: Input buffer (RAMRD/RAMWRT control)</item>
-        /// <item>$0400-$07FF: Text page 1 (80STORE + PAGE2 control)</item>
-        /// <item>$0800-$1FFF: Main low RAM (RAMRD/RAMWRT control)</item>
-        /// <item>$2000-$3FFF: Hi-res page 1 (80STORE + HIRES + PAGE2 control)</item>
-        /// <item>$4000-$5FFF: Hi-res page 2 (RAMRD/RAMWRT control)</item>
-        /// <item>$6000-$BFFF: Main high RAM (RAMRD/RAMWRT control)</item>
-        /// <item>$C000-$C0FF: I/O space (always I/O)</item>
-        /// <item>$C100-$C7FF: Slot ROMs (INTCXROM + SLOTC3ROM control, per-slot)</item>
-        /// <item>$C800-$CFFF: Extended ROM (slot-selected or internal)</item>
-        /// <item>$D000-$DFFF: Language card bank (bank switching)</item>
-        /// <item>$E000-$FFFF: Language card high + reset vector (bank switching)</item>
-        /// </list>
-        /// </para>
-        /// </remarks>
-        public enum Ranges
-        {
-            Region_0000_01FF = 0,
-            Region_0200_03FF = 0x200,
-            Region_0400_07FF = 0x400,
-            Region_0800_1FFF = 0x800,
-            Region_2000_3FFF = 0x2000,
-            Region_4000_5FFF = 0x4000,
-            Region_6000_BFFF = 0x6000,
-            Region_C000_C0FF = 0xC000,
-            Region_C100_C1FF = 0xC100,
-            Region_C200_C2FF = 0xC200,
-            Region_C300_C3FF = 0xC300,
-            Region_C400_C4FF = 0xC400,
-            Region_C500_C5FF = 0xC500,
-            Region_C600_C6FF = 0xC600,
-            Region_C700_C7FF = 0xC700,
-            Region_C800_CFFF = 0xC800,
-            Region_D000_DFFF = 0xD000,
-            Region_E000_FFFF = 0xE000,
-            Region_SysRam = 0xFFFFFE,
-            Region_LangCard = 0xFFFFFF
-        }
-
-
-        // Nullable maps allow unmapped / write-protected regions; instance (was static)
-        private readonly Dictionary<Ranges, Memory<byte>?> _readRanges = [];
-
-        private readonly Dictionary<Ranges, Memory<byte>?> _writeRanges = [];
-
-
-        // Region slices (instance readonly; previously static)
-
-
-        private readonly Memory<byte> _io;
-
-        private readonly Memory<byte> _int1;
-        private readonly Memory<byte> _int2;
-        private readonly Memory<byte> _int3;
-        private readonly Memory<byte> _int4;
-        private readonly Memory<byte> _int5;
-        private readonly Memory<byte> _int6;
-        private readonly Memory<byte> _int7;
-        private readonly Memory<byte> _intext;
-
-
-        private readonly Memory<byte> _s1;
-        private readonly Memory<byte> _s2;
-        private readonly Memory<byte> _s3;
-        private readonly Memory<byte> _s4;
-        private readonly Memory<byte> _s5;
-        private readonly Memory<byte> _s6;
-        private readonly Memory<byte> _s7;
-
-        private readonly Memory<byte> _s1ext;
-        private readonly Memory<byte> _s2ext;
-        private readonly Memory<byte> _s3ext;
-        private readonly Memory<byte> _s4ext;
-        private readonly Memory<byte> _s5ext;
-        private readonly Memory<byte> _s6ext;
-        private readonly Memory<byte> _s7ext;
-
-        private const int RequiredRamSize = 0xC000; // 48KB
-
-
-        private ISystemStatusProvider _status;
-
-        private ILanguageCard _langCard;
-        private ISystemRamSelector _systemRam;
-
-
-        public MemoryPool(
-            ISystemStatusProvider status,
-            ILanguageCard langCard,
-            ISystemRamSelector systemRam,
-            int poolSize = 0x27F00,
-            bool randomInit = false)
-        {
-            ArgumentNullException.ThrowIfNull(status);
-            ArgumentNullException.ThrowIfNull(langCard);
-            ArgumentNullException.ThrowIfNull(systemRam);
-
-            _status = status;
-            _langCard = langCard;
-            _systemRam = Utility.ValidateIMemorySize(systemRam, nameof(systemRam), RequiredRamSize);
-
-            // Subscribe to memory mapping changes
-            _status.MemoryMappingChanged += OnMemoryMappingChanged;
-
-            _pool = new byte[poolSize];
-            if (randomInit)
-            {
-                var rnd = new Random();
-                rnd.NextBytes(_pool);
-            }
-            // Fill _pool with the value 0xA0
-            else
-            {
-                for (int i = 0; i < _pool.Length; i++)
-                {
-                    _pool[i] = 0x00; //0xA0;
-                }
-            }
-
-            // Create slices (offset, length) exactly as before
-            //_m1 = _pool.AsMemory(0x0000, 0x0200); // Default
-            //_m2 = _pool.AsMemory(0x0200, 0x0200); // Default
-            //_m3 = _pool.AsMemory(0x0400, 0x0400); // Default
-            //_m4 = _pool.AsMemory(0x0800, 0x1800); // Default
-            //_m5 = _pool.AsMemory(0x2000, 0x2000); // Default
-            //_m6 = _pool.AsMemory(0x4000, 0x2000); // Default
-            //_m7 = _pool.AsMemory(0x6000, 0x6000); // Default
-
-
-            //_a1 = _pool.AsMemory(0x10000, 0x0200);
-            //_a2 = _pool.AsMemory(0x10200, 0x0200);
-            //_a3 = _pool.AsMemory(0x10400, 0x0400);
-            //_a4 = _pool.AsMemory(0x10800, 0x1800);
-            //_a5 = _pool.AsMemory(0x12000, 0x2000);
-            //_a6 = _pool.AsMemory(0x14000, 0x2000);
-            //_a7 = _pool.AsMemory(0x16000, 0x6000);
-
-
-            _io = _pool.AsMemory(0x20000, 0x0100);
-
-            _int1 = _pool.AsMemory(0x20100, 0x0100);
-            _int2 = _pool.AsMemory(0x20200, 0x0100);
-            _int3 = _pool.AsMemory(0x20300, 0x0100);
-            _int4 = _pool.AsMemory(0x20400, 0x0100);
-            _int5 = _pool.AsMemory(0x20500, 0x0100);
-            _int6 = _pool.AsMemory(0x20600, 0x0100);
-            _int7 = _pool.AsMemory(0x20700, 0x0100);
-            _intext = _pool.AsMemory(0x20800, 0x0800); // Default
-
-
-            _s1 = _pool.AsMemory(0x24000, 0x0100); // Default
-            _s2 = _pool.AsMemory(0x24100, 0x0100); // Default
-            _s3 = _pool.AsMemory(0x24200, 0x0100); // Default
-            _s4 = _pool.AsMemory(0x24300, 0x0100); // Default
-            _s5 = _pool.AsMemory(0x24400, 0x0100); // Default
-            _s6 = _pool.AsMemory(0x24500, 0x0100); // Default
-            _s7 = _pool.AsMemory(0x24600, 0x0100); // Default
-
-            _s1ext = _pool.AsMemory(0x24700, 0x0800);
-            _s2ext = _pool.AsMemory(0x24F00, 0x0800);
-            _s3ext = _pool.AsMemory(0x25700, 0x0800);
-            _s4ext = _pool.AsMemory(0x25F00, 0x0800);
-            _s5ext = _pool.AsMemory(0x26700, 0x0800);
-            _s6ext = _pool.AsMemory(0x26F00, 0x0800);
-            _s7ext = _pool.AsMemory(0x27700, 0x0800);
-
-            SetDefaultReadRanges();
-            SetDefaultWriteRanges();
-        }
-
-        private void OnMemoryMappingChanged(object? sender, SystemStatusSnapshot e)
-        {
-            UpdateMemoryMappings();
-        }
-
-        public void ResetRanges()
-        {
-            SetDefaultReadRanges();
-            SetDefaultWriteRanges();
-        }
-
-        private void SetDefaultReadRanges()
-        {
-            _readRanges[Ranges.Region_C000_C0FF] = _io;
-            _readRanges[Ranges.Region_C100_C1FF] = _int1;
-            _readRanges[Ranges.Region_C200_C2FF] = _int2;
-            _readRanges[Ranges.Region_C300_C3FF] = _int3;
-            _readRanges[Ranges.Region_C400_C4FF] = _int4;
-            _readRanges[Ranges.Region_C500_C5FF] = _int5;
-            _readRanges[Ranges.Region_C600_C6FF] = _int6;
-            _readRanges[Ranges.Region_C700_C7FF] = _int7;
-            _readRanges[Ranges.Region_C800_CFFF] = _intext;
-
-        }
-
-        private void SetDefaultWriteRanges()
-        {
-            _writeRanges[Ranges.Region_C000_C0FF] = _io;
-            _writeRanges[Ranges.Region_C100_C1FF] = null;
-            _writeRanges[Ranges.Region_C200_C2FF] = null;
-            _writeRanges[Ranges.Region_C300_C3FF] = null;
-            _writeRanges[Ranges.Region_C400_C4FF] = null;
-            _writeRanges[Ranges.Region_C500_C5FF] = null;
-            _writeRanges[Ranges.Region_C600_C6FF] = null;
-            _writeRanges[Ranges.Region_C700_C7FF] = null;
-            _writeRanges[Ranges.Region_C800_CFFF] = null;
-
-        }
-
-
-
-        public byte ReadPool(int address) => _pool[address];
-
-        public void WritePool(int address, byte value) => _pool[address] = value;
-
-        private byte ReadFromRegion(Ranges region, int address)
-        {
-            _mappingLock.EnterReadLock();
-            try
-            {
-                _readRanges.TryGetValue(region, out var mem);
-                if (!mem.HasValue)
-                { return 0; }
-                var m = mem.Value;
-                int baseAddr = (int) region;
-                int offset = address - baseAddr;
-                if ((uint) offset >= m.Length)
-                { return 0; }
-                return m.Span[offset];
-            }
-            finally
-            {
-                _mappingLock.ExitReadLock();
-            }
-        }
-
-        private bool WriteToRegion(Ranges region, int address, byte value)
-        {
-            _mappingLock.EnterReadLock();
-            try
-            {
-                _writeRanges.TryGetValue(region, out var mem);
-                if (!mem.HasValue)
-                {
-                    return false;
-                }
-
-                var m = mem.Value;
-                int baseAddr = (int) region;
-                int offset = address - baseAddr;
-                if ((uint) offset >= m.Length)
-                {
-                    return false;
-                }
-
-                m.Span[offset] = value;
-                return true;
-            }
-            finally
-            {
-                _mappingLock.ExitReadLock();
-            }
-        }
-
-        public byte ReadMapped(ushort address) => address switch
-        {
-            //>= (ushort) Ranges.Region_E000_FFFF => ReadFromRegion(Ranges.Region_E000_FFFF, address),
-            //>= (ushort) Ranges.Region_D000_DFFF => ReadFromRegion(Ranges.Region_D000_DFFF, address),
-            >= (ushort) Ranges.Region_E000_FFFF => _langCard.Read(address),
-            >= (ushort) Ranges.Region_D000_DFFF => _langCard.Read(address),
-            >= (ushort) Ranges.Region_C800_CFFF => ReadFromRegion(Ranges.Region_C800_CFFF, address),
-            >= (ushort) Ranges.Region_C700_C7FF => ReadFromRegion(Ranges.Region_C700_C7FF, address),
-            >= (ushort) Ranges.Region_C600_C6FF => ReadFromRegion(Ranges.Region_C600_C6FF, address),
-            >= (ushort) Ranges.Region_C500_C5FF => ReadFromRegion(Ranges.Region_C500_C5FF, address),
-            >= (ushort) Ranges.Region_C400_C4FF => ReadFromRegion(Ranges.Region_C400_C4FF, address),
-            >= (ushort) Ranges.Region_C300_C3FF => ReadFromRegion(Ranges.Region_C300_C3FF, address),
-            >= (ushort) Ranges.Region_C200_C2FF => ReadFromRegion(Ranges.Region_C200_C2FF, address),
-            >= (ushort) Ranges.Region_C100_C1FF => ReadFromRegion(Ranges.Region_C100_C1FF, address),
-            >= (ushort) Ranges.Region_C000_C0FF => ReadFromRegion(Ranges.Region_C000_C0FF, address),
-            //>= (ushort) Ranges.Region_6000_BFFF => ReadFromRegion(Ranges.Region_6000_BFFF, address),
-            //>= (ushort) Ranges.Region_4000_5FFF => ReadFromRegion(Ranges.Region_4000_5FFF, address),
-            //>= (ushort) Ranges.Region_2000_3FFF => ReadFromRegion(Ranges.Region_2000_3FFF, address),
-            //>= (ushort) Ranges.Region_0800_1FFF => ReadFromRegion(Ranges.Region_0800_1FFF, address),
-            //>= (ushort) Ranges.Region_0400_07FF => ReadFromRegion(Ranges.Region_0400_07FF, address),
-            //>= (ushort) Ranges.Region_0200_03FF => ReadFromRegion(Ranges.Region_0200_03FF, address),
-            >= (ushort) Ranges.Region_6000_BFFF => _systemRam.Read(address),
-            >= (ushort) Ranges.Region_4000_5FFF => _systemRam.Read(address),
-            >= (ushort) Ranges.Region_2000_3FFF => _systemRam.Read(address),
-            >= (ushort) Ranges.Region_0800_1FFF => _systemRam.Read(address),
-            >= (ushort) Ranges.Region_0400_07FF => _systemRam.Read(address),
-            >= (ushort) Ranges.Region_0200_03FF => _systemRam.Read(address),
-            //_ => ReadFromRegion(Ranges.Region_0000_01FF, address)
-            _ => _systemRam.Read(address)
-        };
-
-        public void WriteMapped(ushort address, byte value)
-        {
-
-            var range = address switch
-            {
-              //  >= (ushort) Ranges.Region_E000_FFFF => Ranges.Region_E000_FFFF,
-              //  >= (ushort) Ranges.Region_D000_DFFF => Ranges.Region_D000_DFFF,
-                >= (ushort) Ranges.Region_E000_FFFF => Ranges.Region_LangCard,
-                >= (ushort) Ranges.Region_D000_DFFF => Ranges.Region_LangCard,
-                >= (ushort) Ranges.Region_C800_CFFF => Ranges.Region_C800_CFFF,
-                >= (ushort) Ranges.Region_C700_C7FF => Ranges.Region_C700_C7FF,
-                >= (ushort) Ranges.Region_C600_C6FF => Ranges.Region_C600_C6FF,
-                >= (ushort) Ranges.Region_C500_C5FF => Ranges.Region_C500_C5FF,
-                >= (ushort) Ranges.Region_C400_C4FF => Ranges.Region_C400_C4FF,
-                >= (ushort) Ranges.Region_C300_C3FF => Ranges.Region_C300_C3FF,
-                >= (ushort) Ranges.Region_C200_C2FF => Ranges.Region_C200_C2FF,
-                >= (ushort) Ranges.Region_C100_C1FF => Ranges.Region_C100_C1FF,
-                >= (ushort) Ranges.Region_C000_C0FF => Ranges.Region_C000_C0FF,
-                //>= (ushort) Ranges.Region_6000_BFFF => Ranges.Region_6000_BFFF,
-                //>= (ushort) Ranges.Region_4000_5FFF => Ranges.Region_4000_5FFF,
-                //>= (ushort) Ranges.Region_2000_3FFF => Ranges.Region_2000_3FFF,
-                //>= (ushort) Ranges.Region_0800_1FFF => Ranges.Region_0800_1FFF,
-                //>= (ushort) Ranges.Region_0400_07FF => Ranges.Region_0400_07FF,
-                //>= (ushort) Ranges.Region_0200_03FF => Ranges.Region_0200_03FF,
-                >= (ushort) Ranges.Region_6000_BFFF => Ranges.Region_SysRam,
-                >= (ushort) Ranges.Region_4000_5FFF => Ranges.Region_SysRam,
-                >= (ushort) Ranges.Region_2000_3FFF => Ranges.Region_SysRam,
-                >= (ushort) Ranges.Region_0800_1FFF => Ranges.Region_SysRam,
-                >= (ushort) Ranges.Region_0400_07FF => Ranges.Region_SysRam,
-                >= (ushort) Ranges.Region_0200_03FF => Ranges.Region_SysRam,
-                //_ => Ranges.Region_0000_01FF
-                _ => Ranges.Region_SysRam
-            };
-            var validWrite = true;
-            if (range == Ranges.Region_SysRam)
-            {
-                _systemRam.Write(address, value);
-            }
-            else if(range == Ranges.Region_LangCard)
-            {
-                _langCard.Write(address, value);
-            }
-            else
-            {
-                validWrite = WriteToRegion(range, address, value);
-            }
-            if (!validWrite)
-            {
-           //     Debug.WriteLine($"Write to unmapped address {address:X4} ignored."); return;
-            }
-            MemoryWritten?.Invoke(this, new MemoryAccessEventArgs { Address = address, Value = value});
-
-        }
-
-  
-
-
-        public void UpdateMemoryMappings()
-        {
-            //bool _altZp = _status.StateAltZp;
-            //bool _ramRd = _status.StateRamRd;
-            //bool _ramWrt = _status.StateRamWrt;
-            //bool _80Store = _status.State80Store;
-            //bool _page2 = _status.StatePage2;
-            //bool _highWrite = _status.StateHighWrite;
-            //bool _highRead = _status.StateHighRead;
-          //  bool _bank1 = _status.StateUseBank1;
-            //bool _hires = _status.StateHiRes;
-            bool _intCxRom = _status.StateIntCxRom;
-            bool _slotC3Rom = _status.StateSlotC3Rom;
-
-            _mappingLock.EnterWriteLock();
-            try
-            {
-                //_readRanges[Ranges.Region_0000_01FF] = _altZp ? _a1 : _m1;
-                //_writeRanges[Ranges.Region_0000_01FF] = _altZp ? _a1 : _m1;
-
-
-
-                //_readRanges[Ranges.Region_0200_03FF] = (_ramRd ? _a2 : _m2);
-                //_writeRanges[Ranges.Region_0200_03FF] = (_ramWrt ? _a2 : _m2);
-
-                //// $400-$7ff below
-
-                //_readRanges[Ranges.Region_0800_1FFF] = (_ramRd ? _a4 : _m4);
-                //_writeRanges[Ranges.Region_0800_1FFF] = (_ramWrt ? _a4 : _m4);
-
-                //// $2000-$3FFF below
-
-                //_readRanges[Ranges.Region_4000_5FFF] = (_ramRd ? _a6 : _m6);
-                //_writeRanges[Ranges.Region_4000_5FFF] = (_ramWrt ? _a6 : _m6);
-
-                //_readRanges[Ranges.Region_6000_BFFF] = (_ramRd ? _a7 : _m7);
-                //_writeRanges[Ranges.Region_6000_BFFF] = (_ramWrt ? _a7 : _m7);
-
-
-
-                //if (!_80Store)
-                //{
-                //    _readRanges[Ranges.Region_0400_07FF] = (_ramRd ? _a3 : _m3);
-                //    _readRanges[Ranges.Region_2000_3FFF] = (_ramRd ? _a5 : _m5);
-                //    _writeRanges[Ranges.Region_0400_07FF] = (_ramWrt ? _a3 : _m3);
-                //    _writeRanges[Ranges.Region_2000_3FFF] = (_ramWrt ? _a5 : _m5);
-                //}
-                //else
-                //{
-                //    _readRanges[Ranges.Region_0400_07FF] = (_page2 ? _a3 : _m3);
-                //    _writeRanges[Ranges.Region_0400_07FF] = (_page2 ? _a3 : _m3);
-                //    if (_hires)
-                //    {
-                //        _readRanges[Ranges.Region_2000_3FFF] = (_page2 ? _a5 : _m5);
-                //        _writeRanges[Ranges.Region_2000_3FFF] = (_page2 ? _a5 : _m5);
-                //    }
-                //    else
-                //    {
-                //        _readRanges[Ranges.Region_2000_3FFF] = (_ramRd ? _a5 : _m5);
-                //        _writeRanges[Ranges.Region_2000_3FFF] = (_ramWrt ? _a5 : _m5);
-                //    }
-                //}
-
+    //Methods from IDirectMemoryPoolReader:
+
+    /// <summary>
+    /// Reads directly from the main memory bank, bypassing soft switch mapping.
+    /// </summary>
+    /// <param name="address">Physical address in the pool (0-65535 for main bank).</param>
+    /// <returns>Byte value at the physical location.</returns>
+    /// <remarks>
+    /// <para>
+    /// <strong>Direct Access:</strong> This method bypasses the soft switch mapping system
+    /// and reads directly from the physical main memory bank. Used by debuggers, memory
+    /// viewers, and video renderers that need to see actual RAM contents regardless of
+    /// current bank switching.
+    /// </para>
+    /// <para>
+    /// <strong>Example:</strong> The video renderer needs to read from hi-res page 2 even
+    /// if PAGE2 is off, so it uses this method instead of the normal <see cref="Read"/> method.
+    /// </para>
+    /// </remarks>
+    public byte ReadRawMain(int address) => _systemRam.ReadRawMain(address);
     
+    /// <summary>
+    /// Reads directly from the auxiliary memory bank, bypassing soft switch mapping.
+    /// </summary>
+    /// <param name="address">Physical address in the pool (0-65535 for aux bank).</param>
+    /// <returns>Byte value at the physical location.</returns>
+    /// <remarks>
+    /// <para>
+    /// <strong>Direct Access:</strong> Reads from the auxiliary 64KB bank (offset 0x10000
+    /// in the pool). Used for 80-column display, double hi-res graphics, and debugging.
+    /// </para>
+    /// <para>
+    /// <strong>Example:</strong> 80-column text mode interleaves main and auxiliary memory
+    /// for each character position, so the renderer uses this method to access aux memory
+    /// directly.
+    /// </para>
+    /// </remarks>
+    public byte ReadRawAux(int address) => _pool[(address & 0xffff) | 0x10000];
 
-                // This will take the place of the card mechanism for now.
-                bool[] hasCard = [false, true, true, true, true, true, true, true]; // Slots 0-7 (0 -> unused)
 
-                _readRanges[Ranges.Region_C100_C1FF] = _intCxRom ? _int1 : (hasCard[1] ? _s1 : _int1);
-                _readRanges[Ranges.Region_C200_C2FF] = _intCxRom ? _int2 : (hasCard[2] ? _s2 : _int2);
-                _readRanges[Ranges.Region_C300_C3FF] = _intCxRom ? _int3 : (hasCard[3] ? _s3 : _int3);
-                _readRanges[Ranges.Region_C400_C4FF] = _intCxRom ? _int4 : (hasCard[4] ? _s4 : _int4);
-                _readRanges[Ranges.Region_C500_C5FF] = _intCxRom ? _int5 : (hasCard[5] ? _s5 : _int5);
-                _readRanges[Ranges.Region_C600_C6FF] = _intCxRom ? _int6 : (hasCard[6] ? _s6 : _int6);
-                _readRanges[Ranges.Region_C700_C7FF] = _intCxRom ? _int7 : (hasCard[7] ? _s7 : _int7);
-                _readRanges[Ranges.Region_C800_CFFF] = _intext; // TODO: This is hardcoded to internal rom right now
 
-                // Region_C300_C3FF
-                _readRanges[Ranges.Region_C300_C3FF] = (_intCxRom || !_slotC3Rom) ? _int3 : _s3;
-            }
-            finally
-            {
-                _mappingLock.ExitWriteLock();
-            }
-        }
+    /// <summary>
+    /// The backing store - single contiguous byte array containing all memory regions.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Size:</strong> 163,072 bytes (0x27F00):
+    /// <list type="bullet">
+    /// <item>Main RAM: 64KB (offset 0x00000)</item>
+    /// <item>Auxiliary RAM: 64KB (offset 0x10000)</item>
+    /// <item>ROM/I/O: 16KB + 4KB (offset 0x20000)</item>
+    /// <item>Slot ROMs: ~19KB (offset 0x24000)</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Performance:</strong> Single allocation eliminates GC pressure and provides
+    /// cache-friendly memory layout. All Memory&lt;byte&gt; slices reference this array.
+    /// </para>
+    /// </remarks>
+    private readonly byte[] _pool;
+    
+    /// <summary>
+    /// Gets the backing store array (for advanced/debugging use).
+    /// </summary>
+    /// <remarks>
+    /// Exposes the raw pool for scenarios that need direct memory access (save states,
+    /// memory dumps, advanced debugging). Use with caution - modifying the pool directly
+    /// bypasses all soft switch logic and mapping.
+    /// </remarks>
+    public byte[] Pool => _pool;
 
-        // Thread synchronization for memory mapping updates
-        private readonly ReaderWriterLockSlim _mappingLock = new(LockRecursionPolicy.NoRecursion);
+    /// <summary>
+    /// Memory address ranges used for region-based mapping.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Purpose:</strong> The Apple IIe's 64KB address space is divided into
+    /// regions based on how soft switches affect them. Each range has independent
+    /// mapping rules.
+    /// </para>
+    /// <para>
+    /// <strong>Region Boundaries:</strong>
+    /// <list type="bullet">
+    /// <item>$0000-$01FF: Zero page + Stack (ALTZP controls)</item>
+    /// <item>$0200-$03FF: Input buffer (RAMRD/RAMWRT control)</item>
+    /// <item>$0400-$07FF: Text page 1 (80STORE + PAGE2 control)</item>
+    /// <item>$0800-$1FFF: Main low RAM (RAMRD/RAMWRT control)</item>
+    /// <item>$2000-$3FFF: Hi-res page 1 (80STORE + HIRES + PAGE2 control)</item>
+    /// <item>$4000-$5FFF: Hi-res page 2 (RAMRD/RAMWRT control)</item>
+    /// <item>$6000-$BFFF: Main high RAM (RAMRD/RAMWRT control)</item>
+    /// <item>$C000-$C0FF: I/O space (always I/O)</item>
+    /// <item>$C100-$C7FF: Slot ROMs (INTCXROM + SLOTC3ROM control, per-slot)</item>
+    /// <item>$C800-$CFFF: Extended ROM (slot-selected or internal)</item>
+    /// <item>$D000-$DFFF: Language card bank (bank switching)</item>
+    /// <item>$E000-$FFFF: Language card high + reset vector (bank switching)</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    public enum Ranges
+    {
+        Region_0000_01FF = 0,
+        Region_0200_03FF = 0x200,
+        Region_0400_07FF = 0x400,
+        Region_0800_1FFF = 0x800,
+        Region_2000_3FFF = 0x2000,
+        Region_4000_5FFF = 0x4000,
+        Region_6000_BFFF = 0x6000,
+        Region_C000_C0FF = 0xC000,
+        Region_C100_C1FF = 0xC100,
+        Region_C200_C2FF = 0xC200,
+        Region_C300_C3FF = 0xC300,
+        Region_C400_C4FF = 0xC400,
+        Region_C500_C5FF = 0xC500,
+        Region_C600_C6FF = 0xC600,
+        Region_C700_C7FF = 0xC700,
+        Region_C800_CFFF = 0xC800,
+        Region_D000_DFFF = 0xD000,
+        Region_E000_FFFF = 0xE000,
+        Region_SysRam = 0xFFFFFE,
+        Region_LangCard = 0xFFFFFF
+    }
 
-        public void Dispose()
+
+    // Nullable maps allow unmapped / write-protected regions; instance (was static)
+    private readonly Dictionary<Ranges, Memory<byte>?> _readRanges = [];
+
+    private readonly Dictionary<Ranges, Memory<byte>?> _writeRanges = [];
+
+
+    // Region slices (instance readonly; previously static)
+
+
+    private readonly Memory<byte> _io;
+
+    private readonly Memory<byte> _int1;
+    private readonly Memory<byte> _int2;
+    private readonly Memory<byte> _int3;
+    private readonly Memory<byte> _int4;
+    private readonly Memory<byte> _int5;
+    private readonly Memory<byte> _int6;
+    private readonly Memory<byte> _int7;
+    private readonly Memory<byte> _intext;
+
+
+    private readonly Memory<byte> _s1;
+    private readonly Memory<byte> _s2;
+    private readonly Memory<byte> _s3;
+    private readonly Memory<byte> _s4;
+    private readonly Memory<byte> _s5;
+    private readonly Memory<byte> _s6;
+    private readonly Memory<byte> _s7;
+
+    private readonly Memory<byte> _s1ext;
+    private readonly Memory<byte> _s2ext;
+    private readonly Memory<byte> _s3ext;
+    private readonly Memory<byte> _s4ext;
+    private readonly Memory<byte> _s5ext;
+    private readonly Memory<byte> _s6ext;
+    private readonly Memory<byte> _s7ext;
+
+    private const int RequiredRamSize = 0xC000; // 48KB
+
+
+    private ISystemStatusProvider _status;
+
+    private ILanguageCard _langCard;
+    private ISystemRamSelector _systemRam;
+
+
+    public MemoryPool(
+        ISystemStatusProvider status,
+        ILanguageCard langCard,
+        ISystemRamSelector systemRam,
+        int poolSize = 0x27F00,
+        bool randomInit = false)
+    {
+        ArgumentNullException.ThrowIfNull(status);
+        ArgumentNullException.ThrowIfNull(langCard);
+        ArgumentNullException.ThrowIfNull(systemRam);
+
+        _status = status;
+        _langCard = langCard;
+        _systemRam = Utility.ValidateIMemorySize(systemRam, nameof(systemRam), RequiredRamSize);
+
+        // Subscribe to memory mapping changes
+        _status.MemoryMappingChanged += OnMemoryMappingChanged;
+
+        _pool = new byte[poolSize];
+        if (randomInit)
         {
-            // Unsubscribe from events
-            if (_status != null)
-            {
-                _status.MemoryMappingChanged -= OnMemoryMappingChanged;
-            }
-
-            // Dispose logic if needed
-            _mappingLock?.Dispose();
+            var rnd = new Random();
+            rnd.NextBytes(_pool);
         }
-
-        public void InstallApple2ROM(byte[] rom)
+        // Fill _pool with the value 0xA0
+        else
         {
-            // check rom size and throw if not 16k
-            if (rom.Length != 0x4000)
+            for (int i = 0; i < _pool.Length; i++)
             {
-                throw new Exception("Apple IIe ROM must be exactly 16KB in size.");
+                _pool[i] = 0x00; //0xA0;
+            }
+        }
+
+        // Create slices (offset, length) exactly as before
+        //_m1 = _pool.AsMemory(0x0000, 0x0200); // Default
+        //_m2 = _pool.AsMemory(0x0200, 0x0200); // Default
+        //_m3 = _pool.AsMemory(0x0400, 0x0400); // Default
+        //_m4 = _pool.AsMemory(0x0800, 0x1800); // Default
+        //_m5 = _pool.AsMemory(0x2000, 0x2000); // Default
+        //_m6 = _pool.AsMemory(0x4000, 0x2000); // Default
+        //_m7 = _pool.AsMemory(0x6000, 0x6000); // Default
+
+
+        //_a1 = _pool.AsMemory(0x10000, 0x0200);
+        //_a2 = _pool.AsMemory(0x10200, 0x0200);
+        //_a3 = _pool.AsMemory(0x10400, 0x0400);
+        //_a4 = _pool.AsMemory(0x10800, 0x1800);
+        //_a5 = _pool.AsMemory(0x12000, 0x2000);
+        //_a6 = _pool.AsMemory(0x14000, 0x2000);
+        //_a7 = _pool.AsMemory(0x16000, 0x6000);
+
+
+        _io = _pool.AsMemory(0x20000, 0x0100);
+
+        _int1 = _pool.AsMemory(0x20100, 0x0100);
+        _int2 = _pool.AsMemory(0x20200, 0x0100);
+        _int3 = _pool.AsMemory(0x20300, 0x0100);
+        _int4 = _pool.AsMemory(0x20400, 0x0100);
+        _int5 = _pool.AsMemory(0x20500, 0x0100);
+        _int6 = _pool.AsMemory(0x20600, 0x0100);
+        _int7 = _pool.AsMemory(0x20700, 0x0100);
+        _intext = _pool.AsMemory(0x20800, 0x0800); // Default
+
+
+        _s1 = _pool.AsMemory(0x24000, 0x0100); // Default
+        _s2 = _pool.AsMemory(0x24100, 0x0100); // Default
+        _s3 = _pool.AsMemory(0x24200, 0x0100); // Default
+        _s4 = _pool.AsMemory(0x24300, 0x0100); // Default
+        _s5 = _pool.AsMemory(0x24400, 0x0100); // Default
+        _s6 = _pool.AsMemory(0x24500, 0x0100); // Default
+        _s7 = _pool.AsMemory(0x24600, 0x0100); // Default
+
+        _s1ext = _pool.AsMemory(0x24700, 0x0800);
+        _s2ext = _pool.AsMemory(0x24F00, 0x0800);
+        _s3ext = _pool.AsMemory(0x25700, 0x0800);
+        _s4ext = _pool.AsMemory(0x25F00, 0x0800);
+        _s5ext = _pool.AsMemory(0x26700, 0x0800);
+        _s6ext = _pool.AsMemory(0x26F00, 0x0800);
+        _s7ext = _pool.AsMemory(0x27700, 0x0800);
+
+        SetDefaultReadRanges();
+        SetDefaultWriteRanges();
+    }
+
+    private void OnMemoryMappingChanged(object? sender, SystemStatusSnapshot e)
+    {
+        UpdateMemoryMappings();
+    }
+
+    public void ResetRanges()
+    {
+        SetDefaultReadRanges();
+        SetDefaultWriteRanges();
+    }
+
+    private void SetDefaultReadRanges()
+    {
+        _readRanges[Ranges.Region_C000_C0FF] = _io;
+        _readRanges[Ranges.Region_C100_C1FF] = _int1;
+        _readRanges[Ranges.Region_C200_C2FF] = _int2;
+        _readRanges[Ranges.Region_C300_C3FF] = _int3;
+        _readRanges[Ranges.Region_C400_C4FF] = _int4;
+        _readRanges[Ranges.Region_C500_C5FF] = _int5;
+        _readRanges[Ranges.Region_C600_C6FF] = _int6;
+        _readRanges[Ranges.Region_C700_C7FF] = _int7;
+        _readRanges[Ranges.Region_C800_CFFF] = _intext;
+
+    }
+
+    private void SetDefaultWriteRanges()
+    {
+        _writeRanges[Ranges.Region_C000_C0FF] = _io;
+        _writeRanges[Ranges.Region_C100_C1FF] = null;
+        _writeRanges[Ranges.Region_C200_C2FF] = null;
+        _writeRanges[Ranges.Region_C300_C3FF] = null;
+        _writeRanges[Ranges.Region_C400_C4FF] = null;
+        _writeRanges[Ranges.Region_C500_C5FF] = null;
+        _writeRanges[Ranges.Region_C600_C6FF] = null;
+        _writeRanges[Ranges.Region_C700_C7FF] = null;
+        _writeRanges[Ranges.Region_C800_CFFF] = null;
+
+    }
+
+
+
+    public byte ReadPool(int address) => _pool[address];
+
+    public void WritePool(int address, byte value) => _pool[address] = value;
+
+    private byte ReadFromRegion(Ranges region, int address)
+    {
+        _mappingLock.EnterReadLock();
+        try
+        {
+            _readRanges.TryGetValue(region, out var mem);
+            if (!mem.HasValue)
+            { return 0; }
+            var m = mem.Value;
+            int baseAddr = (int) region;
+            int offset = address - baseAddr;
+            if ((uint) offset >= m.Length)
+            { return 0; }
+            return m.Span[offset];
+        }
+        finally
+        {
+            _mappingLock.ExitReadLock();
+        }
+    }
+
+    private bool WriteToRegion(Ranges region, int address, byte value)
+    {
+        _mappingLock.EnterReadLock();
+        try
+        {
+            _writeRanges.TryGetValue(region, out var mem);
+            if (!mem.HasValue)
+            {
+                return false;
             }
 
-            // rom should be 16k with the rom data filling _io, _int1-_int7, _intext, _rom1, _rom2
-            rom.AsSpan(0x0000, 0x0100).CopyTo(_io.Span);
+            var m = mem.Value;
+            int baseAddr = (int) region;
+            int offset = address - baseAddr;
+            if ((uint) offset >= m.Length)
+            {
+                return false;
+            }
 
-            rom.AsSpan(0x0100, 0x0100).CopyTo(_int1.Span);
-            rom.AsSpan(0x0200, 0x0100).CopyTo(_int2.Span);
-            rom.AsSpan(0x0300, 0x0100).CopyTo(_int3.Span);
-            rom.AsSpan(0x0400, 0x0100).CopyTo(_int4.Span);
-            rom.AsSpan(0x0500, 0x0100).CopyTo(_int5.Span);
-            rom.AsSpan(0x0600, 0x0100).CopyTo(_int6.Span);
-            rom.AsSpan(0x0700, 0x0100).CopyTo(_int7.Span);
-
-            rom.AsSpan(0x0800, 0x0800).CopyTo(_intext.Span);
-
-          //  rom.AsSpan(0x1000, 0x1000).CopyTo(_rom1.Span);
-          //  rom.AsSpan(0x2000, 0x2000).CopyTo(_rom2.Span);
+            m.Span[offset] = value;
+            return true;
         }
+        finally
+        {
+            _mappingLock.ExitReadLock();
+        }
+    }
+
+    public byte ReadMapped(ushort address) => address switch
+    {
+        //>= (ushort) Ranges.Region_E000_FFFF => ReadFromRegion(Ranges.Region_E000_FFFF, address),
+        //>= (ushort) Ranges.Region_D000_DFFF => ReadFromRegion(Ranges.Region_D000_DFFF, address),
+        >= (ushort) Ranges.Region_E000_FFFF => _langCard.Read(address),
+        >= (ushort) Ranges.Region_D000_DFFF => _langCard.Read(address),
+        >= (ushort) Ranges.Region_C800_CFFF => ReadFromRegion(Ranges.Region_C800_CFFF, address),
+        >= (ushort) Ranges.Region_C700_C7FF => ReadFromRegion(Ranges.Region_C700_C7FF, address),
+        >= (ushort) Ranges.Region_C600_C6FF => ReadFromRegion(Ranges.Region_C600_C6FF, address),
+        >= (ushort) Ranges.Region_C500_C5FF => ReadFromRegion(Ranges.Region_C500_C5FF, address),
+        >= (ushort) Ranges.Region_C400_C4FF => ReadFromRegion(Ranges.Region_C400_C4FF, address),
+        >= (ushort) Ranges.Region_C300_C3FF => ReadFromRegion(Ranges.Region_C300_C3FF, address),
+        >= (ushort) Ranges.Region_C200_C2FF => ReadFromRegion(Ranges.Region_C200_C2FF, address),
+        >= (ushort) Ranges.Region_C100_C1FF => ReadFromRegion(Ranges.Region_C100_C1FF, address),
+        >= (ushort) Ranges.Region_C000_C0FF => ReadFromRegion(Ranges.Region_C000_C0FF, address),
+        //>= (ushort) Ranges.Region_6000_BFFF => ReadFromRegion(Ranges.Region_6000_BFFF, address),
+        //>= (ushort) Ranges.Region_4000_5FFF => ReadFromRegion(Ranges.Region_4000_5FFF, address),
+        //>= (ushort) Ranges.Region_2000_3FFF => ReadFromRegion(Ranges.Region_2000_3FFF, address),
+        //>= (ushort) Ranges.Region_0800_1FFF => ReadFromRegion(Ranges.Region_0800_1FFF, address),
+        //>= (ushort) Ranges.Region_0400_07FF => ReadFromRegion(Ranges.Region_0400_07FF, address),
+        //>= (ushort) Ranges.Region_0200_03FF => ReadFromRegion(Ranges.Region_0200_03FF, address),
+        >= (ushort) Ranges.Region_6000_BFFF => _systemRam.Read(address),
+        >= (ushort) Ranges.Region_4000_5FFF => _systemRam.Read(address),
+        >= (ushort) Ranges.Region_2000_3FFF => _systemRam.Read(address),
+        >= (ushort) Ranges.Region_0800_1FFF => _systemRam.Read(address),
+        >= (ushort) Ranges.Region_0400_07FF => _systemRam.Read(address),
+        >= (ushort) Ranges.Region_0200_03FF => _systemRam.Read(address),
+        //_ => ReadFromRegion(Ranges.Region_0000_01FF, address)
+        _ => _systemRam.Read(address)
+    };
+
+    public void WriteMapped(ushort address, byte value)
+    {
+
+        var range = address switch
+        {
+          //  >= (ushort) Ranges.Region_E000_FFFF => Ranges.Region_E000_FFFF,
+          //  >= (ushort) Ranges.Region_D000_DFFF => Ranges.Region_D000_DFFF,
+            >= (ushort) Ranges.Region_E000_FFFF => Ranges.Region_LangCard,
+            >= (ushort) Ranges.Region_D000_DFFF => Ranges.Region_LangCard,
+            >= (ushort) Ranges.Region_C800_CFFF => Ranges.Region_C800_CFFF,
+            >= (ushort) Ranges.Region_C700_C7FF => Ranges.Region_C700_C7FF,
+            >= (ushort) Ranges.Region_C600_C6FF => Ranges.Region_C600_C6FF,
+            >= (ushort) Ranges.Region_C500_C5FF => Ranges.Region_C500_C5FF,
+            >= (ushort) Ranges.Region_C400_C4FF => Ranges.Region_C400_C4FF,
+            >= (ushort) Ranges.Region_C300_C3FF => Ranges.Region_C300_C3FF,
+            >= (ushort) Ranges.Region_C200_C2FF => Ranges.Region_C200_C2FF,
+            >= (ushort) Ranges.Region_C100_C1FF => Ranges.Region_C100_C1FF,
+            >= (ushort) Ranges.Region_C000_C0FF => Ranges.Region_C000_C0FF,
+            //>= (ushort) Ranges.Region_6000_BFFF => Ranges.Region_6000_BFFF,
+            //>= (ushort) Ranges.Region_4000_5FFF => Ranges.Region_4000_5FFF,
+            //>= (ushort) Ranges.Region_2000_3FFF => Ranges.Region_2000_3FFF,
+            //>= (ushort) Ranges.Region_0800_1FFF => Ranges.Region_0800_1FFF,
+            //>= (ushort) Ranges.Region_0400_07FF => Ranges.Region_0400_07FF,
+            //>= (ushort) Ranges.Region_0200_03FF => Ranges.Region_0200_03FF,
+            >= (ushort) Ranges.Region_6000_BFFF => Ranges.Region_SysRam,
+            >= (ushort) Ranges.Region_4000_5FFF => Ranges.Region_SysRam,
+            >= (ushort) Ranges.Region_2000_3FFF => Ranges.Region_SysRam,
+            >= (ushort) Ranges.Region_0800_1FFF => Ranges.Region_SysRam,
+            >= (ushort) Ranges.Region_0400_07FF => Ranges.Region_SysRam,
+            >= (ushort) Ranges.Region_0200_03FF => Ranges.Region_SysRam,
+            //_ => Ranges.Region_0000_01FF
+            _ => Ranges.Region_SysRam
+        };
+        var validWrite = true;
+        if (range == Ranges.Region_SysRam)
+        {
+            _systemRam.Write(address, value);
+        }
+        else if(range == Ranges.Region_LangCard)
+        {
+            _langCard.Write(address, value);
+        }
+        else
+        {
+            validWrite = WriteToRegion(range, address, value);
+        }
+        if (!validWrite)
+        {
+       //     Debug.WriteLine($"Write to unmapped address {address:X4} ignored."); return;
+        }
+        MemoryWritten?.Invoke(this, new MemoryAccessEventArgs { Address = address, Value = value});
+
+    }
+
+
+
+
+    public void UpdateMemoryMappings()
+    {
+        //bool _altZp = _status.StateAltZp;
+        //bool _ramRd = _status.StateRamRd;
+        //bool _ramWrt = _status.StateRamWrt;
+        //bool _80Store = _status.State80Store;
+        //bool _page2 = _status.StatePage2;
+        //bool _highWrite = _status.StateHighWrite;
+        //bool _highRead = _status.StateHighRead;
+      //  bool _bank1 = _status.StateUseBank1;
+        //bool _hires = _status.StateHiRes;
+        bool _intCxRom = _status.StateIntCxRom;
+        bool _slotC3Rom = _status.StateSlotC3Rom;
+
+        _mappingLock.EnterWriteLock();
+        try
+        {
+            //_readRanges[Ranges.Region_0000_01FF] = _altZp ? _a1 : _m1;
+            //_writeRanges[Ranges.Region_0000_01FF] = _altZp ? _a1 : _m1;
+
+
+
+            //_readRanges[Ranges.Region_0200_03FF] = (_ramRd ? _a2 : _m2);
+            //_writeRanges[Ranges.Region_0200_03FF] = (_ramWrt ? _a2 : _m2);
+
+            //// $400-$7ff below
+
+            //_readRanges[Ranges.Region_0800_1FFF] = (_ramRd ? _a4 : _m4);
+            //_writeRanges[Ranges.Region_0800_1FFF] = (_ramWrt ? _a4 : _m4);
+
+            //// $2000-$3FFF below
+
+            //_readRanges[Ranges.Region_4000_5FFF] = (_ramRd ? _a6 : _m6);
+            //_writeRanges[Ranges.Region_4000_5FFF] = (_ramWrt ? _a6 : _m6);
+
+            //_readRanges[Ranges.Region_6000_BFFF] = (_ramRd ? _a7 : _m7);
+            //_writeRanges[Ranges.Region_6000_BFFF] = (_ramWrt ? _a7 : _m7);
+
+
+
+            //if (!_80Store)
+            //{
+            //    _readRanges[Ranges.Region_0400_07FF] = (_ramRd ? _a3 : _m3);
+            //    _readRanges[Ranges.Region_2000_3FFF] = (_ramRd ? _a5 : _m5);
+            //    _writeRanges[Ranges.Region_0400_07FF] = (_ramWrt ? _a3 : _m3);
+            //    _writeRanges[Ranges.Region_2000_3FFF] = (_ramWrt ? _a5 : _m5);
+            //}
+            //else
+            //{
+            //    _readRanges[Ranges.Region_0400_07FF] = (_page2 ? _a3 : _m3);
+            //    _writeRanges[Ranges.Region_0400_07FF] = (_page2 ? _a3 : _m3);
+            //    if (_hires)
+            //    {
+            //        _readRanges[Ranges.Region_2000_3FFF] = (_page2 ? _a5 : _m5);
+            //        _writeRanges[Ranges.Region_2000_3FFF] = (_page2 ? _a5 : _m5);
+            //    }
+            //    else
+            //    {
+            //        _readRanges[Ranges.Region_2000_3FFF] = (_ramRd ? _a5 : _m5);
+            //        _writeRanges[Ranges.Region_2000_3FFF] = (_ramWrt ? _a5 : _m5);
+            //    }
+            //}
+
+
+
+            // This will take the place of the card mechanism for now.
+            bool[] hasCard = [false, true, true, true, true, true, true, true]; // Slots 0-7 (0 -> unused)
+
+            _readRanges[Ranges.Region_C100_C1FF] = _intCxRom ? _int1 : (hasCard[1] ? _s1 : _int1);
+            _readRanges[Ranges.Region_C200_C2FF] = _intCxRom ? _int2 : (hasCard[2] ? _s2 : _int2);
+            _readRanges[Ranges.Region_C300_C3FF] = _intCxRom ? _int3 : (hasCard[3] ? _s3 : _int3);
+            _readRanges[Ranges.Region_C400_C4FF] = _intCxRom ? _int4 : (hasCard[4] ? _s4 : _int4);
+            _readRanges[Ranges.Region_C500_C5FF] = _intCxRom ? _int5 : (hasCard[5] ? _s5 : _int5);
+            _readRanges[Ranges.Region_C600_C6FF] = _intCxRom ? _int6 : (hasCard[6] ? _s6 : _int6);
+            _readRanges[Ranges.Region_C700_C7FF] = _intCxRom ? _int7 : (hasCard[7] ? _s7 : _int7);
+            _readRanges[Ranges.Region_C800_CFFF] = _intext; // TODO: This is hardcoded to internal rom right now
+
+            // Region_C300_C3FF
+            _readRanges[Ranges.Region_C300_C3FF] = (_intCxRom || !_slotC3Rom) ? _int3 : _s3;
+        }
+        finally
+        {
+            _mappingLock.ExitWriteLock();
+        }
+    }
+
+    // Thread synchronization for memory mapping updates
+    private readonly ReaderWriterLockSlim _mappingLock = new(LockRecursionPolicy.NoRecursion);
+
+    public void Dispose()
+    {
+        // Unsubscribe from events
+        if (_status != null)
+        {
+            _status.MemoryMappingChanged -= OnMemoryMappingChanged;
+        }
+
+        // Dispose logic if needed
+        _mappingLock?.Dispose();
+    }
+
+    public void InstallApple2ROM(byte[] rom)
+    {
+        // check rom size and throw if not 16k
+        if (rom.Length != 0x4000)
+        {
+            throw new Exception("Apple IIe ROM must be exactly 16KB in size.");
+        }
+
+        // rom should be 16k with the rom data filling _io, _int1-_int7, _intext, _rom1, _rom2
+        rom.AsSpan(0x0000, 0x0100).CopyTo(_io.Span);
+
+        rom.AsSpan(0x0100, 0x0100).CopyTo(_int1.Span);
+        rom.AsSpan(0x0200, 0x0100).CopyTo(_int2.Span);
+        rom.AsSpan(0x0300, 0x0100).CopyTo(_int3.Span);
+        rom.AsSpan(0x0400, 0x0100).CopyTo(_int4.Span);
+        rom.AsSpan(0x0500, 0x0100).CopyTo(_int5.Span);
+        rom.AsSpan(0x0600, 0x0100).CopyTo(_int6.Span);
+        rom.AsSpan(0x0700, 0x0100).CopyTo(_int7.Span);
+
+        rom.AsSpan(0x0800, 0x0800).CopyTo(_intext.Span);
+
+      //  rom.AsSpan(0x1000, 0x1000).CopyTo(_rom1.Span);
+      //  rom.AsSpan(0x2000, 0x2000).CopyTo(_rom2.Span);
     }
 }

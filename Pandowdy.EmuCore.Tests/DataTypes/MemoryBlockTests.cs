@@ -1,5 +1,5 @@
 using Xunit;
-using Pandowdy.EmuCore;
+using Pandowdy.EmuCore.DataTypes;
 
 namespace Pandowdy.EmuCore.Tests;
 

@@ -1,6 +1,8 @@
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 using System.Reactive.Subjects;
+using Pandowdy.EmuCore.DataTypes;
+
 
 namespace Pandowdy.EmuCore.Tests;
 

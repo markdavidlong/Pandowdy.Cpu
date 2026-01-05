@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace Pandowdy.EmuCore
+namespace Pandowdy.EmuCore.DataTypes
 {
     /// <summary>
     /// Multi-bitplane bitmap storage for Apple IIe display rendering (560×192 pixels, 16 bitplanes).

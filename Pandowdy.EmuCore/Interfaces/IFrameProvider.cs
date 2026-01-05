@@ -1,3 +1,5 @@
+using Pandowdy.EmuCore.DataTypes;
+
 namespace Pandowdy.EmuCore.Interfaces;
 
 /// <summary>

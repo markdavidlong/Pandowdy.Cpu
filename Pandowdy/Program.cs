@@ -9,6 +9,7 @@ using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.UI.ViewModels;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.DataTypes;
 
 namespace Pandowdy
 {

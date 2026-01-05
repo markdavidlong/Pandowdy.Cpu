@@ -1,8 +1,8 @@
 using System;
 using Xunit;
 using Emulator;
-using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.DataTypes;
 
 namespace Pandowdy.EmuCore.Tests;
 

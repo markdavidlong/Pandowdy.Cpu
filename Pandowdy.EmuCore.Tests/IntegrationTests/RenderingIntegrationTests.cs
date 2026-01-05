@@ -1,4 +1,5 @@
 using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.DataTypes;
 
 namespace Pandowdy.EmuCore.Tests.IntegrationTests;
 

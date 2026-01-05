@@ -1,8 +1,7 @@
 using Emulator;
 
-namespace Pandowdy.EmuCore.Interfaces
+namespace Pandowdy.EmuCore.Interfaces;
+
+public interface ISystemRam : IMemory
 {
-    public interface ISystemRam : IMemory
-    {
-    }
 }

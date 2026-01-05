@@ -1,7 +1,7 @@
 using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 
-namespace Pandowdy.EmuCore
+namespace Pandowdy.EmuCore.DataTypes
 {
     /// <summary>
     /// Simple contiguous memory block implementation for testing and basic memory emulation.

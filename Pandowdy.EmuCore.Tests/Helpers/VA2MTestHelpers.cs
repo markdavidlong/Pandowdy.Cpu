@@ -1,6 +1,7 @@
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 using Emulator;
+using Pandowdy.EmuCore.DataTypes;
 
 namespace Pandowdy.EmuCore.Tests.Helpers;
 
