@@ -46,3 +46,33 @@ _ReSharper*/
 .DS_Store
 Thumbs.db
 
+###################
+# DocFX Documentation
+###################
+
+# Generated site output
+docs/_site/
+
+# Generated API metadata
+docs/api/
+!docs/api/.gitkeep
+
+# Build artifacts
+docs/obj/
+docs/.manifest
+
+# Generated YAML (keep manual toc.yml)
+docs/**/*.yml
+!docs/toc.yml
+!docs/**/toc.yml
+
+# Log files
+docs/docfx.log
+
+# XML documentation (regenerated from source)
+**/bin/**/*.xml
+**/obj/**/*.xml
+
+# Keep embedded resources XML intact
+!**/Resources/**/*.xml
+
