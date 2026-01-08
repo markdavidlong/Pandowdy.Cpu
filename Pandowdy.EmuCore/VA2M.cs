@@ -71,6 +71,7 @@ using System.Diagnostics;
 using System.Collections.Concurrent;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.DataTypes;
 
 namespace Pandowdy.EmuCore;
 
@@ -237,7 +238,7 @@ public class VA2M : IDisposable, IKeyboardSetter
     private readonly IEmulatorState _stateSink; 
     
     /// <summary>
-    /// Frame provider sink for publishing rendered video frames.
+    /// Frame provider for publishing rendered video frames.
     /// </summary>
     private readonly IFrameProvider _frameSink; 
     
@@ -250,6 +251,21 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// Frame generator for rendering Apple IIe video output.
     /// </summary>
     private readonly IFrameGenerator _frameGenerator;
+    
+    /// <summary>
+    /// Rendering service for threaded frame rendering with automatic frame skipping.
+    /// </summary>
+    private readonly RenderingService _renderingService;
+    
+    /// <summary>
+    /// Pool for reusing video memory snapshots to avoid GC pressure.
+    /// </summary>
+    private readonly VideoMemorySnapshotPool _snapshotPool;
+    
+    /// <summary>
+    /// Frame counter for snapshot debugging and diagnostics.
+    /// </summary>
+    private ulong _frameCounter = 0;
 
     /// <summary>
     /// Flash timer that toggles StateFlashOn at ~2.1 Hz (Apple IIe cursor blink rate).
@@ -280,6 +296,8 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// <param name="bus">System bus coordinating CPU, memory, and I/O.</param>
     /// <param name="memoryPool">Memory pool managing 128KB Apple IIe memory.</param>
     /// <param name="frameGenerator">Frame generator for rendering video output.</param>
+    /// <param name="renderingService">Rendering service for threaded frame rendering.</param>
+    /// <param name="snapshotPool">Pool for reusing video memory snapshots.</param>
     /// <exception cref="ArgumentNullException">Thrown if any parameter is null.</exception>
     /// <remarks>
     /// <para>
@@ -301,7 +319,15 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// is registered to trigger frame rendering and flash state updates at ~60 Hz.
     /// </para>
     /// </remarks>
-    public VA2M(IEmulatorState stateSink, IFrameProvider frameSink, ISystemStatusProvider statusProvider, IAppleIIBus bus, MemoryPool memoryPool, IFrameGenerator frameGenerator )
+    public VA2M(
+        IEmulatorState stateSink, 
+        IFrameProvider frameSink, 
+        ISystemStatusProvider statusProvider, 
+        IAppleIIBus bus, 
+        MemoryPool memoryPool, 
+        IFrameGenerator frameGenerator,
+        RenderingService renderingService,
+        VideoMemorySnapshotPool snapshotPool)
     {
         ArgumentNullException.ThrowIfNull(stateSink);
         ArgumentNullException.ThrowIfNull(frameSink);
@@ -309,26 +335,25 @@ public class VA2M : IDisposable, IKeyboardSetter
         ArgumentNullException.ThrowIfNull(bus);
         ArgumentNullException.ThrowIfNull(memoryPool);
         ArgumentNullException.ThrowIfNull(frameGenerator);
-
-
+        ArgumentNullException.ThrowIfNull(renderingService);
+        ArgumentNullException.ThrowIfNull(snapshotPool);
 
         _stateSink = stateSink;
         _frameSink = frameSink;
         _sysStatusSink = statusProvider;
         _frameGenerator = frameGenerator;
+        _renderingService = renderingService;
+        _snapshotPool = snapshotPool;
         Bus = bus;
         MemoryPool = memoryPool;
         TryLoadEmbeddedRom("Pandowdy.EmuCore.Resources.a2e_enh_c-f.rom");
         
-   //     _cpu = new CPUAdapter(new CPU());
-    //   Bus = new VA2MBus(MemoryPool, _sysStatusSink as ISoftSwitchResponder, _cpu);
-        //Bus.Connect(_cpu);
         if (Bus is VA2MBus vb)
         {
             vb.VBlank += OnVBlank;
         }
-        // Start flash timer if status provider available
-    
+        
+        // Start flash timer
         _flashTimer = new Timer(_ =>
         {
             try
@@ -337,7 +362,6 @@ public class VA2M : IDisposable, IKeyboardSetter
             }
             catch { }
         }, null, FlashPeriod, FlashPeriod);
-       
     }
 
     
@@ -444,29 +468,91 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// <strong>Operations Performed:</strong>
     /// <list type="number">
     /// <item>Toggle flash state if timer has set the flag (cursor blinking)</item>
-    /// <item>Allocate a new render context from the frame generator</item>
-    /// <item>Render the current frame</item>
+    /// <item>Capture memory snapshot (~1-3 microseconds)</item>
+    /// <item>Attempt to enqueue snapshot for rendering (non-blocking)</item>
     /// </list>
     /// </para>
     /// <para>
+    /// <strong>Frame Skipping:</strong> If the rendering thread is still busy with the
+    /// previous frame, the new snapshot is returned to the pool and the frame is skipped.
+    /// This prevents blocking the emulator thread and allows it to run at full speed.
+    /// </para>
+    /// <para>
     /// <strong>Thread Context:</strong> Called on the emulator thread (VBlank is raised
-    /// during Bus.Clock() execution).
+    /// during Bus.Clock() execution). Never blocks - snapshot capture is ~1-3 μs.
     /// </para>
     /// </remarks>
     private void OnVBlank(object? sender, EventArgs e)
     {
         // Apply pending flash toggle at frame boundary for consistent rendering
-        if (System.Threading.Interlocked.Exchange(ref _pendingFlashToggle, 0) != 0)
+        if (Interlocked.Exchange(ref _pendingFlashToggle, 0) != 0)
         {
             _sysStatusSink.Mutate(s => s.StateFlashOn = !s.StateFlashOn);
         }
 
-
-        var renderContext = _frameGenerator.AllocateRenderContext();
-        _frameGenerator.RenderFrame(renderContext);
-
+        // Capture video memory snapshot (fast - ~1-3 microseconds)
+        var snapshot = CaptureVideoMemorySnapshot();
+        
+        // Try to enqueue for rendering (non-blocking check)
+        bool queued = _renderingService.TryEnqueueSnapshot(snapshot);
+        
+        // If frame was skipped, that's fine - rendering couldn't keep up
+        // Emulator continues at full speed, display shows last completed frame
     }
-
+    
+    /// <summary>
+    /// Captures a snapshot of video memory and soft switch states for threaded rendering.
+    /// </summary>
+    /// <returns>VideoMemorySnapshot containing all video-related memory and system status.</returns>
+    /// <remarks>
+    /// <para>
+    /// <strong>Performance:</strong> Uses efficient bulk copy operations via Span&lt;byte&gt;
+    /// to copy ~36KB of video memory in 1-3 microseconds (at 10-30 GB/s memory bandwidth
+    /// on modern CPUs). This is negligible compared to the 16.67ms frame budget.
+    /// </para>
+    /// <para>
+    /// <strong>Memory Regions Captured:</strong>
+    /// <list type="bullet">
+    /// <item>Main text pages: $0400-$07FF, $0800-$0BFF (2KB)</item>
+    /// <item>Main hi-res pages: $2000-$3FFF, $4000-$5FFF (16KB)</item>
+    /// <item>Aux text pages: $0400-$07FF, $0800-$0BFF (2KB)</item>
+    /// <item>Aux hi-res pages: $2000-$3FFF, $4000-$5FFF (16KB)</item>
+    /// </list>
+    /// Total: 36KB per snapshot
+    /// </para>
+    /// </remarks>
+    private VideoMemorySnapshot CaptureVideoMemorySnapshot()
+    {
+        var snapshot = _snapshotPool.Rent();
+        var systemRam = MemoryPool.SystemRam;
+        
+        // Allocate temporary buffers for full 48KB main/aux RAM
+        Span<byte> mainRam = stackalloc byte[0xC000]; // 48KB
+        Span<byte> auxRam = stackalloc byte[0xC000];  // 48KB
+        
+        // Bulk copy entire 48KB main and aux RAM (very fast!)
+        systemRam.CopyMainMemoryIntoSpan(mainRam);
+        systemRam.CopyAuxMemoryIntoSpan(auxRam);
+        
+        // Extract video memory regions from the copied buffers
+        // Main memory regions
+        mainRam.Slice(0x0400, 0x400).CopyTo(snapshot.MainPage1Text);    // $0400-$07FF
+        mainRam.Slice(0x0800, 0x400).CopyTo(snapshot.MainPage2Text);    // $0800-$0BFF
+        mainRam.Slice(0x2000, 0x2000).CopyTo(snapshot.MainPage1HiRes);  // $2000-$3FFF
+        mainRam.Slice(0x4000, 0x2000).CopyTo(snapshot.MainPage2HiRes);  // $4000-$5FFF
+        
+        // Auxiliary memory regions
+        auxRam.Slice(0x0400, 0x400).CopyTo(snapshot.AuxPage1Text);      // Aux $0400-$07FF
+        auxRam.Slice(0x0800, 0x400).CopyTo(snapshot.AuxPage2Text);      // Aux $0800-$0BFF
+        auxRam.Slice(0x2000, 0x2000).CopyTo(snapshot.AuxPage1HiRes);    // Aux $2000-$3FFF
+        auxRam.Slice(0x4000, 0x2000).CopyTo(snapshot.AuxPage2HiRes);    // Aux $4000-$5FFF
+        
+        // Capture soft switch state
+        snapshot.SoftSwitches = _sysStatusSink.Current;
+        snapshot.FrameNumber = _frameCounter++;
+        
+        return snapshot;
+    }
 
     /// <summary>
     /// Loads an embedded ROM resource into memory.
@@ -1014,7 +1100,14 @@ public class VA2M : IDisposable, IKeyboardSetter
             accuracyInfo += $" [SpinWait: {_adaptiveSpinWaitIterations}, ErrorAccum: {_throttleErrorAccumulator:F6}]";
         }
         
-        Debug.WriteLine($"[VA2M Performance] Effective MHz: {effectiveMhz:F3}{accuracyInfo} | Throttle: {(ThrottleEnabled ? "ON" : "OFF")} | Total Cycles: {currentCycles:N0}");
+        // Include timestamp and actual interval for debugging timing issues
+        Debug.WriteLine(
+            $"[VA2M Performance @ {DateTime.Now:HH:mm:ss.fff}] " +
+            $"Interval: {secondsElapsed:F2}s | " +
+            $"Effective MHz: {effectiveMhz:F3}{accuracyInfo} | " +
+            $"Throttle: {(ThrottleEnabled ? "ON" : "OFF")} | " +
+            $"Total Cycles: {currentCycles:N0}"
+        );
         
         // Update for next report
         _perfLastReportTicks = currentTicks;
@@ -1085,6 +1178,7 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// <strong>Cleanup Sequence:</strong>
     /// <list type="number">
     /// <item>Stop and dispose flash timer (~2.1 Hz cursor blink timer)</item>
+    /// <item>Stop and dispose rendering service (threaded rendering)</item>
     /// <item>Clear pending command queue to release enqueued actions</item>
     /// <item>Dispose bus (includes VBlank event cleanup)</item>
     /// <item>Suppress finalization (no unmanaged resources)</item>
@@ -1110,6 +1204,9 @@ public class VA2M : IDisposable, IKeyboardSetter
         // Dispose flash timer
         _flashTimer?.Dispose();
         _flashTimer = null;
+        
+        // Dispose rendering service (stops render thread)
+        _renderingService?.Dispose();
         
         // Clear pending queue
         while (_pending.TryDequeue(out _)) { }

@@ -19,6 +19,17 @@ public class SystemRamSelector(
     private readonly IFloatingBusProvider _floatingBus = floatingBus ?? throw new ArgumentNullException(nameof(floatingBus));
     private readonly ISystemStatusProvider _status = status ?? throw new ArgumentNullException(nameof(status));
 
+    public void CopyMainMemoryIntoSpan(Span<byte> destination) { _mainRam.CopyIntoSpan(destination); }
+    public bool CopyAuxMemoryIntoSpan(Span<byte> destination)
+    {
+        if (auxRam != null)
+        {
+            _auxRam!.CopyIntoSpan(destination);
+            return true;
+        }
+        return false;
+    }
+
 
     public int Size => RequiredRamSize; // 48kb addressable space
 

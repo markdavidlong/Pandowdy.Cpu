@@ -1,4 +1,5 @@
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.DataTypes;
 
 namespace Pandowdy.EmuCore.Services;
 
@@ -152,4 +153,133 @@ public class FrameGenerator : IFrameGenerator
         // Step 5: Invalidate the context to prevent accidental reuse
         context.Invalidate();
     }
+
+    /// <inheritdoc />
+    public void RenderFrameFromSnapshot(VideoMemorySnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(snapshot.SoftSwitches);
+        
+        // Allocate render context with borrowed frame buffer
+        var context = AllocateRenderContext();
+        
+        // Clear the frame buffer
+        context.ClearBuffer();
+        
+        // Create snapshot-based memory reader for renderer
+        var snapshotMemReader = new SnapshotMemoryReader(snapshot);
+        
+        // Create snapshot-based render context
+        var snapshotContext = new RenderContext(
+            context.FrameBuffer,
+            snapshotMemReader,
+            new SnapshotStatusProvider(snapshot.SoftSwitches));
+        
+        // Render using snapshot data
+        _renderer.Render(snapshotContext);
+        
+        // Annotate frame with display mode metadata
+        _frameProvider.IsGraphics = !snapshot.SoftSwitches.StateTextMode;
+        _frameProvider.IsMixed = snapshot.SoftSwitches.StateMixed;
+        
+        // Commit the buffer
+        _frameProvider.CommitWritable();
+        
+        // Invalidate context
+        context.Invalidate();
+    }
+}
+
+/// <summary>
+/// Snapshot-based memory reader for rendering from captured video memory.
+/// </summary>
+internal sealed class SnapshotMemoryReader : IDirectMemoryPoolReader
+{
+    private readonly VideoMemorySnapshot _snapshot;
+    
+    public SnapshotMemoryReader(VideoMemorySnapshot snapshot)
+    {
+        _snapshot = snapshot;
+    }
+    
+    public byte ReadRawMain(int address)
+    {
+        // Route reads to snapshot arrays based on address
+        return address switch
+        {
+            >= 0x0400 and < 0x0800 => _snapshot.MainPage1Text[address - 0x0400],
+            >= 0x0800 and < 0x0C00 => _snapshot.MainPage2Text[address - 0x0800],
+            >= 0x2000 and < 0x4000 => _snapshot.MainPage1HiRes[address - 0x2000],
+            >= 0x4000 and < 0x6000 => _snapshot.MainPage2HiRes[address - 0x4000],
+            _ => 0x00  // Outside video memory regions
+        };
+    }
+    
+    public byte ReadRawAux(int address)
+    {
+        // Route reads to snapshot's auxiliary arrays
+        return address switch
+        {
+            >= 0x0400 and < 0x0800 => _snapshot.AuxPage1Text[address - 0x0400],
+            >= 0x0800 and < 0x0C00 => _snapshot.AuxPage2Text[address - 0x0800],
+            >= 0x2000 and < 0x4000 => _snapshot.AuxPage1HiRes[address - 0x2000],
+            >= 0x4000 and < 0x6000 => _snapshot.AuxPage2HiRes[address - 0x4000],
+            _ => 0x00  // Outside video memory regions
+        };
+    }
+}
+
+/// <summary>
+/// Snapshot-based status provider for rendering from captured soft switch states.
+/// </summary>
+internal sealed class SnapshotStatusProvider : ISystemStatusProvider
+{
+    private readonly SystemStatusSnapshot _snapshot;
+    
+    public SnapshotStatusProvider(SystemStatusSnapshot snapshot)
+    {
+        _snapshot = snapshot;
+    }
+    
+    // Implement ISystemStatusProvider by returning snapshot values
+    public bool State80Store => _snapshot.State80Store;
+    public bool StateRamRd => _snapshot.StateRamRd;
+    public bool StateRamWrt => _snapshot.StateRamWrt;
+    public bool StateIntCxRom => _snapshot.StateIntCxRom;
+    public bool StateAltZp => _snapshot.StateAltZp;
+    public bool StateSlotC3Rom => _snapshot.StateSlotC3Rom;
+    public bool StatePb0 => _snapshot.StatePb0;
+    public bool StatePb1 => _snapshot.StatePb1;
+    public bool StatePb2 => _snapshot.StatePb2;
+    public bool StateAnn0 => _snapshot.StateAnn0;
+    public bool StateAnn1 => _snapshot.StateAnn1;
+    public bool StateAnn2 => _snapshot.StateAnn2;
+    public bool StateAnn3_DGR => _snapshot.StateAnn3_DGR;
+    public byte CurrentKey => _snapshot.StateCurrentKey;
+    public byte Pdl0 => _snapshot.StatePdl0;
+    public byte Pdl1 => _snapshot.StatePdl1;
+    public byte Pdl2 => _snapshot.StatePdl2;
+    public byte Pdl3 => _snapshot.StatePdl3;
+    public bool StatePage2 => _snapshot.StatePage2;
+    public bool StateHiRes => _snapshot.StateHiRes;
+    public bool StateMixed => _snapshot.StateMixed;
+    public bool StateTextMode => _snapshot.StateTextMode;
+    public bool StateShow80Col => _snapshot.StateShow80Col;
+    public bool StateAltCharSet => _snapshot.StateAltCharSet;
+    public bool StateFlashOn => _snapshot.StateFlashOn;
+    public bool StatePreWrite => _snapshot.StatePrewrite;
+    public bool StateUseBank1 => _snapshot.StateUseBank1;
+    public bool StateHighRead => _snapshot.StateHighRead;
+    public bool StateHighWrite => _snapshot.StateHighWrite;
+    public bool StateVBlank => _snapshot.StateVBlank;
+    public SystemStatusSnapshot Current => _snapshot;
+    
+    // Events not used during snapshot rendering
+#pragma warning disable CS0067
+    public event EventHandler<SystemStatusSnapshot>? Changed;
+    public event EventHandler<SystemStatusSnapshot>? MemoryMappingChanged;
+#pragma warning restore CS0067
+    
+    public IObservable<SystemStatusSnapshot> Stream => throw new NotSupportedException();
+    public void Mutate(Action<SystemStatusSnapshotBuilder> mutator) => throw new NotSupportedException();
 }

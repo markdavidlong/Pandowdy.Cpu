@@ -236,6 +236,7 @@ public sealed class MemoryPool : IMemory, IMemoryAccessNotifier, IDirectMemoryPo
     private ILanguageCard _langCard;
     private ISystemRamSelector _systemRam;
 
+    public ISystemRamSelector SystemRam { get => _systemRam; }
 
     public MemoryPool(
         ISystemStatusProvider status,

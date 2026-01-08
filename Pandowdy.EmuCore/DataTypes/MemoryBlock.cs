@@ -94,6 +94,12 @@ namespace Pandowdy.EmuCore.DataTypes
                 $"Memory size must be between 1 and {MaxSize} (0x{MaxSize:X}) bytes. ushort addresses cannot access beyond 64KB.")
             : new byte[size];
 
+
+        public void CopyIntoSpan(Span<byte> destination)
+        {
+            _data.AsSpan().CopyTo(destination);
+        }
+
         /// <summary>
         /// Gets the size of the memory block in bytes.
         /// </summary>

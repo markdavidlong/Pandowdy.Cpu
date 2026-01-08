@@ -64,6 +64,11 @@ public sealed class TestSystemRam(int size) : ISystemRam
         get => _memory[address];
         set => _memory[address] = value;
     }
+    
+    public void CopyIntoSpan(Span<byte> destination)
+    {
+        _memory.AsSpan().CopyTo(destination);
+    }
 }
 
 /// <summary>
@@ -123,11 +128,22 @@ public sealed class TestSystemRamSelector : ISystemRamSelector
     public byte ReadRawMain(int address) => 0xFF;
 
     public byte ReadRawAux(int address) => 0xFF;
+    
+    public void CopyMainMemoryIntoSpan(Span<byte> destination)
+    {
+        destination.Fill(0xFF);
+    }
+    
+    public bool CopyAuxMemoryIntoSpan(Span<byte> destination)
+    {
+        destination.Fill(0xFF);
+        return true;
+    }
 }
 
 public sealed class Test64KSystemRamSelector : ISystemRamSelector
 {
-    private byte[] data =  new byte[0xC000];
+    private byte[] data = new byte[0xC000];
     public int Size => 0xC000;
     public byte Read(ushort address) => data[address];
     public void Write(ushort address, byte value) { data[address] = value; }
@@ -138,7 +154,18 @@ public sealed class Test64KSystemRamSelector : ISystemRamSelector
     }
     public byte ReadRawMain(int address) => Read((ushort)(address & 0xffff));
 
-    public byte ReadRawAux(int address) => Read((ushort) (address & 0xffff));
+    public byte ReadRawAux(int address) => Read((ushort)(address & 0xffff));
+    
+    public void CopyMainMemoryIntoSpan(Span<byte> destination)
+    {
+        data.AsSpan().CopyTo(destination);
+    }
+    
+    public bool CopyAuxMemoryIntoSpan(Span<byte> destination)
+    {
+        data.AsSpan().CopyTo(destination);
+        return true;
+    }
 }
 
 /// <summary>

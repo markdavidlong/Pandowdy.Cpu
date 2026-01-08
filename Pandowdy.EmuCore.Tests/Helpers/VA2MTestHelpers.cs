@@ -71,13 +71,19 @@ public static class VA2MTestHelpers
 
         public VA2M Build()
         {
+            // Create rendering service and snapshot pool for tests
+            var snapshotPool = new VideoMemorySnapshotPool();
+            var renderingService = new RenderingService(_frameGenerator!, snapshotPool);
+            
             return new VA2M(
                 _emulatorState!,
                 _frameProvider!,
                 _systemStatusProvider!,
                 _bus!,
                 _memoryPool!,
-                _frameGenerator!
+                _frameGenerator!,
+                renderingService,
+                snapshotPool
             );
         }
     }
@@ -269,6 +275,12 @@ public class TestFrameGenerator : IFrameGenerator
         _renderCallCount++;
         _lastContext = context;
         context.Invalidate();
+    }
+    
+    public void RenderFrameFromSnapshot(VideoMemorySnapshot snapshot)
+    {
+        // Test implementation - just increment counter
+        _renderCallCount++;
     }
 
     // Test helpers

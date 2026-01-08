@@ -55,6 +55,10 @@ namespace Pandowdy
                     services.AddSingleton<IDisplayBitmapRenderer, LegacyBitmapRenderer>();
 
                     services.AddSingleton<IFrameGenerator, FrameGenerator>();
+                    
+                    // Threaded rendering services
+                    services.AddSingleton<VideoMemorySnapshotPool>(sp => new VideoMemorySnapshotPool(maxPoolSize: 4));
+                    services.AddSingleton<RenderingService>();
 
                     services.AddSingleton<SoftSwitches>();
 

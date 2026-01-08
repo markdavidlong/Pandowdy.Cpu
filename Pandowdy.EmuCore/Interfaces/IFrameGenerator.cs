@@ -1,5 +1,7 @@
 namespace Pandowdy.EmuCore.Interfaces;
 
+using Pandowdy.EmuCore.DataTypes;
+
 /// <summary>
 /// Coordinates the generation of video frames from Apple IIe system state.
 /// </summary>
@@ -87,4 +89,34 @@ public interface IFrameGenerator
     /// </para>
     /// </remarks>
     void RenderFrame(RenderContext context);
+
+    /// <summary>
+    /// Renders an Apple IIe video frame from a memory snapshot (threaded rendering).
+    /// </summary>
+    /// <param name="snapshot">
+    /// The <see cref="VideoMemorySnapshot"/> containing captured video memory and system status.
+    /// </param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Threaded Rendering:</strong> This method is designed to be called from a
+    /// separate rendering thread. It renders from a snapshot of video memory captured at
+    /// VBlank time, allowing the emulator thread to continue execution without blocking.
+    /// </para>
+    /// <para>
+    /// <strong>Rendering Process:</strong>
+    /// <list type="number">
+    /// <item>Allocates a render context with a frame buffer</item>
+    /// <item>Reads video data from the snapshot (not live memory)</item>
+    /// <item>Applies rendering based on snapshot's soft switch states</item>
+    /// <item>Publishes the rendered frame to the frame provider</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Performance:</strong> This method may take several milliseconds to complete
+    /// (typically 5-15ms depending on video mode and system). Running on a separate thread
+    /// prevents this from blocking the emulator's CPU emulation, allowing it to run at
+    /// full speed (11-13 MHz unthrottled).
+    /// </para>
+    /// </remarks>
+    void RenderFrameFromSnapshot(VideoMemorySnapshot snapshot);
 }
