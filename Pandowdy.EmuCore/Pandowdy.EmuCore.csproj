@@ -22,4 +22,9 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Enums\" />
+    <Folder Include="Utilities\" />
+  </ItemGroup>
+
 </Project>

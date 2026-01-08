@@ -1002,13 +1002,15 @@ bool showScanLines)
     /// <list type="number">
     /// <item>Check if input should be suppressed (after Alt or F-key)</item>
     /// <item>Convert newline to carriage return (Apple IIe convention)</item>
-    /// <item>Apply caps lock if enabled and character is lowercase letter</item>
+    /// <item>Apply emulator caps lock if enabled and character is lowercase letter</item>
     /// <item>Inject ASCII character with high bit set (Apple IIe key latch format)</item>
     /// </list>
     /// </para>
     /// <para>
-    /// <strong>Caps Lock Emulation:</strong> When enabled, converts lowercase letters (a-z)
-    /// to uppercase (A-Z) by subtracting 32 from ASCII value.
+    /// <strong>Caps Lock Emulation:</strong> When enabled, the Apple IIe keyboard was uppercase-only.
+    /// This emulates that behavior by converting lowercase input to uppercase. The TextInput event
+    /// provides the actual character typed (respecting physical keyboard Shift and Caps Lock states),
+    /// and we apply an additional software Caps Lock on top of that.
     /// </para>
     /// <para>
     /// <strong>High Bit:</strong> Apple IIe keyboard latch requires bit 7 set (OR with 0x80).
@@ -1029,13 +1031,21 @@ bool showScanLines)
         {
             return;
         }
+        
+        bool emuCapsLockState = IsCapsLockEnabled;
+        
         foreach (char ch in e.Text)
         {
             char c = ch == '\n' ? '\r' : ch;
-            if (IsCapsLockEnabled && c >= 'a' && c <= 'z')
+            
+            // Apply emulator caps lock conversion if:
+            // 1. Emulator caps lock is enabled, AND
+            // 2. Character is lowercase (from keyboard)
+            if (emuCapsLockState && c >= 'a' && c <= 'z')
             {
-                c = (char) (c - 32);
+                c = (char) (c - 32);  // Convert lowercase to uppercase
             }
+            
             if (c <= 0x7F)
             {
                 _machine.EnqueueKey((byte) ((byte) c | 0x80));
