@@ -142,6 +142,8 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
     /// </remarks>
 
     public byte ReadRawAux(int address) => _systemRam.ReadRawAux(address);
+
+
     /// <summary>
     /// The backing store - single contiguous byte array containing all memory regions.
     /// </summary>
@@ -174,7 +176,8 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
         Region_2000_3FFF = 0x2000,
         Region_4000_5FFF = 0x4000,
         Region_6000_BFFF = 0x6000,
-        Region_C000_C0FF = 0xC000,
+        Region_C000_C08F = 0xC000,
+        Region_C090_C0FF = 0xC090,
         Region_C100_C1FF = 0xC100,
         Region_C200_C2FF = 0xC200,
         Region_C300_C3FF = 0xC300,
@@ -185,6 +188,7 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
         Region_C800_CFFF = 0xC800,
         Region_D000_DFFF = 0xD000,
         Region_E000_FFFF = 0xE000,
+        Region_Slots = 0xFFFFFD,
         Region_SysRam = 0xFFFFFE,
         Region_LangCard = 0xFFFFFF
     }
@@ -229,6 +233,7 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
 
     private const int RequiredRamSize = 0xC000; // 48KB
 
+    private ISlots _slots;
 
     private ISystemStatusProvider _status;
 
@@ -241,13 +246,16 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
         ISystemStatusProvider status,
         ILanguageCard langCard,
         ISystemRamSelector systemRam,
+        ISlots slots,
         int poolSize = 0x27F00,
         bool randomInit = false)
     {
         ArgumentNullException.ThrowIfNull(status);
         ArgumentNullException.ThrowIfNull(langCard);
         ArgumentNullException.ThrowIfNull(systemRam);
+        ArgumentNullException.ThrowIfNull(slots);
 
+        _slots = slots;
         _status = status;
         _langCard = langCard;
         _systemRam = Utility.ValidateIMemorySize(systemRam, nameof(systemRam), RequiredRamSize);
@@ -270,23 +278,7 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
             }
         }
 
-        // Create slices (offset, length) exactly as before
-        //_m1 = _pool.AsMemory(0x0000, 0x0200); // Default
-        //_m2 = _pool.AsMemory(0x0200, 0x0200); // Default
-        //_m3 = _pool.AsMemory(0x0400, 0x0400); // Default
-        //_m4 = _pool.AsMemory(0x0800, 0x1800); // Default
-        //_m5 = _pool.AsMemory(0x2000, 0x2000); // Default
-        //_m6 = _pool.AsMemory(0x4000, 0x2000); // Default
-        //_m7 = _pool.AsMemory(0x6000, 0x6000); // Default
 
-
-        //_a1 = _pool.AsMemory(0x10000, 0x0200);
-        //_a2 = _pool.AsMemory(0x10200, 0x0200);
-        //_a3 = _pool.AsMemory(0x10400, 0x0400);
-        //_a4 = _pool.AsMemory(0x10800, 0x1800);
-        //_a5 = _pool.AsMemory(0x12000, 0x2000);
-        //_a6 = _pool.AsMemory(0x14000, 0x2000);
-        //_a7 = _pool.AsMemory(0x16000, 0x6000);
 
 
         _io = _pool.AsMemory(0x20000, 0x0100);
@@ -338,7 +330,8 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
 
     private void SetDefaultReadRanges()
     {
-        _readRanges[Ranges.Region_C000_C0FF] = _io;
+        _readRanges[Ranges.Region_C000_C08F] = _io;
+        _readRanges[Ranges.Region_C090_C0FF] = _io;
         _readRanges[Ranges.Region_C100_C1FF] = _int1;
         _readRanges[Ranges.Region_C200_C2FF] = _int2;
         _readRanges[Ranges.Region_C300_C3FF] = _int3;
@@ -352,7 +345,8 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
 
     private void SetDefaultWriteRanges()
     {
-        _writeRanges[Ranges.Region_C000_C0FF] = _io;
+        _writeRanges[Ranges.Region_C000_C08F] = _io;
+        _writeRanges[Ranges.Region_C090_C0FF] = _io;
         _writeRanges[Ranges.Region_C100_C1FF] = null;
         _writeRanges[Ranges.Region_C200_C2FF] = null;
         _writeRanges[Ranges.Region_C300_C3FF] = null;
@@ -366,9 +360,9 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
 
 
 
-    public byte ReadPool(int address) => _pool[address];
+    //public byte ReadPool(int address) => _pool[address];
 
-    public void WritePool(int address, byte value) => _pool[address] = value;
+    //public void WritePool(int address, byte value) => _pool[address] = value;
 
     private byte ReadFromRegion(Ranges region, int address)
     {
@@ -424,15 +418,16 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
 
         >= (ushort) Ranges.Region_E000_FFFF => _langCard.Read(address),
         >= (ushort) Ranges.Region_D000_DFFF => _langCard.Read(address),
-        >= (ushort) Ranges.Region_C800_CFFF => ReadFromRegion(Ranges.Region_C800_CFFF, address),
-        >= (ushort) Ranges.Region_C700_C7FF => ReadFromRegion(Ranges.Region_C700_C7FF, address),
-        >= (ushort) Ranges.Region_C600_C6FF => ReadFromRegion(Ranges.Region_C600_C6FF, address),
-        >= (ushort) Ranges.Region_C500_C5FF => ReadFromRegion(Ranges.Region_C500_C5FF, address),
-        >= (ushort) Ranges.Region_C400_C4FF => ReadFromRegion(Ranges.Region_C400_C4FF, address),
-        >= (ushort) Ranges.Region_C300_C3FF => ReadFromRegion(Ranges.Region_C300_C3FF, address),
-        >= (ushort) Ranges.Region_C200_C2FF => ReadFromRegion(Ranges.Region_C200_C2FF, address),
-        >= (ushort) Ranges.Region_C100_C1FF => ReadFromRegion(Ranges.Region_C100_C1FF, address),
-        >= (ushort) Ranges.Region_C000_C0FF => ReadFromRegion(Ranges.Region_C000_C0FF, address),
+        >= (ushort) Ranges.Region_C800_CFFF => _slots.Read((ushort) (address - 0xC000)), // ReadFromRegion(Ranges.Region_C800_CFFF, address),
+        >= (ushort) Ranges.Region_C700_C7FF => _slots.Read((ushort) (address - 0xC000)), // ReadFromRegion(Ranges.Region_C700_C7FF, address),
+        >= (ushort) Ranges.Region_C600_C6FF => _slots.Read((ushort) (address - 0xC000)), // ReadFromRegion(Ranges.Region_C600_C6FF, address),
+        >= (ushort) Ranges.Region_C500_C5FF => _slots.Read((ushort) (address - 0xC000)), // ReadFromRegion(Ranges.Region_C500_C5FF, address),
+        >= (ushort) Ranges.Region_C400_C4FF => _slots.Read((ushort) (address - 0xC000)), // ReadFromRegion(Ranges.Region_C400_C4FF, address),
+        >= (ushort) Ranges.Region_C300_C3FF => _slots.Read((ushort) (address - 0xC000)), // ReadFromRegion(Ranges.Region_C300_C3FF, address),
+        >= (ushort) Ranges.Region_C200_C2FF => _slots.Read((ushort) (address - 0xC000)), // ReadFromRegion(Ranges.Region_C200_C2FF, address),
+        >= (ushort) Ranges.Region_C100_C1FF => _slots.Read((ushort) (address - 0xC000)), // ReadFromRegion(Ranges.Region_C100_C1FF, address),
+        >= (ushort) Ranges.Region_C090_C0FF => _slots.Read((ushort) (address - 0xC000)), // ReadFromRegion(Ranges.Region_C090_C0FF, address),
+        >= (ushort) Ranges.Region_C000_C08F => ReadFromRegion(Ranges.Region_C000_C08F, address),
         >= (ushort) Ranges.Region_6000_BFFF => _systemRam.Read(address),
         >= (ushort) Ranges.Region_4000_5FFF => _systemRam.Read(address),
         >= (ushort) Ranges.Region_2000_3FFF => _systemRam.Read(address),
@@ -449,15 +444,16 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
         {
             >= (ushort) Ranges.Region_E000_FFFF => Ranges.Region_LangCard,
             >= (ushort) Ranges.Region_D000_DFFF => Ranges.Region_LangCard,
-            >= (ushort) Ranges.Region_C800_CFFF => Ranges.Region_C800_CFFF,
-            >= (ushort) Ranges.Region_C700_C7FF => Ranges.Region_C700_C7FF,
-            >= (ushort) Ranges.Region_C600_C6FF => Ranges.Region_C600_C6FF,
-            >= (ushort) Ranges.Region_C500_C5FF => Ranges.Region_C500_C5FF,
-            >= (ushort) Ranges.Region_C400_C4FF => Ranges.Region_C400_C4FF,
-            >= (ushort) Ranges.Region_C300_C3FF => Ranges.Region_C300_C3FF,
-            >= (ushort) Ranges.Region_C200_C2FF => Ranges.Region_C200_C2FF,
-            >= (ushort) Ranges.Region_C100_C1FF => Ranges.Region_C100_C1FF,
-            >= (ushort) Ranges.Region_C000_C0FF => Ranges.Region_C000_C0FF,
+            >= (ushort) Ranges.Region_C800_CFFF => Ranges.Region_Slots,
+            >= (ushort) Ranges.Region_C700_C7FF => Ranges.Region_Slots,
+            >= (ushort) Ranges.Region_C600_C6FF => Ranges.Region_Slots,
+            >= (ushort) Ranges.Region_C500_C5FF => Ranges.Region_Slots,
+            >= (ushort) Ranges.Region_C400_C4FF => Ranges.Region_Slots,
+            >= (ushort) Ranges.Region_C300_C3FF => Ranges.Region_Slots,
+            >= (ushort) Ranges.Region_C200_C2FF => Ranges.Region_Slots,
+            >= (ushort) Ranges.Region_C100_C1FF => Ranges.Region_Slots,
+            >= (ushort) Ranges.Region_C090_C0FF => Ranges.Region_Slots,
+            >= (ushort) Ranges.Region_C000_C08F => Ranges.Region_C000_C08F,
             >= (ushort) Ranges.Region_6000_BFFF => Ranges.Region_SysRam,
             >= (ushort) Ranges.Region_4000_5FFF => Ranges.Region_SysRam,
             >= (ushort) Ranges.Region_2000_3FFF => Ranges.Region_SysRam,
@@ -474,6 +470,10 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
         else if(range == Ranges.Region_LangCard)
         {
             _langCard.Write(address, value);
+        }
+        else if (range == Ranges.Region_Slots)
+        {
+            _slots.Write(address, value);
         }
         else
         {

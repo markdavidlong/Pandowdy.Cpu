@@ -50,6 +50,9 @@ namespace Pandowdy
 
                     services.AddSingleton<IGameControllerStatus, SimpleGameController>();
 
+                    services.AddSingleton<ICardFactory, CardFactory>();
+                    services.AddSingleton<ISlots, Slots>();
+
                     // EmuCore - Memory & Bus
                     services.AddSingleton<AddressSpaceController>();
 
@@ -64,7 +67,10 @@ namespace Pandowdy
                     services.AddSingleton<IFrameGenerator, FrameGenerator>();
 
                     services.AddSingleton<ISystemIoHandler, SystemIoHandler>();
-                    
+
+                    // Cards
+                    services.AddTransient<ICard, NullCard>();
+
                     // Threaded rendering services
                     services.AddSingleton<VideoMemorySnapshotPool>(sp => new VideoMemorySnapshotPool(maxPoolSize: 4));
                     services.AddSingleton<RenderingService>();
