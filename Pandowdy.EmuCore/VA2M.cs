@@ -435,7 +435,7 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// to prevent one bad command from crashing the emulator.
     /// </para>
     /// </remarks>
-    private void ProcessPending()
+    private void ProcessAnyPendingActions()
     {
         // Only process pending commands at instruction boundaries to maintain 6502 atomicity.
         // Without this check, a Reset() or InterruptRequest() from another thread could
@@ -619,7 +619,7 @@ public class VA2M : IDisposable, IKeyboardSetter
     public void Clock()
     {
         // Execute commands enqueued from other threads
-        ProcessPending();
+        ProcessAnyPendingActions();
         Bus.Clock();
         _throttleCycles++;
         if (ThrottleEnabled)
@@ -933,7 +933,7 @@ public class VA2M : IDisposable, IKeyboardSetter
                     // Check for pending commands periodically to reduce input latency
                     if (i % PendingCheckInterval == 0)
                     {
-                        ProcessPending();
+                        ProcessAnyPendingActions();
                     }
                     
                     Bus.Clock();
@@ -946,7 +946,7 @@ public class VA2M : IDisposable, IKeyboardSetter
                 }
                 
                 // Final pending check at end of batch
-                ProcessPending();
+                ProcessAnyPendingActions();
                 
                 // Apply adaptive throttling AFTER executing the batch
                 // This allows the PID controller to adjust delays based on actual execution time
@@ -963,7 +963,7 @@ public class VA2M : IDisposable, IKeyboardSetter
                     // Check for pending commands periodically in fast mode too
                     if (i % PendingCheckInterval == 0)
                     {
-                        ProcessPending();
+                        ProcessAnyPendingActions();
                     }
                     
                     Bus.Clock();
@@ -976,7 +976,7 @@ public class VA2M : IDisposable, IKeyboardSetter
                 }
                 
                 // Final pending check
-                ProcessPending();
+                ProcessAnyPendingActions();
                 
                 PublishState();
                 

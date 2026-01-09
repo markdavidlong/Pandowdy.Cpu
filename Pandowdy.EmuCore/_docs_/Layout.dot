@@ -59,10 +59,10 @@ digraph PandowdyEmuCore {
         color=lightcoral;
         
         IAppleIIBus [fillcolor=lightgreen, shape=ellipse, label="IAppleIIBus"];
-        VA2MBus [fillcolor=lightblue, label="VA2MBus\n(Singleton)\nMemory Router"];
+        VA2MBus [fillcolor=lightblue, label="VA2MBus\n(Singleton)\nMemory Router\nI/O Handler"];
         
-        ISystemIoHandler [fillcolor=lightgreen, shape=ellipse, label="ISystemIoHandler\n(Planned)"];
-        SystemIoHandler [fillcolor=lightyellow, label="SystemIoHandler\n(In Development)\nI/O Coordinator", style="filled,dashed"];
+        ISystemIoHandler [fillcolor=lightgreen, shape=ellipse, label="ISystemIoHandler\n(Planned)", style="filled,dashed"];
+        SystemIoHandler [fillcolor=lightyellow, label="SystemIoHandler\n(Future)\nI/O Coordinator", style="filled,dashed"];
     }
     
     // ========================================
@@ -76,8 +76,8 @@ digraph PandowdyEmuCore {
         
         IKeyboardSetter [fillcolor=lightgreen, shape=ellipse, label="IKeyboardSetter\nWrite Interface"];
 
-        IKeyboardReader [fillcolor=lightgreen, shape=ellipse, label="IKeyboardReader\nRead Interface"];
-        SingularKeyHandler [fillcolor=lightblue, label="SingularKeyHandler\n(Singleton)\nApple IIe Protocol"];
+        IKeyboardReader [fillcolor=lightgreen, shape=ellipse, label="IKeyboardReader\nRead Interface", style="filled,dashed"];
+        SingularKeyHandler [fillcolor=lightblue, label="SingularKeyHandler\n(Future)\nApple IIe Protocol", style="filled,dashed"];
     }
     
     // ========================================
@@ -140,7 +140,7 @@ digraph PandowdyEmuCore {
     }
     
     // ========================================
-    // STATE & STATUS SUBSYSTEM
+    // STATE & STATUS SUBSYSTEM (REFACTORED)
     // ========================================
     
     subgraph cluster_state {
@@ -148,17 +148,17 @@ digraph PandowdyEmuCore {
         style=filled;
         color=lavender;
         
-        // System Status
+        // System Status - NEW ARCHITECTURE
         SystemStatusProvider [fillcolor=lightblue, label="SystemStatusProvider\n(Singleton)\nObservable State"];
-        ISystemStatusProvider [fillcolor=lightgreen, shape=ellipse, label="ISystemStatusProvider\nState Reader"];
-        ISoftSwitchResponder [fillcolor=lightgreen, shape=ellipse, label="ISoftSwitchResponder\nState Writer"];
+        ISystemStatusProvider [fillcolor=lightgreen, shape=ellipse, label="ISystemStatusProvider\nRead-Only Interface"];
+        ISystemStatusMutator [fillcolor=lightgreen, shape=ellipse, label="ISystemStatusMutator\nRead-Write Interface\n(extends ISystemStatusProvider)"];
         
         // Emulator State
         IEmulatorState [fillcolor=lightgreen, shape=ellipse, label="IEmulatorState"];
         EmulatorStateProvider [fillcolor=lightblue, label="EmulatorStateProvider\n(Singleton)\nCPU State"];
         
-        // Soft Switches (DI Managed)
-        SoftSwitches [fillcolor=lightblue, label="SoftSwitches\n(Singleton)\nDI Managed\nSwitch Collection"];
+        // Soft Switches (DI Managed) - REFACTORED
+        SoftSwitches [fillcolor=lightblue, label="SoftSwitches\n(Singleton)\nDirect Coupling\nwith StatusProvider"];
     }
     
     // ========================================
@@ -181,6 +181,10 @@ digraph PandowdyEmuCore {
         
         IDisplayBitmapRenderer [fillcolor=lightgreen, shape=ellipse, label="IDisplayBitmapRenderer"];
         LegacyBitmapRenderer [fillcolor=lightblue, label="LegacyBitmapRenderer\n(Singleton)\nPixel Renderer"];
+        
+        // Threaded Rendering
+        VideoMemorySnapshotPool [fillcolor=lightblue, label="VideoMemorySnapshotPool\n(Singleton)\nSnapshot Pool"];
+        RenderingService [fillcolor=lightblue, label="RenderingService\n(Singleton)\nThreaded Rendering"];
     }
     
     // ========================================
@@ -190,20 +194,21 @@ digraph PandowdyEmuCore {
     // CPU Adapter implements ICpu
     CPUAdapter -> ICpu [label="implements", style=dashed, color=blue];
     
-    // Keyboard implementations
-    SingularKeyHandler -> IKeyboardReader [label="implements", style=dashed, color=blue];
-    SingularKeyHandler -> IKeyboardSetter [label="implements", style=dashed, color=blue];
+    // Keyboard implementations (planned)
+    SingularKeyHandler -> IKeyboardReader [label="implements", style=dashed, color=orange];
+    SingularKeyHandler -> IKeyboardSetter [label="implements", style=dashed, color=orange];
     
-    // SystemStatusProvider implements both interfaces
-    SystemStatusProvider -> ISystemStatusProvider [label="implements", style=dashed, color=blue];
-    SystemStatusProvider -> ISoftSwitchResponder [label="implements", style=dashed, color=blue];
+    // SystemStatusProvider implements NEW interfaces
+    SystemStatusProvider -> ISystemStatusProvider [label="implements", style=dashed, color=blue, penwidth=2];
+    SystemStatusProvider -> ISystemStatusMutator [label="implements", style=dashed, color=blue, penwidth=2];
+    ISystemStatusMutator -> ISystemStatusProvider [label="extends", style=dashed, color=green, penwidth=2];
     
     // MemoryPool implements IDirectMemoryPoolReader
     MemoryPool -> IDirectMemoryPoolReader [label="implements", style=dashed, color=blue];
     
     // Bus implementation
     VA2MBus -> IAppleIIBus [label="implements", style=dashed, color=blue];
-    SystemIoHandler -> ISystemIoHandler [label="implements", style=dashed, color=blue];
+    SystemIoHandler -> ISystemIoHandler [label="implements", style=dashed, color=orange];
     
     // Memory implementations
     LanguageCard -> ILanguageCard [label="implements", style=dashed, color=blue];
@@ -229,23 +234,25 @@ digraph PandowdyEmuCore {
     // VA2M dependencies (orchestrates everything)
     VA2M -> IEmulatorState [label="publishes to", color=red];
     VA2M -> IFrameProvider [label="uses", color=red];
-    VA2M -> ISystemStatusProvider [label="observes", color=red];
+    VA2M -> ISystemStatusMutator [label="mutates flash", color=red, penwidth=2];
     VA2M -> IAppleIIBus [label="orchestrates", color=red, penwidth=2];
     VA2M -> MemoryPool [label="manages", color=red];
     VA2M -> IFrameGenerator [label="triggers", color=red];
+    VA2M -> RenderingService [label="coordinates", color=red];
+    VA2M -> VideoMemorySnapshotPool [label="uses pool", color=red];
     VA2M -> IKeyboardSetter [label="implements", color=red];
     
-    // VA2MBus dependencies (central routing)
+    // VA2MBus dependencies (central routing) - REFACTORED
     VA2MBus -> MemoryPool [label="routes to", color=red, penwidth=2];
     VA2MBus -> ISystemStatusProvider [label="observes", color=red];
     VA2MBus -> ICpu [label="executes", color=red, penwidth=2];
-    VA2MBus -> SoftSwitches [label="depends on", color=red];
+    VA2MBus -> SoftSwitches [label="manages", color=red, penwidth=2];
     VA2MBus -> IKeyboardSetter [label="implements", color=red];
     VA2MBus -> ISystemIoHandler [label="will route to", color=orange, style=dashed];
     
     // SystemIoHandler dependencies (planned refactor)
     SystemIoHandler -> IKeyboardReader [label="reads from", color=orange, style=dashed];
-    SystemIoHandler -> ISystemStatusProvider [label="updates", color=orange, style=dashed];
+    SystemIoHandler -> ISystemStatusMutator [label="updates", color=orange, style=dashed];
     
     // CPUAdapter wraps CPU (Adapter pattern)
     CPUAdapter -> CPU [label="wraps", color=purple, penwidth=2];
@@ -268,15 +275,30 @@ digraph PandowdyEmuCore {
     
     // FrameGenerator dependencies (rendering coordinator)
     FrameGenerator -> IFrameProvider [label="writes to", color=red];
-    FrameGenerator -> ICharacterRomProvider [label="reads chars", color=red];
-    FrameGenerator -> IDisplayBitmapRenderer [label="renders with", color=red];
+    FrameGenerator -> IDisplayBitmapRenderer [label="renders with", color=red, penwidth=2];
     FrameGenerator -> IDirectMemoryPoolReader [label="reads RAM", color=red];
     FrameGenerator -> ISystemStatusProvider [label="observes", color=red];
     
-    // SoftSwitches dependencies
-    SoftSwitches -> ISoftSwitchResponder [label="notifies", color=red];
+    // LegacyBitmapRenderer dependencies
+    LegacyBitmapRenderer -> ICharacterRomProvider [label="reads chars", color=red, penwidth=2];
+    
+    // SoftSwitches dependencies - NEW ARCHITECTURE
+    SoftSwitches -> ISystemStatusMutator [label="directly mutates", color=red, penwidth=3];
+    SoftSwitches -> ISystemStatusProvider [label="reads from\n(via DI)", color=red, penwidth=2];
     
     // Keyboard chain of responsibility
     VA2M -> VA2MBus [label="EnqueueKey", color=green, style=bold];
-    VA2MBus -> SingularKeyHandler [label="EnqueueKey\n(planned)", color=green, style=dashed];
+    VA2MBus -> SingularKeyHandler [label="EnqueueKey\n(future)", color=orange, style=dashed];
+    
+    // Rendering Service dependencies
+    RenderingService -> VideoMemorySnapshotPool [label="uses pool", color=red];
+    RenderingService -> IFrameGenerator [label="generates with", color=red];
+    
+    // ========================================
+    // ARCHITECTURAL NOTES
+    // ========================================
+    
+    note_refactor [shape=note, fillcolor=lightyellow, label="RECENT REFACTORING:\n\n• Removed ISoftSwitchResponder\n• Created ISystemStatusMutator\n• Direct DI coupling:\n  SoftSwitches → StatusProvider\n• Components subscribe to\n  StatusProvider events\n  for state changes"];
+    
+    note_refactor -> SoftSwitches [style=invis];
 }
