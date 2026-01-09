@@ -192,25 +192,7 @@ public interface ISystemStatusProvider
     /// </remarks>
     bool StateAnn3_DGR { get; }
     
-    /// <summary>
-    /// Gets the current keyboard character code.
-    /// </summary>
-    /// <value>
-    /// The current keyboard character code with high bit set when a key is pressed.
-    /// </value>
-    /// <remarks>
-    /// <para>
-    /// Reading from $C000 returns the current keyboard strobe value. When a key is pressed,
-    /// bit 7 is set (value >= 128) and bits 0-6 contain the ASCII character code.
-    /// The strobe remains set until cleared by reading $C010.
-    /// </para>
-    /// <para>
-    /// <strong>Apple IIe Behavior:</strong> The keyboard generates standard ASCII codes
-    /// (0-127) with bit 7 serving as the strobe indicator. Control characters and
-    /// special keys are mapped to specific ASCII ranges.
-    /// </para>
-    /// </remarks>
-    byte CurrentKey { get; }
+
 
     /// <summary>
     /// Gets the current value of paddle 0 (game controller analog input).

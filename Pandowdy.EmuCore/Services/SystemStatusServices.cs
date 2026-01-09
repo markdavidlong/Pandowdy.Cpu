@@ -13,13 +13,24 @@ namespace Pandowdy.EmuCore.Services;
 /// </para>
 /// <para>
 /// <strong>Complete State Capture:</strong> Contains all soft switch states and I/O values for a single
-/// point in time, including memory configuration, video modes, keyboard input, and game controller state.
+/// point in time, including memory configuration, video modes, and game controller state.
 /// This allows consumers (renderers, debuggers, UI) to work with a consistent view of system state.
 /// </para>
 /// <para>
 /// <strong>Apple IIe Context:</strong> These flags directly correspond to Apple IIe hardware
 /// soft switches and I/O registers, providing authentic emulation of the system's state
 /// management. See Apple IIe Technical Reference Manual for detailed switch descriptions.
+/// </para>
+/// <para>
+/// <strong>Keyboard State:</strong> Note that keyboard state (current key, strobe) is NOT included
+/// in this snapshot. Keyboard state is managed entirely by the keyboard subsystem (SingularKeyHandler)
+/// and read directly by SystemIoHandler when the CPU accesses $C000/$C010. This separation keeps
+/// the keyboard subsystem truly independent.
+/// </para>
+/// <para>
+/// <strong>Game Controller Synchronization:</strong> Button and paddle states are included in this
+/// snapshot and automatically synchronized from IGameControllerStatus via event subscription. This
+/// ensures UI and debuggers can observe controller state without directly accessing the controller.
 /// </para>
 /// </remarks>
 /// <param name="State80Store">80STORE switch - redirects page 2 to aux memory ($C000/$C001).</param>
@@ -28,9 +39,9 @@ namespace Pandowdy.EmuCore.Services;
 /// <param name="StateIntCxRom">INTCXROM switch - uses internal ROM vs slot ROMs ($C006/$C007).</param>
 /// <param name="StateAltZp">ALTZP switch - uses aux zero page and stack ($C008/$C009).</param>
 /// <param name="StateSlotC3Rom">SLOTC3ROM switch - enables slot 3 ROM ($C00A/$C00B).</param>
-/// <param name="StatePb0">Paddle button 0 state (readable at $C061, bit 7).</param>
-/// <param name="StatePb1">Paddle button 1 state (readable at $C062, bit 7).</param>
-/// <param name="StatePb2">Paddle button 2 state (readable at $C063, bit 7).</param>
+/// <param name="StatePb0">Pushbutton 0 state (readable at $C061, bit 7) - synchronized from IGameControllerStatus.</param>
+/// <param name="StatePb1">Pushbutton 1 state (readable at $C062, bit 7) - synchronized from IGameControllerStatus.</param>
+/// <param name="StatePb2">Pushbutton 2 state (readable at $C063, bit 7) - synchronized from IGameControllerStatus.</param>
 /// <param name="StateAnn0">Annunciator 0 state ($C058/$C059).</param>
 /// <param name="StateAnn1">Annunciator 1 state ($C05A/$C05B).</param>
 /// <param name="StateAnn2">Annunciator 2 state ($C05C/$C05D).</param>
@@ -47,11 +58,10 @@ namespace Pandowdy.EmuCore.Services;
 /// <param name="StateHighRead">Language card read enable ($D000-$FFFF).</param>
 /// <param name="StateHighWrite">Language card write enable ($D000-$FFFF).</param>
 /// <param name="StateVBlank">Vertical blanking interval active (readable at $C019, bit 7).</param>
-/// <param name="StateCurrentKey">Keyboard character code with strobe (readable at $C000).</param>
-/// <param name="StatePdl0">Paddle 0 analog value 0-255 (timer readable at $C064, bit 7).</param>
-/// <param name="StatePdl1">Paddle 1 analog value 0-255 (timer readable at $C064, bit 6).</param>
-/// <param name="StatePdl2">Paddle 2 analog value 0-255 (timer readable at $C065, bit 7).</param>
-/// <param name="StatePdl3">Paddle 3 analog value 0-255 (timer readable at $C065, bit 6).</param>
+/// <param name="StatePdl0">Paddle 0 analog value 0-255 (timer readable at $C064, bit 7) - synchronized from IGameControllerStatus.</param>
+/// <param name="StatePdl1">Paddle 1 analog value 0-255 (timer readable at $C064, bit 6) - synchronized from IGameControllerStatus.</param>
+/// <param name="StatePdl2">Paddle 2 analog value 0-255 (timer readable at $C065, bit 7) - synchronized from IGameControllerStatus.</param>
+/// <param name="StatePdl3">Paddle 3 analog value 0-255 (timer readable at $C065, bit 6) - synchronized from IGameControllerStatus.</param>
 public record SystemStatusSnapshot(
     bool State80Store,
     bool StateRamRd,
@@ -78,7 +88,6 @@ public record SystemStatusSnapshot(
     bool StateHighRead,
     bool StateHighWrite,
     bool StateVBlank,
-    byte StateCurrentKey,
     byte StatePdl0,
     byte StatePdl1,
     byte StatePdl2,
@@ -153,7 +162,6 @@ public sealed class SystemStatusProvider : ISystemStatusMutator
         StateHighRead: false,
         StateHighWrite: false,
         StateVBlank: false, // Apple IIe powers on outside VBlank period
-        StateCurrentKey: 0,
         StatePdl0: 0,
         StatePdl1: 0,
         StatePdl2: 0,
@@ -337,9 +345,6 @@ public sealed class SystemStatusProvider : ISystemStatusMutator
     public bool StateVBlank => _current.StateVBlank;
 
     /// <inheritdoc />
-    public byte CurrentKey => _current.StateCurrentKey;
-    
-    /// <inheritdoc />
     public byte Pdl0 => _current.StatePdl0;
     
     /// <inheritdoc />
@@ -490,31 +495,29 @@ public sealed class SystemStatusProvider : ISystemStatusMutator
     /// <inheritdoc />
     public void SetPreWrite(bool enabled) => Mutate(b => b.StatePrewrite = enabled);
 
-    // Pushbuttons (game controller)
+    // Pushbuttons (game controller) - Private to sync from GameController subsystem.  Should only be changed internally.
     /// <inheritdoc />
-    public void SetButton0(bool pressed) => Mutate(b => b.StatePb0 = pressed);
+    private void SetButton0(bool pressed) => Mutate(b => b.StatePb0 = pressed);
     
     /// <inheritdoc />
-    public void SetButton1(bool pressed) => Mutate(b => b.StatePb1 = pressed);
+    private void SetButton1(bool pressed) => Mutate(b => b.StatePb1 = pressed);
     
     /// <inheritdoc />
-    public void SetButton2(bool pressed) => Mutate(b => b.StatePb2 = pressed);
+    private void SetButton2(bool pressed) => Mutate(b => b.StatePb2 = pressed);
 
     // Keyboard and paddles
+   
     /// <inheritdoc />
-    public void SetCurrentKey(byte value) => Mutate(b => b.StateCurrentKey = value);
+    private void SetPdl0(byte value) => Mutate(b => b.StatePdl0 = value);
 
     /// <inheritdoc />
-    public void SetPdl0(byte value) => Mutate(b => b.StatePdl0 = value);
+    private void SetPdl1(byte value) => Mutate(b => b.StatePdl1 = value);
 
     /// <inheritdoc />
-    public void SetPdl1(byte value) => Mutate(b => b.StatePdl1 = value);
+    private void SetPdl2(byte value) => Mutate(b => b.StatePdl2 = value);
 
     /// <inheritdoc />
-    public void SetPdl2(byte value) => Mutate(b => b.StatePdl2 = value);
-
-    /// <inheritdoc />
-    public void SetPdl3(byte value) => Mutate(b => b.StatePdl3 = value);
+    private void SetPdl3(byte value) => Mutate(b => b.StatePdl3 = value);
 
     // Vertical blanking interval
     /// <inheritdoc />
@@ -619,7 +622,6 @@ public sealed class SystemStatusSnapshotBuilder(SystemStatusSnapshot s)
 
     /// <summary>Vertical blanking interval state.</summary>
     public bool StateVBlank = s.StateVBlank;
-    public byte StateCurrentKey = s.StateCurrentKey;
     public byte StatePdl0 = s.StatePdl0;
     public byte StatePdl1 = s.StatePdl1;
     public byte StatePdl2 = s.StatePdl2;
@@ -640,6 +642,6 @@ public sealed class SystemStatusSnapshotBuilder(SystemStatusSnapshot s)
         StatePb0, StatePb1, StatePb2, StateAnn0, StateAnn1, StateAnn2, StateAnn3,
         StatePage2, StateHiRes, StateMixed, StateTextMode, StateShow80Col, StateAltCharSet,
         StateFlashOn, StatePrewrite, StateUseBank1, StateHighRead, StateHighWrite, StateVBlank,
-        StateCurrentKey, StatePdl0, StatePdl1, StatePdl2, StatePdl3);
+        StatePdl0, StatePdl1, StatePdl2, StatePdl3);
 }
 

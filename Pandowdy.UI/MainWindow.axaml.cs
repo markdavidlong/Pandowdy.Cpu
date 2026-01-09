@@ -97,9 +97,15 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 #pragma warning restore CS0414
 
     /// <summary>
-    /// Apple IIe emulator machine instance (injected via Initialize).
+    /// Emulator core control interface for commanding emulator operations from UI thread (injected via Initialize).
     /// </summary>
-    private VA2M? _machine;
+    /// <remarks>
+    /// Uses the <see cref="IEmulatorCoreInterface"/> abstraction instead of concrete VA2M type.
+    /// This allows the UI to remain decoupled from the emulator implementation details while
+    /// providing thread-safe command queueing for Reset, UserReset, EnqueueKey, SetPushButton,
+    /// and execution control via RunAsync, Clock, and ThrottleEnabled.
+    /// </remarks>
+    private IEmulatorCoreInterface? _machine;
     
     /// <summary>
     /// Cancellation token source for controlling emulator thread lifetime.
@@ -331,51 +337,46 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     }
 
     /// <summary>
-    /// Initializes the MainWindow with all required dependencies.
-    /// Must be called immediately after construction (handled by MainWindowFactory).
+    /// Initializes MainWindow with required dependencies (phase 2 of two-phase construction).
     /// </summary>
     /// <param name="viewModel">Main window view model containing UI state and commands.</param>
-    /// <param name="machine">Apple IIe emulator machine instance.</param>
-    /// <param name="frameProvider">Provider supplying rendered video frames.</param>
+    /// <param name="machine">Emulator core control interface for commanding operations from UI thread.</param>
+    /// <param name="frameProvider">Frame provider for display rendering.</param>
     /// <param name="refreshTicker">60 Hz ticker for driving display updates.</param>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown if Initialize is called more than once, or if ScreenDisplay control is not found in XAML.
-    /// </exception>
+    /// <exception cref="InvalidOperationException">Thrown if Initialize() is called more than once.</exception>
     /// <remarks>
     /// <para>
-    /// <strong>⚠️ Important:</strong> Do not call this method directly. Use <see cref="MainWindowFactory.Create"/>
-    /// which handles the complete construction and initialization sequence correctly.
+    /// <strong>⚠️ Two-Phase Construction:</strong> This method must be called exactly once
+    /// immediately after construction. Do not call directly - use <see cref="MainWindowFactory.Create"/>
+    /// which handles both phases automatically.
     /// </para>
     /// <para>
-    /// <strong>Two-Phase Initialization:</strong> This method completes the initialization started
-    /// by the parameterless constructor, injecting all dependencies that couldn't be provided
-    /// through constructor parameters due to Avalonia's XAML requirements.
-    /// </para>
-    /// <para>
-    /// <strong>Why Two-Phase?</strong> Avalonia requires windows to have parameterless constructors
-    /// for XAML compilation. Since we can't inject dependencies via constructor, we use this separate
-    /// Initialize() method called by MainWindowFactory immediately after construction.
-    /// </para>
-    /// <para>
-    /// <strong>Initialization Steps:</strong>
-    /// <list type="number">
-    /// <item>Validate single initialization (throw if called twice)</item>
-    /// <item>Set ViewModel and DataContext</item>
-    /// <item>Store machine and refresh ticker references</item>
-    /// <item>Attach machine and frame provider to Apple2Display control</item>
-    /// <item>Initialize SoftSwitchStatusPanel with its view model</item>
-    /// <item>Set up ReactiveUI subscriptions for view model property changes</item>
-    /// <item>Bridge command executions to emulator actions</item>
-    /// <item>Restore settings from configuration file</item>
+    /// <strong>Dependency Injection:</strong> This method accepts:
+    /// <list type="bullet">
+    /// <item><strong>viewModel:</strong> Provides UI state, settings, and ReactiveCommands</item>
+    /// <item><strong>machine:</strong> Emulator core interface (IEmulatorCoreInterface) for Reset, EnqueueKey, RunAsync, etc.</item>
+    /// <item><strong>frameProvider:</strong> Provides rendered frames for display</item>
+    /// <item><strong>refreshTicker:</strong> Drives 60 Hz display updates</item>
     /// </list>
     /// </para>
     /// <para>
-    /// <strong>Reactive Subscriptions:</strong> Subscribes to view model properties and propagates
-    /// changes to emulator and display:
+    /// <strong>Abstraction:</strong> The machine parameter uses <see cref="IEmulatorCoreInterface"/>
+    /// instead of concrete VA2M type, decoupling the UI from emulator implementation details while
+    /// providing thread-safe command queueing and preventing accidental cross-thread calls.
+    /// </para>
+    /// <para>
+    /// <strong>Child Control Initialization:</strong> Attaches machine and frame provider to:
     /// <list type="bullet">
-    /// <item><strong>ThrottleEnabled:</strong> Controls CPU speed (1.023 MHz vs unthrottled)</item>
-    /// <item><strong>CapsLockEnabled:</strong> Controls keyboard uppercase conversion</item>
-    /// <item><strong>ShowScanLines:</strong> Controls CRT scanline effect</item>
+    /// <item><strong>ScreenDisplay:</strong> Apple2Display control for video rendering</item>
+    /// <item><strong>SoftSwitchStatusPanel:</strong> Status panel for soft switch display</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Reactive Bindings:</strong> Sets up subscriptions for:
+    /// <list type="bullet">
+    /// <item><strong>ThrottleEnabled:</strong> Controls emulator speed limiting</item>
+    /// <item><strong>CapsLockEnabled:</strong> Controls uppercase-only keyboard mode</item>
+    /// <item><strong>ShowScanLines:</strong> Controls CRT scanline visual effect</item>
     /// <item><strong>ForceMonochrome:</strong> Controls color vs monochrome display</item>
     /// <item><strong>DecreaseContrast:</strong> Controls contrast reduction</item>
     /// <item><strong>MonoMixed:</strong> Controls mixed mode text defring</item>
@@ -399,7 +400,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// </code>
     /// </para>
     /// </remarks>
-    public void Initialize(MainWindowViewModel viewModel, VA2M machine, IFrameProvider frameProvider, IRefreshTicker refreshTicker)
+    public void Initialize(MainWindowViewModel viewModel, IEmulatorCoreInterface machine, IFrameProvider frameProvider, IRefreshTicker refreshTicker)
     {
         if (_depsInjected)
         {

@@ -185,21 +185,6 @@ public sealed class SoftSwitches
         /// Two consecutive reads of certain addresses are required to enable writing.
         /// </summary>
         PreWrite,
-        
-        /// <summary>
-        /// Pushbutton 0 state (readable at $C061). Typically mapped to Open-Apple key.
-        /// </summary>
-        Button0,
-        
-        /// <summary>
-        /// Pushbutton 1 state (readable at $C062). Typically mapped to Closed-Apple/Solid-Apple key.
-        /// </summary>
-        Button1,
-        
-        /// <summary>
-        /// Pushbutton 2 state (readable at $C063). Typically mapped to Shift key for joystick button emulation.
-        /// </summary>
-        Button2,
 
         /// <summary>
         /// VBlank switch ($C060). Indicates vertical blanking interval for video.
@@ -249,9 +234,6 @@ public sealed class SoftSwitches
         _switches[SoftSwitchId.HighWrite] = new SoftSwitch("HIGHWRITE", _status.StateHighWrite);
         _switches[SoftSwitchId.HighRead] = new SoftSwitch("HIGHREAD", _status.StateHighRead);
         _switches[SoftSwitchId.PreWrite] = new SoftSwitch("PREWRITE", _status.StatePreWrite);
-        _switches[SoftSwitchId.Button0] = new SoftSwitch("BUTTON0", _status.StatePb0);
-        _switches[SoftSwitchId.Button1] = new SoftSwitch("BUTTON1", _status.StatePb1);
-        _switches[SoftSwitchId.Button2] = new SoftSwitch("BUTTON2", _status.StatePb2);
         _switches[SoftSwitchId.VBlank] = new SoftSwitch("VBLANK", _status.StateVBlank);
 
         ResetAllSwitches();
@@ -416,17 +398,6 @@ public sealed class SoftSwitches
                 _status.SetPreWrite(value);
                 break;
 
-            case SoftSwitchId.Button0:
-                _status.SetButton0(value);
-                break;
-
-            case SoftSwitchId.Button1:
-                _status.SetButton1(value);
-                break;
-
-            case SoftSwitchId.Button2:
-                _status.SetButton2(value);
-                break;
 
             case SoftSwitchId.VBlank:
                 _status.SetVBlank(value);

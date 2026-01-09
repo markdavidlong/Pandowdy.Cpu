@@ -77,7 +77,6 @@ public class RenderContextTests
                 StateHighRead: false,
                 StateHighWrite: false,
                 StateVBlank: false,
-                StateCurrentKey: 0,
                 StatePdl0: 0,
                 StatePdl1: 0,
                 StatePdl2: 0,
@@ -130,7 +129,6 @@ public class RenderContextTests
         public bool StateHighRead { get => _current.StateHighRead; set => UpdateField(s => s with { StateHighRead = value }); }
         public bool StateHighWrite { get => _current.StateHighWrite; set => UpdateField(s => s with { StateHighWrite = value }); }
         public bool StateVBlank { get => _current.StateVBlank; set => UpdateField(s => s with { StateVBlank = value }); }
-        public byte CurrentKey => _current.StateCurrentKey;
         public byte Pdl0 => _current.StatePdl0;
         public byte Pdl1 => _current.StatePdl1;
         public byte Pdl2 => _current.StatePdl2;

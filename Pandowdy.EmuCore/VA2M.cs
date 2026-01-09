@@ -1,7 +1,7 @@
 //------------------------------------------------------------------------------
 // VA2M.cs
 //
-// ⚠️ PLANNED FOR REFACTORING - SEE _docs_/VA2MBus-Refactoring-Notes.md ⚠️
+// ✅ MAJOR REFACTORING COMPLETED - Input subsystems extracted!
 //
 // "Virtual Apple II Machinator" - Main emulator orchestrator that coordinates
 // the CPU, bus, memory, and timing systems to emulate an Apple IIe computer.
@@ -10,60 +10,78 @@
 // VA2M serves as the top-level controller for the emulator, managing:
 //
 // 1. **Emulator Lifecycle:**
-//    - Construction and dependency injection
+//    - Construction and dependency injection (10 required dependencies)
 //    - Resource loading (embedded ROM)
-//    - Disposal and cleanup
+//    - Disposal and cleanup (flash timer, rendering service)
 //
 // 2. **Execution Control:**
 //    - Clock() - Single-cycle execution for simple loops
 //    - RunAsync() - Async batched execution for continuous operation
-//    - Throttling to maintain ~1.023 MHz Apple IIe speed
+//    - PID-based adaptive throttling to maintain ~1.023 MHz Apple IIe speed
 //
 // 3. **Reset Handling:**
 //    - Reset() - Full system reset (power cycle)
-//    - UserReset() - Warm reset (Ctrl+Reset)
+//    - UserReset() - Warm reset (Ctrl+Reset) - thread-safe
 //
-// 4. **External Input:**
-//    - Keyboard input injection
-//    - Pushbutton state management
-//    - Cross-thread command queueing
+// 4. **External Input Delegation:**
+//    - EnqueueKey() - Keyboard input injection (delegates to IKeyboardSetter)
+//    - SetPushButton() - Pushbutton state (delegates to IGameControllerStatus)
+//    - Cross-thread command queueing with instruction boundary respect
 //
 // 5. **State Publishing:**
 //    - Emulator state snapshots (PC, SP, cycles, BASIC line)
-//    - System status snapshots (soft switches, buttons)
-//    - Frame rendering coordination
+//    - Performance metrics (effective MHz, accuracy, error PPM)
+//    - Frame rendering coordination (threaded, non-blocking)
 //
 // 6. **Timing & Synchronization:**
-//    - Cycle-accurate throttling (Sleep + SpinWait)
+//    - PID-based adaptive throttling (Kp=0.8, Ki=0.15, Kd=0.02)
 //    - Flash timer (~2.1 Hz for cursor/mode indicators)
-//    - VBlank event handling for frame rendering
+//    - VBlank event handling for frame rendering (~60 Hz)
+//    - Performance reporting every 5 seconds
 //
 // DESIGN PATTERN: Façade + Coordinator
 // VA2M acts as a façade over the emulator subsystems (Bus, Memory, CPU) and
-// coordinates their interactions. It handles cross-thread communication via
-// a command queue pattern, allowing UI/external threads to safely interact
-// with the single-threaded emulator core.
+// coordinates their interactions. It delegates to specialized subsystems:
+// - IKeyboardSetter (SingularKeyHandler) for keyboard input
+// - IGameControllerStatus (SimpleGameController) for game controller
+// - RenderingService for threaded frame rendering
+// Handles cross-thread communication via command queue pattern.
 //
 // THREADING MODEL:
 // - **Emulator Thread:** Runs Clock() or RunAsync() loop
-// - **External Threads:** Enqueue commands via InjectKey(), SetPushButton(), etc.
+// - **External Threads:** Enqueue commands via EnqueueKey(), SetPushButton(), etc.
 // - **Flash Timer Thread:** Toggles flash state at ~2.1 Hz
-// - **Synchronization:** Commands are processed at frame boundaries (ProcessPending)
+// - **Render Thread:** Processes video memory snapshots asynchronously
+// - **Synchronization:** Commands processed at instruction boundaries (6502 atomicity)
 //
 // THROTTLING MECHANISM:
-// Two-phase throttling for accurate timing:
-// 1. Sleep for whole milliseconds (OS scheduler)
-// 2. SpinWait for sub-millisecond precision (busy wait)
-// This achieves ~1.023 MHz accuracy while being efficient.
+// PID-based adaptive throttling for accurate timing:
+// 1. Proportional (Kp=0.8) - Corrects current timing error
+// 2. Integral (Ki=0.15) - Corrects accumulated drift over time
+// 3. Derivative (Kd=0.02) - Anticipates error trends
+// 4. Sleep for whole milliseconds (OS scheduler, efficient)
+// 5. Adaptive SpinWait for sub-millisecond precision (5-200 iterations)
+// Achieves ~1.023 MHz within 0.05% error (~500 PPM).
 //
-// FUTURE REFACTORING:
-// This class will be refactored alongside VA2MBus to:
-// - Separate timing/throttling into dedicated service
-// - Move input handling to input manager
-// - Extract state publishing to dedicated provider
-// - Simplify to pure coordinator role
+// SUBSYSTEM EXTRACTION (COMPLETED):
+// ✅ Keyboard: Extracted to SingularKeyHandler (IKeyboardSetter/IKeyboardReader)
+//    - 26 comprehensive tests
+//    - Single source of truth shared with SystemIoHandler
+// ✅ Game Controller: Extracted to SimpleGameController (IGameControllerStatus)
+//    - 32 comprehensive tests
+//    - Event-driven updates to SystemStatusProvider
+// ✅ Rendering: Threaded via RenderingService + VideoMemorySnapshotPool
+//    - Non-blocking snapshot capture (~1-3 microseconds)
+//    - Automatic frame skipping when renderer falls behind
 //
-// See: Pandowdy.EmuCore/_docs_/VA2MBus-Refactoring-Notes.md
+// REFACTORING STATUS:
+// - Input Manager: ✅ DONE (keyboard + game controller extracted)
+// - State Publishing: ✅ IMPROVED (event-driven, no manual polling)
+// - Timing Service: ⏳ PARTIAL (PID throttling improved but not extracted)
+// - ROM Loader: ❌ NOT STARTED (still embedded ROM only)
+//
+// See: Pandowdy.EmuCore/_docs_/VA2M-documentation-status.md
+//      Pandowdy.EmuCore/_docs_/VA2M-Current-State-Comparison.md
 //------------------------------------------------------------------------------
 
 using System.Reflection;
@@ -80,21 +98,60 @@ namespace Pandowdy.EmuCore;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>⚠️ PLANNED FOR REFACTORING:</strong> This class will be refactored to separate
-/// concerns (timing, input, state publishing) into dedicated services. See
-/// Pandowdy.EmuCore/_docs_/VA2MBus-Refactoring-Notes.md for planned architecture.
+/// <strong>✅ MAJOR REFACTORING COMPLETED:</strong> Input subsystems (keyboard and game controller)
+/// have been successfully extracted to dedicated, well-tested subsystems. VA2M now acts as a pure
+/// coordinator, delegating to specialized components. See documentation for details:
+/// <list type="bullet">
+/// <item>Pandowdy.EmuCore/_docs_/VA2M-documentation-status.md</item>
+/// <item>Pandowdy.EmuCore/_docs_/VA2M-Current-State-Comparison.md</item>
+/// </list>
 /// </para>
 /// <para>
 /// <strong>Name Origin:</strong> "VA2M" = "Virtual Apple II Machinator" - the machine
 /// orchestrator that brings together all emulator subsystems.
 /// </para>
 /// <para>
+/// <strong>Dependencies (10):</strong>
+/// <list type="number">
+/// <item><strong>IEmulatorState:</strong> State snapshot sink for UI display</item>
+/// <item><strong>IFrameProvider:</strong> Frame sink for video rendering</item>
+/// <item><strong>ISystemStatusMutator:</strong> System status provider (soft switches)</item>
+/// <item><strong>IAppleIIBus:</strong> System bus (CPU, memory, I/O coordination)</item>
+/// <item><strong>AddressSpaceController:</strong> 128KB Apple IIe memory management</item>
+/// <item><strong>IFrameGenerator:</strong> Video frame rendering</item>
+/// <item><strong>RenderingService:</strong> Threaded rendering with auto frame-skipping</item>
+/// <item><strong>VideoMemorySnapshotPool:</strong> Memory-efficient snapshot pooling</item>
+/// <item><strong>IKeyboardSetter:</strong> Keyboard input injection (SingularKeyHandler)</item>
+/// <item><strong>IGameControllerStatus:</strong> Game controller state (SimpleGameController)</item>
+/// </list>
+/// </para>
+/// <para>
 /// <strong>Threading Model:</strong>
 /// <list type="bullet">
 /// <item><strong>Emulator Thread:</strong> Single-threaded CPU execution (Clock/RunAsync loop)</item>
-/// <item><strong>External Threads:</strong> UI/input threads enqueue commands via InjectKey(), etc.</item>
+/// <item><strong>External Threads:</strong> UI/input threads enqueue commands via EnqueueKey(), etc.</item>
 /// <item><strong>Flash Timer:</strong> Separate timer thread toggles cursor at ~2.1 Hz</item>
-/// <item><strong>Synchronization:</strong> Commands processed at frame boundaries (thread-safe)</item>
+/// <item><strong>Render Thread:</strong> Processes video memory snapshots asynchronously</item>
+/// <item><strong>Synchronization:</strong> Commands processed at instruction boundaries (6502 atomicity)</item>
+/// </list>
+/// </para>
+/// <para>
+/// <strong>Throttling:</strong> PID-based adaptive control achieves ~1.023 MHz within 0.05% error:
+/// <list type="bullet">
+/// <item><strong>Proportional (Kp=0.8):</strong> Corrects current timing error</item>
+/// <item><strong>Integral (Ki=0.15):</strong> Corrects accumulated drift</item>
+/// <item><strong>Derivative (Kd=0.02):</strong> Anticipates error trends</item>
+/// <item><strong>Adaptive SpinWait:</strong> Self-tuning (5-200 iterations)</item>
+/// <item><strong>Performance Reporting:</strong> Logs effective MHz every 5 seconds</item>
+/// </list>
+/// </para>
+/// <para>
+/// <strong>Subsystem Delegation:</strong>
+/// <list type="bullet">
+/// <item><strong>Keyboard:</strong> Delegates to IKeyboardSetter (SingularKeyHandler, 26 tests)</item>
+/// <item><strong>Game Controller:</strong> Delegates to IGameControllerStatus (SimpleGameController, 32 tests)</item>
+/// <item><strong>Rendering:</strong> Threaded via RenderingService (non-blocking, ~1-3μs capture)</item>
+/// <item><strong>State Updates:</strong> Event-driven via SystemStatusProvider (no manual polling)</item>
 /// </list>
 /// </para>
 /// <para>
@@ -105,7 +162,7 @@ namespace Pandowdy.EmuCore;
 /// </list>
 /// </para>
 /// </remarks>
-public class VA2M : IDisposable, IKeyboardSetter
+public class VA2M : IDisposable, IKeyboardSetter, IEmulatorCoreInterface
 {
     /// <summary>
     /// Gets the memory pool managing the 128KB Apple IIe memory space.
@@ -307,18 +364,32 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// <param name="bus">System bus coordinating CPU, memory, and I/O.</param>
     /// <param name="memoryPool">Address space controller managing 128KB Apple IIe memory.</param>
     /// <param name="frameGenerator">Frame generator for rendering video output.</param>
-    /// <param name="renderingService">Rendering service for threaded frame rendering.</param>
-    /// <param name="snapshotPool">Pool for reusing video memory snapshots.</param>
-    /// <param name="keyboardSetter">Keyboard setter for injecting key events from UI thread.</param>
+    /// <param name="renderingService">Rendering service for threaded frame rendering with automatic frame skipping.</param>
+    /// <param name="snapshotPool">Pool for reusing video memory snapshots to reduce GC pressure.</param>
+    /// <param name="keyboardSetter">Keyboard setter for injecting key events from UI thread (shared with SystemIoHandler).</param>
+    /// <param name="gameController">Game controller for pushbutton and paddle state (fires events to SystemStatusProvider).</param>
     /// <exception cref="ArgumentNullException">Thrown if any parameter is null.</exception>
     /// <remarks>
     /// <para>
     /// <strong>Initialization Sequence:</strong>
     /// <list type="number">
-    /// <item>Store dependency references (all required)</item>
+    /// <item>Store dependency references (all 10 required)</item>
     /// <item>Load embedded Apple IIe ROM from resources</item>
     /// <item>Subscribe to VBlank event from bus (if VA2MBus)</item>
-    /// <item>Start flash timer for cursor blinking</item>
+    /// <item>Start flash timer for cursor blinking (~2.1 Hz)</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Subsystem Integration:</strong>
+    /// <list type="bullet">
+    /// <item><strong>Keyboard:</strong> The injected <paramref name="keyboardSetter"/> (SingularKeyHandler)
+    /// is shared with SystemIoHandler, ensuring single source of truth. VA2M uses the setter interface
+    /// to enqueue keys from UI thread via thread-safe command queue.</item>
+    /// <item><strong>Game Controller:</strong> The injected <paramref name="gameController"/> (SimpleGameController)
+    /// fires ButtonChanged and PaddleChanged events that SystemStatusProvider observes directly.
+    /// VA2M delegates SetPushButton() calls to this controller.</item>
+    /// <item><strong>Rendering:</strong> The <paramref name="renderingService"/> runs on a separate thread,
+    /// processing snapshots allocated from <paramref name="snapshotPool"/>. Capture is non-blocking (~1-3μs).</item>
     /// </list>
     /// </para>
     /// <para>
@@ -329,11 +400,6 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// <para>
     /// <strong>VBlank Event:</strong> If the bus is a VA2MBus, the OnVBlank handler
     /// is registered to trigger frame rendering and flash state updates at ~60 Hz.
-    /// </para>
-    /// <para>
-    /// <strong>Keyboard Injection:</strong> The injected <paramref name="keyboardSetter"/> is used
-    /// by <see cref="EnqueueKey"/> to inject keyboard events from the UI thread. This is the same
-    /// instance that SystemIoHandler uses for reading keyboard state, ensuring single source of truth.
     /// </para>
     /// </remarks>
     public VA2M(
@@ -860,7 +926,7 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// </para>
     /// <para>
     /// <strong>Thread Safety:</strong> This method is thread-safe. It enqueues the reset
-    /// operation which will be executed on the emulator thread at the next instruction boundary
+    /// operation which will be processed on the emulator thread at the next instruction boundary
     /// (via ProcessPending). This ensures the reset doesn't interrupt a CPU instruction in progress,
     /// maintaining 6502 atomic instruction guarantees.
     /// </para>
@@ -1130,21 +1196,31 @@ public class VA2M : IDisposable, IKeyboardSetter
     }
     
     /// <summary>
-    /// Injects a keyboard character into the emulator as if a key was pressed.
+    /// Enqueues a keyboard character to be injected into the emulator as if a key was pressed.
     /// </summary>
-    /// <param name="ascii">ASCII character code (0-127). High bit will be set automatically.</param>
+    /// <param name="ascii">ASCII character code (0-127). High bit will be set automatically by keyboard handler.</param>
     /// <inheritdoc cref="IKeyboardSetter.EnqueueKey" path="/remarks"/>
     /// <remarks>
     /// <para>
-    /// <strong>Thread Safety:</strong> This method is thread-safe. It enqueues the key injection
-    /// command which will be executed on the emulator thread at the next ProcessPending() call.
-    /// This allows UI threads to inject keyboard input without race conditions.
+    /// <strong>Architecture:</strong> This method delegates to the injected <see cref="IKeyboardSetter"/>
+    /// instance (SingularKeyHandler), which is shared with SystemIoHandler. This ensures single source
+    /// of truth for keyboard state - VA2M injects keys (write), SystemIoHandler reads keys (read).
     /// </para>
     /// <para>
-    /// <strong>Implementation Note:</strong> This method now delegates directly to the injected
-    /// <see cref="IKeyboardSetter"/> instance (SingularKeyHandler), bypassing VA2MBus. The keyboard
-    /// handler is shared between VA2M (for input injection) and SystemIoHandler (for I/O reads),
-    /// ensuring single source of truth for keyboard state.
+    /// <strong>Thread Safety:</strong> This method is thread-safe. It enqueues the key injection
+    /// command which will be executed on the emulator thread at the next instruction boundary
+    /// (via ProcessAnyPendingActions). This allows UI threads to inject keyboard input without
+    /// race conditions while respecting 6502 instruction atomicity.
+    /// </para>
+    /// <para>
+    /// <strong>Renamed from InjectKey:</strong> This method was renamed from InjectKey() to
+    /// EnqueueKey() to better reflect that the key is enqueued for later processing, not
+    /// immediately injected. The name matches the IKeyboardSetter.EnqueueKey() method it delegates to.
+    /// </para>
+    /// <para>
+    /// <strong>Apple IIe Keyboard Format:</strong> The keyboard handler automatically sets bit 7
+    /// (OR with 0x80) to match Apple II keyboard hardware format. The key becomes available at
+    /// $C000 with strobe set, and is cleared when software reads $C010 (KBDSTRB).
     /// </para>
     /// </remarks>
     public void EnqueueKey(byte ascii)
@@ -1159,6 +1235,12 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// <param name="num">Button number (0-2). Button 0 is typically button 0, buttons 1-2 are paddle buttons.</param>
     /// <param name="pressed">True if button is pressed, false if released.</param>
     /// <remarks>
+    /// <para>
+    /// <strong>Architecture:</strong> This method delegates to the injected <see cref="IGameControllerStatus"/>
+    /// instance (SimpleGameController). The controller fires ButtonChanged events that SystemStatusProvider
+    /// observes directly, ensuring automatic synchronization of button state to SystemStatus without
+    /// manual polling. This is event-driven architecture - VA2M doesn't manage button state directly.
+    /// </para>
     /// <para>
     /// <strong>Apple IIe Pushbutton Hardware:</strong> The Apple IIe has three pushbutton
     /// inputs typically used for game controllers (joysticks/paddles). These are read from
@@ -1177,8 +1259,14 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// of the corresponding I/O address. If bit 7 is set, the button is pressed.
     /// </para>
     /// <para>
+    /// <strong>Change Detection:</strong> The SimpleGameController implementation only fires
+    /// ButtonChanged events when the button state actually changes, preventing event spam.
+    /// This ensures efficient updates to SystemStatus and observers.
+    /// </para>
+    /// <para>
     /// <strong>Thread Safety:</strong> This method is thread-safe. It enqueues the button
-    /// state change which will be executed on the emulator thread at the next ProcessPending() call.
+    /// state change which will be executed on the emulator thread at the next instruction
+    /// boundary (via ProcessAnyPendingActions). This respects 6502 atomic instruction guarantees.
     /// </para>
     /// </remarks>
     public void SetPushButton(byte num, bool pressed)
@@ -1196,25 +1284,35 @@ public class VA2M : IDisposable, IKeyboardSetter
     /// <strong>Cleanup Sequence:</strong>
     /// <list type="number">
     /// <item>Stop and dispose flash timer (~2.1 Hz cursor blink timer)</item>
-    /// <item>Stop and dispose rendering service (threaded frame rendering)</item>
+    /// <item>Stop and dispose rendering service (stops render thread, releases snapshots)</item>
     /// <item>Clear pending command queue to release enqueued actions</item>
-    /// <item>Dispose bus (includes VBlank event cleanup)</item>
+    /// <item>Dispose bus (includes VBlank event cleanup if VA2MBus)</item>
     /// <item>Suppress finalization (no unmanaged resources)</item>
     /// </list>
     /// </para>
     /// <para>
     /// <strong>Thread Safety:</strong> Should be called from the thread that owns the emulator
     /// instance (typically the UI thread after stopping emulation). Do not call while RunAsync()
-    /// is executing.
+    /// is executing - cancel the CancellationToken and await the task first.
     /// </para>
     /// <para>
-    /// <strong>MemoryPool Note:</strong> MemoryPool disposal is currently commented out as it
-    /// may be shared across multiple emulator instances or have external ownership. This should
-    /// be revisited if MemoryPool lifetime is clarified.
+    /// <strong>Rendering Service:</strong> Disposing the RenderingService stops the render thread
+    /// and waits for any in-progress rendering to complete. Any pooled snapshots are released
+    /// back to the VideoMemorySnapshotPool.
+    /// </para>
+    /// <para>
+    /// <strong>AddressSpaceController Note:</strong> MemoryPool (AddressSpaceController) disposal
+    /// is currently commented out as it may be shared across multiple emulator instances or have
+    /// external ownership. This should be revisited if lifetime semantics are clarified.
     /// </para>
     /// <para>
     /// <strong>CPU Note:</strong> The legacy 6502.NET CPU library does not implement IDisposable,
     /// so no explicit CPU cleanup is needed. The CPU instance is managed by the Bus.
+    /// </para>
+    /// <para>
+    /// <strong>Subsystems:</strong> The keyboard (IKeyboardSetter) and game controller
+    /// (IGameControllerStatus) are not disposed here as they may be shared or have external
+    /// lifetime management. If they implement IDisposable, they should be disposed by their owner.
     /// </para>
     /// </remarks>
     public void Dispose()

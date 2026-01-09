@@ -52,8 +52,9 @@ namespace Pandowdy.UI;
 /// The main window view model containing UI state and commands. Must not be null.
 /// </param>
 /// <param name="machine">
-/// The Apple IIe emulator instance (VA2M) that executes 6502 instructions and manages
-/// system state. Must not be null.
+/// The emulator core control interface (IEmulatorCoreInterface) for commanding operations from the UI thread.
+/// Provides thread-safe command queueing for Reset, UserReset, EnqueueKey, SetPushButton, and execution
+/// control via RunAsync, Clock, and ThrottleEnabled. Must not be null.
 /// </param>
 /// <param name="frameProvider">
 /// The frame provider supplying rendered video frames (560x192 pixels) from the emulator
@@ -65,7 +66,7 @@ namespace Pandowdy.UI;
 /// </param>
 public sealed class MainWindowFactory(
     MainWindowViewModel viewModel,
-    VA2M machine,
+    IEmulatorCoreInterface machine,
     IFrameProvider frameProvider,
     IRefreshTicker refreshTicker) : IMainWindowFactory
 {
@@ -79,13 +80,16 @@ public sealed class MainWindowFactory(
     private readonly MainWindowViewModel _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
     
     /// <summary>
-    /// Apple IIe emulator instance that executes 6502 code and manages system state.
+    /// Emulator core control interface for commanding operations from the UI thread.
     /// </summary>
     /// <remarks>
     /// Validated as non-null in constructor. Passed to MainWindow.Initialize() which attaches
-    /// it to the Apple2Display control for keyboard input injection and emulator control.
+    /// it to the Apple2Display control for keyboard input injection and emulator control commands.
+    /// Uses <see cref="IEmulatorCoreInterface"/> abstraction instead of concrete VA2M type,
+    /// decoupling the UI from emulator implementation details and providing an explicit thread-safe
+    /// contract that prevents accidental cross-thread calls.
     /// </remarks>
-    private readonly VA2M _machine = machine ?? throw new ArgumentNullException(nameof(machine));
+    private readonly IEmulatorCoreInterface _machine = machine ?? throw new ArgumentNullException(nameof(machine));
     
     /// <summary>
     /// Frame provider supplying rendered video frames from the emulator.

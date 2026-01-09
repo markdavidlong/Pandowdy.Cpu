@@ -58,9 +58,14 @@ public class Apple2Display : Control
     private bool _suppressNextTextInput;
     
     /// <summary>
-    /// Reference to the emulator machine for keyboard input injection.
+    /// Reference to the emulator core control interface for keyboard input injection.
     /// </summary>
-    private VA2M? _machine;
+    /// <remarks>
+    /// Uses <see cref="IEmulatorCoreInterface"/> abstraction instead of concrete VA2M type.
+    /// This decouples the display control from the emulator implementation while providing
+    /// thread-safe keyboard input queueing via EnqueueKey().
+    /// </remarks>
+    private IEmulatorCoreInterface? _machine;
 
     #region NTSC Color Constants
 
@@ -964,10 +969,20 @@ bool showScanLines)
     private static bool IsFunctionKey(Key key) => key >= Key.F1 && key <= Key.F24;
 
     /// <summary>
-    /// Attaches the emulator machine for keyboard input injection.
+    /// Attaches the emulator core control interface to this display control.
     /// </summary>
-    /// <param name="machine">VA2M emulator instance to receive keyboard input.</param>
-    public void AttachMachine(VA2M machine) => _machine = machine;
+    /// <param name="machine">Emulator core interface for keyboard input queueing.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Abstraction:</strong> Accepts <see cref="IEmulatorCoreInterface"/> instead of
+    /// concrete VA2M type, decoupling the display from emulator implementation details.
+    /// </para>
+    /// <para>
+    /// Called by MainWindow.Initialize() after control construction. The machine reference
+    /// is used to queue keyboard input via EnqueueKey() when the user types.
+    /// </para>
+    /// </remarks>
+    public void AttachMachine(IEmulatorCoreInterface machine) => _machine = machine;
 
     /// <summary>
     /// Gets whether caps lock emulation is enabled from the parent MainWindow.

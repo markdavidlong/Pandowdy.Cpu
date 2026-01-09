@@ -132,6 +132,11 @@ namespace Pandowdy
 
                     services.AddSingleton<VA2M>();
                     
+                    // Register IEmulatorCoreInterface alias for VA2M
+                    // This allows the UI to depend on the core interface abstraction instead of concrete VA2M type,
+                    // providing explicit thread-safe contract and preventing accidental cross-thread calls
+                    services.AddSingleton<IEmulatorCoreInterface>(sp => sp.GetRequiredService<VA2M>());
+                    
                     // MainWindow factory - encapsulates creation and initialization
                     services.AddSingleton<IMainWindowFactory, MainWindowFactory>();
                 });

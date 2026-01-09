@@ -126,7 +126,6 @@ public class FrameGeneratorTests
                 StateHighRead: false,
                 StateHighWrite: false,
                 StateVBlank: false,
-                StateCurrentKey: 0,
                 StatePdl0: 0,
                 StatePdl1: 0,
                 StatePdl2: 0,
@@ -284,7 +283,7 @@ public class FrameGeneratorTests
             set => UpdateField(s => s with { StateVBlank = value });
         }
         
-        public byte CurrentKey => _current.StateCurrentKey;
+        // CurrentKey removed - keyboard state is managed entirely by SingularKeyHandler subsystem
         public byte Pdl0 => _current.StatePdl0;
         public byte Pdl1 => _current.StatePdl1;
         public byte Pdl2 => _current.StatePdl2;
@@ -654,7 +653,6 @@ public class FrameGeneratorTests
                 StateHighRead: statusProvider.StateHighRead,
                 StateHighWrite: statusProvider.StateHighWrite,
                 StateVBlank: statusProvider.StateVBlank,
-                StateCurrentKey: statusProvider.CurrentKey, // Property name is CurrentKey
                 StatePdl0: statusProvider.Pdl0, // Property name is Pdl0
                 StatePdl1: statusProvider.Pdl1, // Property name is Pdl1
                 StatePdl2: statusProvider.Pdl2, // Property name is Pdl2
