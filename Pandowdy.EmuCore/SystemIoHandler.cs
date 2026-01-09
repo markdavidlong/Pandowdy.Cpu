@@ -46,6 +46,11 @@ public class SystemIoHandler : ISystemIoHandler
         InitIoWriteHandlers();
     }
 
+    public void Reset()
+    {
+        _softSwitches.ResetAllSwitches();
+    }
+
 
     public byte Read(ushort offset)
     {

@@ -327,10 +327,12 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
         UpdateMemoryMappings();
     }
 
-    public void ResetRanges()
+    public void Reset()
     {
         SetDefaultReadRanges();
         SetDefaultWriteRanges();
+
+        // Reset IO when installed
     }
 
     private void SetDefaultReadRanges()
