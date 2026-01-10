@@ -39,13 +39,15 @@ using Pandowdy.EmuCore.Services;
 namespace Pandowdy.EmuCore;
 
 /// <summary>
-/// Manages all Apple IIe soft switches and notifies responders when switches change.
+/// Manages all Apple IIe soft switches with direct coupling to SystemStatusProvider.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>Responder Pattern:</strong> Components register as <see cref="ISoftSwitchResponder"/>
-/// to receive notifications when switches change. This decouples switch management from
-/// the components that react to changes (MemoryPool, video renderer, etc.).
+/// <strong>Direct Coupling Pattern:</strong> This implementation directly mutates the
+/// SystemStatusProvider when switches change, eliminating the overhead of the responder
+/// pattern since only one component (SystemStatusProvider) needs to track switch states.
+/// Components that need to react to switch changes (like memory subsystems) subscribe
+/// to SystemStatusProvider's MemoryMappingChanged event.
 /// </para>
 /// <para>
 /// <strong>Switch Categories:</strong>

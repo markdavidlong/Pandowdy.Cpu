@@ -38,6 +38,7 @@ public class VA2MBusTests
         public IKeyboardReader KeyboardReader { get; }
         public IGameControllerStatus GameController { get; }
         public ISystemIoHandler IoHandler { get; }
+        public VBlankStatusHandler VBlank { get; }
 
         public VA2MBusFixture()
         {
@@ -61,11 +62,14 @@ public class VA2MBusTests
             // Create soft switches
             Switches = new SoftSwitches(StatusProvider);
             
-            // Create I/O handler (coordinates keyboard, controller, switches)
-            IoHandler = new SystemIoHandler(Switches, keyboard, GameController);
+            // Create VBlank status handler
+            VBlank = new VBlankStatusHandler();
             
-            // Create bus (new architecture: AddressSpace + IoHandler + CPU)
-            Bus = new VA2MBus(AddressSpace, IoHandler, Cpu);
+            // Create I/O handler (coordinates keyboard, controller, switches, VBlank)
+            IoHandler = new SystemIoHandler(Switches, keyboard, GameController, VBlank);
+            
+            // Create bus (new architecture: AddressSpace + IoHandler + CPU + VBlank)
+            Bus = new VA2MBus(AddressSpace, IoHandler, Cpu, VBlank);
         }
     }
 
@@ -86,10 +90,11 @@ public class VA2MBusTests
         var cpu = new CPUAdapter(new CPU());
         var keyboard = new SingularKeyHandler();
         var switches = new SoftSwitches(status);
-        var ioHandler = new SystemIoHandler(switches, keyboard, gameController);
+        var vblank = new VBlankStatusHandler();
+        var ioHandler = new SystemIoHandler(switches, keyboard, gameController, vblank);
 
         // Act
-        var bus = new VA2MBus(addressSpace, ioHandler, cpu);
+        var bus = new VA2MBus(addressSpace, ioHandler, cpu, vblank);
 
         // Assert
         Assert.NotNull(bus);
@@ -106,10 +111,11 @@ public class VA2MBusTests
         var cpu = new CPUAdapter(new CPU());
         var keyboard = new SingularKeyHandler();
         var switches = new SoftSwitches(status);
-        var ioHandler = new SystemIoHandler(switches, keyboard, gameController);
+        var vblank = new VBlankStatusHandler();
+        var ioHandler = new SystemIoHandler(switches, keyboard, gameController, vblank);
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new VA2MBus(null!, ioHandler, cpu));
+        Assert.Throws<ArgumentNullException>(() => new VA2MBus(null!, ioHandler, cpu, vblank));
     }
     
     [Fact]
@@ -123,9 +129,10 @@ public class VA2MBusTests
             new Test64KSystemRamSelector(),
             new TestSlots(status));
         var cpu = new CPUAdapter(new CPU());
+        var vblank = new VBlankStatusHandler();
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new VA2MBus(addressSpace, null!, cpu));
+        Assert.Throws<ArgumentNullException>(() => new VA2MBus(addressSpace, null!, cpu, vblank));
     }
 
     [Fact]
@@ -140,10 +147,11 @@ public class VA2MBusTests
             new TestSlots(status));
         var keyboard = new SingularKeyHandler();
         var switches = new SoftSwitches(status);
-        var ioHandler = new SystemIoHandler(switches, keyboard, gameController);
+        var vblank = new VBlankStatusHandler();
+        var ioHandler = new SystemIoHandler(switches, keyboard, gameController, vblank);
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new VA2MBus(addressSpace, ioHandler, null!));
+        Assert.Throws<ArgumentNullException>(() => new VA2MBus(addressSpace, ioHandler, null!, vblank));
     }
 
     #endregion

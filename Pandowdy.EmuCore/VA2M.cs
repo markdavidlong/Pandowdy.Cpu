@@ -281,7 +281,7 @@ public class VA2M : IDisposable, IKeyboardSetter, IEmulatorCoreInterface
     /// </para>
     /// <para>
     /// <strong>Threading:</strong> Frames are rendered on a separate thread and published at ~60 Hz.
-    /// The UI subscribes to <see cref="IFrameProvider.Stream"/> to receive frames asynchronously.
+    /// The UI subscribes to <see cref="IFrameProvider.FrameAvailable"/> to receive frames asynchronously.
     /// </para>
     /// </remarks>
     public IFrameProvider FrameProvider => _frameSink;

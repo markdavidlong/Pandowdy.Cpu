@@ -89,11 +89,23 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <item>Keyboard input (KBD, KEYSTRB)</item>
     /// <item>Pushbutton states (BUTTON0-2)</item>
     /// <item>Language card banking ($C080-$C08F)</item>
-    /// <item>VBlank status (RD_VERTBLANK)</item>
+    /// <item>VBlank status (RD_VERTBLANK) via VBlankStatusHandler</item>
     /// </list>
     /// </para>
     /// </remarks>
     private ISystemIoHandler _io;
+
+    /// <summary>
+    /// VBlank status handler managing vertical blanking timing.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Shared with SystemIoHandler to synchronize VBlank state. VA2MBus decrements
+    /// the counter every CPU cycle and resets it when VBlank fires. SystemIoHandler
+    /// reads the InVBlank property to service $C019 (RD_VERTBLANK_) reads.
+    /// </para>
+    /// </remarks>
+    private VBlankStatusHandler _vblank;
 
     /// <summary>
     /// Gets the AddressSpaceController for direct memory access.
@@ -143,31 +155,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// </remarks>
     private const ulong CyclesPerVBlank = 17030;
 
-    /// <summary>
-    /// Number of cycles during which the vertical blanking flag (RD_VERTBLANK_) reads as $80.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// The VBlank blackout period is 4,550 cycles (70 scanlines × 65 cycles/scanline) during
-    /// which the video scanner is not drawing visible scanlines. Software can use this period
-    /// for graphics updates without causing visual artifacts.
-    /// </para>
-    /// <para>
-    /// <strong>Timing:</strong>
-    /// <list type="bullet">
-    /// <item>VBlank starts at cycle 12,480 (scanline 192)</item>
-    /// <item>VBlank ends at cycle 17,029 (scanline 261)</item>
-    /// <item>Duration: 70 scanlines × 65 cycles = 4,550 cycles</item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// <strong>80-Column Firmware Synchronization:</strong> The 80-column firmware relies on
-    /// testing RD_VERTBLANK_ to determine when to start page-flipping. By ensuring VBlank
-    /// fires at the correct cycle (12,480), we maintain synchronization with firmware timing
-    /// expectations.
-    /// </para>
-    /// </remarks>
-    private const int VBlankBlackoutCycles = 4550;
+
     
     /// <summary>
     /// Cycle count within frame at which VBlank starts (scanline 192 begins).
@@ -196,15 +184,6 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// </remarks>
     private ulong _nextVblankCycle = VBlankStartCycle;
     
-    /// <summary>
-    /// Countdown timer for VBlank blackout period (decremented each cycle).
-    /// </summary>
-    /// <remarks>
-    /// When > 0, RD_VERTBLANK_ ($C019) reads as $80 (in VBlank).
-    /// When ≤ 0, RD_VERTBLANK_ reads as $00 (visible scanlines).
-    /// </remarks>
-    private long _VblankBlackoutCounter = VBlankBlackoutCycles;
-
     /// <summary>
     /// Event raised every ~60 Hz (17,063 cycles) to signal vertical blanking interval.
     /// </summary>
@@ -236,16 +215,13 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
 
 
 
-
-    
-
-
     /// <summary>
     /// Initializes a new instance of the VA2MBus class.
     /// </summary>
     /// <param name="addressSpace">Address space controller managing 128KB Apple IIe memory space (RAM, ROM, banking).</param>
     /// <param name="ioHandler">System I/O handler managing $C000-$C08F I/O space operations.</param>
     /// <param name="cpu">CPU instance (6502 emulator) to connect to this bus.</param>
+    /// <param name="vb">VBlank status handler for vertical blanking timing synchronization.</param>
     /// <exception cref="ArgumentNullException">Thrown if any parameter is null.</exception>
     /// <remarks>
     /// <para>
@@ -255,7 +231,14 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <item>Store AddressSpaceController reference for memory operations</item>
     /// <item>Store SystemIoHandler reference for I/O operations</item>
     /// <item>Store CPU reference for instruction execution</item>
+    /// <item>Store VBlankStatusHandler reference for VBlank timing</item>
     /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>VBlankStatusHandler Integration:</strong> The VBlankStatusHandler is shared
+    /// between VA2MBus (which manages the countdown) and SystemIoHandler (which reads the
+    /// status for $C019). This ensures both subsystems see consistent VBlank state without
+    /// tight coupling.
     /// </para>
     /// <para>
     /// <strong>Simplified Architecture:</strong> This bus no longer manages I/O handler
@@ -271,14 +254,16 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// </list>
     /// </para>
     /// </remarks>
-    public VA2MBus(AddressSpaceController addressSpace, ISystemIoHandler ioHandler , ICpu cpu)
+    public VA2MBus(AddressSpaceController addressSpace, ISystemIoHandler ioHandler , ICpu cpu, VBlankStatusHandler vb)
     {
         ArgumentNullException.ThrowIfNull(addressSpace);
         ArgumentNullException.ThrowIfNull(ioHandler);
         ArgumentNullException.ThrowIfNull(cpu);
+        ArgumentNullException.ThrowIfNull(vb);
         _addressSpace = addressSpace;
         _cpu = cpu;
         _io = ioHandler;
+        _vblank = vb;
     }
 
    
@@ -312,6 +297,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <list type="bullet">
     /// <item>$C000-$C08F: System I/O space → ISystemIoHandler.Read(offset)</item>
     /// <item>All other addresses → AddressSpaceController.Read(address)</item>
+    /// </list>
     /// </para>
     /// <para>
     /// <strong>Address Translation:</strong> System I/O addresses are converted to zero-based
@@ -388,20 +374,23 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <list type="number">
     /// <item>Execute one CPU instruction (CPU.Clock)</item>
     /// <item>Increment system clock counter</item>
-    /// <item>Decrement VBlank blackout counter</item>
-    /// <item>Update I/O handler's VBlank counter for RD_VERTBLANK reads</item>
+    /// <item>Decrement VBlank counter (via VBlankStatusHandler.Counter--)</item>
     /// <item>Check if VBlank cycle reached, fire event if so</item>
+    /// <item>Reset VBlank counter (via VBlankStatusHandler.ResetCounter) when VBlank starts</item>
     /// </list>
     /// </para>
     /// <para>
-    /// <strong>VBlank Counter Synchronization:</strong> The _VblankBlackoutCounter is shared
-    /// with the I/O handler via UpdateVBlankCounter() so that reads to $C019 (RD_VERTBLANK_)
-    /// return the correct bit 7 state (set during VBlank, clear during visible scanlines).
+    /// <strong>VBlank Counter Synchronization:</strong> The VBlankStatusHandler is shared
+    /// with the I/O handler so that reads to $C019 (RD_VERTBLANK_) return the correct bit 7
+    /// state (set during VBlank, clear during visible scanlines). VA2MBus manages the counter
+    /// lifecycle (decrement every cycle, reset at VBlank start), while SystemIoHandler reads
+    /// the InVBlank property.
     /// </para>
     /// <para>
     /// <strong>VBlank Timing:</strong> When _systemClock reaches _nextVblankCycle (initially
     /// 12,480, then 29,510, 46,540, ...), the VBlank event is fired and _nextVblankCycle is
-    /// advanced by CyclesPerVBlank (17,030). The VBlank blackout counter is reset to 4,550 cycles.
+    /// advanced by CyclesPerVBlank (17,030). The VBlank counter is reset to 4,550 cycles via
+    /// VBlankStatusHandler.ResetCounter().
     /// </para>
     /// <para>
     /// <strong>Frame Cycle Calculation:</strong>
@@ -438,28 +427,11 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
             return;
         }
 
-        //var currPc = _cpu!.PC;
-        //if (lastPc != currPc)
-        //{
-        //    var hook = _hookTable?.Get((ushort) currPc);
-        //    if (hook != null)
-        //    {
-        //        var lineNum = this.CpuRead(0x75) + (this.CpuRead(0x76) * 256);
-        //        string ln = lineNum < 0xFA00 ? lineNum.ToString() : "IMM";
-        //        var sp = _cpu!.SP;
-        //        var spcs = 0xFF - sp;
-        //        hook(-1, lineNum, spcs);
-        //    }
-
-        //}
-        //lastPc = currPc;
-
         // Execute a single CPU cycle
         _cpu.Clock(this);
         _systemClock++;
-        _VblankBlackoutCounter--;
-        _io.UpdateVBlankCounter(_VblankBlackoutCounter);
-         
+        _vblank.Counter--;
+
 
         if (_systemClock >= _nextVblankCycle)
         {
@@ -468,7 +440,9 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
             do
             { 
                 _nextVblankCycle += CyclesPerVBlank;
-                _VblankBlackoutCounter = VBlankBlackoutCycles;
+                _vblank.ResetCounter();
+
+
 
             } while (_systemClock >= _nextVblankCycle);
 

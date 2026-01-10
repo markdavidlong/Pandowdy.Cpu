@@ -235,7 +235,7 @@ public interface IEmulatorCoreInterface
     /// </para>
     /// <para>
     /// <strong>Observable Pattern:</strong> Frames are rendered on a separate thread and published through
-    /// reactive streams. Subscribe to <see cref="IFrameProvider.Stream"/> to receive frames at ~60 Hz.
+    /// reactive streams. Subscribe to <see cref="IFrameProvider.FrameAvailable"/> to receive frames at ~60 Hz.
     /// </para>
     /// <para>
     /// <strong>Use Cases:</strong> Display Apple IIe video output, capture screenshots, record video.

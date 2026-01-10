@@ -3,43 +3,53 @@ using Pandowdy.EmuCore.Interfaces;
 namespace Pandowdy.EmuCore;
 
 /// <summary>
-/// Simple single-key keyboard handler that emulates Apple IIe keyboard behavior with strobe mechanism.
+/// Simple keyboard handler that maintains a single key with strobe bit (Apple IIe style).
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>Apple IIe Keyboard Emulation:</strong> This class provides a faithful emulation of the
-/// original Apple IIe keyboard hardware, which maintains only a single key latch with a strobe bit.
-/// Unlike modern keyboard buffers, the Apple IIe keyboard has no queue - a new keypress immediately
-/// overwrites any previous unread key.
+/// <strong>Purpose:</strong> Implements the Apple IIe keyboard hardware behavior where a single
+/// key latch holds the most recent keypress with a strobe bit (bit 7) indicating whether the
+/// key has been read. This class provides both <see cref="IKeyboardReader"/> (for emulator I/O)
+/// and <see cref="IKeyboardSetter"/> (for UI input injection).
 /// </para>
 /// <para>
-/// <strong>Hardware Behavior Match:</strong>
+/// <strong>Apple IIe Keyboard Mechanism:</strong>
 /// <list type="bullet">
-/// <item>$C000 (KBD) - Returns current key with strobe bit: <see cref="PeekCurrentKeyAndStrobe"/></item>
-/// <item>$C010 (KBDSTRB) - Clears strobe bit: <see cref="FetchPendingAndClearStrobe"/></item>
-/// <item>Key overwrite - New keypress replaces previous unread key (authentic behavior)</item>
+/// <item><strong>Key Press:</strong> When a key is pressed, its 7-bit ASCII code (0-127) is
+/// placed in the keyboard latch with bit 7 set to 1 (strobe set), creating a value >= 128.</item>
+/// <item><strong>Reading $C000 (KBD):</strong> Returns the keyboard latch value with strobe bit intact.
+/// Multiple reads without clearing strobe return the same value.</item>
+/// <item><strong>Reading $C010 (KBDSTRB):</strong> Clears the strobe bit (sets bit 7 to 0), indicating
+/// the key has been acknowledged. Implemented by <see cref="ClearStrobe"/>.</item>
+/// <item><strong>New Key Press:</strong> If a new key is pressed before the strobe is cleared, the
+/// old key is discarded (hardware limitation of single-key latch).</item>
 /// </list>
 /// </para>
 /// <para>
-/// <strong>Strobe Bit Mechanism (Bit 7):</strong>
+/// <strong>Dual Interface Design:</strong>
 /// <list type="bullet">
-/// <item><c>1</c> (set, value >= 128) - Key is unread, new keypress available</item>
-/// <item><c>0</c> (clear, value &lt; 128) - Key has been read, strobe cleared via $C010</item>
+/// <item><strong>IKeyboardReader:</strong> Used by SystemIoHandler to read keyboard state during
+/// CPU memory access to $C000-$C010. Provides non-destructive reads and strobe clearing.</item>
+/// <item><strong>IKeyboardSetter:</strong> Used by UI layer (MainWindowViewModel) to inject keypresses
+/// when user types on physical keyboard. Sets key value with strobe bit automatically.</item>
 /// </list>
 /// </para>
 /// <para>
-/// <strong>Thread Safety:</strong> This implementation is <em>not</em> thread-safe. It is designed
-/// to be accessed from a single thread (the emulator's CPU thread). If keyboard input arrives from
-/// a different thread (e.g., UI thread), proper synchronization must be implemented by the caller.
+/// <strong>Single-Key Limitation:</strong> Like the original Apple IIe hardware, this implementation
+/// maintains only one key at a time. If the user presses a key before the software reads $C010,
+/// the new key overwrites the old one. This matches authentic Apple IIe behavior (no key rollover,
+/// no buffering).
 /// </para>
 /// <para>
-/// <strong>Design Pattern:</strong> Implements both <see cref="IKeyboardReader"/> (for I/O handlers
-/// to read keyboard state) and <see cref="IKeyboardSetter"/> (for UI/input handlers to inject keypresses).
-/// This dual-interface approach provides clear separation between input injection and emulated hardware reading.
+/// <strong>Thread Safety:</strong> Not thread-safe. All operations (EnqueueKey from UI thread,
+/// reads from emulator thread) must be synchronized by the caller. In practice, ReactiveUI's
+/// DispatcherScheduler handles this automatically.
 /// </para>
 /// </remarks>
 /// <example>
-/// <para><strong>Typical Usage in Emulator:</strong></para>
+/// <para>
+/// <strong>Typical Usage in Emulator Architecture:</strong>
+/// </para>
 /// <code>
 /// // Dependency injection setup
 /// var keyboardHandler = new SingularKeyHandler();
@@ -104,7 +114,7 @@ public class SingularKeyHandler : IKeyboardReader, IKeyboardSetter
     /// </para>
     /// <para>
     /// <strong>Use Case:</strong> Useful for debugging or UI display of the current key state
-    /// without modifying the strobe bit.
+    /// without modifying the strobe bit. See <see cref="ClearStrobe"/> for strobe management.
     /// </para>
     /// </remarks>
     public byte PeekCurrentKeyValue() => (byte)(_key & 0x7f);
@@ -117,7 +127,7 @@ public class SingularKeyHandler : IKeyboardReader, IKeyboardSetter
     /// </para>
     /// <para>
     /// <strong>Non-Destructive Read:</strong> This method does not clear the strobe bit.
-    /// Multiple calls return the same value until <see cref="FetchPendingAndClearStrobe"/>
+    /// Multiple calls return the same value until <see cref="ClearStrobe"/>
     /// or <see cref="EnqueueKey"/> is called.
     /// </para>
     /// </remarks>

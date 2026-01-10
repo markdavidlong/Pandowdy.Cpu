@@ -53,6 +53,8 @@ namespace Pandowdy
                     services.AddSingleton<ICardFactory, CardFactory>();
                     services.AddSingleton<ISlots, Slots>();
 
+                    services.AddSingleton<VBlankStatusHandler>();
+
                     // EmuCore - Memory & Bus
                     services.AddSingleton<AddressSpaceController>();
 

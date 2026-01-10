@@ -68,7 +68,7 @@ public interface IKeyboardReader
     /// </para>
     /// <para>
     /// <strong>Use Case:</strong> Useful for inspecting the key value without clearing the strobe,
-    /// or for reading the key after the strobe has already been cleared via <see cref="FetchPendingAndClearStrobe"/>.
+    /// or for reading the key after the strobe has already been cleared via <see cref="ClearStrobe"/>.
     /// </para>
     /// <para>
     /// <strong>Example:</strong> If the internal value is 0xC1 (strobe set, 'A' key), this returns 0x41.

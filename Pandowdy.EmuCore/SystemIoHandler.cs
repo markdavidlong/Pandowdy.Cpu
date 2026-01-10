@@ -55,22 +55,8 @@ public class SystemIoHandler : ISystemIoHandler
     /// </remarks>
     private readonly IGameControllerStatus _gameController;
 
-    private long _VblankBlackoutCounter = 0;
-
-
-      
-    
-
-    /// <summary>
-    /// Updates the VBlank blackout counter from VA2MBus timing.
-    /// </summary>
-    /// <param name="counter">
-    /// Current VBlank counter. Positive during VBlank, negative during visible scanlines.
-    /// </param>
-    /// <remarks>
-    /// Called every CPU cycle by VA2MBus.Clock(). When counter &gt; 0, RD_VERTBLANK ($C019) returns $80+.
-    /// </remarks>
-    public void UpdateVBlankCounter(long counter) { _VblankBlackoutCounter = counter; }    
+    // private long _VblankBlackoutCounter = 0;
+    private VBlankStatusHandler _vblank;
 
     /// <summary>
     /// Initializes the SystemIoHandler with required dependencies.
@@ -78,21 +64,39 @@ public class SystemIoHandler : ISystemIoHandler
     /// <param name="switches">Soft switches for memory mapping and video modes.</param>
     /// <param name="keyboard">Keyboard reader (shared with VA2M as IKeyboardSetter).</param>
     /// <param name="gameController">Game controller for button and paddle state.</param>
+    /// <param name="vb">VBlank status handler for vertical blanking timing synchronization.</param>
     /// <exception cref="ArgumentNullException">Thrown if any parameter is null.</exception>
     /// <remarks>
-    /// Initializes I/O handler dictionaries via InitIoReadHandlers() and InitIoWriteHandlers().
-    /// Does not subscribe to game controller events - SystemStatusProvider handles that.
+    /// <para>
+    /// <strong>Initialization:</strong> Validates all dependencies and initializes I/O handler
+    /// dictionaries via InitIoReadHandlers() and InitIoWriteHandlers().
+    /// </para>
+    /// <para>
+    /// <strong>VBlank Integration:</strong> The VBlankStatusHandler is shared with VA2MBus to
+    /// synchronize VBlank state. VA2MBus manages the countdown (decrements Counter every cycle),
+    /// while SystemIoHandler reads the InVBlank property when servicing $C019 (RD_VERTBLANK_) reads.
+    /// </para>
+    /// <para>
+    /// <strong>Event Subscription:</strong> Does not subscribe to game controller events -
+    /// SystemStatusProvider handles that directly to maintain clean separation:
+    /// <list type="bullet">
+    /// <item>SystemIoHandler: Reads controller state for CPU I/O operations</item>
+    /// <item>SystemStatusProvider: Observes controller changes for state snapshots</item>
+    /// </list>
+    /// </para>
     /// </remarks>
-    public SystemIoHandler(SoftSwitches switches, IKeyboardReader keyboard, IGameControllerStatus gameController)
+    public SystemIoHandler(SoftSwitches switches, IKeyboardReader keyboard, IGameControllerStatus gameController, VBlankStatusHandler vb)
     {
         ArgumentNullException.ThrowIfNull(switches);
         ArgumentNullException.ThrowIfNull(keyboard);
         ArgumentNullException.ThrowIfNull(gameController);
+        ArgumentNullException.ThrowIfNull(vb);
 
 
         _softSwitches = switches;
         _keyboard = keyboard;
         _gameController = gameController;
+        _vblank = vb;
 
         // Note: We do NOT subscribe to game controller events here.
         // SystemStatusProvider subscribes directly to maintain clean separation:
@@ -709,7 +713,7 @@ public class SystemIoHandler : ISystemIoHandler
         _ioReadHandlers[RD_HIRES_] = () => Utility.BuildHiBitVal(_softSwitches.Get(SoftSwitches.SoftSwitchId.HiRes), _keyboard.PeekCurrentKeyValue());
         _ioReadHandlers[RD_ALTCHAR_] = () => Utility.BuildHiBitVal(_softSwitches.Get(SoftSwitches.SoftSwitchId.AltChar), _keyboard.PeekCurrentKeyValue());
         _ioReadHandlers[RD_80VID_] = () => Utility.BuildHiBitVal(_softSwitches.Get(SoftSwitches.SoftSwitchId.Vid80), _keyboard.PeekCurrentKeyValue());
-        _ioReadHandlers[RD_VERTBLANK_] = () => { byte inVBlank = (byte) (_VblankBlackoutCounter > 0 ? 0x80 : 0x00); return (byte) (inVBlank | _keyboard.PeekCurrentKeyValue() & 0x7f); };
+        _ioReadHandlers[RD_VERTBLANK_] = () => { return (byte) ((byte) (_vblank.InVBlank ? 0x80 : 0x00) | _keyboard.PeekCurrentKeyValue() & 0x7f); };
         _ioReadHandlers[TAPEIN_] = () => 0x00;
         _ioReadHandlers[BUTTON0_] = () => (byte) (_gameController.GetButton(0) ? 0x80 : 0x00);
         _ioReadHandlers[BUTTON1_] = () => (byte) (_gameController.GetButton(1) ? 0x80 : 0x00);

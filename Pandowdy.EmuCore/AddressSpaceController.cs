@@ -130,7 +130,7 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
     /// if PAGE2 is off, so it uses this method instead of the normal <see cref="Read"/> method.
     /// </para>
     /// <para>
-    /// <strong>Delegation:</strong> Delegates to <see cref="ISystemRamSelector.ReadRawMain"/>.
+    /// <strong>Delegation:</strong> Delegates to <see cref="IDirectMemoryPoolReader.ReadRawMain"/>.
     /// </para>
     /// </remarks>
     public byte ReadRawMain(int address) => _systemRam.ReadRawMain(address);
@@ -151,7 +151,7 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
     /// directly.
     /// </para>
     /// <para>
-    /// <strong>Delegation:</strong> Delegates to <see cref="ISystemRamSelector.ReadRawAux"/>.
+    /// <strong>Delegation:</strong> Delegates to <see cref="IDirectMemoryPoolReader.ReadRawAux"/>.
     /// </para>
     /// </remarks>
     public byte ReadRawAux(int address) => _systemRam.ReadRawAux(address);
