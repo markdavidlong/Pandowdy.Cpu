@@ -162,6 +162,11 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
     private const int RequiredRamSize = 0xC000;
 
     /// <summary>
+    /// System IO handling $C000-$C08F 
+    /// </summary>
+    private readonly ISystemIoHandler _io;
+
+    /// <summary>
     /// Slot system handling $C090-$CFFF (slot I/O and ROM).
     /// </summary>
     private readonly ISlots _slots;
@@ -175,6 +180,7 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
     /// System RAM handling $0000-$BFFF (main and auxiliary memory).
     /// </summary>
     private readonly ISystemRamSelector _systemRam;
+
 
     /// <summary>
     /// Gets the system RAM selector for direct access to memory subsystem.
@@ -206,12 +212,15 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
     public AddressSpaceController(
         ILanguageCard langCard,
         ISystemRamSelector systemRam,
+        ISystemIoHandler ioHandler,
         ISlots slots)
     {
         ArgumentNullException.ThrowIfNull(langCard);
         ArgumentNullException.ThrowIfNull(systemRam);
         ArgumentNullException.ThrowIfNull(slots);
+        ArgumentNullException.ThrowIfNull(ioHandler);
 
+        _io = ioHandler;
         _langCard = langCard;
         _systemRam = Utility.ValidateIMemorySize(systemRam, nameof(systemRam), RequiredRamSize);
         _slots = slots;
@@ -245,9 +254,14 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
         >= 0xE000 => _langCard.Read(address),        // $E000-$FFFF
         >= 0xD000 => _langCard.Read(address),        // $D000-$DFFF
         >= 0xC090 => _slots.Read((ushort)(address - 0xC000)), // $C090-$CFFF
-        >= 0xC000 => throw new InvalidOperationException($"AddressSpaceController should never receive $C000-$C08F (VA2MBus intercepts). Address: ${address:X4}"),
+        >= 0xC000 => _io.Read((ushort) (address - 0xC000)),
         _ => _systemRam.Read(address)                // $0000-$BFFF
     };
+
+    public void Reset()
+    {
+        _io.Reset();
+    }
 
     /// <summary>
     /// Writes a byte to the specified address, routing to the appropriate subsystem.
@@ -283,7 +297,8 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
                 break;
 
             case >= 0xC000:
-                throw new InvalidOperationException($"AddressSpaceController should never receive $C000-$C08F (VA2MBus intercepts). Address: ${address:X4}");
+                _io.Write((ushort) (address - 0xC000), value);
+                break;
 
             default: // $0000-$BFFF
                 _systemRam.Write(address, value);

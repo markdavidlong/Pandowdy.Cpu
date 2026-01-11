@@ -32,12 +32,21 @@ public static class VA2MTestHelpers
             _gameController = new SimpleGameController(); // Create controller first
             _systemStatusProvider = new SystemStatusProvider(_gameController); // Pass controller to status provider
             _bus = new TestAppleIIBus();
+            _keyboardSetter = new SingularKeyHandler(); // Default keyboard handler
+            
+            // Create I/O handler
+            var softSwitches = new SoftSwitches(_systemStatusProvider as SystemStatusProvider 
+                ?? new SystemStatusProvider(_gameController));
+            var vblank = new CpuClockingCounters();
+            var ioHandler = new SystemIoHandler(softSwitches, _keyboardSetter as IKeyboardReader 
+                ?? new SingularKeyHandler(), _gameController, vblank);
+            
             _memoryPool = new AddressSpaceController(
                 new TestLanguageCard(), 
                 new TestSystemRamSelector(),
+                ioHandler,
                 new TestSlots(_systemStatusProvider));
             _frameGenerator = new TestFrameGenerator();
-            _keyboardSetter = new SingularKeyHandler(); // Default keyboard handler
         }
 
         public VA2MBuilder WithEmulatorState(IEmulatorState state)
@@ -188,9 +197,15 @@ public class TestAppleIIBus : IAppleIIBus
     {
         var gameController = new SimpleGameController();
         var statusProvider = new SystemStatusProvider(gameController);
+        var softSwitches = new SoftSwitches(statusProvider);
+        var keyboard = new SingularKeyHandler();
+        var vblank = new CpuClockingCounters();
+        var ioHandler = new SystemIoHandler(softSwitches, keyboard, gameController, vblank);
+        
         _memory = new AddressSpaceController(
             new TestLanguageCard(), 
             new Test64KSystemRamSelector(),
+            ioHandler,
             new TestSlots(statusProvider));
     }
 
@@ -295,11 +310,17 @@ public class TestFrameGenerator : IFrameGenerator
     {
         var gameController = new SimpleGameController();
         var statusProvider = new SystemStatusProvider(gameController);
+        var softSwitches = new SoftSwitches(statusProvider);
+        var keyboard = new SingularKeyHandler();
+        var vblank = new CpuClockingCounters();
+        var ioHandler = new SystemIoHandler(softSwitches, keyboard, gameController, vblank);
+        
         return new RenderContext(
             new BitmapDataArray(),
             new AddressSpaceController(
                 new TestLanguageCard(), 
                 new TestSystemRamSelector(),
+                ioHandler,
                 new TestSlots(statusProvider)),
             statusProvider
         );

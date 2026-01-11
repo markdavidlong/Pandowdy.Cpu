@@ -5,7 +5,7 @@ using Pandowdy.EmuCore.Interfaces;
 namespace Pandowdy.EmuCore;
 
 /// <summary>
-/// VA2M-specific system bus that coordinates CPU, memory, and I/O operations for Apple IIe emulation.
+/// VA2M-specific system bus that coordinates CPU, memory, and timing for Apple IIe emulation.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -13,19 +13,17 @@ namespace Pandowdy.EmuCore;
 /// <list type="bullet">
 /// <item>CPU connection and cycle execution</item>
 /// <item>Memory read/write routing to AddressSpaceController</item>
-/// <item>System I/O routing ($C000-$C08F) to SystemIoHandler</item>
-/// <item>VBlank timing and event generation (~60 Hz)</item>
-/// <item>Keyboard input delegation (via ISystemIoHandler)</item>
-/// <item>Game controller pushbutton delegation (via ISystemIoHandler)</item>
+/// <item>CPU cycle counting and VBlank timing (via CpuClockingCounters)</item>
+/// <item>VBlank event generation (~60 Hz)</item>
 /// </list>
 /// </para>
 /// <para>
-/// <strong>Architecture Changes:</strong>
+/// <strong>Architecture:</strong>
 /// <list type="bullet">
-/// <item>I/O handling delegated to ISystemIoHandler (no longer internal)</item>
-/// <item>Memory operations delegated to AddressSpaceController (renamed from MemoryPool)</item>
-/// <item>Soft switch management handled by SystemIoHandler</item>
-/// <item>Language card banking logic handled by SystemIoHandler</item>
+/// <item>Memory operations delegated to AddressSpaceController</item>
+/// <item>Timing and VBlank management delegated to CpuClockingCounters</item>
+/// <item>I/O handling managed by AddressSpaceController's routing to cards/handlers</item>
+/// <item>Simplified to pure bus coordination role</item>
 /// </list>
 /// </para>
 /// <para>
@@ -34,19 +32,13 @@ namespace Pandowdy.EmuCore;
 /// emulator thread; UI subscribers MUST marshal to UI thread via dispatcher.
 /// </para>
 /// <para>
-/// <strong>VBlank Timing:</strong> Emits VBlank event every 17,030 cycles (~60 Hz at 1.023 MHz),
+/// <strong>VBlank Timing:</strong> Emits VBlank event every 17,030 cycles (~60.06 Hz at 1.023 MHz),
 /// matching the Apple IIe NTSC vertical blanking interval. The VBlank blackout period lasts
-/// 4,550 cycles during which RD_VERTBLANK_ ($C019) reads as $80.
+/// 4,550 cycles. All timing logic is managed by CpuClockingCounters.
 /// </para>
 /// <para>
 /// <strong>Disposal:</strong> After disposal, no further events are raised and Clock() becomes
 /// a no-op. Proper disposal prevents event handler leaks and ensures clean shutdown.
-/// </para>
-/// <para>
-/// <strong>⚠️ REFACTORING IN PROGRESS:</strong> This class has been simplified to focus on
-/// bus coordination only. I/O handling, keyboard input, and pushbutton management have been
-/// extracted to dedicated subsystems. See Pandowdy.EmuCore/_docs_/VA2MBus-Refactoring-Notes.md
-/// for architectural details.
 /// </para>
 /// </remarks>
 public sealed class VA2MBus : IAppleIIBus, IDisposable
@@ -55,8 +47,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// Address space controller managing the 128KB Apple IIe memory space.
     /// </summary>
     /// <remarks>
-    /// Renamed from MemoryPool to better reflect its responsibility of managing
-    /// the entire address space including RAM, ROM, and memory banking.
+    /// Handles all memory operations including RAM, ROM, memory banking, and I/O routing.
     /// </remarks>
     private readonly AddressSpaceController _addressSpace;
     
@@ -70,35 +61,12 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// </summary>
     public ICpu Cpu { get => _cpu; }
 
-  //  private int lastPc = 0;
-  //  private AppleSoftHookTable? _hookTable;
-  
     /// <summary>
-    /// System I/O handler managing $C000-$C08F I/O space.
+    /// CPU clocking and VBlank timing counters.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// Handles all system I/O operations including:
-    /// <list type="bullet">
-    /// <item>Soft switch management (memory mapping, video modes)</item>
-    /// <item>Keyboard input (KBD, KEYSTRB)</item>
-    /// <item>Pushbutton states (BUTTON0-2)</item>
-    /// <item>Language card banking ($C080-$C08F)</item>
-    /// <item>VBlank status (RD_VERTBLANK) via VBlankStatusHandler</item>
-    /// </list>
-    /// </para>
-    /// </remarks>
-    private ISystemIoHandler _io;
-
-    /// <summary>
-    /// VBlank status handler managing vertical blanking timing.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Shared with SystemIoHandler to synchronize VBlank state. VA2MBus decrements
-    /// the counter every CPU cycle and resets it when VBlank fires. SystemIoHandler
-    /// reads the InVBlank property to service $C019 (RD_VERTBLANK_) reads.
-    /// </para>
+    /// Manages total CPU cycle count, VBlank counter, and VBlank timing logic.
+    /// Provides global access to accurate timing information for all components.
     /// </remarks>
     private CpuClockingCounters _clockCounters;
 
@@ -108,16 +76,15 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <remarks>
     /// <para>
     /// Primarily used for testing and direct memory inspection. Normal CPU access
-    /// should go through CpuRead/CpuWrite which handle I/O space routing.
+    /// should go through CpuRead/CpuWrite.
     /// </para>
     /// <para>
     /// <strong>Note:</strong> This exposes the full address space controller, not just
-    /// RAM. It includes memory banking, ROM mapping, and other address space features.
+    /// RAM. It includes memory banking, ROM mapping, and I/O routing.
     /// The IMemory interface is used for compatibility with existing code.
     /// </para>
     /// </remarks>
     public IMemory RAM => _addressSpace;
-
 
     /// <summary>
     /// Gets the total number of CPU cycles executed since last reset.
@@ -130,11 +97,11 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     private bool _disposed;
     
     /// <summary>
-    /// Event raised every ~60 Hz (17,030 cycles) to signal vertical blanking interval.
+    /// Event raised every ~60.06 Hz (17,030 cycles) to signal vertical blanking interval.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <strong>Timing:</strong> Fires at 1,023,000 Hz / 17,063 cycles ≈ 60.02 Hz (NTSC).
+    /// <strong>Timing:</strong> Fires at 1,023,000 Hz / 17,030 cycles ≈ 60.06 Hz (NTSC).
     /// </para>
     /// <para>
     /// <strong>Thread Context:</strong> Always raised on the emulator thread. UI subscribers
@@ -152,21 +119,17 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// </remarks>
     public event EventHandler? VBlank;
 
-
     /// <summary>Start of system I/O space ($C000).</summary>
     public const ushort SYSTEM_IO_START = 0xC000;
-    /// <summary>End of Apple IIe internal system I/O address space</summary>
+    /// <summary>End of Apple IIe internal system I/O address space ($C08F).</summary>
     public const ushort IO_SYSTEM_AREA_END = 0xC08F;
-
-
 
     /// <summary>
     /// Initializes a new instance of the VA2MBus class.
     /// </summary>
-    /// <param name="addressSpace">Address space controller managing 128KB Apple IIe memory space (RAM, ROM, banking).</param>
-    /// <param name="ioHandler">System I/O handler managing $C000-$C08F I/O space operations.</param>
+    /// <param name="addressSpace">Address space controller managing 128KB Apple IIe memory space (RAM, ROM, banking, I/O routing).</param>
     /// <param name="cpu">CPU instance (6502 emulator) to connect to this bus.</param>
-    /// <param name="vb">VBlank status handler for vertical blanking timing synchronization.</param>
+    /// <param name="clockCounters">CPU clocking counters for cycle counting and VBlank timing.</param>
     /// <exception cref="ArgumentNullException">Thrown if any parameter is null.</exception>
     /// <remarks>
     /// <para>
@@ -174,44 +137,29 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <list type="number">
     /// <item>Validate all dependencies (null checks)</item>
     /// <item>Store AddressSpaceController reference for memory operations</item>
-    /// <item>Store SystemIoHandler reference for I/O operations</item>
     /// <item>Store CPU reference for instruction execution</item>
-    /// <item>Store VBlankStatusHandler reference for VBlank timing</item>
+    /// <item>Store CpuClockingCounters reference for timing management</item>
     /// </list>
     /// </para>
     /// <para>
-    /// <strong>VBlankStatusHandler Integration:</strong> The VBlankStatusHandler is shared
-    /// between VA2MBus (which manages the countdown) and SystemIoHandler (which reads the
-    /// status for $C019). This ensures both subsystems see consistent VBlank state without
-    /// tight coupling.
+    /// <strong>Simplified Architecture:</strong> This bus focuses purely on coordination.
+    /// Memory operations route through AddressSpaceController, which handles I/O card
+    /// routing, soft switches, and memory banking. Timing is managed by CpuClockingCounters.
     /// </para>
     /// <para>
-    /// <strong>Simplified Architecture:</strong> This bus no longer manages I/O handler
-    /// dictionaries or soft switch logic directly. All I/O operations are delegated to
-    /// the injected ISystemIoHandler, which handles soft switches, keyboard input,
-    /// pushbuttons, and language card banking internally.
-    /// </para>
-    /// <para>
-    /// <strong>Address Routing:</strong>
-    /// <list type="bullet">
-    /// <item>$C000-$C08F: Routed to ISystemIoHandler</item>
-    /// <item>All other addresses: Routed to AddressSpaceController</item>
-    /// </list>
+    /// <strong>Address Routing:</strong> All memory and I/O addresses are routed through
+    /// AddressSpaceController, which delegates to appropriate handlers (RAM, ROM, I/O cards).
     /// </para>
     /// </remarks>
-    public VA2MBus(AddressSpaceController addressSpace, ISystemIoHandler ioHandler , ICpu cpu, CpuClockingCounters vb)
+    public VA2MBus(AddressSpaceController addressSpace, ICpu cpu, CpuClockingCounters clockCounters)
     {
         ArgumentNullException.ThrowIfNull(addressSpace);
-        ArgumentNullException.ThrowIfNull(ioHandler);
         ArgumentNullException.ThrowIfNull(cpu);
-        ArgumentNullException.ThrowIfNull(vb);
+        ArgumentNullException.ThrowIfNull(clockCounters);
         _addressSpace = addressSpace;
         _cpu = cpu;
-        _io = ioHandler;
-        _clockCounters = vb;
+        _clockCounters = clockCounters;
     }
-
-   
 
     /// <summary>
     /// Legacy CPU connection method. Not supported in VA2MBus.
@@ -228,9 +176,8 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         throw new NotSupportedException("This should not be called. Connect is deprecated.");
     }
 
-
     /// <summary>
-    /// Reads a byte from memory or I/O space, routing to appropriate handler.
+    /// Reads a byte from memory or I/O space.
     /// </summary>
     /// <param name="address">16-bit address to read from ($0000-$FFFF).</param>
     /// <param name="readOnly">If true, indicates a non-mutating read (not currently used).</param>
@@ -238,20 +185,8 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the bus has been disposed.</exception>
     /// <remarks>
     /// <para>
-    /// <strong>Routing Logic:</strong>
-    /// <list type="bullet">
-    /// <item>$C000-$C08F: System I/O space → ISystemIoHandler.Read(offset)</item>
-    /// <item>All other addresses → AddressSpaceController.Read(address)</item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// <strong>Address Translation:</strong> System I/O addresses are converted to zero-based
-    /// offsets (address - 0xC000) before passing to the I/O handler. This allows the handler
-    /// to work with offsets 0x00-0x8F instead of absolute addresses.
-    /// </para>
-    /// <para>
-    /// <strong>Future Expansion:</strong> Slot I/O space ($C090-$C0FF) routing will be added
-    /// in a future refactoring phase when slot card support is implemented.
+    /// <strong>Routing:</strong> All reads are routed through AddressSpaceController, which
+    /// handles memory banking, ROM mapping, and I/O card routing automatically.
     /// </para>
     /// <para>
     /// <strong>Thread Context:</strong> Must be called from emulator thread only.
@@ -260,40 +195,19 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     public byte CpuRead(ushort address, bool readOnly = false)
     {
         ThrowIfDisposed();
-        if (address >= SYSTEM_IO_START && address <= IO_SYSTEM_AREA_END)
-        {
-            return _io.Read((ushort)(address-0xC000));
-        }
         return _addressSpace.Read(address);
     }
 
     /// <summary>
-    /// Writes a byte to memory or I/O space, routing to appropriate handler.
+    /// Writes a byte to memory or I/O space.
     /// </summary>
     /// <param name="address">16-bit address to write to ($0000-$FFFF).</param>
     /// <param name="data">Byte value to write.</param>
     /// <exception cref="ObjectDisposedException">Thrown if the bus has been disposed.</exception>
     /// <remarks>
     /// <para>
-    /// <strong>Routing Logic:</strong>
-    /// <list type="bullet">
-    /// <item>$C000-$C08F: System I/O space → ISystemIoHandler.Write(offset, data)</item>
-    /// <item>All other addresses → AddressSpaceController.Write(address, data)</item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// <strong>Address Translation:</strong> System I/O addresses are converted to zero-based
-    /// offsets (address - 0xC000) before passing to the I/O handler. This allows the handler
-    /// to work with offsets 0x00-0x8F instead of absolute addresses.
-    /// </para>
-    /// <para>
-    /// <strong>Write Protection:</strong> The AddressSpaceController enforces write protection
-    /// based on soft switch states (ROM areas, language card write enable, etc.). The I/O handler
-    /// handles soft switch writes which may toggle these protection states.
-    /// </para>
-    /// <para>
-    /// <strong>Future Expansion:</strong> Slot I/O space ($C090-$C0FF) routing will be added
-    /// in a future refactoring phase when slot card support is implemented.
+    /// <strong>Routing:</strong> All writes are routed through AddressSpaceController, which
+    /// handles memory banking, ROM write protection, and I/O card routing automatically.
     /// </para>
     /// <para>
     /// <strong>Thread Context:</strong> Must be called from emulator thread only.
@@ -302,30 +216,30 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     public void CpuWrite(ushort address, byte data)
     {
         ThrowIfDisposed();
-        if (address >= SYSTEM_IO_START && address <= IO_SYSTEM_AREA_END)
-        {
-            _io.Write((ushort) (address - 0xC000),data);
-            return;
-        }
         _addressSpace.Write(address, data);
     }
 
     /// <summary>
-    /// Executes one CPU clock cycle and updates VBlank timing.
+    /// Executes one CPU clock cycle and updates timing.
     /// </summary>
     /// <remarks>
     /// <para>
     /// <strong>Execution Sequence:</strong>
     /// <list type="number">
     /// <item>Execute one CPU instruction (CPU.Clock)</item>
-    /// <item>Increment cycle counters (via CpuClockingCounters)</item>
-    /// <item>Decrement VBlank counter</item>
-    /// <item>Check if VBlank cycle reached, fire event if so</item>
+    /// <item>Increment total cycle counter (via CpuClockingCounters)</item>
+    /// <item>Decrement VBlank blackout counter</item>
+    /// <item>Check if VBlank event should fire</item>
     /// </list>
     /// </para>
     /// <para>
-    /// <strong>VBlank Timing:</strong> The CpuClockingCounters class manages all timing logic
-    /// including cycle counting, VBlank counter management, and catch-up logic for fast emulation.
+    /// <strong>VBlank Timing:</strong> CpuClockingCounters manages all timing logic including:
+    /// <list type="bullet">
+    /// <item>Total CPU cycle counting (TotalCycles property)</item>
+    /// <item>VBlank blackout countdown (4,550 cycles)</item>
+    /// <item>VBlank event scheduling (every 17,030 cycles)</item>
+    /// <item>Catch-up logic for fast emulation (unthrottled batches)</item>
+    /// </list>
     /// VA2MBus simply calls CheckAndAdvanceVBlank() and fires the event when signaled.
     /// </para>
     /// <para>
@@ -367,9 +281,9 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <para>
     /// <strong>Reset Operations:</strong>
     /// <list type="number">
-    /// <item>Reset I/O handler (soft switches, keyboard latch, button states)</item>
+    /// <item>Reset address space controller (memory ranges, banking, I/O handlers)</item>
     /// <item>Reset CPU (PC loaded from $FFFC/$FFFD, SP = $FF)</item>
-    /// <item>Reset timing counters (via CpuClockingCounters.Reset())</item>
+    /// <item>Reset timing counters (TotalCycles = 0, VBlankCounter = 0, NextVBlankCycle = 12,480)</item>
     /// </list>
     /// </para>
     /// <para>
@@ -380,7 +294,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     {
         ThrowIfDisposed();
         
-        _io.Reset();
+        _addressSpace.Reset();
         _cpu!.Reset(this);
         _clockCounters.Reset();
     }
@@ -393,9 +307,9 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <para>
     /// <strong>Reset Operations:</strong>
     /// <list type="number">
-    /// <item>Reset I/O handler (soft switches, keyboard latch, button states)</item>
+    /// <item>Reset address space controller (memory ranges, banking, I/O handlers)</item>
     /// <item>Reset CPU (PC loaded from $FFFC/$FFFD)</item>
-    /// <item>Reset timing counters (via CpuClockingCounters.Reset())</item>
+    /// <item>Reset timing counters (TotalCycles = 0, VBlankCounter = 0, NextVBlankCycle = 12,480)</item>
     /// </list>
     /// </para>
     /// <para>
@@ -410,8 +324,8 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     public void UserReset()
     {
         ThrowIfDisposed();
-        
-        _io.Reset();
+
+        _addressSpace.Reset();
         _cpu!.Reset(this);
         _clockCounters.Reset();
     }
@@ -452,7 +366,6 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
 
         _disposed = true;
         VBlank = null;
-
     }
 
     /// <summary>

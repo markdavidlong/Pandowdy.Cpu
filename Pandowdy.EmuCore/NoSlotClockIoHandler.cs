@@ -21,10 +21,19 @@ public class NoSlotClockIoHandler : ISystemIoHandler
     private bool _isUnlocked;
     private int _unlockSequenceIndex;
     private int _bitPosition;
+    private int _byteIndex; // Track which byte (0-7) we're currently reading
     private byte _currentByte;
     private ClockMode _mode;
     private bool _writeMode;
     private ulong _lastUnlockAccessTick;
+
+    // Time offset: stores difference between emulator time and system time
+    // Positive = emulator time is ahead, Negative = emulator time is behind
+    private long _timeOffsetTicks = 0;
+
+    // Cached clock registers (written when clock is set)
+    private byte[] _clockRegisters = new byte[8];
+    private bool _clockRegistersValid = false;
 
     // The unlock sequence: reading addresses in this specific pattern
     private static readonly byte[] UnlockSequence = { 0x5, 0xA, 0x5, 0xA };
@@ -56,10 +65,33 @@ public class NoSlotClockIoHandler : ISystemIoHandler
         _isUnlocked = false;
         _unlockSequenceIndex = 0;
         _bitPosition = 0;
+        _byteIndex = 0;
         _currentByte = 0;
         _mode = ClockMode.Locked;
         _writeMode = false;
         _lastUnlockAccessTick = 0ul;
+        // Note: We don't reset _timeOffsetTicks - it persists across resets
+    }
+
+    /// <summary>
+    /// Sets the emulator clock time by calculating offset from system time.
+    /// </summary>
+    /// <param name="emulatorTime">The desired emulator time.</param>
+    public void SetClockTime(DateTime emulatorTime)
+    {
+        DateTime systemTime = DateTime.Now;
+        _timeOffsetTicks = emulatorTime.Ticks - systemTime.Ticks;
+        _clockRegistersValid = false; // Invalidate cached registers
+    }
+
+    /// <summary>
+    /// Gets the current emulator clock time (system time + offset).
+    /// </summary>
+    /// <returns>The current emulator time.</returns>
+    public DateTime GetClockTime()
+    {
+        DateTime systemTime = DateTime.Now;
+        return new DateTime(systemTime.Ticks + _timeOffsetTicks);
     }
 
     public int Size
@@ -124,6 +156,7 @@ public class NoSlotClockIoHandler : ISystemIoHandler
                     _isUnlocked = true;
                     _unlockSequenceIndex = 0;
                     _bitPosition = 0;
+                    _byteIndex = 0;
                     _mode = ClockMode.ReadClock;
                     _writeMode = false;
                 }
@@ -148,6 +181,7 @@ public class NoSlotClockIoHandler : ISystemIoHandler
 
             case 0x2: // Enable write mode
                 _writeMode = true;
+                _byteIndex = 0; // Reset to first byte for writing
                 return 0x00;
 
             case 0x3: // Disable write mode / Enable read mode
@@ -155,6 +189,7 @@ public class NoSlotClockIoHandler : ISystemIoHandler
                 return 0x00;
 
             case 0x4: // Load next byte for reading
+                _byteIndex = 0; // Reset to first byte
                 LoadNextClockByte();
                 return 0x00;
 
@@ -204,9 +239,16 @@ public class NoSlotClockIoHandler : ISystemIoHandler
         if (_bitPosition >= 8)
         {
             _bitPosition = 0;
-            // Auto-load next byte after 8 bits
+            
+            // Only auto-advance byte index in read mode
             if (!_writeMode)
             {
+                _byteIndex++; // Move to next byte
+                if (_byteIndex >= 8)
+                {
+                    _byteIndex = 0; // Wrap around after 8 bytes
+                }
+                // Auto-load next byte after 8 bits
                 LoadNextClockByte();
             }
         }
@@ -237,18 +279,20 @@ public class NoSlotClockIoHandler : ISystemIoHandler
         // Byte 6: Month (01-12)
         // Byte 7: Year (00-99)
 
-        int byteIndex = _bitPosition / 8;
+        // Get current emulator time
+        DateTime emulatorTime = GetClockTime();
 
-        _currentByte = byteIndex switch
+        // Convert to BCD format based on current byte index
+        _currentByte = _byteIndex switch
         {
-            0 => 0x00, // TODO: centiseconds (placeholder)
-            1 => 0x00, // TODO: seconds (placeholder)
-            2 => 0x00, // TODO: minutes (placeholder)
-            3 => 0x12, // TODO: hours (placeholder - 12 noon)
-            4 => 0x01, // TODO: day of week (placeholder - Monday)
-            5 => 0x15, // TODO: day of month (placeholder - 15th)
-            6 => 0x06, // TODO: month (placeholder - June)
-            7 => 0x24, // TODO: year (placeholder - 2024 -> 24)
+            0 => DecimalToBcd(emulatorTime.Millisecond / 10), // Centiseconds (0-99)
+            1 => DecimalToBcd(emulatorTime.Second),           // Seconds (00-59)
+            2 => DecimalToBcd(emulatorTime.Minute),           // Minutes (00-59)
+            3 => DecimalToBcd(emulatorTime.Hour),             // Hours (00-23)
+            4 => DecimalToBcd((int)emulatorTime.DayOfWeek),   // Day of week (0=Sunday)
+            5 => DecimalToBcd(emulatorTime.Day),              // Day of month (01-31)
+            6 => DecimalToBcd(emulatorTime.Month),            // Month (01-12)
+            7 => DecimalToBcd(emulatorTime.Year % 100),       // Year (00-99)
             _ => 0x00
         };
 
@@ -258,17 +302,102 @@ public class NoSlotClockIoHandler : ISystemIoHandler
     private void StoreClockByte()
     {
         // Store the current byte to the clock registers
-        // This would write to the clock hardware
-        // For now, this is a stub - actual date/time setting would go here
-        
-        int byteIndex = _bitPosition / 8;
+        // Cache the written byte for later calculation of new time offset
 
-        // TODO: Implement actual clock register writes
-        // The byte index determines which register to write:
-        // 0 = centiseconds, 1 = seconds, 2 = minutes, etc.
+        if (_byteIndex >= 0 && _byteIndex < _clockRegisters.Length)
+        {
+            _clockRegisters[_byteIndex] = _currentByte;
+            
+            // If all 8 bytes have been written, recalculate time offset
+            if (_byteIndex == 7)
+            {
+                _clockRegistersValid = true;
+                RecalculateTimeOffset();
+                _byteIndex = 0; // Reset for next write cycle
+            }
+            else
+            {
+                _byteIndex++; // Move to next byte
+            }
+        }
 
         _currentByte = 0;
         _bitPosition = 0;
+    }
+
+    /// <summary>
+    /// Converts a decimal value to BCD (Binary-Coded Decimal) format.
+    /// </summary>
+    /// <param name="value">Decimal value (0-99).</param>
+    /// <returns>BCD-encoded byte.</returns>
+    private byte DecimalToBcd(int value)
+    {
+        if (value < 0 || value > 99)
+        {
+            return 0x00; // Invalid value
+        }
+        
+        int tens = value / 10;
+        int ones = value % 10;
+        return (byte)((tens << 4) | ones);
+    }
+
+    /// <summary>
+    /// Converts a BCD (Binary-Coded Decimal) value to decimal.
+    /// </summary>
+    /// <param name="bcd">BCD-encoded byte.</param>
+    /// <returns>Decimal value (0-99).</returns>
+    private int BcdToDecimal(byte bcd)
+    {
+        int tens = (bcd >> 4) & 0x0F;
+        int ones = bcd & 0x0F;
+        return tens * 10 + ones;
+    }
+
+    /// <summary>
+    /// Recalculates the time offset based on newly written clock registers.
+    /// </summary>
+    private void RecalculateTimeOffset()
+    {
+        if (!_clockRegistersValid)
+        {
+            return;
+        }
+
+        try
+        {
+            // Parse BCD values from clock registers
+            int centiseconds = BcdToDecimal(_clockRegisters[0]);
+            int seconds = BcdToDecimal(_clockRegisters[1]);
+            int minutes = BcdToDecimal(_clockRegisters[2]);
+            int hours = BcdToDecimal(_clockRegisters[3]);
+            int dayOfWeek = BcdToDecimal(_clockRegisters[4]); // Not used for DateTime
+            int day = BcdToDecimal(_clockRegisters[5]);
+            int month = BcdToDecimal(_clockRegisters[6]);
+            int year = BcdToDecimal(_clockRegisters[7]);
+
+            // Convert 2-digit year to 4-digit year (assume 2000-2099)
+            year += 2000;
+
+            // Build DateTime from registers
+            DateTime writtenTime = new DateTime(
+                year,
+                month,
+                day,
+                hours,
+                minutes,
+                seconds,
+                centiseconds * 10); // Centiseconds to milliseconds
+
+            // Calculate new offset
+            DateTime systemTime = DateTime.Now;
+            _timeOffsetTicks = writtenTime.Ticks - systemTime.Ticks;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            // Invalid date/time values - ignore the write
+            // This can happen if the software writes invalid BCD values
+        }
     }
 
     public byte this[ushort offset]

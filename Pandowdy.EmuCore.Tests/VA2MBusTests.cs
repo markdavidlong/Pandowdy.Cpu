@@ -46,15 +46,6 @@ public class VA2MBusTests
             GameController = new SimpleGameController();
             StatusProvider = new SystemStatusProvider(GameController);
             
-            // Create memory subsystem (AddressSpaceController no longer needs StatusProvider!)
-            AddressSpace = new AddressSpaceController(
-                new TestLanguageCard(), 
-                new Test64KSystemRamSelector(),
-                new TestSlots(StatusProvider));
-            
-            // Create CPU
-            Cpu = new CPUAdapter(new CPU());
-            
             // Create keyboard handler
             var keyboard = new SingularKeyHandler();
             KeyboardReader = keyboard;
@@ -68,8 +59,18 @@ public class VA2MBusTests
             // Create I/O handler (coordinates keyboard, controller, switches, VBlank)
             IoHandler = new SystemIoHandler(Switches, keyboard, GameController, VBlank);
             
-            // Create bus (new architecture: AddressSpace + IoHandler + CPU + VBlank)
-            Bus = new VA2MBus(AddressSpace, IoHandler, Cpu, VBlank);
+            // Create memory subsystem (AddressSpaceController needs IoHandler for routing!)
+            AddressSpace = new AddressSpaceController(
+                new TestLanguageCard(), 
+                new Test64KSystemRamSelector(),
+                IoHandler,
+                new TestSlots(StatusProvider));
+            
+            // Create CPU
+            Cpu = new CPUAdapter(new CPU());
+            
+            // Create bus (new architecture: AddressSpace + CPU + VBlank)
+            Bus = new VA2MBus(AddressSpace, Cpu, VBlank);
         }
     }
 
@@ -83,18 +84,19 @@ public class VA2MBusTests
         // Arrange
         var gameController = new SimpleGameController();
         var status = new SystemStatusProvider(gameController);
-        var addressSpace = new AddressSpaceController(
-            new TestLanguageCard(), 
-            new Test64KSystemRamSelector(),
-            new TestSlots(status));
-        var cpu = new CPUAdapter(new CPU());
         var keyboard = new SingularKeyHandler();
         var switches = new SoftSwitches(status);
         var vblank = new CpuClockingCounters();
         var ioHandler = new SystemIoHandler(switches, keyboard, gameController, vblank);
+        var addressSpace = new AddressSpaceController(
+            new TestLanguageCard(), 
+            new Test64KSystemRamSelector(),
+            ioHandler,
+            new TestSlots(status));
+        var cpu = new CPUAdapter(new CPU());
 
         // Act
-        var bus = new VA2MBus(addressSpace, ioHandler, cpu, vblank);
+        var bus = new VA2MBus(addressSpace, cpu, vblank);
 
         // Assert
         Assert.NotNull(bus);
@@ -115,25 +117,10 @@ public class VA2MBusTests
         var ioHandler = new SystemIoHandler(switches, keyboard, gameController, vblank);
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new VA2MBus(null!, ioHandler, cpu, vblank));
+        Assert.Throws<ArgumentNullException>(() => new VA2MBus(null!,  cpu, vblank));
     }
     
-    [Fact]
-    public void Constructor_NullIoHandler_ThrowsArgumentNullException()
-    {
-        // Arrange
-        var gameController = new SimpleGameController();
-        var status = new SystemStatusProvider(gameController);
-        var addressSpace = new AddressSpaceController(
-            new TestLanguageCard(), 
-            new Test64KSystemRamSelector(),
-            new TestSlots(status));
-        var cpu = new CPUAdapter(new CPU());
-        var vblank = new CpuClockingCounters();
 
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new VA2MBus(addressSpace, null!, cpu, vblank));
-    }
 
     [Fact]
     public void Constructor_NullCpu_ThrowsArgumentNullException()
@@ -141,17 +128,18 @@ public class VA2MBusTests
         // Arrange
         var gameController = new SimpleGameController();
         var status = new SystemStatusProvider(gameController);
-        var addressSpace = new AddressSpaceController(
-            new TestLanguageCard(), 
-            new Test64KSystemRamSelector(),
-            new TestSlots(status));
         var keyboard = new SingularKeyHandler();
         var switches = new SoftSwitches(status);
         var vblank = new CpuClockingCounters();
         var ioHandler = new SystemIoHandler(switches, keyboard, gameController, vblank);
+        var addressSpace = new AddressSpaceController(
+            new TestLanguageCard(), 
+            new Test64KSystemRamSelector(),
+            ioHandler,
+            new TestSlots(status));
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new VA2MBus(addressSpace, ioHandler, null!, vblank));
+        Assert.Throws<ArgumentNullException>(() => new VA2MBus(addressSpace, null!, vblank));
     }
 
     #endregion

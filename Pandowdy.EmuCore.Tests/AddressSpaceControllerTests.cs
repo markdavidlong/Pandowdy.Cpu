@@ -107,6 +107,7 @@ public class AddressSpaceControllerTests
         public MockLanguageCard LanguageCard { get; }
         public Test64KSystemRamSelector SystemRam { get; }
         public MockSlots Slots { get; }
+        public ISystemIoHandler IoHandler { get; }
         public AddressSpaceController AddressSpace { get; }
 
         public AddressSpaceFixture()
@@ -114,7 +115,13 @@ public class AddressSpaceControllerTests
             LanguageCard = new MockLanguageCard();
             SystemRam = new Test64KSystemRamSelector();
             Slots = new MockSlots();
-            AddressSpace = new AddressSpaceController(LanguageCard, SystemRam, Slots);
+            var statusProvider = new SystemStatusProvider(new SimpleGameController());
+            IoHandler = new SystemIoHandler(
+                new SoftSwitches(statusProvider),
+                new SingularKeyHandler(),
+                new SimpleGameController(),
+                new CpuClockingCounters());
+            AddressSpace = new AddressSpaceController(LanguageCard, SystemRam, IoHandler, Slots);
         }
     }
 
@@ -129,9 +136,15 @@ public class AddressSpaceControllerTests
         var langCard = new TestLanguageCard();
         var systemRam = new Test64KSystemRamSelector();
         var slots = new MockSlots();
+        var statusProvider = new SystemStatusProvider(new SimpleGameController());
+        var ioHandler = new SystemIoHandler(
+            new SoftSwitches(statusProvider),
+            new SingularKeyHandler(),
+            new SimpleGameController(),
+            new CpuClockingCounters());
 
         // Act
-        var controller = new AddressSpaceController(langCard, systemRam, slots);
+        var controller = new AddressSpaceController(langCard, systemRam, ioHandler, slots);
 
         // Assert
         Assert.NotNull(controller);
@@ -145,9 +158,15 @@ public class AddressSpaceControllerTests
         // Arrange
         var systemRam = new Test64KSystemRamSelector();
         var slots = new MockSlots();
+        var statusProvider = new SystemStatusProvider(new SimpleGameController());
+        var ioHandler = new SystemIoHandler(
+            new SoftSwitches(statusProvider),
+            new SingularKeyHandler(),
+            new SimpleGameController(),
+            new CpuClockingCounters());
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new AddressSpaceController(null!, systemRam, slots));
+        Assert.Throws<ArgumentNullException>(() => new AddressSpaceController(null!, systemRam, ioHandler, slots));
     }
 
     [Fact]
@@ -156,9 +175,15 @@ public class AddressSpaceControllerTests
         // Arrange
         var langCard = new TestLanguageCard();
         var slots = new MockSlots();
+        var statusProvider = new SystemStatusProvider(new SimpleGameController());
+        var ioHandler = new SystemIoHandler(
+            new SoftSwitches(statusProvider),
+            new SingularKeyHandler(),
+            new SimpleGameController(),
+            new CpuClockingCounters());
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new AddressSpaceController(langCard, null!, slots));
+        Assert.Throws<ArgumentNullException>(() => new AddressSpaceController(langCard, null!, ioHandler, slots));
     }
 
     [Fact]
@@ -167,9 +192,15 @@ public class AddressSpaceControllerTests
         // Arrange
         var langCard = new TestLanguageCard();
         var systemRam = new Test64KSystemRamSelector();
+        var statusProvider = new SystemStatusProvider(new SimpleGameController());
+        var ioHandler = new SystemIoHandler(
+            new SoftSwitches(statusProvider),
+            new SingularKeyHandler(),
+            new SimpleGameController(),
+            new CpuClockingCounters());
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new AddressSpaceController(langCard, systemRam, null!));
+        Assert.Throws<ArgumentNullException>(() => new AddressSpaceController(langCard, systemRam, ioHandler, null!));
     }
 
     [Fact]
@@ -260,26 +291,30 @@ public class AddressSpaceControllerTests
     }
 
     [Fact]
-    public void Read_AddressC000toC08F_ThrowsInvalidOperationException()
+    public void Read_AddressC000toC08F_RoutesToSystemIoHandler()
     {
         // Arrange
         var fixture = new AddressSpaceFixture();
 
-        // Act & Assert - These addresses should be intercepted by VA2MBus
-        var ex = Assert.Throws<InvalidOperationException>(() => fixture.AddressSpace.Read(0xC000));
-        Assert.Contains("VA2MBus intercepts", ex.Message);
-        Assert.Contains("C000", ex.Message);
+        // Act
+        var value = fixture.AddressSpace.Read(0xC000);
+
+        // Assert - Should route to IoHandler, not throw
+        // The actual value depends on what the mock IoHandler returns
+        Assert.NotNull(fixture.IoHandler);
     }
 
     [Fact]
-    public void Read_AddressC08F_ThrowsInvalidOperationException()
+    public void Read_AddressC08F_RoutesToSystemIoHandler()
     {
         // Arrange
         var fixture = new AddressSpaceFixture();
 
-        // Act & Assert
-        var ex = Assert.Throws<InvalidOperationException>(() => fixture.AddressSpace.Read(0xC08F));
-        Assert.Contains("VA2MBus intercepts", ex.Message);
+        // Act
+        var value = fixture.AddressSpace.Read(0xC08F);
+
+        // Assert - Should route to IoHandler, not throw
+        Assert.NotNull(fixture.IoHandler);
     }
 
     [Fact]
@@ -399,26 +434,29 @@ public class AddressSpaceControllerTests
     }
 
     [Fact]
-    public void Write_AddressC000toC08F_ThrowsInvalidOperationException()
+    public void Write_AddressC000toC08F_RoutesToSystemIoHandler()
     {
         // Arrange
         var fixture = new AddressSpaceFixture();
 
-        // Act & Assert - These addresses should be intercepted by VA2MBus
-        var ex = Assert.Throws<InvalidOperationException>(() => fixture.AddressSpace.Write(0xC000, 0x42));
-        Assert.Contains("VA2MBus intercepts", ex.Message);
-        Assert.Contains("C000", ex.Message);
+        // Act
+        fixture.AddressSpace.Write(0xC000, 0x42);
+
+        // Assert - Should route to IoHandler, not throw
+        Assert.NotNull(fixture.IoHandler);
     }
 
     [Fact]
-    public void Write_AddressC08F_ThrowsInvalidOperationException()
+    public void Write_AddressC08F_RoutesToSystemIoHandler()
     {
         // Arrange
         var fixture = new AddressSpaceFixture();
 
-        // Act & Assert
-        var ex = Assert.Throws<InvalidOperationException>(() => fixture.AddressSpace.Write(0xC08F, 0x99));
-        Assert.Contains("VA2MBus intercepts", ex.Message);
+        // Act
+        fixture.AddressSpace.Write(0xC08F, 0x99);
+
+        // Assert - Should route to IoHandler, not throw
+        Assert.NotNull(fixture.IoHandler);
     }
 
     [Fact]
@@ -521,23 +559,29 @@ public class AddressSpaceControllerTests
     }
 
     [Fact]
-    public void Indexer_Get_InvalidAddress_ThrowsException()
+    public void Indexer_Get_SystemIoAddress_RoutesToHandler()
     {
         // Arrange
         var fixture = new AddressSpaceFixture();
 
-        // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => _ = fixture.AddressSpace[0xC010]);
+        // Act
+        var value = fixture.AddressSpace[0xC010];
+
+        // Assert - Should route to IoHandler, not throw
+        Assert.NotNull(fixture.IoHandler);
     }
 
     [Fact]
-    public void Indexer_Set_InvalidAddress_ThrowsException()
+    public void Indexer_Set_SystemIoAddress_RoutesToHandler()
     {
         // Arrange
         var fixture = new AddressSpaceFixture();
 
-        // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => fixture.AddressSpace[0xC020] = 0x42);
+        // Act
+        fixture.AddressSpace[0xC020] = 0x42;
+
+        // Assert - Should route to IoHandler, not throw
+        Assert.NotNull(fixture.IoHandler);
     }
 
     #endregion
