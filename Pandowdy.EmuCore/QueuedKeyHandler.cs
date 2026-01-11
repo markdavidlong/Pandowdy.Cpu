@@ -147,7 +147,7 @@ public sealed class QueuedKeyHandler : IKeyboardReader, IKeyboardSetter, IDispos
     /// Timer starts only when ClearStrobe() is called and keys are queued.
     /// </para>
     /// </remarks>
-    public QueuedKeyHandler(int delayMilliseconds = 50)
+    public QueuedKeyHandler(int delayMilliseconds = 30)
     {
         if (delayMilliseconds < 1 || delayMilliseconds > 1000)
         {

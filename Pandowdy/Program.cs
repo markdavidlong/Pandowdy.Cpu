@@ -44,9 +44,10 @@ namespace Pandowdy
                     services.AddSingleton<Emulator.CPU>();
 
                     // EmuCore - Input Subsystems
-                    services.AddSingleton<SingularKeyHandler>();  // Keyboard handler (both IKeyboardReader and IKeyboardSetter)
-                    services.AddSingleton<IKeyboardReader>(sp => sp.GetRequiredService<SingularKeyHandler>());
-                    services.AddSingleton<IKeyboardSetter>(sp => sp.GetRequiredService<SingularKeyHandler>());
+                    //services.AddSingleton<SingularKeyHandler>();  // Keyboard handler (both IKeyboardReader and IKeyboardSetter)
+                    services.AddSingleton<QueuedKeyHandler>();  // Keyboard handler (both IKeyboardReader and IKeyboardSetter)
+                    services.AddSingleton<IKeyboardReader>(sp => sp.GetRequiredService<QueuedKeyHandler>());
+                    services.AddSingleton<IKeyboardSetter>(sp => sp.GetRequiredService<QueuedKeyHandler>());
 
                     services.AddSingleton<IGameControllerStatus, SimpleGameController>();
 

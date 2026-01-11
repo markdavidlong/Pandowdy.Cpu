@@ -782,7 +782,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             WindowSettingsHelper.Save(this);
         }
         
-        // Save display settings (scanlines, colors, etc.)
+        // Save display settings (scan-lines, colors, etc.)
         SaveSettingsToConfigFile();
     }
 
@@ -1230,6 +1230,40 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// Closes the window, triggering the OnClosed event which handles cleanup and settings save.
     /// </remarks>
     private void OnQuitClicked(object? sender, RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// Handles the Edit > Paste menu command.
+    /// </summary>
+    /// <param name="sender">Event sender (menu item).</param>
+    /// <param name="e">Routed event arguments.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Operation:</strong> Retrieves text from clipboard and feeds it character-by-character
+    /// to the emulator keyboard buffer via the Apple2Display control's PasteFromClipboard method.
+    /// </para>
+    /// <para>
+    /// <strong>Character Filtering:</strong> Non-ASCII characters (> 127) are ignored. The
+    /// QueuedKeyHandler automatically queues keys and feeds them at a controlled rate (default 50ms
+    /// between keys) to prevent overwhelming Apple IIe software.
+    /// </para>
+    /// <para>
+    /// <strong>Use Cases:</strong>
+    /// <list type="bullet">
+    /// <item>Paste BASIC programs from external editor</item>
+    /// <item>Paste DOS commands for batch execution</item>
+    /// <item>Paste configuration or file paths</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Keyboard Shortcut:</strong> Accessible via Ctrl+Shift+V. Note that Ctrl+V alone
+    /// is reserved for sending to the emulator (Ctrl+V = ASCII 0x16).
+    /// </para>
+    /// </remarks>
+    private void OnPasteClicked(object? sender, RoutedEventArgs e)
+    {
+        var display = GetScreenDisplay();
+        display?.PasteFromClipboard();
+    }
 
     /// <summary>
     /// Handles key down events at the window level (before routing to child controls).

@@ -19,6 +19,10 @@
 				<MenuItem Header="_Quit" Click="OnQuitClicked" InputGesture="Alt+F4" />
 			</MenuItem>
 
+			<MenuItem Header="_Edit">
+				<MenuItem Header="_Paste" Click="OnPasteClicked" InputGesture="Ctrl+Shift+V" />
+			</MenuItem>
+
 			<MenuItem Header="_View">
 
 				<MenuItem x:Name="ScanLinesMenuItem" Header="_Scan Lines" ToggleType="CheckBox" IsChecked="{Binding ShowScanLines}" Command="{Binding ToggleScanLines}" InputGesture="Alt+S" />

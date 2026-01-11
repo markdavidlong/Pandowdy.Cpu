@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -1078,6 +1079,7 @@ bool showScanLines)
     /// <para>
     /// <strong>Special Key Handling:</strong>
     /// <list type="bullet">
+    /// <item><strong>Ctrl+Shift+V:</strong> Paste from clipboard (feeds text to keyboard buffer)</item>
     /// <item><strong>Alt + key, F-keys:</strong> Suppresses next TextInput event (menu shortcuts)</item>
     /// <item><strong>Ctrl + A-Z:</strong> Generates control characters (0x01-0x1A)</item>
     /// <item><strong>Arrow keys:</strong> Up=0x0B, Down=0x0A, Left=0x08, Right=0x15</item>
@@ -1092,6 +1094,11 @@ bool showScanLines)
     /// <strong>Apple IIe Control Characters:</strong> Matches Apple IIe keyboard behavior
     /// where Ctrl + letter produces ASCII control characters.
     /// </para>
+    /// <para>
+    /// <strong>Paste Special Case:</strong> Ctrl+Shift+V is intercepted before normal control key
+    /// handling to trigger clipboard paste operation. This keeps Ctrl+V (0x16) available for
+    /// sending to the emulator.
+    /// </para>
     /// </remarks>
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
@@ -1099,6 +1106,17 @@ bool showScanLines)
         {
             return;
         }
+
+        // Handle Ctrl+Shift+V for paste BEFORE other control key handling
+        if ((e.KeyModifiers & KeyModifiers.Control) != 0 && 
+            (e.KeyModifiers & KeyModifiers.Shift) != 0 && 
+            e.Key == Key.V)
+        {
+            PasteFromClipboard();
+            e.Handled = true;
+            return;
+        }
+
         if ((e.KeyModifiers & KeyModifiers.Alt) != 0 || IsFunctionKey(e.Key))
         {
             _suppressNextTextInput = true;
@@ -1145,6 +1163,117 @@ bool showScanLines)
         if ((e.Key == Key.LeftAlt || e.Key == Key.RightAlt) || IsFunctionKey(e.Key))
         {
             _suppressNextTextInput = false;
+        }
+    }
+
+    /// <summary>
+    /// Handles clipboard paste operation, feeding text to keyboard buffer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Processing:</strong>
+    /// <list type="number">
+    /// <item>Retrieve text from system clipboard</item>
+    /// <item>Normalize line endings: CR, LF, and CRLF all become CR (Apple IIe convention)</item>
+    /// <item>Filter each character to ASCII range (0-127)</item>
+    /// <item>Apply caps lock if enabled and character is lowercase</item>
+    /// <item>Queue each valid character to keyboard buffer (without high bit)</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Line Ending Conversion:</strong> Windows uses CRLF (\r\n), Unix/Mac use LF (\n),
+    /// old Mac used CR (\r). The Apple IIe expects only CR (0x0D) at line endings. All line ending
+    /// variants are normalized to single CR characters.
+    /// </para>
+    /// <para>
+    /// <strong>Character Filtering:</strong> Non-ASCII characters (> 127) are ignored.
+    /// QueuedKeyHandler automatically sets the high bit (strobe) when queuing.
+    /// </para>
+    /// <para>
+    /// <strong>Async Operation:</strong> Clipboard access is async. Paste happens on
+    /// UI thread to safely access clipboard and queue keys.
+    /// </para>
+    /// <para>
+    /// <strong>Use Cases:</strong>
+    /// <list type="bullet">
+    /// <item>Paste BASIC program from external editor</item>
+    /// <item>Paste DOS commands for batch execution</item>
+    /// <item>Paste file paths or configuration</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    public async void PasteFromClipboard()
+    {
+        if (_machine == null)
+        {
+            return;
+        }
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel?.Clipboard == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Use TryGetTextAsync instead of obsolete GetTextAsync
+            string? clipboardText = await ClipboardExtensions.TryGetTextAsync(topLevel.Clipboard);
+            if (string.IsNullOrEmpty(clipboardText))
+            {
+                return;
+            }
+
+            bool emuCapsLockState = IsCapsLockEnabled;
+
+            // Process character by character
+            for (int i = 0; i < clipboardText.Length; i++)
+            {
+                char ch = clipboardText[i];
+
+                // Normalize all line endings to CR (Apple IIe convention)
+                // Handle CRLF (\r\n) by converting CR and skipping the following LF
+                // Handle bare LF (\n) by converting to CR
+                // Handle bare CR (\r) by keeping as is
+                char c;
+                if (ch == '\r')
+                {
+                    // CR: Convert to CR and skip next LF if present (handles CRLF)
+                    c = '\r';
+                    if (i + 1 < clipboardText.Length && clipboardText[i + 1] == '\n')
+                    {
+                        i++; // Skip the LF in CRLF sequence
+                    }
+                }
+                else if (ch == '\n')
+                {
+                    // Bare LF: Convert to CR
+                    c = '\r';
+                }
+                else
+                {
+                    c = ch;
+                }
+
+                // Apply emulator caps lock if enabled and character is lowercase
+                if (emuCapsLockState && c >= 'a' && c <= 'z')
+                {
+                    c = (char)(c - 32); // Convert to uppercase
+                }
+
+                // Filter to ASCII range 0-127 only
+                if (c >= 0 && c <= 0x7F)
+                {
+                    // Enqueue without high bit - QueuedKeyHandler sets strobe automatically
+                    _machine.EnqueueKey((byte)c);
+                }
+                // Non-ASCII characters (> 127) are silently ignored
+            }
+        }
+        catch (Exception)
+        {
+            // Clipboard access can fail (clipboard locked, no clipboard support, etc.)
+            // Silently ignore - paste just doesn't happen
         }
     }
 
