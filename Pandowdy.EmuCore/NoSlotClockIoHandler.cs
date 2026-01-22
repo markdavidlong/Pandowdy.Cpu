@@ -36,7 +36,7 @@ public class NoSlotClockIoHandler : ISystemIoHandler
     private bool _clockRegistersValid = false;
 
     // The unlock sequence: reading addresses in this specific pattern
-    private static readonly byte[] UnlockSequence = { 0x5, 0xA, 0x5, 0xA };
+    private static readonly byte[] UnlockSequence = [ 0x5, 0xA, 0x5, 0xA ];
     
     // Timeout for unlock sequence: ~100 cycles between accesses
     // (adjustable based on real hardware behavior)
@@ -330,7 +330,7 @@ public class NoSlotClockIoHandler : ISystemIoHandler
     /// </summary>
     /// <param name="value">Decimal value (0-99).</param>
     /// <returns>BCD-encoded byte.</returns>
-    private byte DecimalToBcd(int value)
+    private static byte DecimalToBcd(int value)
     {
         if (value < 0 || value > 99)
         {
@@ -347,7 +347,7 @@ public class NoSlotClockIoHandler : ISystemIoHandler
     /// </summary>
     /// <param name="bcd">BCD-encoded byte.</param>
     /// <returns>Decimal value (0-99).</returns>
-    private int BcdToDecimal(byte bcd)
+    private static int BcdToDecimal(byte bcd)
     {
         int tens = (bcd >> 4) & 0x0F;
         int ones = bcd & 0x0F;
@@ -380,7 +380,7 @@ public class NoSlotClockIoHandler : ISystemIoHandler
             year += 2000;
 
             // Build DateTime from registers
-            DateTime writtenTime = new DateTime(
+            DateTime writtenTime = new (
                 year,
                 month,
                 day,

@@ -36,6 +36,10 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// <seealso cref="ISlots"/>
 public interface ICard : IConfigurable
 {
+
+
+    public SlotNumber? Slot { get; }
+
     /// <summary>
     /// Gets the human-readable name of the card (e.g., "Disk II Controller", "Super Serial Card").
     /// </summary>
@@ -240,6 +244,45 @@ public interface ICard : IConfigurable
     /// </para>
     /// </remarks>
     ICard Clone();
+
+
+    /// <summary>
+    /// Called when the card is installed into a slot, allowing runtime initialization.
+    /// </summary>
+    /// <param name="slot">The slot number where the card is being installed.</param>
+    /// <remarks>
+    /// <para>
+    /// This method is invoked by <see cref="ISlots.InstallCard(int, SlotNumber)"/> or
+    /// <see cref="ISlots.InstallCard(string, SlotNumber)"/> after the card has been
+    /// created by the factory but before it becomes accessible to the system.
+    /// </para>
+    /// <para>
+    /// <strong>Use Cases:</strong>
+    /// <list type="bullet">
+    /// <item><description>Creating child components (drives, ports, etc.) with slot-specific names</description></item>
+    /// <item><description>Initializing hardware state that depends on slot location</description></item>
+    /// <item><description>Performing deferred construction to keep factory lightweight</description></item>
+    /// <item><description>Setting up resources that require knowledge of the slot number</description></item>
+    /// <item><description>Configuring slot-specific I/O addresses or resources</description></item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Design Rationale:</strong><br/>
+    /// This callback allows cards to defer expensive initialization until they are actually
+    /// installed into a slot. The factory can maintain lightweight prototype instances,
+    /// and each cloned card can perform full initialization only when needed. The slot
+    /// number parameter enables slot-aware initialization and diagnostics.
+    /// </para>
+    /// <para>
+    /// For cards with no initialization requirements (like <see cref="NullCard"/>),
+    /// this method can be implemented as an empty no-op.
+    /// </para>
+    /// </remarks>
+    void OnInstalled(SlotNumber slot);
+
+
+    public void Reset();
+
 }
 
 

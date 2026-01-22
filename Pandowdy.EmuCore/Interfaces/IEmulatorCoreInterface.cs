@@ -59,7 +59,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// and observable state accessors - representing the complete UI control surface.
 /// </para>
 /// </remarks>
-public interface IEmulatorCoreInterface
+public interface IEmulatorCoreInterface : IKeyboardSetter
 {
     #region Command Queueing (Thread-Safe)
     
@@ -95,24 +95,7 @@ public interface IEmulatorCoreInterface
     /// </remarks>
     void UserReset();
     
-    /// <summary>
-    /// Queues a keyboard character to be injected into the emulator.
-    /// </summary>
-    /// <param name="value">ASCII character code (0-127). High bit will be set automatically by keyboard handler.</param>
-    /// <remarks>
-    /// <para>
-    /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread (typically UI thread
-    /// from keyboard event handlers). The key will be enqueued and appear at $C000 with strobe set when
-    /// the emulator thread processes the command at the next instruction boundary.
-    /// </para>
-    /// <para>
-    /// <strong>Apple IIe Format:</strong> The keyboard handler (SingularKeyHandler) automatically sets
-    /// bit 7 (OR with 0x80) to match Apple II keyboard hardware format. The key becomes available at
-    /// $C000 with strobe set, cleared when software reads $C010 (KBDSTRB).
-    /// </para>
-    /// </remarks>
-    void EnqueueKey(byte value);
-    
+   
     /// <summary>
     /// Queues a pushbutton state change for game controller.
     /// </summary>

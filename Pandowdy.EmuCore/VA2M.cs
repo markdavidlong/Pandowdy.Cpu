@@ -128,7 +128,7 @@ namespace Pandowdy.EmuCore;
 /// </list>
 /// </para>
 /// </remarks>
-public class VA2M : IDisposable, IKeyboardSetter, IEmulatorCoreInterface
+public class VA2M : IDisposable,  IEmulatorCoreInterface
 {
     /// <summary>
     /// Gets the memory pool managing the 128KB Apple IIe memory space.

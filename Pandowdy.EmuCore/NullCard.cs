@@ -65,6 +65,10 @@ namespace Pandowdy.EmuCore;
 /// <seealso cref="ICardFactory"/>
 public class NullCard : ICard
 {
+    private SlotNumber? _slotNumber;
+
+    public SlotNumber? Slot { get => _slotNumber; }
+
     /// <summary>
     /// Gets the display name for empty slots.
     /// </summary>
@@ -224,4 +228,11 @@ public class NullCard : ICard
     /// </para>
     /// </remarks>
     public bool ApplyMetadata(string metadata) => true;
+
+
+    public void OnInstalled(SlotNumber slot) { _slotNumber = slot; }
+
+
+    public void Reset() { /* NOP */ }
+
 }
