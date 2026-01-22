@@ -195,6 +195,7 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
     /// </summary>
     /// <param name="langCard">Language card managing $D000-$FFFF RAM/ROM banking.</param>
     /// <param name="systemRam">System RAM managing $0000-$BFFF main and auxiliary memory.</param>
+    /// <param name="ioHandler">System I/O handler managing $C000-$C08F keyboard, video, and soft switches.</param>
     /// <param name="slots">Slot system managing $C090-$CFFF slot I/O and ROM.</param>
     /// <exception cref="ArgumentNullException">Thrown if any parameter is null.</exception>
     /// <exception cref="ArgumentException">Thrown if systemRam doesn't meet minimum size requirement (48KB).</exception>
@@ -260,6 +261,7 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
 
     public void Reset()
     {
+        _slots.Reset();
         _io.Reset();
     }
 
