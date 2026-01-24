@@ -26,7 +26,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// </para>
 /// <para>
 /// <strong>Implementation Note:</strong> This interface supports both single-key and buffered keyboard
-/// implementations. The <see cref="SingularKeyHandler"/> provides a simple single-key implementation
+/// implementations. The <see cref="Services.SingularKeyHandler"/> provides a simple single-key implementation
 /// matching original Apple IIe behavior (new keypress overwrites previous unread key).
 /// </para>
 /// </remarks>
@@ -113,7 +113,7 @@ public interface IKeyboardReader
     /// </para>
     /// <para>
     /// <strong>Buffered Implementations:</strong> In buffered keyboard implementations like
-    /// <see cref="QueuedKeyHandler"/>, calling this method may trigger automatic loading of
+    /// <see cref="Services.QueuedKeyHandler"/>, calling this method may trigger automatic loading of
     /// the next queued key after a configurable delay. This simulates natural typing where
     /// keys arrive sequentially with pauses between.
     /// </para>

@@ -1,7 +1,7 @@
 
 using Pandowdy.EmuCore.Interfaces;
 
-namespace Pandowdy.EmuCore;
+namespace Pandowdy.EmuCore.Services;
 
 /// <summary>
 /// Factory for creating peripheral card instances from registered card prototypes.

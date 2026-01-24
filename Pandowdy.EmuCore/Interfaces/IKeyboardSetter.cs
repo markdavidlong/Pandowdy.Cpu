@@ -20,7 +20,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// keyboard events from the host operating system (via Avalonia UI, test code, etc.).
 /// </para>
 /// <para>
-/// <strong>Thread Safety Warning:</strong> Implementations of this interface (such as <see cref="SingularKeyHandler"/>)
+/// <strong>Thread Safety Warning:</strong> Implementations of this interface (such as <see cref="Services.SingularKeyHandler"/>)
 /// are typically <em>not</em> thread-safe. The emulator core runs on a dedicated CPU emulation thread,
 /// while keyboard events arrive on the UI thread. <strong>Callers must use a thread-safe queueing mechanism</strong>
 /// (such as <see cref="System.Collections.Concurrent.ConcurrentQueue{T}"/> or a dispatcher) to marshal
@@ -28,7 +28,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// </para>
 /// <para>
 /// <strong>Implementation Note:</strong> Classes implementing both <see cref="IKeyboardSetter"/> and
-/// <see cref="IKeyboardReader"/> (such as <see cref="SingularKeyHandler"/>) provide the complete
+/// <see cref="IKeyboardReader"/> (such as <see cref="Services.SingularKeyHandler"/>) provide the complete
 /// keyboard emulation: input injection (setter) and Apple IIe-style reading (reader).
 /// </para>
 /// </remarks>
@@ -111,7 +111,7 @@ public interface IKeyboardSetter
     /// <para>
     /// <strong>Single-Key vs. Buffered Implementations:</strong>
     /// <list type="bullet">
-    /// <item><see cref="SingularKeyHandler"/> - Overwrites previous unread key (matches original Apple IIe)</item>
+    /// <item><see cref="Services.SingularKeyHandler"/> - Overwrites previous unread key (matches original Apple IIe)</item>
     /// <item>Buffered implementations - Enqueues key into FIFO buffer for processing</item>
     /// </list>
     /// </para>

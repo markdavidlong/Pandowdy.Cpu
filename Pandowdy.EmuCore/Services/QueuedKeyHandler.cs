@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Pandowdy.EmuCore.Interfaces;
 
-namespace Pandowdy.EmuCore;
+namespace Pandowdy.EmuCore.Services;
 
 /// <summary>
 /// Buffered keyboard handler that queues multiple keystrokes with automatic timed feeding.

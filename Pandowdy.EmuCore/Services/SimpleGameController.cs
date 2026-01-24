@@ -1,7 +1,6 @@
 using Pandowdy.EmuCore.Interfaces;
 
-namespace Pandowdy.EmuCore
-{
+namespace Pandowdy.EmuCore.Services;
     /// <summary>
     /// Simple game controller implementation supporting 4 analog paddles and 3 pushbuttons.
     /// </summary>
@@ -105,14 +104,13 @@ namespace Pandowdy.EmuCore
             }
         }
 
-        /// <inheritdoc />
-        public byte GetPaddle(int paddle)
-        {
-            if (paddle >= 0 && paddle < 4)
+            /// <inheritdoc />
+            public byte GetPaddle(int paddle)
             {
-                return _axes[paddle];
+                if (paddle >= 0 && paddle < 4)
+                {
+                    return _axes[paddle];
+                }
+                return 0;
             }
-            return 0;
         }
-    }
-}

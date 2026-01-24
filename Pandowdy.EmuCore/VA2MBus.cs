@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Emulator;
+using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore;

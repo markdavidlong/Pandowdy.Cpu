@@ -1,4 +1,4 @@
-namespace Pandowdy.EmuCore;
+namespace Pandowdy.EmuCore.DataTypes;
 
 /// <summary>
 /// Manages CPU cycle counting and timing-related counters for the emulator.

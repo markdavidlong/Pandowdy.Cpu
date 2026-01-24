@@ -1,6 +1,6 @@
  using Pandowdy.EmuCore.Interfaces;
 
-namespace Pandowdy.EmuCore;
+ namespace Pandowdy.EmuCore.Services;
 
 /// <summary>
 /// Simple keyboard handler that maintains a single key with strobe bit (Apple IIe style).
