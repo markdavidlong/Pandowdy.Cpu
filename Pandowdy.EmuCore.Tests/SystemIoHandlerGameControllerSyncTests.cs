@@ -1,5 +1,6 @@
 using Xunit;
 using Pandowdy.EmuCore;
+using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 
@@ -40,7 +41,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void ButtonChanged_SynchronizesToSystemStatus(int buttonNum)
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act - Simulate button press
         controller.SetButton(buttonNum, true);
@@ -62,7 +63,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void ButtonChanged_AllButtons_SynchronizeIndependently()
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act - Set different states for each button
         controller.SetButton(0, true);
@@ -79,7 +80,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void ButtonChanged_Toggle_SystemStatusUpdates()
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act - Toggle button 0
         controller.SetButton(0, true);
@@ -96,7 +97,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void ButtonChanged_MultipleChanges_AllSynchronized()
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act - Rapid button changes
         controller.SetButton(0, true);
@@ -123,7 +124,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void PaddleChanged_SynchronizesToSystemStatus(int paddleNum, byte value)
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act - Set paddle value
         controller.SetPaddle(paddleNum, value);
@@ -145,7 +146,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void PaddleChanged_AllPaddles_SynchronizeIndependently()
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act - Set different values for each paddle
         controller.SetPaddle(0, 10);
@@ -164,7 +165,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void PaddleChanged_MultipleUpdates_SystemStatusTracksLatest()
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act - Update paddle 0 multiple times
         controller.SetPaddle(0, 50);
@@ -181,7 +182,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void PaddleChanged_FullRange_AllValuesSynchronized()
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act & Assert - Test extreme values
         controller.SetPaddle(0, 0);
@@ -202,7 +203,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void MixedChanges_ButtonsAndPaddles_AllSynchronized()
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act - Mix button and paddle changes
         controller.SetButton(0, true);
@@ -221,7 +222,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void Scenario_JoystickInput_CompleteStateSynchronized()
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act - Simulate joystick movement with button press
         controller.SetPaddle(0, 255); // X-axis right
@@ -238,7 +239,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void Scenario_GamePaddle_StateChangesTracked()
     {
         // Arrange
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, controller, status, _) = CreateTestFixture();
 
         // Act - Simulate game paddle sequence
         controller.SetPaddle(0, 50);   // Turn paddle left
@@ -316,7 +317,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void Constructor_InitialButtonStatesMatch()
     {
         // Arrange & Act
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, _, status, _) = CreateTestFixture();
 
         // Assert - Initial states should match (all buttons released)
         Assert.False(status.StatePb0);
@@ -328,7 +329,7 @@ public class SystemIoHandlerGameControllerSyncTests
     public void Constructor_InitialPaddleValuesMatch()
     {
         // Arrange & Act
-        var (ioHandler, controller, status, vblank) = CreateTestFixture();
+        var (_, _, status, _) = CreateTestFixture();
 
         // Assert - Initial paddle values should match (all zero)
         Assert.Equal(0, status.Pdl0);

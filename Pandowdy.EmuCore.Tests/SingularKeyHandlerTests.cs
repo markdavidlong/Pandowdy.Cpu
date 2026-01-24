@@ -1,6 +1,7 @@
 using Xunit;
 using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -358,47 +359,42 @@ public class SingularKeyHandlerTests
     [Fact]
     public void IKeyboardReader_ExposesReadOnlyOperations()
     {
-        // Arrange
-        IKeyboardReader reader = new SingularKeyHandler();
-        IKeyboardSetter setter = (IKeyboardSetter)reader;
+        // Arrange - Testing that the interface works correctly
+        var handler = new SingularKeyHandler();
 
-        // Act
-        setter.EnqueueKey(0x41);
+        // Act - Use handler directly (implements IKeyboardSetter)
+        handler.EnqueueKey(0x41);
 
-        // Assert - Reader can only read, not write
-        Assert.Equal(0x41, reader.PeekCurrentKeyValue());
-        Assert.True(reader.StrobePending());
+        // Assert - Reader methods work via concrete type (implements IKeyboardReader)
+        Assert.Equal(0x41, handler.PeekCurrentKeyValue());
+        Assert.True(handler.StrobePending());
     }
 
     [Fact]
     public void IKeyboardSetter_ExposesWriteOnlyOperations()
     {
-        // Arrange
-        IKeyboardSetter setter = new SingularKeyHandler();
+        // Arrange - Testing that the interface works correctly
+        var handler = new SingularKeyHandler();
 
-        // Act
-        setter.EnqueueKey(0x42);
+        // Act - Use handler directly (implements IKeyboardSetter)
+        handler.EnqueueKey(0x42);
 
-        // Assert - Can only write via setter interface
-        // Must cast to reader to verify
-        var reader = (IKeyboardReader)setter;
-        Assert.Equal(0x42, reader.PeekCurrentKeyValue());
+        // Assert - Verify via reader methods (implements IKeyboardReader)
+        Assert.Equal(0x42, handler.PeekCurrentKeyValue());
     }
 
     [Fact]
     public void BothInterfaces_ShareSameState()
     {
-        // Arrange
+        // Arrange - Verify shared state across interface views
         var handler = new SingularKeyHandler();
-        IKeyboardReader reader = handler;
-        IKeyboardSetter setter = handler;
 
-        // Act
-        setter.EnqueueKey(0x43);
+        // Act - Use setter method
+        handler.EnqueueKey(0x43);
 
-        // Assert - Both interfaces see same state
-        Assert.Equal(0x43, reader.PeekCurrentKeyValue());
-        Assert.Equal(0xC3, reader.PeekCurrentKeyAndStrobe());
+        // Assert - Reader methods see the same state
+        Assert.Equal(0x43, handler.PeekCurrentKeyValue());
+        Assert.Equal(0xC3, handler.PeekCurrentKeyAndStrobe());
     }
 
     #endregion

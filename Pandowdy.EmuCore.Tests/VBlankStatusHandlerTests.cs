@@ -1,3 +1,5 @@
+using Pandowdy.EmuCore.DataTypes;
+
 namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
@@ -63,10 +65,11 @@ public class VBlankStatusHandlerTests
     public void VBlankCounter_CanBeSetAndRetrieved()
     {
         // Arrange
-        var handler = new CpuClockingCounters();
-
-        // Act
-        handler.VBlankCounter = 100;
+        var handler = new CpuClockingCounters
+        {
+            // Act
+            VBlankCounter = 100
+        };
 
         // Assert
         Assert.Equal(100, handler.VBlankCounter);
@@ -92,10 +95,11 @@ public class VBlankStatusHandlerTests
     public void VBlankCounter_CanBeSetToNegativeValue()
     {
         // Arrange
-        var handler = new CpuClockingCounters();
-
-        // Act
-        handler.VBlankCounter = -100;
+        var handler = new CpuClockingCounters
+        {
+            // Act
+            VBlankCounter = -100
+        };
 
         // Assert
         Assert.Equal(-100, handler.VBlankCounter);
@@ -537,10 +541,11 @@ public class VBlankStatusHandlerTests
     public void IntegrationSimulation_VBlankStatusForC019Reads()
     {
         // Arrange - Simulating SystemIoHandler reading $C019
-        var handler = new CpuClockingCounters();
-
-        // Scenario 1: Not in VBlank
-        handler.VBlankCounter = -100;
+        var handler = new CpuClockingCounters
+        {
+            // Scenario 1: Not in VBlank
+            VBlankCounter = -100
+        };
         byte rdVertBlank1 = (byte)(handler.InVBlank ? 0x80 : 0x00);
         Assert.Equal(0x00, rdVertBlank1);
 

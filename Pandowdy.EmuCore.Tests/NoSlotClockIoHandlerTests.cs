@@ -1,3 +1,4 @@
+using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Tests.Helpers;
 
@@ -132,97 +133,95 @@ public class NoSlotClockIoHandlerTests
         var fixture = new NoSlotClockFixture();
         fixture.Downstream.ReturnValue = 0x99;
 
-        // Act
-        var value = fixture.Clock.Read(0x10); // Address not in unlock range
+        // Act - Read without sending unlock pattern
+        var value = fixture.Clock.Read(0x10);
 
-        // Assert
+        // Assert - Should passthrough unmodified
         Assert.Equal(0x99, value);
         Assert.Equal(1, fixture.Downstream.ReadCount);
     }
 
     [Fact]
-    public void Read_UnlockSequence_UnlocksAfterCorrectSequence()
+    public void Read_UnlockSequence_UnlocksAfterCorrectPattern()
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
+        fixture.Downstream.ReturnValue = 0x42; // 0x42 in binary = 01000010
 
-        // Act - Perform unlock sequence: 0x5, 0xA, 0x5, 0xA
-        fixture.Clock.Read(0x5);
-        fixture.Clock.Read(0xA);
-        fixture.Clock.Read(0x5);
-        fixture.Clock.Read(0xA);
+        // Act - Send unlock pattern
+        UnlockClock(fixture);
 
-        // Now try reading bit (should work if unlocked)
-        var bit = fixture.Clock.Read(0x0);
-
-        // Assert - Should return 0x00 or 0x80 (not downstream value)
-        Assert.True(bit == 0x00 || bit == 0x80);
-    }
-
-    [Fact]
-    public void Read_UnlockSequence_WrongSequence_ResetsUnlock()
-    {
-        // Arrange
-        var fixture = new NoSlotClockFixture();
-        fixture.Downstream.ReturnValue = 0x99;
-
-        // Act - Start unlock then use wrong address
-        fixture.Clock.Read(0x5);
-        fixture.Clock.Read(0xA);
-        fixture.Clock.Read(0x7); // Wrong! Should be 0x5
-        fixture.Clock.Read(0xA);
-
-        // Try reading bit (should passthrough if still locked)
-        fixture.Clock.Read(0x0);
-
-        // Assert - Should have passed through to downstream
-        Assert.True(fixture.Downstream.ReadCount > 0);
-    }
-
-    [Fact]
-    public void Read_UnlockSequence_TimeoutBetweenReads_ResetsUnlock()
-    {
-        // Arrange
-        var fixture = new NoSlotClockFixture();
-        fixture.Downstream.ReturnValue = 0x99;
-
-        // Act - Start unlock sequence
-        fixture.Clock.Read(0x5);
-        fixture.Clock.Read(0xA);
-
-        // Simulate time passing (> 100 cycles)
-        for (int i = 0; i < 150; i++)
-        {
-            fixture.ClockingCounters.IncrementCycles(1);
-        }
-
-        // Try to continue unlock
-        fixture.Clock.Read(0x5); // Should timeout and reset
-
-        // Assert - Should still be locked (passthrough to downstream)
+        // Now read a clock byte - should return clock data in bit 0
         var value = fixture.Clock.Read(0x0);
-        Assert.True(fixture.Downstream.ReadCount > 0);
+
+        // Assert - Bit 0 should be clock data (modified), other bits from downstream
+        // The value should be 0x42 or 0x43 depending on clock bit
+        Assert.True(value == 0x42 || value == 0x43);
     }
 
     [Fact]
-    public void Read_UnlockSequence_QuickSuccession_Unlocks()
+    public void Read_UnlockSequence_WrongPattern_StaysLocked()
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
+        fixture.Downstream.ReturnValue = 0x99;
 
-        // Act - Perform unlock sequence with minimal cycles between
-        for (int i = 0; i < 4; i++)
+        // Act - Send wrong pattern (all zeros instead of recognition pattern)
+        for (int i = 0; i < 64; i++)
         {
-            byte offset = (i % 2 == 0) ? (byte)0x5 : (byte)0xA;
-            fixture.Clock.Read(offset);
-            fixture.ClockingCounters.IncrementCycles(1); // Only 1 cycle between
+            fixture.Clock.Read(0x00); // All A0=0
         }
 
-        // Try reading bit
-        var bit = fixture.Clock.Read(0x0);
+        // Read should still passthrough
+        var value = fixture.Clock.Read(0x00);
 
-        // Assert - Should be unlocked (returns 0x00 or 0x80, not downstream)
-        Assert.True(bit == 0x00 || bit == 0x80);
+        // Assert - Should still be in matching mode, returning unmodified downstream
+        Assert.Equal(0x99, value);
+    }
+
+    [Fact]
+    public void Read_PartialPattern_StaysLocked()
+    {
+        // Arrange
+        var fixture = new NoSlotClockFixture();
+        fixture.Downstream.ReturnValue = 0x99;
+
+        // Act - Send only 32 bits of pattern
+        for (int i = 0; i < 32; i++)
+        {
+            bool bit = ((RecognitionPattern >> i) & 1) != 0;
+            fixture.Clock.Read(bit ? (ushort)0x01 : (ushort)0x00);
+        }
+
+        // Read should still passthrough
+        var value = fixture.Clock.Read(0x00);
+
+        // Assert - Should still be in matching mode
+        Assert.Equal(0x99, value);
+    }
+
+    [Fact]
+    public void Read_CorrectPatternTwice_UnlocksOnlyOnce()
+    {
+        // Arrange
+        var fixture = new NoSlotClockFixture();
+        fixture.Clock.SetClockTime(new DateTime(2024, 6, 15, 12, 0, 0, 0));
+
+        // Act - Unlock and read all 64 bits (returns to matching state)
+        UnlockClock(fixture);
+        for (int i = 0; i < 64; i++)
+        {
+            fixture.Clock.Read(0x00);
+        }
+
+        // Now should be back in matching mode - unlock again
+        UnlockClock(fixture);
+
+        // Read first byte
+        byte centiseconds = ReadClockByte(fixture);
+
+        // Assert - Should read valid clock data
+        Assert.Equal(0x00, centiseconds); // 0 centiseconds
     }
 
     [Fact]
@@ -230,42 +229,39 @@ public class NoSlotClockIoHandlerTests
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
+        fixture.Downstream.ReturnValue = 0x99;
 
         // Unlock the clock
-        fixture.Clock.Read(0x5);
-        fixture.Clock.Read(0xA);
-        fixture.Clock.Read(0x5);
-        fixture.Clock.Read(0xA);
+        UnlockClock(fixture);
 
         // Act - Reset
         fixture.Clock.Reset();
 
         // Assert - Should be locked again (passthrough to downstream)
-        fixture.Downstream.ReturnValue = 0x99;
-        var value = fixture.Clock.Read(0x0);
-        Assert.True(fixture.Downstream.ReadCount > 0);
+        var value = fixture.Clock.Read(0x00);
+        Assert.Equal(0x99, value);
     }
 
     [Fact]
-    public void Read_AfterUnlock_AddressesOutsideRange_PassThrough()
+    public void Read_AfterUnlock_AllAddressesReturnClockData()
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
-        
-        // Unlock
-        fixture.Clock.Read(0x5);
-        fixture.Clock.Read(0xA);
-        fixture.Clock.Read(0x5);
-        fixture.Clock.Read(0xA);
+        fixture.Clock.SetClockTime(new DateTime(2024, 6, 15, 12, 0, 0, 0));
+        fixture.Downstream.ReturnValue = 0x00;
+        UnlockClock(fixture);
 
-        fixture.Downstream.ReturnValue = 0xAB;
+        // Act - Read from various addresses
+        byte value1 = fixture.Clock.Read(0x00);
+        byte value2 = fixture.Clock.Read(0x10);
+        byte value3 = fixture.Clock.Read(0x50);
 
-        // Act - Read address outside 0x0-0xB range
-        var value = fixture.Clock.Read(0x0C);
-
-        // Assert
-        Assert.Equal(0xAB, value);
-        Assert.True(fixture.Downstream.ReadCount > 0);
+        // Assert - All reads advance through clock data
+        // All should have clock data in bit 0
+        // They may differ based on which bit we're on
+        Assert.True(value1 == 0x00 || value1 == 0x01);
+        Assert.True(value2 == 0x00 || value2 == 0x01);
+        Assert.True(value3 == 0x00 || value3 == 0x01);
     }
 
     [Fact]
@@ -288,97 +284,102 @@ public class NoSlotClockIoHandlerTests
     #region Bit Reading Tests (5 tests)
 
     [Fact]
-    public void Read_DataBit_AfterUnlock_ReturnsHighBitFormat()
+    public void Read_DataBit_AfterUnlock_ReturnsBitInPosition0()
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
         UnlockClock(fixture);
 
-        // Act - Read data bit (address 0x0)
-        var bit = fixture.Clock.Read(0x0);
+        // Act - Read data bit (clock data is in bit 0 of return value)
+        var value = fixture.Clock.Read(0x0);
 
-        // Assert - NSC returns bit in high bit position (0x00 or 0x80)
-        Assert.True(bit == 0x00 || bit == 0x80);
+        // Assert - NSC returns clock bit in bit 0 position
+        // The value will be (romData & 0xFE) | clockBit
+        // Since MockSystemIoHandler returns 0x42, result is 0x42 or 0x43
+        Assert.True((value & 0xFE) == (fixture.Downstream.ReturnValue & 0xFE));
     }
 
     [Fact]
-    public void Read_ShiftOperation_AdvancesBitPosition()
+    public void Read_AfterUnlock_ReturnsClockDataInBit0()
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
+        fixture.Clock.SetClockTime(new DateTime(2024, 6, 15, 12, 30, 45, 560)); // 56 centiseconds
         UnlockClock(fixture);
 
-        // Set a known time for testing
-        fixture.Clock.SetClockTime(new DateTime(2024, 6, 15, 12, 30, 45));
+        // Act - Read first byte (centiseconds = 56 = 0x56 BCD)
+        byte centiseconds = ReadClockByte(fixture);
 
-        // Act - Load byte and read multiple bits
-        fixture.Clock.Read(0x4); // Load next byte
-        var bit0 = fixture.Clock.Read(0x0); // Read bit 0
-        fixture.Clock.Read(0x1); // Shift
-        var bit1 = fixture.Clock.Read(0x0); // Read bit 1
-
-        // Assert - Bits should be different (unless all 0s or all 1s)
-        // At minimum, the read operations should complete without error
-        Assert.True(bit0 == 0x00 || bit0 == 0x80);
-        Assert.True(bit1 == 0x00 || bit1 == 0x80);
+        // Assert - Should be 0x56 (56 in BCD)
+        Assert.Equal(0x56, centiseconds);
     }
 
     [Fact]
-    public void Read_EightBitsShift_AutoLoadsNextByte()
+    public void Read_64Bits_ReturnsToMatchingState()
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
         UnlockClock(fixture);
 
-        // Act - Load byte and shift 8 times
-        fixture.Clock.Read(0x4); // Load byte 0
-        for (int i = 0; i < 8; i++)
+        // Act - Read all 64 bits (8 bytes)
+        for (int i = 0; i < 64; i++)
         {
-            fixture.Clock.Read(0x0); // Read bit
-            fixture.Clock.Read(0x1); // Shift
+            fixture.Clock.Read(0x00);
         }
 
-        // After 8 shifts, should auto-load next byte
-        var nextBit = fixture.Clock.Read(0x0);
+        // After 64 reads, should return to matching state
+        // Now reads should pass through to downstream unchanged
+        fixture.Downstream.ReturnValue = 0xAB;
+        var value = fixture.Clock.Read(0x00);
 
-        // Assert - Should complete without error
-        Assert.True(nextBit == 0x00 || nextBit == 0x80);
+        // Assert - Should return unmodified downstream value (not clock data)
+        // Actually, it returns clock bit in bit 0, so check if we're back to matching
+        Assert.Equal(0xAB, value); // Full passthrough when in matching state
     }
 
     [Fact]
-    public void Read_LoadNextByte_ResetsBitPosition()
+    public void Read_LoadNextByte_AutoAdvancesAfterEightBits()
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
+        fixture.Clock.SetClockTime(new DateTime(2024, 6, 15, 12, 30, 45, 560));
         UnlockClock(fixture);
 
-        // Shift a few times
-        fixture.Clock.Read(0x1);
-        fixture.Clock.Read(0x1);
-        fixture.Clock.Read(0x1);
-
-        // Act - Load next byte (should reset position)
-        fixture.Clock.Read(0x4);
-        var bit = fixture.Clock.Read(0x0);
-
-        // Assert - Should read bit 0 of new byte
-        Assert.True(bit == 0x00 || bit == 0x80);
-    }
-
-    [Fact]
-    public void Read_EnableWriteMode_ReturnsZero()
-    {
-        // Arrange
-        var fixture = new NoSlotClockFixture();
-        UnlockClock(fixture);
-
-        // Act
-        var value1 = fixture.Clock.Read(0x2); // Enable write mode
-        var value2 = fixture.Clock.Read(0x3); // Disable write mode
+        // Act - Read first 2 bytes
+        byte byte0 = ReadClockByte(fixture); // Centiseconds = 0x56
+        byte byte1 = ReadClockByte(fixture); // Seconds = 45 = 0x45 BCD
 
         // Assert
-        Assert.Equal(0x00, value1);
-        Assert.Equal(0x00, value2);
+        Assert.Equal(0x56, byte0);
+        Assert.Equal(0x45, byte1);
+    }
+
+    [Fact]
+    public void Read_AllEightBytes_ReturnsCorrectTime()
+    {
+        // Arrange
+        var fixture = new NoSlotClockFixture();
+        // Set time: June 15, 2024 (Saturday), 12:30:45.56
+        // Saturday = DayOfWeek.Saturday = 6, so NSC day = 6 + 1 = 7
+        fixture.Clock.SetClockTime(new DateTime(2024, 6, 15, 12, 30, 45, 560));
+        UnlockClock(fixture);
+
+        // Act - Read all 8 bytes
+        byte[] bytes = new byte[8];
+        for (int i = 0; i < 8; i++)
+        {
+            bytes[i] = ReadClockByte(fixture);
+        }
+
+        // Assert - Verify BCD encoded values
+        Assert.Equal(0x56, bytes[0]); // Centiseconds = 56
+        Assert.Equal(0x45, bytes[1]); // Seconds = 45
+        Assert.Equal(0x30, bytes[2]); // Minutes = 30
+        Assert.Equal(0x12, bytes[3]); // Hours = 12
+        Assert.Equal(0x07, bytes[4]); // Day of week = Saturday = 7
+        Assert.Equal(0x15, bytes[5]); // Day = 15
+        Assert.Equal(0x06, bytes[6]); // Month = 6
+        Assert.Equal(0x24, bytes[7]); // Year = 24
     }
 
     #endregion
@@ -406,7 +407,7 @@ public class NoSlotClockIoHandlerTests
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
-        DateTime targetTime = new DateTime(1985, 6, 15, 12, 30, 0);
+        var targetTime = new DateTime(1985, 6, 15, 12, 30, 0);
 
         // Act
         fixture.Clock.SetClockTime(targetTime);
@@ -422,7 +423,7 @@ public class NoSlotClockIoHandlerTests
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
-        DateTime targetTime = new DateTime(2000, 1, 1, 0, 0, 0);
+        var targetTime = new DateTime(2000, 1, 1, 0, 0, 0);
         fixture.Clock.SetClockTime(targetTime);
 
         // Act
@@ -441,38 +442,16 @@ public class NoSlotClockIoHandlerTests
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
+        fixture.Clock.SetClockTime(new DateTime(2024, 6, 15, 12, 34, 56, 0)); // 0 centiseconds
         UnlockClock(fixture);
 
-        // Set known time
-        fixture.Clock.SetClockTime(new DateTime(2024, 6, 15, 12, 34, 56));
+        // Act - Read first two bytes
+        byte centiseconds = ReadClockByte(fixture);
+        byte seconds = ReadClockByte(fixture);
 
-        // Act - Load and read seconds byte (byte 1)
-        fixture.Clock.Read(0x4); // Load byte 0 (centiseconds)
-        
-        // Shift through byte 0 (8 bits)
-        for (int i = 0; i < 8; i++)
-        {
-            fixture.Clock.Read(0x0);
-            fixture.Clock.Read(0x1);
-        }
-
-        // Now we're on byte 1 (seconds = 56 = 0x56 BCD)
-        byte reconstructed = 0;
-        for (int i = 0; i < 8; i++)
-        {
-            byte bit = fixture.Clock.Read(0x0);
-            if (bit == 0x80)
-            {
-                reconstructed |= (byte)(1 << i);
-            }
-            if (i < 7)
-            {
-                fixture.Clock.Read(0x1); // Shift
-            }
-        }
-
-        // Assert - Should be 0x56 (56 in BCD)
-        Assert.Equal(0x56, reconstructed);
+        // Assert - Seconds should be 0x56 (56 in BCD)
+        Assert.Equal(0x00, centiseconds); // 0 centiseconds
+        Assert.Equal(0x56, seconds);      // 56 seconds in BCD
     }
 
     [Fact]
@@ -480,7 +459,7 @@ public class NoSlotClockIoHandlerTests
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
-        DateTime targetTime = new DateTime(1990, 12, 25, 10, 30, 0);
+        var targetTime = new DateTime(1990, 12, 25, 10, 30, 0);
         fixture.Clock.SetClockTime(targetTime);
 
         // Act
@@ -497,42 +476,24 @@ public class NoSlotClockIoHandlerTests
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
+
+        // June 17, 2024 is a Monday
+        // DayOfWeek.Monday = 1, so NSC day = 1 + 1 = 2
+        var testTime = new DateTime(2024, 6, 17, 0, 0, 0);
+        fixture.Clock.SetClockTime(testTime);
         UnlockClock(fixture);
 
-        // Set to a Monday (June 15, 2024 is a Saturday)
-        DateTime testTime = new DateTime(2024, 6, 17); // Monday
-        fixture.Clock.SetClockTime(testTime);
-
-        // Act - Load byte 4 (day of week)
-        fixture.Clock.Read(0x4); // Load byte 0
-        
-        // Skip to byte 4 by auto-loading
-        for (int byteNum = 0; byteNum < 4; byteNum++)
+        // Skip first 4 bytes (centiseconds, seconds, minutes, hours)
+        for (int i = 0; i < 4; i++)
         {
-            for (int i = 0; i < 8; i++)
-            {
-                fixture.Clock.Read(0x0);
-                fixture.Clock.Read(0x1);
-            }
+            ReadClockByte(fixture);
         }
 
-        // Read byte 4 (day of week)
-        byte dayOfWeek = 0;
-        for (int i = 0; i < 8; i++)
-        {
-            byte bit = fixture.Clock.Read(0x0);
-            if (bit == 0x80)
-            {
-                dayOfWeek |= (byte)(1 << i);
-            }
-            if (i < 7)
-            {
-                fixture.Clock.Read(0x1);
-            }
-        }
+        // Act - Read byte 4 (day of week)
+        byte dayOfWeek = ReadClockByte(fixture);
 
-        // Assert - Monday = 1 in BCD (0x01)
-        Assert.Equal(0x01, dayOfWeek);
+        // Assert - Monday = DayOfWeek.Monday(1) + 1 = 2 in NSC format
+        Assert.Equal(0x02, dayOfWeek);
     }
 
     [Fact]
@@ -540,105 +501,68 @@ public class NoSlotClockIoHandlerTests
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
+        // Set time with distinct values: 23:59:58.00 on Dec 25
+        fixture.Clock.SetClockTime(new DateTime(2024, 12, 25, 23, 59, 58, 0));
         UnlockClock(fixture);
 
-        // Set time with distinct values
-        fixture.Clock.SetClockTime(new DateTime(2024, 12, 25, 23, 59, 58));
-
         // Act - Read first 3 bytes (centiseconds, seconds, minutes)
-        var bytes = new List<byte>();
-        fixture.Clock.Read(0x4); // Load byte 0
+        byte centiseconds = ReadClockByte(fixture);
+        byte seconds = ReadClockByte(fixture);
+        byte minutes = ReadClockByte(fixture);
 
-        for (int byteNum = 0; byteNum < 3; byteNum++)
-        {
-            byte reconstructed = 0;
-            for (int i = 0; i < 8; i++)
-            {
-                byte bit = fixture.Clock.Read(0x0);
-                if (bit == 0x80)
-                {
-                    reconstructed |= (byte)(1 << i);
-                }
-                fixture.Clock.Read(0x1); // Shift (auto-loads after 8th)
-            }
-            bytes.Add(reconstructed);
-        }
-
-        // Assert - Bytes should be different (seconds=58, minutes=59)
-        // At minimum, verify we got 3 distinct reads
-        Assert.Equal(3, bytes.Count);
-        // Seconds should be 0x58, Minutes should be 0x59
-        Assert.True(bytes.Any(b => b != 0x00)); // Should have non-zero values
+        // Assert - Verify expected BCD values
+        Assert.Equal(0x00, centiseconds); // 0 centiseconds
+        Assert.Equal(0x58, seconds);      // 58 seconds in BCD
+        Assert.Equal(0x59, minutes);      // 59 minutes in BCD
     }
 
     #endregion
 
-    #region Time Writing Tests (5 tests)
+    #region Time Writing Tests (3 tests)
 
     [Fact]
-    public void Write_EnableWriteMode_AllowsBitWrites()
+    public void Write_AlwaysPassesThroughToDownstream()
     {
         // Arrange
         var fixture = new NoSlotClockFixture();
         UnlockClock(fixture);
+
+        // Act - Writes always pass through (NSC protocol is read-based)
+        fixture.Clock.Write(0x00, 0x42);
+
+        // Assert - Write should passthrough
+        Assert.Equal(1, fixture.Downstream.WriteCount);
+        Assert.Equal(0x00, fixture.Downstream.LastWriteAddress);
+        Assert.Equal(0x42, fixture.Downstream.LastWriteValue);
+    }
+
+    [Fact]
+    public void Write_AfterUnlock_StillPassesThrough()
+    {
+        // Arrange
+        var fixture = new NoSlotClockFixture();
+        UnlockClock(fixture);
+
+        // Act - Even after unlock, writes pass through
+        fixture.Clock.Write(0x10, 0xAB);
+
+        // Assert
+        Assert.Equal(1, fixture.Downstream.WriteCount);
+        Assert.Equal(0x10, fixture.Downstream.LastWriteAddress);
+        Assert.Equal(0xAB, fixture.Downstream.LastWriteValue);
+    }
+
+    [Fact]
+    public void SetClockTime_ViaPublicMethod_UpdatesTime()
+    {
+        // Arrange - The DS1216 write protocol is complex; use the public API
+        var fixture = new NoSlotClockFixture();
+        var targetTime = new DateTime(2024, 6, 15, 12, 45, 30);
 
         // Act
-        fixture.Clock.Read(0x2); // Enable write mode
-        fixture.Clock.Write(0x0, 0x01); // Write bit 1
+        fixture.Clock.SetClockTime(targetTime);
 
-        // Assert - Should not throw or passthrough
-        Assert.Equal(0, fixture.Downstream.WriteCount);
-    }
-
-    [Fact]
-    public void Write_WithoutWriteMode_Ignored()
-    {
-        // Arrange
-        var fixture = new NoSlotClockFixture();
-        UnlockClock(fixture);
-
-        // Act - Try writing without enabling write mode
-        fixture.Clock.Write(0x0, 0x01);
-
-        // Assert - Should be ignored (not passed downstream)
-        Assert.Equal(0, fixture.Downstream.WriteCount);
-    }
-
-    [Fact]
-    public void Write_EightBytes_RecalculatesOffset()
-    {
-        // Arrange
-        var fixture = new NoSlotClockFixture();
-        UnlockClock(fixture);
-        fixture.Clock.Read(0x2); // Enable write mode
-
-        // Act - Write 8 bytes of clock data (simplified)
-        // Byte 0: Centiseconds = 0x00
-        // Byte 1: Seconds = 0x30 (30)
-        // Byte 2: Minutes = 0x45 (45)
-        // Byte 3: Hours = 0x12 (12)
-        // Byte 4: Day of week = 0x03 (Wednesday)
-        // Byte 5: Day = 0x15 (15)
-        // Byte 6: Month = 0x06 (June)
-        // Byte 7: Year = 0x24 (2024)
-
-        byte[] clockData = { 0x00, 0x30, 0x45, 0x12, 0x03, 0x15, 0x06, 0x24 };
-
-        foreach (byte data in clockData)
-        {
-            // Write 8 bits
-            for (int i = 0; i < 8; i++)
-            {
-                byte bit = (byte)((data >> i) & 1);
-                fixture.Clock.Write(0x0, bit);
-                fixture.Clock.Write(0x1, 0); // Shift
-            }
-            
-            // Store byte
-            fixture.Clock.Write(0x4, 0);
-        }
-
-        // Assert - Time should now be June 15, 2024, 12:45:30
+        // Assert
         DateTime result = fixture.Clock.GetClockTime();
         Assert.Equal(2024, result.Year);
         Assert.Equal(6, result.Month);
@@ -646,53 +570,6 @@ public class NoSlotClockIoHandlerTests
         Assert.Equal(12, result.Hour);
         Assert.Equal(45, result.Minute);
         Assert.Equal(30, result.Second);
-    }
-
-    [Fact]
-    public void Write_InvalidDate_IgnoresWrite()
-    {
-        // Arrange
-        var fixture = new NoSlotClockFixture();
-        UnlockClock(fixture);
-        fixture.Clock.Read(0x2); // Enable write mode
-
-        DateTime beforeTime = fixture.Clock.GetClockTime();
-
-        // Act - Write invalid date (month = 13)
-        byte[] clockData = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x13, 0x24 }; // Invalid month
-
-        foreach (byte data in clockData)
-        {
-            for (int i = 0; i < 8; i++)
-            {
-                byte bit = (byte)((data >> i) & 1);
-                fixture.Clock.Write(0x0, bit);
-                fixture.Clock.Write(0x1, 0);
-            }
-            fixture.Clock.Write(0x4, 0);
-        }
-
-        DateTime afterTime = fixture.Clock.GetClockTime();
-
-        // Assert - Time should not have changed significantly (may advance slightly due to system time)
-        TimeSpan difference = afterTime - beforeTime;
-        Assert.True(Math.Abs(difference.TotalSeconds) < 2); // Allow for execution time
-    }
-
-    [Fact]
-    public void Write_AddressOutsideRange_PassesThroughToDownstream()
-    {
-        // Arrange
-        var fixture = new NoSlotClockFixture();
-        UnlockClock(fixture);
-
-        // Act
-        fixture.Clock.Write(0x0C, 0x42); // Outside 0x0-0xB range
-
-        // Assert
-        Assert.Equal(1, fixture.Downstream.WriteCount);
-        Assert.Equal(0x0C, fixture.Downstream.LastWriteAddress);
-        Assert.Equal(0x42, fixture.Downstream.LastWriteValue);
     }
 
     #endregion
@@ -734,14 +611,49 @@ public class NoSlotClockIoHandlerTests
     #region Helper Methods
 
     /// <summary>
-    /// Helper method to unlock the clock with the correct sequence.
+    /// The 64-bit recognition pattern for the DS1216 No-Slot Clock.
+    /// Pattern: $5C $A3 $3A $C5 $5C $A3 $3A $C5 (read LSB first within each byte).
     /// </summary>
-    private void UnlockClock(NoSlotClockFixture fixture)
+    private const ulong RecognitionPattern = 0xC53AA35CC53AA35C;
+
+    /// <summary>
+    /// Helper method to unlock the clock with the correct 64-bit sequence.
+    /// </summary>
+    /// <remarks>
+    /// The DS1216 protocol requires 64 reads where A0 (address bit 0) matches
+    /// the recognition pattern bit-by-bit. The pattern is shifted into the
+    /// accumulator from bit 63 down to bit 0.
+    /// </remarks>
+    private static void UnlockClock(NoSlotClockFixture fixture)
     {
-        fixture.Clock.Read(0x5);
-        fixture.Clock.Read(0xA);
-        fixture.Clock.Read(0x5);
-        fixture.Clock.Read(0xA);
+        // Send the 64-bit recognition pattern via A0 (address bit 0)
+        // The pattern is shifted in from MSB to LSB
+        for (int i = 0; i < 64; i++)
+        {
+            // Extract bit i from the pattern (LSB first)
+            bool bit = ((RecognitionPattern >> i) & 1) != 0;
+            // Read from address 0 or 1 depending on the bit
+            ushort address = bit ? (ushort)0x01 : (ushort)0x00;
+            fixture.Clock.Read(address);
+        }
+    }
+
+    /// <summary>
+    /// Reads a single byte (8 bits) of clock data after unlock.
+    /// Returns the byte reconstructed from bit 0 of each read.
+    /// </summary>
+    private static byte ReadClockByte(NoSlotClockFixture fixture)
+    {
+        byte result = 0;
+        for (int i = 0; i < 8; i++)
+        {
+            byte readValue = fixture.Clock.Read(0x00); // Any address works, we just need the read
+            if ((readValue & 0x01) != 0)
+            {
+                result |= (byte)(1 << i);
+            }
+        }
+        return result;
     }
 
     #endregion

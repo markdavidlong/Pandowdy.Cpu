@@ -1,6 +1,7 @@
 using Xunit;
 using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -503,13 +504,13 @@ public class SimpleGameControllerTests
     [Fact]
     public void ImplementsIGameControllerStatus()
     {
-        // Arrange
-        IGameControllerStatus controller = new SimpleGameController();
+        // Arrange - Testing interface implementation
+        var controller = new SimpleGameController();
 
         // Act & Assert - Interface methods work
         controller.SetButton(0, true);
         Assert.True(controller.GetButton(0));
-        
+
         controller.SetPaddle(0, 100);
         Assert.Equal(100, controller.GetPaddle(0));
     }
@@ -517,10 +518,10 @@ public class SimpleGameControllerTests
     [Fact]
     public void EventsAccessibleThroughInterface()
     {
-        // Arrange
-        IGameControllerStatus controller = new SimpleGameController();
+        // Arrange - Testing that events work via interface
+        var controller = new SimpleGameController();
         int eventCount = 0;
-        
+
         controller.ButtonChanged += (sender, e) => eventCount++;
         controller.PaddleChanged += (sender, e) => eventCount++;
 

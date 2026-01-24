@@ -105,6 +105,7 @@ public class FrameGeneratorTests
                 StateRamRd: false,
                 StateRamWrt: false,
                 StateIntCxRom: false,
+                StateIntC8Rom: false,
                 StateAltZp: false,
                 StateSlotC3Rom: false,
                 StatePb0: false,
@@ -129,7 +130,9 @@ public class FrameGeneratorTests
                 StatePdl0: 0,
                 StatePdl1: 0,
                 StatePdl2: 0,
-                StatePdl3: 0
+                StatePdl3: 0,
+                StateIntC8RomSlot: 0,
+                StateCurrentMhz: 1.023
             );
         }
 
@@ -288,6 +291,9 @@ public class FrameGeneratorTests
         public byte Pdl1 => _current.StatePdl1;
         public byte Pdl2 => _current.StatePdl2;
         public byte Pdl3 => _current.StatePdl3;
+        public bool StateIntC8Rom => _current.StateIntC8Rom;
+        public byte StateIntC8RomSlot => _current.StateIntC8RomSlot;
+        public double StateCurrentMhz => _current.StateCurrentMhz;
         
 
         private void UpdateField(Func<SystemStatusSnapshot, SystemStatusSnapshot> updater)
@@ -632,6 +638,7 @@ public class FrameGeneratorTests
                 StateRamRd: statusProvider.StateRamRd,
                 StateRamWrt: statusProvider.StateRamWrt,
                 StateIntCxRom: statusProvider.StateIntCxRom,
+                StateIntC8Rom: statusProvider.StateIntC8Rom,
                 StateAltZp: statusProvider.StateAltZp,
                 StateSlotC3Rom: statusProvider.StateSlotC3Rom,
                 StatePb0: statusProvider.StatePb0,
@@ -656,7 +663,9 @@ public class FrameGeneratorTests
                 StatePdl0: statusProvider.Pdl0, // Property name is Pdl0
                 StatePdl1: statusProvider.Pdl1, // Property name is Pdl1
                 StatePdl2: statusProvider.Pdl2, // Property name is Pdl2
-                StatePdl3: statusProvider.Pdl3  // Property name is Pdl3
+                StatePdl3: statusProvider.Pdl3, // Property name is Pdl3
+                StateIntC8RomSlot: statusProvider.StateIntC8RomSlot,
+                StateCurrentMhz: statusProvider.StateCurrentMhz
             ),
             FrameNumber = 1
         };

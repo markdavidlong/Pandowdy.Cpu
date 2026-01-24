@@ -1,3 +1,4 @@
+using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 using Pandowdy.EmuCore.Tests.Helpers;
@@ -90,14 +91,15 @@ public class AddressSpaceControllerTests
             set => Write(address, value);
         }
 
-        public void InstallCard(int id, SlotNumber slot) { }
-        public void InstallCard(string name, SlotNumber slot) { }
-        public void RemoveCard(SlotNumber slot) { }
-        public ICard GetCardIn(SlotNumber slot) => throw new NotImplementedException();
-        public bool IsEmpty(SlotNumber slot) => true;
-        public string GetMetadata() => string.Empty;
-        public bool ApplyMetadata(string metadata) => true;
-    }
+            public void InstallCard(int id, SlotNumber slot) { }
+            public void InstallCard(string name, SlotNumber slot) { }
+            public void RemoveCard(SlotNumber slot) { }
+            public ICard GetCardIn(SlotNumber slot) => throw new NotImplementedException();
+            public bool IsEmpty(SlotNumber slot) => true;
+            public string GetMetadata() => string.Empty;
+            public bool ApplyMetadata(string metadata) => true;
+            public void Reset() { }
+        }
 
     /// <summary>
     /// Helper to create a fully configured AddressSpaceController for testing.
@@ -203,20 +205,7 @@ public class AddressSpaceControllerTests
         Assert.Throws<ArgumentNullException>(() => new AddressSpaceController(langCard, systemRam, ioHandler, null!));
     }
 
-    [Fact]
-    public void Constructor_InsufficientSystemRamSize_ThrowsArgumentException()
-    {
-        // Arrange
-        var langCard = new TestLanguageCard();
-        // Test64KSystemRamSelector doesn't have size parameter - use default which is sufficient
-        // This test would need a different mock to properly test size validation
-        // For now, skip this test as it requires a custom mock
-        var slots = new MockSlots();
 
-        // This test is skipped because Test64KSystemRamSelector always creates 64KB
-        // and we need a way to create a smaller RAM for testing
-        Assert.True(true); // Placeholder - size validation tested via Utility.ValidateIMemorySize tests
-    }
 
     [Fact]
     public void Size_ReturnsCorrect64KBAddressSpace()
@@ -296,22 +285,22 @@ public class AddressSpaceControllerTests
         // Arrange
         var fixture = new AddressSpaceFixture();
 
-        // Act
-        var value = fixture.AddressSpace.Read(0xC000);
+            // Act
+            _ = fixture.AddressSpace.Read(0xC000);
 
-        // Assert - Should route to IoHandler, not throw
-        // The actual value depends on what the mock IoHandler returns
-        Assert.NotNull(fixture.IoHandler);
-    }
+            // Assert - Should route to IoHandler, not throw
+            // The actual value depends on what the mock IoHandler returns
+            Assert.NotNull(fixture.IoHandler);
+        }
 
-    [Fact]
-    public void Read_AddressC08F_RoutesToSystemIoHandler()
-    {
-        // Arrange
-        var fixture = new AddressSpaceFixture();
+        [Fact]
+        public void Read_AddressC08F_RoutesToSystemIoHandler()
+        {
+            // Arrange
+            var fixture = new AddressSpaceFixture();
 
-        // Act
-        var value = fixture.AddressSpace.Read(0xC08F);
+            // Act
+            _ = fixture.AddressSpace.Read(0xC08F);
 
         // Assert - Should route to IoHandler, not throw
         Assert.NotNull(fixture.IoHandler);
@@ -565,7 +554,7 @@ public class AddressSpaceControllerTests
         var fixture = new AddressSpaceFixture();
 
         // Act
-        var value = fixture.AddressSpace[0xC010];
+        _ = fixture.AddressSpace[0xC010];
 
         // Assert - Should route to IoHandler, not throw
         Assert.NotNull(fixture.IoHandler);
@@ -613,7 +602,7 @@ public class AddressSpaceControllerTests
         fixture.SystemRam.Write(0x4000, 0xBB); // Writes to current bank
         
         // Act
-        var value = fixture.AddressSpace.ReadRawAux(0x4000);
+        _ = fixture.AddressSpace.ReadRawAux(0x4000);
 
         // Assert
         // Value depends on how Test64KSystemRamSelector implements aux memory
@@ -642,7 +631,7 @@ public class AddressSpaceControllerTests
         fixture.SystemRam[0x0400] = 0xDD; // Text page 1
 
         // Act - ReadRawAux should delegate to SystemRam
-        var value = fixture.AddressSpace.ReadRawAux(0x0400);
+        _ = fixture.AddressSpace.ReadRawAux(0x0400);
 
         // Assert - Basic test that method works
         Assert.NotNull(fixture.SystemRam);

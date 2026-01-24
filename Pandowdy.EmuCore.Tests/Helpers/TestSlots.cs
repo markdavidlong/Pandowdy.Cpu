@@ -10,15 +10,10 @@ namespace Pandowdy.EmuCore.Tests.Helpers;
 /// Provides a minimal slots implementation that doesn't require ROM files or card factories.
 /// Returns floating bus values (0x00) for all reads and ignores all writes.
 /// </remarks>
-public class TestSlots : ISlots
+public class TestSlots(ISystemStatusProvider status) : ISlots
 {
-    private readonly ISystemStatusProvider _status;
+    private readonly ISystemStatusProvider _status = status ?? throw new ArgumentNullException(nameof(status));
     private readonly byte[] _memory = new byte[0x1000]; // $C000-$CFFF space
-
-    public TestSlots(ISystemStatusProvider status)
-    {
-        _status = status ?? throw new ArgumentNullException(nameof(status));
-    }
 
     public int Size => 0x1000;
     
@@ -75,13 +70,18 @@ public class TestSlots : ISlots
         return true; // All slots empty in test implementation
     }
 
-    public string GetMetadata()
-    {
-        return string.Empty;
-    }
+        public string GetMetadata()
+        {
+            return string.Empty;
+        }
 
-    public bool ApplyMetadata(string metadata)
-    {
-        return true;
+        public bool ApplyMetadata(string metadata)
+        {
+            return true;
+        }
+
+        public void Reset()
+        {
+            // No-op for testing
+        }
     }
-}

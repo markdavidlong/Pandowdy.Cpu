@@ -56,6 +56,7 @@ public class RenderContextTests
                 StateRamRd: false,
                 StateRamWrt: false,
                 StateIntCxRom: false,
+                StateIntC8Rom: false,
                 StateAltZp: false,
                 StateSlotC3Rom: false,
                 StatePb0: false,
@@ -80,7 +81,9 @@ public class RenderContextTests
                 StatePdl0: 0,
                 StatePdl1: 0,
                 StatePdl2: 0,
-                StatePdl3: 0
+                StatePdl3: 0,
+                StateIntC8RomSlot: 0,
+                StateCurrentMhz: 1.023
             );
         }
 
@@ -129,6 +132,9 @@ public class RenderContextTests
         public bool StateHighRead { get => _current.StateHighRead; set => UpdateField(s => s with { StateHighRead = value }); }
         public bool StateHighWrite { get => _current.StateHighWrite; set => UpdateField(s => s with { StateHighWrite = value }); }
         public bool StateVBlank { get => _current.StateVBlank; set => UpdateField(s => s with { StateVBlank = value }); }
+        public bool StateIntC8Rom { get => _current.StateIntC8Rom; set => UpdateField(s => s with { StateIntC8Rom = value }); }
+        public byte StateIntC8RomSlot => _current.StateIntC8RomSlot;
+        public double StateCurrentMhz => _current.StateCurrentMhz;
         public byte Pdl0 => _current.StatePdl0;
         public byte Pdl1 => _current.StatePdl1;
         public byte Pdl2 => _current.StatePdl2;

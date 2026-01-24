@@ -84,6 +84,9 @@ public class LanguageCardTests
         public bool StateFlashOn => false;
         public bool StatePreWrite => false;
         public bool StateVBlank => false;
+        public bool StateIntC8Rom => false;
+        public byte StateIntC8RomSlot => 0;
+        public double StateCurrentMhz => 1.023;
         public byte CurrentKey { get; set; }
         public byte Pdl0 { get; set; }
         public byte Pdl1 { get; set; }

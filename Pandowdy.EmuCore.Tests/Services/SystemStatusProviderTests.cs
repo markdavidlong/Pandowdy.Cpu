@@ -20,7 +20,7 @@ public class SystemStatusProviderTests
         Assert.False(provider.State80Store, "80STORE should default to false");
         Assert.False(provider.StateRamRd, "RAMRD should default to false");
         Assert.False(provider.StateRamWrt, "RAMWRT should default to false");
-        Assert.True(provider.StateIntCxRom, "INTCXROM should default to true");
+        Assert.False(provider.StateIntCxRom, "INTCXROM should default to false");
         Assert.False(provider.StateAltZp, "ALTZP should default to false");
         Assert.False(provider.StateSlotC3Rom, "SLOTC3ROM should default to false");
         
@@ -56,7 +56,7 @@ public class SystemStatusProviderTests
 
         // Assert
         Assert.NotNull(provider.Current);
-        Assert.True(provider.Current.StateIntCxRom);
+        Assert.False(provider.Current.StateIntCxRom);
         Assert.True(provider.Current.StateTextMode);
     }
 
@@ -121,18 +121,18 @@ public class SystemStatusProviderTests
     }
 
     [Fact]
-    public void SetIntCxRom_CanToggleFromDefaultTrue()
+    public void SetIntCxRom_CanToggleFromDefaultFalse()
     {
         // Arrange
         var provider = new SystemStatusProvider();
-        Assert.True(provider.StateIntCxRom); // Verify default
+        Assert.False(provider.StateIntCxRom); // Verify default
 
         // Act
-        provider.SetIntCxRom(false);
+        provider.SetIntCxRom(true);
 
         // Assert
-        Assert.False(provider.StateIntCxRom);
-        Assert.False(provider.Current.StateIntCxRom);
+        Assert.True(provider.StateIntCxRom);
+        Assert.True(provider.Current.StateIntCxRom);
     }
 
     [Theory]
@@ -903,7 +903,7 @@ public class SystemStatusProviderTests
         provider.MemoryMappingChanged += (sender, snapshot) => eventRaised = true;
 
         // Act
-        provider.SetIntCxRom(false); // Default is true, change to false
+        provider.SetIntCxRom(true); // Default is false, change to true
 
         // Assert
         Assert.True(eventRaised, "MemoryMappingChanged should fire when INTCXROM changes");

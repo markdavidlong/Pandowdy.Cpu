@@ -1,3 +1,6 @@
+using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Services;
+
 namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
