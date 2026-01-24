@@ -146,7 +146,7 @@ public sealed class SystemStatusProvider : ISystemStatusMutator
         State80Store: false,
         StateRamRd: false,
         StateRamWrt: false,
-        StateIntCxRom: true,        // Bug: Apple IIe powers on with internal ROM enabled
+        StateIntCxRom: false,        
         StateIntC8Rom: false,
         StateAltZp: false,
         StateSlotC3Rom: false,
@@ -174,7 +174,7 @@ public sealed class SystemStatusProvider : ISystemStatusMutator
         StatePdl2: 0,
         StatePdl3: 0,
         StateIntC8RomSlot: 0,
-        StateCurrentMhz: 0.0);        
+        StateCurrentMhz: -1.0);        
 
     // Reactive subject for observable pattern (replays current state to new subscribers)
     private readonly System.Reactive.Subjects.BehaviorSubject<SystemStatusSnapshot> _subject;

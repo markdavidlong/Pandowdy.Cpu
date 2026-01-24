@@ -220,10 +220,11 @@ public sealed class RenderingService : IDisposable
             return; // No frames yet or invalid timing
         }
         
+#if DebugRendering
         // FPS based on interval, not total runtime
         double effectiveFps = rendered / secondsSinceLastReport;
         double skipRate = (skipped * 100.0) / total;
-        
+
         // Include actual timestamp and interval for debugging timing issues
         Debug.WriteLine(
             $"[RenderingService @ {DateTime.Now:HH:mm:ss.fff}] " +
@@ -232,7 +233,7 @@ public sealed class RenderingService : IDisposable
             $"Rendered: {rendered} | Skipped: {skipped} ({skipRate:F1}%) | " +
             $"Total: {total}"
         );
-        
+#endif
         // Reset counters for next period
         Interlocked.Exchange(ref _framesRendered, 0);
         Interlocked.Exchange(ref _framesSkipped, 0);
