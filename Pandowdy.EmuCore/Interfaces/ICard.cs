@@ -281,6 +281,34 @@ public interface ICard : IConfigurable
     void OnInstalled(SlotNumber slot);
 
 
+    /// <summary>
+    /// Resets the card to its power-on or initial state.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Reset Behavior:</strong> Called when the Apple IIe system is reset (power cycle
+    /// or Ctrl+Reset). Each card should restore its internal state to match what would happen
+    /// on a real Apple IIe hardware reset:
+    /// <list type="bullet">
+    /// <item>Clear pending I/O operations</item>
+    /// <item>Reset hardware registers to default values</item>
+    /// <item>Stop motors or other active devices</item>
+    /// <item>Clear buffers and queues</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Disk Controller Example:</strong> A disk controller should stop any drive motors,
+    /// clear the current track/sector state, but preserve the mounted disk images.
+    /// </para>
+    /// <para>
+    /// <strong>Serial Card Example:</strong> A serial card should reset baud rate and control
+    /// registers to defaults, clear transmit/receive buffers, but maintain connection state.
+    /// </para>
+    /// <para>
+    /// For cards with no state to reset (like <see cref="NullCard"/>), this method can be
+    /// implemented as an empty no-op.
+    /// </para>
+    /// </remarks>
     public void Reset();
 
 }

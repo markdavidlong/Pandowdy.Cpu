@@ -2,6 +2,19 @@ using Emulator;
 
 namespace Pandowdy.EmuCore;
 
+/// <summary>
+/// Common utility methods used throughout the emulator core.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>Validation Helpers:</strong> Provides memory size validation for constructor
+/// argument checking, ensuring memory subsystems are properly sized.
+/// </para>
+/// <para>
+/// <strong>Bit Manipulation:</strong> Provides helpers for building Apple IIe-style
+/// status bytes where bit 7 indicates switch state and bits 0-6 contain keyboard latch.
+/// </para>
+/// </remarks>
 public static class Utility
 {
     /// <summary>

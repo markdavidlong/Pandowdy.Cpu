@@ -90,8 +90,37 @@ public interface ISystemStatusMutator : ISystemStatusProvider
     /// </remarks>
     void SetSlotC3Rom(bool slotC3Rom);
 
+    /// <summary>
+    /// Sets the state of the internal C800-CFFF ROM switch.
+    /// </summary>
+    /// <param name="intC8Rom">True to use internal C800 ROM; false to use slot-based extended ROM.</param>
+    /// <remarks>
+    /// <para>
+    /// Controls whether the $C800-$CFFF extended ROM space uses the internal (motherboard) ROM
+    /// or the currently banked-in slot's extended ROM. This switch is typically set automatically
+    /// when accessing slot ROM space.
+    /// </para>
+    /// <para>
+    /// <strong>Bank Selection:</strong> When false, the slot specified by <see cref="ISystemStatusProvider.StateIntC8RomSlot"/>
+    /// provides the extended ROM data. Accessing $CFFF resets this to internal ROM.
+    /// </para>
+    /// </remarks>
     void SetIntC8Rom(bool intC8Rom);
 
+    /// <summary>
+    /// Sets which slot's extended ROM is banked into $C800-$CFFF.
+    /// </summary>
+    /// <param name="slotNumber">Slot number (1-7) whose extended ROM should be active.</param>
+    /// <remarks>
+    /// <para>
+    /// When <see cref="ISystemStatusProvider.StateIntC8Rom"/> is false, this slot's extended ROM is mapped into
+    /// the $C800-$CFFF address range. Each slot can have up to 2KB of extended firmware ROM.
+    /// </para>
+    /// <para>
+    /// <strong>Automatic Selection:</strong> This value is typically set automatically when
+    /// the CPU accesses a slot's $Cx00-$CxFF ROM space - that slot becomes the active C800 bank.
+    /// </para>
+    /// </remarks>
     void SetIntC8RomSlot(byte slotNumber);
 
     
@@ -295,6 +324,24 @@ public interface ISystemStatusMutator : ISystemStatusProvider
     /// </remarks>
     void SetFlashOn(bool flashOn);
 
+    /// <summary>
+    /// Sets the current effective CPU speed in megahertz.
+    /// </summary>
+    /// <param name="mhz">The current effective CPU speed (e.g., 1.023 for stock Apple IIe speed).</param>
+    /// <remarks>
+    /// <para>
+    /// This value is updated periodically by <see cref="VA2M"/> based on actual emulation performance.
+    /// It reflects the real-time measured speed, not the target speed.
+    /// </para>
+    /// <para>
+    /// <strong>Typical Values:</strong>
+    /// <list type="bullet">
+    /// <item>~1.023 MHz: Stock Apple IIe speed (throttled mode)</item>
+    /// <item>10-15 MHz: Typical unthrottled speed on modern hardware</item>
+    /// <item>-1.0: Not yet measured (initial value)</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
     void SetCurrentMhz(double mhz);
     #endregion
 }

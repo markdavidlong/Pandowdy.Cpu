@@ -13,6 +13,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// </remarks>
 public enum SlotNumber
 {
+    /// <summary>Card is not installed in any slot (prototype or unassigned state).</summary>
     Unslotted,
     /// <summary>Expansion slot 1.</summary>
     Slot1,

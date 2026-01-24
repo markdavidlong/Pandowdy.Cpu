@@ -157,7 +157,7 @@ public class NullCard : ICard
     /// <returns>Always <c>null</c>, indicating no response.</returns>
     /// <remarks>
     /// The <c>null</c> return causes <see cref="ISlots"/> to return a floating bus value.
-    /// Even when an empty slot's extended ROM is "selected" via <see cref="ISlots.BankSelect"/>,
+    /// Even when an empty slot's extended ROM is "selected" via slot ROM access,
     /// reads return floating bus values since no physical ROM is present.
     /// </remarks>
     public byte? ReadExtendedRom(ushort _) => null;

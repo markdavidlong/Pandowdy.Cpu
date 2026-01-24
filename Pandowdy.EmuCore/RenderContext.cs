@@ -211,8 +211,8 @@ public class RenderContext(
     /// Invalidates this context, preventing further use.
     /// </summary>
     /// <remarks>
-    /// This method is called internally by <see cref="FrameGenerator.RenderFrame(RenderContext)"/> after
-    /// committing the frame buffer. Once invalidated, the context cannot be reused.
+    /// This method is called internally by the frame generator after committing the frame buffer.
+    /// Once invalidated, the context cannot be reused.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown if the context has already been invalidated.
