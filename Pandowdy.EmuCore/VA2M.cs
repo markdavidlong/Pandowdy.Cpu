@@ -621,6 +621,9 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
         {
             try { act(); } catch { Debug.WriteLine($"Exception during ProcessPending()"); }
         }
+
+        // Process telemetry resend requests with deduplication
+        ProcessPendingResendRequests();
     }
 
     /// <summary>
@@ -1338,6 +1341,150 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     {
         Enqueue(() =>  _gameController.SetButton(num,pressed));
     }
+
+    #region Telemetry Resend Request Methods
+
+    /// <summary>
+    /// Queues a request for all telemetry providers to resend their current state.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread (typically UI thread).
+    /// The request is queued and processed at the next instruction boundary on the emulator thread.
+    /// </para>
+    /// <para>
+    /// <strong>Deduplication:</strong> Multiple pending "all" requests are deduplicated - only one
+    /// request of type <see cref="ResendScope.All"/> will be processed per batch.
+    /// </para>
+    /// </remarks>
+    public void RequestTelemetryResend()
+    {
+        EnqueueResendRequest(ResendRequest.All);
+    }
+
+    /// <summary>
+    /// Queues a request for a specific telemetry provider to resend its current state.
+    /// </summary>
+    /// <param name="providerId">The numeric ID of the provider.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread (typically UI thread).
+    /// The request is queued and processed at the next instruction boundary on the emulator thread.
+    /// </para>
+    /// <para>
+    /// <strong>Deduplication:</strong> Multiple pending requests for the same provider ID are
+    /// deduplicated - only one request per provider ID will be processed per batch.
+    /// </para>
+    /// </remarks>
+    public void RequestTelemetryResendById(int providerId)
+    {
+        EnqueueResendRequest(ResendRequest.ForProvider(providerId));
+    }
+
+    /// <summary>
+    /// Queues a request for all telemetry providers of a category to resend their current state.
+    /// </summary>
+    /// <param name="category">The category name (e.g., "DiskII", "Printer").</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread (typically UI thread).
+    /// The request is queued and processed at the next instruction boundary on the emulator thread.
+    /// </para>
+    /// <para>
+    /// <strong>Deduplication:</strong> Multiple pending requests for the same category are
+    /// deduplicated - only one request per category will be processed per batch.
+    /// </para>
+    /// </remarks>
+    public void RequestTelemetryResendByCategory(string category)
+    {
+        ArgumentNullException.ThrowIfNull(category);
+        EnqueueResendRequest(ResendRequest.ForCategory(category));
+    }
+
+    /// <summary>
+    /// Queue of pending telemetry resend requests awaiting processing.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the main command queue to enable deduplication. Processed at instruction
+    /// boundaries along with other pending commands.
+    /// </remarks>
+    private readonly ConcurrentQueue<ResendRequest> _pendingResendRequests = new();
+
+    /// <summary>
+    /// Enqueues a resend request for processing on the emulator thread.
+    /// </summary>
+    /// <param name="request">The resend request to enqueue.</param>
+    private void EnqueueResendRequest(ResendRequest request)
+    {
+        _pendingResendRequests.Enqueue(request);
+    }
+
+    /// <summary>
+    /// Processes pending telemetry resend requests with deduplication.
+    /// </summary>
+    /// <remarks>
+    /// Called from <see cref="ProcessAnyPendingActions"/> at instruction boundaries.
+    /// Deduplicates requests: only one "All" request, one request per category, and
+    /// one request per provider ID will be published per processing batch.
+    /// </remarks>
+    private void ProcessPendingResendRequests()
+    {
+        if (_pendingResendRequests.IsEmpty)
+        {
+            return;
+        }
+
+        // Collect all pending requests for deduplication
+        var requests = new List<ResendRequest>();
+        while (_pendingResendRequests.TryDequeue(out var request))
+        {
+            requests.Add(request);
+        }
+
+        // Deduplicate: keep only unique requests
+        // - One "All" request covers everything, so dedupe to single All
+        // - One request per unique category
+        // - One request per unique provider ID
+        var hasAll = false;
+        var categories = new HashSet<string>();
+        var providerIds = new HashSet<int>();
+
+        foreach (var request in requests)
+        {
+            switch (request.Scope)
+            {
+                case ResendScope.All:
+                    hasAll = true;
+                    break;
+                case ResendScope.ByCategory when request.Category != null:
+                    categories.Add(request.Category);
+                    break;
+                case ResendScope.ById when request.ProviderId.HasValue:
+                    providerIds.Add(request.ProviderId.Value);
+                    break;
+            }
+        }
+
+        // If "All" was requested, publish just that (it covers everything)
+        if (hasAll)
+        {
+            _telemetryAggregator.PublishResendRequest(ResendRequest.All);
+            return;
+        }
+
+        // Otherwise, publish category and ID requests
+        foreach (var category in categories)
+        {
+            _telemetryAggregator.PublishResendRequest(ResendRequest.ForCategory(category));
+        }
+
+        foreach (var providerId in providerIds)
+        {
+            _telemetryAggregator.PublishResendRequest(ResendRequest.ForProvider(providerId));
+        }
+    }
+
+    #endregion
 
 
 

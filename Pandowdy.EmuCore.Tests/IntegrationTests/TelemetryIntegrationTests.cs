@@ -226,11 +226,18 @@ public class TelemetryIntegrationTests
         var streamType = typeof(ITelemetryStream);
         Assert.Null(streamType.GetMethod("CreateId"));
         Assert.Null(streamType.GetMethod("Publish"));
-        
-        // Verify it only has Stream property
+
+        // Verify properties are Stream and ResendRequests (read-only access)
         var properties = streamType.GetProperties();
-        Assert.Single(properties);
-        Assert.Equal("Stream", properties[0].Name);
+        Assert.Equal(2, properties.Length);
+        Assert.Contains(properties, p => p.Name == "Stream");
+        Assert.Contains(properties, p => p.Name == "ResendRequests");
+
+        // Verify no request methods on ITelemetryStream (moved to IEmulatorCoreInterface)
+        var methods = streamType.GetMethods().Where(m => !m.IsSpecialName).ToList();
+        Assert.DoesNotContain(methods, m => m.Name == "RequestResend");
+        Assert.DoesNotContain(methods, m => m.Name == "RequestResendById");
+        Assert.DoesNotContain(methods, m => m.Name == "RequestResendByCategory");
     }
 
     [Fact]
@@ -387,16 +394,219 @@ public class TelemetryIntegrationTests
             aggregator.Publish(new TelemetryMessage(driveId, "motor", false));
         });
 
-        // Assert
-        Assert.Equal(8, uiReceivedMessages.Count); // insert + motor on + 5 tracks + motor off
-        
-        // Verify sequence
-        var messages = uiReceivedMessages.ToList();
-        Assert.Equal("disk-inserted:DOS33.dsk", messages[0]);
-        Assert.Equal("motor:True", messages[1]);
-        Assert.Equal("track:0", messages[2]);
-        Assert.Equal("motor:False", messages[7]);
-    }
+                // Assert
+                Assert.Equal(8, uiReceivedMessages.Count); // insert + motor on + 5 tracks + motor off
 
-    #endregion
-}
+                // Verify sequence
+                var messages = uiReceivedMessages.ToList();
+                Assert.Equal("disk-inserted:DOS33.dsk", messages[0]);
+                Assert.Equal("motor:True", messages[1]);
+                Assert.Equal("track:0", messages[2]);
+                Assert.Equal("motor:False", messages[7]);
+            }
+
+            #endregion
+
+            #region Resend Request Integration Tests
+
+            [Fact]
+            public void Scenario_ViewModelStartup_RequestsCurrentState()
+            {
+                // Arrange - Simulate a disk drive provider
+                var aggregator = new TelemetryAggregator();
+                var driveId = aggregator.CreateId("DiskII");
+                var currentTrack = 15;
+                var motorOn = true;
+
+                // Provider listens for resend requests
+                aggregator.ResendRequests
+                    .Where(r => r.MatchesProvider(driveId))
+                    .Subscribe(_ =>
+                    {
+                        // Republish current state
+                        aggregator.Publish(new TelemetryMessage(driveId, "track", currentTrack));
+                        aggregator.Publish(new TelemetryMessage(driveId, "motor", motorOn));
+                    });
+
+                // ViewModel subscribes
+                var receivedMessages = new List<TelemetryMessage>();
+                aggregator.Stream
+                    .Where(m => m.SourceId.Id == driveId.Id)
+                    .Subscribe(m => receivedMessages.Add(m));
+
+                // Act - ViewModel requests current state on startup (through aggregator for test)
+                aggregator.PublishResendRequest(ResendRequest.ForProvider(driveId.Id));
+
+                // Assert - ViewModel received current state
+                Assert.Equal(2, receivedMessages.Count);
+                Assert.Equal(15, receivedMessages.First(m => m.MessageType == "track").Payload);
+                Assert.Equal(true, receivedMessages.First(m => m.MessageType == "motor").Payload);
+            }
+
+            [Fact]
+            public void Scenario_MultipleProviders_CategoryResendRequest()
+            {
+                // Arrange - Two disk drives
+                var aggregator = new TelemetryAggregator();
+                var drive1Id = aggregator.CreateId("DiskII");
+                var drive2Id = aggregator.CreateId("DiskII");
+                var printerId = aggregator.CreateId("Printer");
+
+                // Track which providers responded
+                var respondedProviders = new List<int>();
+
+                // Drive 1 listens
+                aggregator.ResendRequests
+                    .Where(r => r.MatchesProvider(drive1Id))
+                    .Subscribe(_ =>
+                    {
+                        respondedProviders.Add(drive1Id.Id);
+                        aggregator.Publish(new TelemetryMessage(drive1Id, "track", 5));
+                    });
+
+                // Drive 2 listens
+                aggregator.ResendRequests
+                    .Where(r => r.MatchesProvider(drive2Id))
+                    .Subscribe(_ =>
+                    {
+                        respondedProviders.Add(drive2Id.Id);
+                        aggregator.Publish(new TelemetryMessage(drive2Id, "track", 10));
+                    });
+
+                // Printer listens
+                aggregator.ResendRequests
+                    .Where(r => r.MatchesProvider(printerId))
+                    .Subscribe(_ =>
+                    {
+                        respondedProviders.Add(printerId.Id);
+                        aggregator.Publish(new TelemetryMessage(printerId, "status", "ready"));
+                    });
+
+                // Act - Request all DiskII providers to resend
+                aggregator.PublishResendRequest(ResendRequest.ForCategory("DiskII"));
+
+                // Assert - Only disk drives responded
+                Assert.Equal(2, respondedProviders.Count);
+                Assert.Contains(drive1Id.Id, respondedProviders);
+                Assert.Contains(drive2Id.Id, respondedProviders);
+                Assert.DoesNotContain(printerId.Id, respondedProviders);
+            }
+
+            [Fact]
+            public void Scenario_BroadcastResend_AllProvidersRespond()
+            {
+                // Arrange
+                var aggregator = new TelemetryAggregator();
+                var disk1 = aggregator.CreateId("DiskII");
+                var disk2 = aggregator.CreateId("DiskII");
+                var printer = aggregator.CreateId("Printer");
+
+                var respondedProviders = new System.Collections.Concurrent.ConcurrentBag<int>();
+
+                // All providers listen
+                aggregator.ResendRequests
+                    .Where(r => r.MatchesProvider(disk1))
+                    .Subscribe(_ => respondedProviders.Add(disk1.Id));
+
+                aggregator.ResendRequests
+                    .Where(r => r.MatchesProvider(disk2))
+                    .Subscribe(_ => respondedProviders.Add(disk2.Id));
+
+                aggregator.ResendRequests
+                    .Where(r => r.MatchesProvider(printer))
+                    .Subscribe(_ => respondedProviders.Add(printer.Id));
+
+                // Act - Broadcast resend request
+                aggregator.PublishResendRequest(ResendRequest.All);
+
+                // Assert - All providers responded
+                Assert.Equal(3, respondedProviders.Count);
+                Assert.Contains(disk1.Id, respondedProviders);
+                Assert.Contains(disk2.Id, respondedProviders);
+                Assert.Contains(printer.Id, respondedProviders);
+            }
+
+            [Fact]
+            public async Task Scenario_CrossThread_ResendRequest()
+            {
+                // Arrange - Provider on "emulator thread", UI requests on main thread
+                var aggregator = new TelemetryAggregator();
+                var driveId = aggregator.CreateId("DiskII");
+                var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<TelemetryMessage>();
+                var resendCompleted = new TaskCompletionSource<bool>();
+
+                // Provider on background thread
+                _ = Task.Run(() =>
+                {
+                    aggregator.ResendRequests
+                        .Where(r => r.MatchesProvider(driveId))
+                        .Subscribe(_ =>
+                        {
+                            // Simulate state publishing
+                            aggregator.Publish(new TelemetryMessage(driveId, "track", 20));
+                            aggregator.Publish(new TelemetryMessage(driveId, "motor", false));
+                            resendCompleted.TrySetResult(true);
+                        });
+                });
+
+                // Give provider time to subscribe
+                await Task.Delay(10);
+
+                // Subscribe to messages
+                aggregator.Stream
+                    .Where(m => m.SourceId.Id == driveId.Id)
+                    .Subscribe(m => receivedMessages.Add(m));
+
+                // Act - Request resend from "main thread"
+                aggregator.PublishResendRequest(ResendRequest.ForProvider(driveId.Id));
+
+                // Wait for resend to complete
+                await resendCompleted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+                // Assert
+                Assert.Equal(2, receivedMessages.Count);
+            }
+
+            [Fact]
+            public void Scenario_LateSubscriber_RequestsResendToGetCurrentState()
+            {
+                // Arrange - Provider starts publishing, then subscriber joins late
+                var aggregator = new TelemetryAggregator();
+                var driveId = aggregator.CreateId("DiskII");
+                var currentState = new { Track = 0, Motor = false };
+
+                // Provider publishes initial state and listens for resend
+                aggregator.Publish(new TelemetryMessage(driveId, "track", 0));
+                aggregator.Publish(new TelemetryMessage(driveId, "motor", false));
+
+                // Update state (late subscriber missed these)
+                currentState = new { Track = 35, Motor = true };
+                aggregator.Publish(new TelemetryMessage(driveId, "track", 35));
+                aggregator.Publish(new TelemetryMessage(driveId, "motor", true));
+
+                // Provider sets up resend handler
+                aggregator.ResendRequests
+                    .Where(r => r.MatchesProvider(driveId))
+                    .Subscribe(_ =>
+                    {
+                        aggregator.Publish(new TelemetryMessage(driveId, "track", currentState.Track));
+                        aggregator.Publish(new TelemetryMessage(driveId, "motor", currentState.Motor));
+                    });
+
+                // Late subscriber joins (missed all previous messages)
+                var lateMessages = new List<TelemetryMessage>();
+                aggregator.Stream
+                    .Where(m => m.SourceId.Id == driveId.Id)
+                    .Subscribe(m => lateMessages.Add(m));
+
+                // Act - Late subscriber requests current state
+                aggregator.PublishResendRequest(ResendRequest.ForProvider(driveId.Id));
+
+                // Assert - Late subscriber gets current state
+                Assert.Equal(2, lateMessages.Count);
+                Assert.Equal(35, lateMessages.First(m => m.MessageType == "track").Payload);
+                Assert.Equal(true, lateMessages.First(m => m.MessageType == "motor").Payload);
+            }
+
+            #endregion
+        }

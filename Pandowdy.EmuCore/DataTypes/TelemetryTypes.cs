@@ -67,9 +67,99 @@ public readonly record struct TelemetryMessage(
     /// <summary>
     /// Returns a string representation of the telemetry message.
     /// </summary>
-    /// <returns>Format: "[SourceId] MessageType: Payload".</returns>
-    public override string ToString() => 
-        Payload is null 
-            ? $"[{SourceId}] {MessageType}" 
-            : $"[{SourceId}] {MessageType}: {Payload}";
-}
+        /// <returns>Format: "[SourceId] MessageType: Payload".</returns>
+        public override string ToString() => 
+            Payload is null 
+                ? $"[{SourceId}] {MessageType}" 
+                : $"[{SourceId}] {MessageType}: {Payload}";
+    }
+
+    /// <summary>
+    /// Scope of a telemetry resend request.
+    /// </summary>
+    public enum ResendScope
+    {
+        /// <summary>Request all providers to resend their current state.</summary>
+        All,
+
+        /// <summary>Request a specific provider (by ID) to resend.</summary>
+        ById,
+
+        /// <summary>Request all providers of a category to resend.</summary>
+        ByCategory
+    }
+
+    /// <summary>
+    /// A request for telemetry providers to resend their current state.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Purpose:</strong> Allows subscribers (ViewModels) to request current state from
+    /// providers without waiting for the next state change. Useful for initialization, refresh,
+    /// or reconnection scenarios.
+    /// </para>
+    /// <para>
+    /// <strong>Provider Handling:</strong> Providers subscribe to the ResendRequests stream
+    /// and filter for requests that match their ID or category:
+    /// <code>
+    /// aggregator.ResendRequests
+    ///     .Where(r => r.MatchesProvider(_myId))
+    ///     .Subscribe(_ => PublishCurrentState());
+    /// </code>
+    /// </para>
+    /// </remarks>
+    /// <param name="Scope">The scope of the resend request (All, ById, or ByCategory).</param>
+    /// <param name="ProviderId">The specific provider ID (only valid when Scope is ById).</param>
+    /// <param name="Category">The category filter (only valid when Scope is ByCategory).</param>
+    public readonly record struct ResendRequest(
+        ResendScope Scope,
+        int? ProviderId = null,
+        string? Category = null)
+    {
+        /// <summary>
+        /// Creates a request for all providers to resend.
+        /// </summary>
+        public static ResendRequest All => new(ResendScope.All);
+
+        /// <summary>
+        /// Creates a request for a specific provider to resend.
+        /// </summary>
+        /// <param name="providerId">The numeric ID of the provider.</param>
+        public static ResendRequest ForProvider(int providerId) => 
+            new(ResendScope.ById, ProviderId: providerId);
+
+        /// <summary>
+        /// Creates a request for all providers of a category to resend.
+        /// </summary>
+        /// <param name="category">The category name (e.g., "DiskII").</param>
+        /// <exception cref="ArgumentNullException">Thrown when category is null.</exception>
+        public static ResendRequest ForCategory(string category)
+        {
+            ArgumentNullException.ThrowIfNull(category);
+            return new(ResendScope.ByCategory, Category: category);
+        }
+
+        /// <summary>
+        /// Determines if this resend request applies to the specified provider.
+        /// </summary>
+        /// <param name="telemetryId">The provider's telemetry ID.</param>
+        /// <returns>True if the provider should respond to this request.</returns>
+        public bool MatchesProvider(TelemetryId telemetryId) => Scope switch
+        {
+            ResendScope.All => true,
+            ResendScope.ById => ProviderId == telemetryId.Id,
+            ResendScope.ByCategory => Category == telemetryId.Category,
+            _ => false
+        };
+
+        /// <summary>
+        /// Returns a string representation of the resend request.
+        /// </summary>
+        public override string ToString() => Scope switch
+        {
+            ResendScope.All => "ResendRequest[All]",
+            ResendScope.ById => $"ResendRequest[Id={ProviderId}]",
+            ResendScope.ByCategory => $"ResendRequest[Category={Category}]",
+            _ => "ResendRequest[Unknown]"
+        };
+    }

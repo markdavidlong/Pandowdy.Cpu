@@ -367,21 +367,226 @@ public class TelemetryAggregatorTests
             .Where(m => m.SourceId.Id == driveId.Id)
             .Subscribe(m => events.Add($"{m.MessageType}:{m.Payload}"));
 
-        // Act - Simulate disk insertion and reading
-        aggregator.Publish(new TelemetryMessage(driveId, "disk-inserted", "DOS33.dsk"));
-        aggregator.Publish(new TelemetryMessage(driveId, "motor", true));
-        aggregator.Publish(new TelemetryMessage(driveId, "track", 0));
-        aggregator.Publish(new TelemetryMessage(driveId, "track", 1));
-        aggregator.Publish(new TelemetryMessage(driveId, "track", 2));
-        aggregator.Publish(new TelemetryMessage(driveId, "motor", false));
+                // Act - Simulate disk insertion and reading
+                aggregator.Publish(new TelemetryMessage(driveId, "disk-inserted", "DOS33.dsk"));
+                aggregator.Publish(new TelemetryMessage(driveId, "motor", true));
+                aggregator.Publish(new TelemetryMessage(driveId, "track", 0));
+                aggregator.Publish(new TelemetryMessage(driveId, "track", 1));
+                aggregator.Publish(new TelemetryMessage(driveId, "track", 2));
+                aggregator.Publish(new TelemetryMessage(driveId, "motor", false));
 
-        // Assert
-        Assert.Equal(6, events.Count);
-                        Assert.Equal("disk-inserted:DOS33.dsk", events[0]);
-                        Assert.Equal("motor:True", events[1]);
-                        Assert.Equal("track:0", events[2]);
-                                Assert.Equal("motor:False", events[5]);
-                            }
+                // Assert
+                Assert.Equal(6, events.Count);
+                Assert.Equal("disk-inserted:DOS33.dsk", events[0]);
+                Assert.Equal("motor:True", events[1]);
+                Assert.Equal("track:0", events[2]);
+                Assert.Equal("motor:False", events[5]);
+            }
 
-                            #endregion
-                        }
+            #endregion
+
+            #region ResendRequest Data Type Tests
+
+            [Fact]
+            public void ResendRequest_All_CreatesCorrectRequest()
+            {
+                // Act
+                var request = ResendRequest.All;
+
+                // Assert
+                Assert.Equal(ResendScope.All, request.Scope);
+                Assert.Null(request.ProviderId);
+                Assert.Null(request.Category);
+            }
+
+            [Fact]
+            public void ResendRequest_ForProvider_CreatesCorrectRequest()
+            {
+                // Act
+                var request = ResendRequest.ForProvider(42);
+
+                // Assert
+                Assert.Equal(ResendScope.ById, request.Scope);
+                Assert.Equal(42, request.ProviderId);
+                Assert.Null(request.Category);
+            }
+
+            [Fact]
+            public void ResendRequest_ForCategory_CreatesCorrectRequest()
+            {
+                // Act
+                var request = ResendRequest.ForCategory("DiskII");
+
+                // Assert
+                Assert.Equal(ResendScope.ByCategory, request.Scope);
+                Assert.Null(request.ProviderId);
+                Assert.Equal("DiskII", request.Category);
+            }
+
+            [Fact]
+            public void ResendRequest_MatchesProvider_All_MatchesEverything()
+            {
+                // Arrange
+                var request = ResendRequest.All;
+                var disk1 = new TelemetryId(1, "DiskII");
+                var disk2 = new TelemetryId(2, "DiskII");
+                var printer = new TelemetryId(3, "Printer");
+
+                // Assert
+                Assert.True(request.MatchesProvider(disk1));
+                Assert.True(request.MatchesProvider(disk2));
+                Assert.True(request.MatchesProvider(printer));
+            }
+
+            [Fact]
+            public void ResendRequest_MatchesProvider_ById_MatchesOnlySpecificId()
+            {
+                // Arrange
+                var request = ResendRequest.ForProvider(2);
+                var disk1 = new TelemetryId(1, "DiskII");
+                var disk2 = new TelemetryId(2, "DiskII");
+                var printer = new TelemetryId(3, "Printer");
+
+                // Assert
+                Assert.False(request.MatchesProvider(disk1));
+                Assert.True(request.MatchesProvider(disk2));
+                Assert.False(request.MatchesProvider(printer));
+            }
+
+            [Fact]
+            public void ResendRequest_MatchesProvider_ByCategory_MatchesAllInCategory()
+            {
+                // Arrange
+                var request = ResendRequest.ForCategory("DiskII");
+                var disk1 = new TelemetryId(1, "DiskII");
+                var disk2 = new TelemetryId(2, "DiskII");
+                var printer = new TelemetryId(3, "Printer");
+
+                // Assert
+                Assert.True(request.MatchesProvider(disk1));
+                Assert.True(request.MatchesProvider(disk2));
+                Assert.False(request.MatchesProvider(printer));
+            }
+
+            [Fact]
+            public void ResendRequest_ToString_FormatsCorrectly()
+            {
+                // Assert
+                Assert.Equal("ResendRequest[All]", ResendRequest.All.ToString());
+                Assert.Equal("ResendRequest[Id=42]", ResendRequest.ForProvider(42).ToString());
+                Assert.Equal("ResendRequest[Category=DiskII]", ResendRequest.ForCategory("DiskII").ToString());
+            }
+
+            #endregion
+
+            #region Resend Request Method Tests
+
+            [Fact]
+            public void PublishResendRequest_All_PublishesToResendRequestsStream()
+            {
+                // Arrange
+                var aggregator = new TelemetryAggregator();
+                ResendRequest? received = null;
+                aggregator.ResendRequests.Subscribe(r => received = r);
+
+                // Act
+                aggregator.PublishResendRequest(ResendRequest.All);
+
+                // Assert
+                Assert.NotNull(received);
+                Assert.Equal(ResendScope.All, received.Value.Scope);
+            }
+
+            [Fact]
+            public void PublishResendRequest_ById_PublishesToResendRequestsStream()
+            {
+                // Arrange
+                var aggregator = new TelemetryAggregator();
+                ResendRequest? received = null;
+                aggregator.ResendRequests.Subscribe(r => received = r);
+
+                // Act
+                aggregator.PublishResendRequest(ResendRequest.ForProvider(42));
+
+                // Assert
+                Assert.NotNull(received);
+                Assert.Equal(ResendScope.ById, received.Value.Scope);
+                Assert.Equal(42, received.Value.ProviderId);
+            }
+
+            [Fact]
+            public void PublishResendRequest_ByCategory_PublishesToResendRequestsStream()
+            {
+                // Arrange
+                var aggregator = new TelemetryAggregator();
+                ResendRequest? received = null;
+                aggregator.ResendRequests.Subscribe(r => received = r);
+
+                // Act
+                aggregator.PublishResendRequest(ResendRequest.ForCategory("DiskII"));
+
+                // Assert
+                Assert.NotNull(received);
+                Assert.Equal(ResendScope.ByCategory, received.Value.Scope);
+                Assert.Equal("DiskII", received.Value.Category);
+            }
+
+            [Fact]
+            public void ForCategory_NullCategory_ThrowsArgumentNullException()
+            {
+                // Act & Assert
+                Assert.Throws<ArgumentNullException>(() => ResendRequest.ForCategory(null!));
+            }
+
+            [Fact]
+            public void PublishResendRequest_MultipleRequests_AllDelivered()
+            {
+                // Arrange
+                var aggregator = new TelemetryAggregator();
+                var received = new List<ResendRequest>();
+                aggregator.ResendRequests.Subscribe(r => received.Add(r));
+
+                // Act
+                aggregator.PublishResendRequest(ResendRequest.All);
+                aggregator.PublishResendRequest(ResendRequest.ForProvider(1));
+                aggregator.PublishResendRequest(ResendRequest.ForCategory("DiskII"));
+
+                // Assert
+                Assert.Equal(3, received.Count);
+                Assert.Equal(ResendScope.All, received[0].Scope);
+                Assert.Equal(ResendScope.ById, received[1].Scope);
+                Assert.Equal(ResendScope.ByCategory, received[2].Scope);
+            }
+
+            [Fact]
+            public void PublishResendRequest_ProviderCanFilter()
+            {
+                // Arrange
+                var aggregator = new TelemetryAggregator();
+                var diskId = aggregator.CreateId("DiskII");
+                var printerId = aggregator.CreateId("Printer");
+
+                var diskResendCount = 0;
+                var printerResendCount = 0;
+
+                // Simulate provider subscriptions
+                aggregator.ResendRequests
+                    .Where(r => r.MatchesProvider(diskId))
+                    .Subscribe(_ => diskResendCount++);
+
+                aggregator.ResendRequests
+                    .Where(r => r.MatchesProvider(printerId))
+                    .Subscribe(_ => printerResendCount++);
+
+                // Act
+                aggregator.PublishResendRequest(ResendRequest.All);              // Both should respond
+                aggregator.PublishResendRequest(ResendRequest.ForCategory("DiskII")); // Only disk should respond
+                aggregator.PublishResendRequest(ResendRequest.ForProvider(printerId.Id));   // Only printer should respond
+
+                // Assert
+                Assert.Equal(2, diskResendCount);    // All + ByCategory
+                Assert.Equal(2, printerResendCount); // All + ById
+            }
+
+            #endregion
+        }

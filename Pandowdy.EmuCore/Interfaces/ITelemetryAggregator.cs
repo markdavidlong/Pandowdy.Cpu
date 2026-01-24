@@ -23,6 +23,13 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// callbacks to the UI thread before updating bound properties.
 /// </para>
 /// <para>
+/// <strong>Resend Requests:</strong> To request providers to resend their current state,
+/// use the request methods on <see cref="IEmulatorCoreInterface"/> (RequestTelemetryResend,
+/// RequestTelemetryResendById, RequestTelemetryResendByCategory). These are routed through
+/// the emulator's command queue for thread-safe execution. Providers listen to
+/// <see cref="ResendRequests"/> and republish their current state when a matching request arrives.
+/// </para>
+/// <para>
 /// <strong>Usage Pattern:</strong>
 /// <code>
 /// // In a ViewModel:
@@ -30,6 +37,9 @@ namespace Pandowdy.EmuCore.Interfaces;
 ///     .Where(m => m.SourceId.Category == "DiskII")
 ///     .ObserveOn(RxApp.MainThreadScheduler)
 ///     .Subscribe(HandleDiskTelemetry);
+/// 
+/// // Request current state on startup (through seam interface, queued)
+/// machine.RequestTelemetryResendByCategory("DiskII");
 /// </code>
 /// </para>
 /// </remarks>
@@ -61,6 +71,31 @@ public interface ITelemetryStream
     /// </para>
     /// </remarks>
     IObservable<TelemetryMessage> Stream { get; }
+
+    /// <summary>
+    /// Gets the observable stream of resend requests.
+    /// </summary>
+    /// <value>
+    /// An <see cref="IObservable{ResendRequest}"/> that emits when resend requests are processed.
+    /// </value>
+    /// <remarks>
+    /// <para>
+    /// Providers subscribe to this stream to respond to resend requests. Use the
+    /// <see cref="ResendRequest.MatchesProvider"/> method to filter for relevant requests:
+    /// </para>
+    /// <code>
+    /// aggregator.ResendRequests
+    ///     .Where(r => r.MatchesProvider(_myId))
+    ///     .Subscribe(_ => PublishCurrentState());
+    /// </code>
+    /// <para>
+    /// <strong>Threading:</strong> Resend requests are processed on the emulator thread
+    /// after being queued through <see cref="IEmulatorCoreInterface"/>. This ensures
+    /// providers receive requests in a thread-safe manner consistent with other
+    /// emulator operations.
+    /// </para>
+    /// </remarks>
+    IObservable<ResendRequest> ResendRequests { get; }
 }
 
 /// <summary>
@@ -131,21 +166,36 @@ public interface ITelemetryAggregator : ITelemetryStream
     /// </remarks>
     TelemetryId CreateId(string category);
     
-    /// <summary>
-    /// Publishes a telemetry message to all subscribers.
-    /// </summary>
-    /// <param name="message">The telemetry message to publish.</param>
-    /// <remarks>
-    /// <para>
-    /// Messages are delivered to all subscribers of <see cref="Stream"/> synchronously
-    /// on the calling thread. For high-frequency messages, consider throttling or
-    /// sampling on the subscriber side.
-    /// </para>
-    /// <para>
-    /// This method is thread-safe and may be called from any thread.
+        /// <summary>
+        /// Publishes a telemetry message to all subscribers.
+        /// </summary>
+        /// <param name="message">The telemetry message to publish.</param>
+        /// <remarks>
+        /// <para>
+        /// Messages are delivered to all subscribers of <see cref="ITelemetryStream.Stream"/> synchronously
+        /// on the calling thread. For high-frequency messages, consider throttling or
+        /// sampling on the subscriber side.
+        /// </para>
+        /// <para>
+        /// This method is thread-safe and may be called from any thread.
         /// </para>
         /// </remarks>
         void Publish(TelemetryMessage message);
 
-        // Stream property is inherited from ITelemetryStream
+        /// <summary>
+        /// Publishes a resend request to all providers.
+        /// </summary>
+        /// <param name="request">The resend request to publish.</param>
+        /// <remarks>
+        /// <para>
+        /// <strong>Internal Use:</strong> This method is called by VA2M after processing
+        /// queued resend requests from <see cref="IEmulatorCoreInterface"/>. External callers
+        /// should use the request methods on IEmulatorCoreInterface instead.
+        /// </para>
+        /// <para>
+        /// Requests are delivered to all subscribers of <see cref="ITelemetryStream.ResendRequests"/>.
+        /// Providers filter for matching requests using <see cref="ResendRequest.MatchesProvider"/>.
+        /// </para>
+        /// </remarks>
+        void PublishResendRequest(ResendRequest request);
     }

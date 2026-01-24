@@ -275,8 +275,69 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
             /// <strong>Use Cases:</strong> Display drive activity indicators (motor on, track number), show disk
             /// insertion/ejection notifications, monitor peripheral status, implement diagnostic views.
             /// </para>
-            /// </remarks>
-            ITelemetryStream Telemetry { get; }
+                /// </remarks>
+                ITelemetryStream Telemetry { get; }
 
-            #endregion
-        }
+                #endregion
+
+                #region Telemetry Resend Requests (Thread-Safe Queueing)
+
+                /// <summary>
+                /// Queues a request for all telemetry providers to resend their current state.
+                /// </summary>
+                /// <remarks>
+                /// <para>
+                /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread (typically UI thread).
+                /// The request is queued and processed at the next instruction boundary on the emulator thread,
+                /// consistent with other cross-thread operations (keyboard, pushbuttons).
+                /// </para>
+                /// <para>
+                /// <strong>Deduplication:</strong> Multiple pending requests of the same type may be deduplicated
+                /// before processing to reduce unnecessary traffic.
+                /// </para>
+                /// <para>
+                /// <strong>Use sparingly:</strong> Broadcast requests generate traffic from all providers.
+                /// Prefer <see cref="RequestTelemetryResendByCategory"/> or <see cref="RequestTelemetryResendById"/>
+                /// when you only need state from specific providers.
+                /// </para>
+                /// </remarks>
+                void RequestTelemetryResend();
+
+                /// <summary>
+                /// Queues a request for a specific telemetry provider to resend its current state.
+                /// </summary>
+                /// <param name="providerId">The numeric ID of the provider.</param>
+                /// <remarks>
+                /// <para>
+                /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread (typically UI thread).
+                /// The request is queued and processed at the next instruction boundary on the emulator thread.
+                /// </para>
+                /// <para>
+                /// <strong>Deduplication:</strong> Multiple pending requests for the same provider ID may be
+                /// deduplicated before processing.
+                /// </para>
+                /// </remarks>
+                void RequestTelemetryResendById(int providerId);
+
+                /// <summary>
+                /// Queues a request for all telemetry providers of a category to resend their current state.
+                /// </summary>
+                /// <param name="category">The category name (e.g., "DiskII", "Printer").</param>
+                /// <remarks>
+                /// <para>
+                /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread (typically UI thread).
+                /// The request is queued and processed at the next instruction boundary on the emulator thread.
+                /// </para>
+                /// <para>
+                /// <strong>Deduplication:</strong> Multiple pending requests for the same category may be
+                /// deduplicated before processing.
+                /// </para>
+                /// <para>
+                /// <strong>Use Case:</strong> Ideal for ViewModel initialization - request all disk drive states
+                /// without knowing specific provider IDs.
+                /// </para>
+                /// </remarks>
+                void RequestTelemetryResendByCategory(string category);
+
+                #endregion
+            }
