@@ -217,7 +217,7 @@ public sealed class SoftSwitches
     /// switches set to their default states.
     /// </summary>
     /// <remarks>
-    /// All switches are initialized to false (off) except INTCXROM which defaults to true.
+    /// All switches are initialized to false (off).
     /// This matches the Apple IIe power-on state where internal ROMs are enabled by default.
     /// </remarks>
     public SoftSwitches(SystemStatusProvider status)
@@ -272,7 +272,7 @@ public sealed class SoftSwitches
         // Reset all switches to false, except INTCXROM which defaults to true
         for (int i = 0; i < _switchValues.Length; i++)
         {
-            bool defaultValue = (i == (int)SoftSwitchId.IntCxRom);
+            bool defaultValue = false;  // (i == (int)SoftSwitchId.IntCxRom);
             _switchValues[i] = defaultValue;
             SetStatus((SoftSwitchId)i, defaultValue);
         }
