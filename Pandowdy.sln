@@ -48,8 +48,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docs", "Docs", "{BABE080F-8A88-4BFC-8A17-ABDDA536D783}"
 	ProjectSection(SolutionItems) = preProject
 		Debugger Notes.md = Debugger Notes.md
-		docs\DiskII-Integration-Plan.md = docs\DiskII-Integration-Plan.md
-		Project Outline.md = Project Outline.md
+		docs\Development-Roadmap.md = docs\Development-Roadmap.md
 		docs\RenderRefactor.md = docs\RenderRefactor.md
 	EndProjectSection
 EndProject
