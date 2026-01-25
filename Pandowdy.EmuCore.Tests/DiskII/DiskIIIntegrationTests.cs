@@ -327,7 +327,7 @@ public class DiskIIIntegrationTests
 
 
     [Fact]
-    public void PhaseControl_SequentialPhases_StepHeadAndReturn()
+    public void PhaseControl_OverlappingPhases_StepsSymmetrically()
     {
         var controller = CreateController();
         InstallController(controller);
@@ -337,37 +337,31 @@ public class DiskIIIntegrationTests
 
         int initialQuarterTrack = controller.Drives[0].QuarterTrack;
 
-        // Sanity check: ensure there's room to move in either direction
-        // Drive starts at track 17 (quarter track 68) - arbitrary middle position
-        Assert.True(initialQuarterTrack > 0, "Initial quarter track should allow stepping to lower tracks");
-        Assert.True(initialQuarterTrack < DiskIIConstants.MaxQuarterTracks, "Initial quarter track should allow stepping to higher tracks");
+        // The drive starts at quarterTrack 68, which is position 68 & 7 = 4 (S)
+        // Phase 2 alone maps to position 4 in MagnetToPosition.
+        // We must sync the phase state to match the head position before stepping.
+        controller.ReadIO(0x05); // Phase 2 on → _currentPhase = 4, pos = 4
 
-        // Step 1: Activate phases in sequence to step outward (toward higher tracks)
-        // Phase sequence: 0 -> 1 -> 2 -> 3 moves head outward
-        controller.ReadIO(0x01); // Phase 0 on
-        controller.ReadIO(0x00); // Phase 0 off
-        controller.ReadIO(0x03); // Phase 1 on
-        controller.ReadIO(0x02); // Phase 1 off
-        controller.ReadIO(0x05); // Phase 2 on
-        controller.ReadIO(0x04); // Phase 2 off
-        controller.ReadIO(0x07); // Phase 3 on
+        // Step forward 4 quarter-tracks using overlapping phases:
+        // Position sequence: 4 → 5 → 6 → 7 → 0
+        controller.ReadIO(0x07); // Phase 3 on (2+3 = pos 5) → +1
+        controller.ReadIO(0x04); // Phase 2 off (3 only = pos 6) → +1
+        controller.ReadIO(0x01); // Phase 0 on (3+0 = pos 7) → +1
+        controller.ReadIO(0x06); // Phase 3 off (0 only = pos 0) → +1
 
-        // Verify head moved from initial position
         int afterForwardQuarterTrack = controller.Drives[0].QuarterTrack;
-        Assert.True(afterForwardQuarterTrack >= 0 && afterForwardQuarterTrack <= DiskIIConstants.MaxQuarterTracks);
-        Assert.NotEqual(initialQuarterTrack, afterForwardQuarterTrack);
+        Assert.Equal(initialQuarterTrack + 4, afterForwardQuarterTrack);
 
-        // Step 2: Reverse the phase sequence to step back (toward lower tracks)
-        // Phase sequence: 3 -> 2 -> 1 -> 0 moves head inward
-        controller.ReadIO(0x06); // Phase 3 off
-        controller.ReadIO(0x05); // Phase 2 on
-        controller.ReadIO(0x04); // Phase 2 off
-        controller.ReadIO(0x03); // Phase 1 on
-        controller.ReadIO(0x02); // Phase 1 off
-        controller.ReadIO(0x01); // Phase 0 on
+        // Step backward 4 quarter-tracks using reverse overlapping sequence:
+        // Position sequence: 0 → 7 → 6 → 5 → 4
+        controller.ReadIO(0x07); // Phase 3 on (0+3 = pos 7) → -1
+        controller.ReadIO(0x00); // Phase 0 off (3 only = pos 6) → -1
+        controller.ReadIO(0x05); // Phase 2 on (3+2 = pos 5) → -1
+        controller.ReadIO(0x06); // Phase 3 off (2 only = pos 4) → -1
 
-        // Verify head returned to original position
         int finalQuarterTrack = controller.Drives[0].QuarterTrack;
+
+        // With proper overlapping phases and synced starting position, head returns to start
         Assert.Equal(initialQuarterTrack, finalQuarterTrack);
     }
 

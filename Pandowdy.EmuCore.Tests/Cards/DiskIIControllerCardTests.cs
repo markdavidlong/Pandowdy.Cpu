@@ -900,103 +900,106 @@ public class DiskIIControllerCardTests
             Assert.True(initialQuarterTrack > 0, "Initial quarter track should allow stepping to lower tracks");
             Assert.True(initialQuarterTrack < DiskIIConstants.MaxQuarterTracks, "Initial quarter track should allow stepping to higher tracks");
 
-            // Step outward (toward higher tracks) using phase sequence: 0 -> 1 -> 2 -> 3
-            card.ReadIO(0x01); // Phase 0 on
-            card.ReadIO(0x00); // Phase 0 off
-            card.ReadIO(0x03); // Phase 1 on
-            card.ReadIO(0x02); // Phase 1 off
-            card.ReadIO(0x05); // Phase 2 on
-            card.ReadIO(0x04); // Phase 2 off
-            card.ReadIO(0x07); // Phase 3 on
+            // Sync phase state to head position (quarterTrack 68 = position 4, which is Phase 2)
+            card.ReadIO(0x05); // Phase 2 on → _currentPhase = 4, pos = 4
+
+            // Step forward using proper overlapping phases (add next phase, then remove previous)
+            // Position sequence: 4 → 5 → 6 → 7 → 0
+            card.ReadIO(0x07); // Phase 3 on (2+3 = pos 5) → +1
+            card.ReadIO(0x04); // Phase 2 off (3 only = pos 6) → +1
+            card.ReadIO(0x01); // Phase 0 on (3+0 = pos 7) → +1
+            card.ReadIO(0x06); // Phase 3 off (0 only = pos 0) → +1
 
             // Verify head moved from initial position
             int afterForwardQuarterTrack = card.Drives[0].QuarterTrack;
             Assert.True(afterForwardQuarterTrack >= 0 && afterForwardQuarterTrack <= DiskIIConstants.MaxQuarterTracks,
                 "Quarter track should be in valid range");
-            Assert.NotEqual(initialQuarterTrack, afterForwardQuarterTrack);
+            Assert.Equal(initialQuarterTrack + 4, afterForwardQuarterTrack);
 
-            // Step inward (reverse phase sequence) - phases: 3 -> 2 -> 1 -> 0
-            card.ReadIO(0x06); // Phase 3 off
-            card.ReadIO(0x05); // Phase 2 on
-            card.ReadIO(0x04); // Phase 2 off
-            card.ReadIO(0x03); // Phase 1 on
-            card.ReadIO(0x02); // Phase 1 off
-            card.ReadIO(0x01); // Phase 0 on
+            // Step backward using reverse overlapping phases
+            // Position sequence: 0 → 7 → 6 → 5 → 4
+            card.ReadIO(0x07); // Phase 3 on (0+3 = pos 7) → -1
+            card.ReadIO(0x00); // Phase 0 off (3 only = pos 6) → -1
+            card.ReadIO(0x05); // Phase 2 on (3+2 = pos 5) → -1
+            card.ReadIO(0x06); // Phase 3 off (2 only = pos 4) → -1
 
-            // Verify head moved in the opposite direction
+            // Verify head returned to initial position
             int afterBackwardQuarterTrack = card.Drives[0].QuarterTrack;
-            Assert.NotEqual(afterForwardQuarterTrack, afterBackwardQuarterTrack);
+            Assert.Equal(initialQuarterTrack, afterBackwardQuarterTrack);
         }
 
-                [Fact]
-                public void PhaseControl_AtTrack0_CannotStepLower()
-                {
-                    var card = CreateCard();
-                    card.OnInstalled(SlotNumber.Slot6);
+        [Fact]
+        public void PhaseControl_AtTrack0_CannotStepLower()
+        {
+            var card = CreateCard();
+            card.OnInstalled(SlotNumber.Slot6);
 
-                    // Set drive to track 0
-                    var mockDrive = (MockDiskIIDrive)card.Drives[0];
-                    mockDrive.SetQuarterTrack(0);
+            // Set drive to track 0 (position 0 & 7 = 0)
+            var mockDrive = (MockDiskIIDrive)card.Drives[0];
+            mockDrive.SetQuarterTrack(0);
 
-                    // Turn motor on
-                    card.ReadIO(0x09);
+            // Turn motor on
+            card.ReadIO(0x09);
 
-                    // Try to step toward lower tracks (phase sequence: 3 -> 2 -> 1 -> 0)
-                    card.ReadIO(0x07); // Phase 3 on
-                    card.ReadIO(0x06); // Phase 3 off
-                    card.ReadIO(0x05); // Phase 2 on
-                    card.ReadIO(0x04); // Phase 2 off
-                    card.ReadIO(0x03); // Phase 1 on
-                    card.ReadIO(0x02); // Phase 1 off
-                    card.ReadIO(0x01); // Phase 0 on
+            // Sync phase to position 0 (Phase 0)
+            card.ReadIO(0x01); // Phase 0 on
 
-                    // Quarter track should still be 0 (clamped)
-                    Assert.Equal(0, card.Drives[0].QuarterTrack);
-                }
+            // Try to step toward lower tracks using overlapping phases (backward sequence)
+            card.ReadIO(0x07); // Phase 3 on (0+3 = pos 7) → would be -1
+            card.ReadIO(0x00); // Phase 0 off (3 only = pos 6) → would be -1
+            card.ReadIO(0x05); // Phase 2 on (3+2 = pos 5) → would be -1
+            card.ReadIO(0x06); // Phase 3 off (2 only = pos 4) → would be -1
 
-                [Fact]
-                public void PhaseControl_AtMaxTrack_CannotStepHigher()
-                {
-                    var card = CreateCard();
-                    card.OnInstalled(SlotNumber.Slot6);
+            // Quarter track should still be 0 (clamped at boundary)
+            Assert.Equal(0, card.Drives[0].QuarterTrack);
+        }
 
-                    // Set drive to max track
-                    var mockDrive = (MockDiskIIDrive)card.Drives[0];
-                    mockDrive.SetQuarterTrack(DiskIIConstants.MaxQuarterTracks);
+        [Fact]
+        public void PhaseControl_AtMaxTrack_CannotStepHigher()
+        {
+            var card = CreateCard();
+            card.OnInstalled(SlotNumber.Slot6);
 
-                    // Turn motor on
-                    card.ReadIO(0x09);
+            // Set drive to max track (position = MaxQuarterTracks & 7)
+            var mockDrive = (MockDiskIIDrive)card.Drives[0];
+            mockDrive.SetQuarterTrack(DiskIIConstants.MaxQuarterTracks);
 
-                    // Try to step toward higher tracks (phase sequence: 0 -> 1 -> 2 -> 3)
-                    card.ReadIO(0x01); // Phase 0 on
-                    card.ReadIO(0x00); // Phase 0 off
-                    card.ReadIO(0x03); // Phase 1 on
-                    card.ReadIO(0x02); // Phase 1 off
-                    card.ReadIO(0x05); // Phase 2 on
-                    card.ReadIO(0x04); // Phase 2 off
-                    card.ReadIO(0x07); // Phase 3 on
+            // Turn motor on
+            card.ReadIO(0x09);
 
-                    // Quarter track should still be at max (clamped)
-                    Assert.Equal(DiskIIConstants.MaxQuarterTracks, card.Drives[0].QuarterTrack);
-                }
+            // Sync phase to current position (MaxQuarterTracks & 7)
+            // MaxQuarterTracks = 139, 139 & 7 = 3, which is phases 0+1 (pos 1) or phase 1+2 (pos 3)
+            // Position 3 = phases 1+2 = _currentPhase = 6
+            card.ReadIO(0x03); // Phase 1 on
+            card.ReadIO(0x05); // Phase 2 on (1+2 = pos 3)
 
-                [Fact]
-                public void PhaseControl_MotorOff_DoesNotMoveHead()
-                {
-                    var card = CreateCard();
-                    card.OnInstalled(SlotNumber.Slot6);
+            // Try to step toward higher tracks using overlapping phases (forward sequence)
+            card.ReadIO(0x02); // Phase 1 off (2 only = pos 4) → would be +1
+            card.ReadIO(0x07); // Phase 3 on (2+3 = pos 5) → would be +1
+            card.ReadIO(0x04); // Phase 2 off (3 only = pos 6) → would be +1
+            card.ReadIO(0x01); // Phase 0 on (3+0 = pos 7) → would be +1
 
-                    int initialQuarterTrack = card.Drives[0].QuarterTrack;
+            // Quarter track should still be at max (clamped at boundary)
+            Assert.Equal(DiskIIConstants.MaxQuarterTracks, card.Drives[0].QuarterTrack);
+        }
 
-                    // Motor is OFF - phases should not move head
-                    card.ReadIO(0x01); // Phase 0 on
-                    card.ReadIO(0x03); // Phase 1 on
-                    card.ReadIO(0x05); // Phase 2 on
-                    card.ReadIO(0x07); // Phase 3 on
+        [Fact]
+        public void PhaseControl_MotorOff_DoesNotMoveHead()
+        {
+            var card = CreateCard();
+            card.OnInstalled(SlotNumber.Slot6);
 
-                    // Head should not have moved
-                    Assert.Equal(initialQuarterTrack, card.Drives[0].QuarterTrack);
-                }
+            int initialQuarterTrack = card.Drives[0].QuarterTrack;
+
+            // Motor is OFF - phases should not move head even with overlapping sequence
+            card.ReadIO(0x05); // Phase 2 on (sync to position 4)
+            card.ReadIO(0x07); // Phase 3 on (2+3 = pos 5)
+            card.ReadIO(0x04); // Phase 2 off (3 only = pos 6)
+            card.ReadIO(0x01); // Phase 0 on (3+0 = pos 7)
+
+            // Head should not have moved because motor is off
+            Assert.Equal(initialQuarterTrack, card.Drives[0].QuarterTrack);
+        }
 
                 #endregion
 
