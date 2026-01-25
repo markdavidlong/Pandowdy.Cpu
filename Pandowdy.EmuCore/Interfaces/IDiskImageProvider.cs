@@ -18,7 +18,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// </list>
 /// </para>
 /// </remarks>
-public interface IDiskImageProvider
+public interface IDiskImageProvider : IDisposable
 {
     /// <summary>
     /// Gets the file path of the disk image.

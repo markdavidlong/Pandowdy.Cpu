@@ -35,7 +35,7 @@ This document provides a comprehensive plan for integrating the Disk II emulatio
 4. [Target File Structure](#target-file-structure)
 5. [Phase 1: Foundation](#phase-1-foundation) ✅ COMPLETED
 6. [Phase 2: Interfaces](#phase-2-interfaces) ✅ COMPLETED
-7. [Phase 3: Disk Image Providers](#phase-3-disk-image-providers)
+7. [Phase 3: Disk Image Providers](#phase-3-disk-image-providers) ✅ COMPLETED
 8. [Phase 4: Drive Implementation](#phase-4-drive-implementation)
 9. [Phase 5: Controller Card](#phase-5-controller-card)
 10. [Phase 6: Factory Registration](#phase-6-factory-registration)
@@ -500,11 +500,14 @@ All interfaces compile correctly.
 
 ---
 
-## Phase 3: Disk Image Providers
+## Phase 3: Disk Image Providers ✅ COMPLETED
 
-**Goal:** Add disk format providers and supporting classes.
+**Goal:** Add disk format providers and supporting classes with tests.
 
-### Step 3.1: Create DiskII folder and GcrEncoder
+> **Testing Strategy:** Tests are created alongside each implementation step (not deferred to Phase 7).
+> This enables regression detection during iterative development.
+
+### Step 3.1: Create GcrEncoder ✅ COMPLETED
 
 **Target:** `Pandowdy.EmuCore\DiskII\GcrEncoder.cs`
 
@@ -512,60 +515,119 @@ All interfaces compile correctly.
 
 **Changes:**
 - Update namespace to `Pandowdy.EmuCore.DiskII`
+- Fix code style (braces, indentation)
+- Use collection expression syntax for static array
 
-### Step 3.2: Create Providers subfolder
+**Tests:** `Pandowdy.EmuCore.Tests\DiskII\GcrEncoderTests.cs` (15 tests)
+- Address field encoding produces valid prologue/epilogue
+- Data field 6&2 encoding produces 342 bytes from 256
+- Sync gaps write correct byte values
+- Checksum calculation is correct
+- Offset handling works correctly
 
-Create directory: `Pandowdy.EmuCore\DiskII\Providers\`
+### Step 3.2: Create Providers subfolder structure ✅ COMPLETED
 
-### Step 3.3: Copy DiskImageFactory
+Directories created:
+- `Pandowdy.EmuCore\DiskII\Providers\`
+- `Pandowdy.EmuCore.Tests\DiskII\`
+- `Pandowdy.EmuCore.Tests\DiskII\Providers\`
+
+### Step 3.3: Copy DiskImageFactory ✅ COMPLETED (implementation)
 
 **Source:** `Pandowdy.DiskImportCode\DiskImageFactory.cs`  
 **Target:** `Pandowdy.EmuCore\DiskII\Providers\DiskImageFactory.cs`
 
 **Changes:**
 - Update namespace to `Pandowdy.EmuCore.DiskII.Providers`
-- Add `using Pandowdy.EmuCore.Interfaces;`
+- Fix indentation on `IsFormatSupported` method
 
-### Step 3.4: Copy NibDiskImageProvider
+**Tests:** `Pandowdy.EmuCore.Tests\DiskII\Providers\DiskImageFactoryTests.cs` (25 tests) ✅
+- Returns correct provider type for each extension (.nib, .woz, .dsk, .do, .po, .2mg)
+- Throws FileNotFoundException for missing files
+- Throws NotSupportedException for unsupported extensions
+- IsFormatSupported returns correct values
+
+### Step 3.4: Copy NibDiskImageProvider ✅ COMPLETED (implementation)
 
 **Source:** `Pandowdy.DiskImportCode\NibDiskImageProvider.cs`  
 **Target:** `Pandowdy.EmuCore\DiskII\Providers\NibDiskImageProvider.cs`
 
 **Changes:**
 - Update namespace to `Pandowdy.EmuCore.DiskII.Providers`
-- Replace `CYCLES_PER_BIT` with `DiskIIConstants.CyclesPerBit`
-- Replace other magic numbers with constants
+- Replace `CYCLES_PER_BIT` constant with `DiskIIConstants.CyclesPerBit`
+- Replace `TRACK_COUNT` with `DiskIIConstants.TrackCount`
+- Replace `BYTES_PER_TRACK` with `DiskIIConstants.BytesPerNibTrack`
+- Replace `BITS_PER_TRACK` with `DiskIIConstants.BitsPerTrack`
+- Fix indentation inconsistencies (lines 153-166, 298-329 in source)
 
-### Step 3.5: Copy SectorDiskImageProvider
+**Tests:** `Pandowdy.EmuCore.Tests\DiskII\Providers\NibDiskImageProviderTests.cs` (15 tests) ✅
+- Loads valid .nib file (232,960 bytes)
+- Throws InvalidDataException for wrong file size
+- SetQuarterTrack updates CurrentQuarterTrack
+- GetBit returns bits from correct track
+- Out-of-bounds tracks return random bits (MC3470 simulation)
+- WriteBit writes to correct position
+- Dispose flushes changes
+
+### Step 3.5: Copy SectorDiskImageProvider ✅ COMPLETED (implementation)
 
 **Source:** `Pandowdy.DiskImportCode\SectorDiskImageProvider.cs`  
 **Target:** `Pandowdy.EmuCore\DiskII\Providers\SectorDiskImageProvider.cs`
 
 **Changes:**
 - Update namespace to `Pandowdy.EmuCore.DiskII.Providers`
-- Use `DiskIIConstants`
+- Replace constants with `DiskIIConstants.*`
+- Fix code style
 
-### Step 3.6: Copy InternalWozDiskImageProvider
+**Tests:** `Pandowdy.EmuCore.Tests\DiskII\Providers\SectorDiskImageProviderTests.cs` (13 tests) ✅
+- Loads valid sector-based disk image
+- Track synthesis produces valid GCR data
+- Caches synthesized tracks
+- SetQuarterTrack updates position
+- GetBit returns synthesized bits
+
+### Step 3.6: Copy InternalWozDiskImageProvider ✅ COMPLETED (implementation)
 
 **Source:** `Pandowdy.DiskImportCode\InternalWozDiskImageProvider.cs`  
 **Target:** `Pandowdy.EmuCore\DiskII\Providers\InternalWozDiskImageProvider.cs`
 
 **Changes:**
 - Update namespace to `Pandowdy.EmuCore.DiskII.Providers`
-- Use `DiskIIConstants`
+- Replace `CYCLES_PER_BIT` with `DiskIIConstants.CyclesPerBit`
 
-### Step 3.7: Copy WozDiskImageProvider (Optional)
+**Tests:** `Pandowdy.EmuCore.Tests\DiskII\Providers\InternalWozDiskImageProviderTests.cs` (14 tests) ✅
+- Loads WOZ 1.0 files correctly
+- Loads WOZ 2.0 files correctly
+- Validates CRC32 checksum
+- Parses INFO chunk metadata
+- TMAP quarter-track mapping works
+- GetBit returns bits from correct track
+- Unmapped tracks return random bits
+
+### Step 3.7: Copy WozDiskImageProvider (CiderPress2) ✅ COMPLETED (implementation)
 
 **Source:** `Pandowdy.DiskImportCode\WozDiskImageProvider.cs`  
 **Target:** `Pandowdy.EmuCore\DiskII\Providers\WozDiskImageProvider.cs`
 
+> **Note:** Both WOZ providers are imported. `InternalWozDiskImageProvider` is the default
+> (no CiderPress2 dependency). `WozDiskImageProvider` uses CiderPress2's `Woz` class.
+> `DiskImageFactory` uses `InternalWozDiskImageProvider` by default.
+
 **Changes:**
-- Update namespace
-- Use `DiskIIConstants`
+- Update namespace to `Pandowdy.EmuCore.DiskII.Providers`
+- Replace `CYCLES_PER_BIT` with `DiskIIConstants.CyclesPerBit`
 
-### Step 3.8: Verify Build
+**Tests:** `Pandowdy.EmuCore.Tests\DiskII\Providers\WozDiskImageProviderTests.cs` *(not created - optional CiderPress2 provider)*
+- Loads valid WOZ file via CiderPress2
+- Quarter-track access works
+- Track caching works
+- GetBit returns correct values
 
-Ensure all providers compile correctly.
+### Step 3.8: Verify Build and Run Tests ✅ COMPLETED
+
+Build successful. CiderPress2 project references added to Pandowdy.EmuCore.csproj:
+- `CommonUtil.csproj`
+- `DiskArc.csproj`
 
 ---
 
@@ -826,27 +888,37 @@ Ensure CardFactory compiles and all cards are registered.
 
 ---
 
-## Phase 7: Tests
+## Phase 7: Integration Tests and Test Utilities
 
-**Goal:** Create comprehensive test coverage.
+**Goal:** Create integration tests and shared test utilities.
 
-### Step 7.1: Create Test Directory Structure
+> **Note:** Unit tests are now created alongside each implementation step (Phases 3-6).
+> This phase focuses on integration tests and shared testing infrastructure.
+
+### Step 7.1: Test Directory Structure
+
+Tests are created incrementally with each phase. Final structure:
 
 ```
 Pandowdy.EmuCore.Tests/
 ├── DiskII/
-│   ├── DiskIIDriveTests.cs
-│   ├── DiskIIControllerCardTests.cs
-│   ├── DiskIIFactoryTests.cs
-│   ├── GcrEncoderTests.cs
+│   ├── GcrEncoderTests.cs              (Phase 3.1)
+│   ├── DiskIIDriveTests.cs             (Phase 4.2)
+│   ├── DiskIIFactoryTests.cs           (Phase 4.5)
+│   ├── DiskIIControllerCardTests.cs    (Phase 5.2)
 │   └── Providers/
-│       ├── DiskImageFactoryTests.cs
-│       ├── NibDiskImageProviderTests.cs
-│       ├── SectorDiskImageProviderTests.cs
-│       └── InternalWozDiskImageProviderTests.cs
+│       ├── DiskImageFactoryTests.cs           (Phase 3.3)
+│       ├── NibDiskImageProviderTests.cs       (Phase 3.4)
+│       ├── SectorDiskImageProviderTests.cs    (Phase 3.5)
+│       ├── InternalWozDiskImageProviderTests.cs (Phase 3.6)
+│       └── WozDiskImageProviderTests.cs       (Phase 3.7)
+├── Helpers/
+│   └── MockTelemetryAggregator.cs      (Created when first needed)
 ```
 
 ### Step 7.2: Create Mock Telemetry Aggregator
+
+Created when first needed (Phase 4.2 - DiskIIDrive with telemetry).
 
 ```csharp
 public class MockTelemetryAggregator : ITelemetryAggregator
@@ -872,13 +944,14 @@ public class MockTelemetryAggregator : ITelemetryAggregator
 }
 ```
 
-### Step 7.3: Priority Test Areas
+### Step 7.3: Integration Test Areas
 
-1. **DiskIIDrive:** Motor control, track stepping, bit read/write
-2. **DiskIIControllerCard:** Phase control, Q6/Q7 modes, shift register
-3. **GcrEncoder:** Address/data field encoding, 6&2 encoding
-4. **NibDiskImageProvider:** File loading, bit reading, track positioning
-5. **Telemetry Integration:** Verify messages published on state changes
+After all unit tests are in place, create integration tests for:
+
+1. **End-to-End Boot:** Load a disk image, boot sequence reads sectors correctly
+2. **Telemetry Flow:** Controller → Drive → UI receives correct state updates
+3. **Motor Timeout:** VBlank-based motor-off timing works correctly
+4. **Multi-Drive:** Switching between Drive 1 and Drive 2 works
 
 ---
 
@@ -1117,6 +1190,8 @@ After the Disk II integration is complete, the following refactoring tasks shoul
 - Apparent bug with rendering when 80-col mode is on and HGR is active.  Might exist on full-screen HGR too.
 - Need to investiate.
 - Probably a timing issue related to VBlank or rendering.
+- It actually looks like maybe a race condition. This happens with GR mode too.  The flicker is a quick swap where aux memory's contents are being drawn.
+
 
 ---
 
@@ -1147,4 +1222,4 @@ After the Disk II integration is complete, the following refactoring tasks shoul
 ---
 
 *Document Created: 2025*  
-*Last Updated: Phase 2 Complete - All 4 interfaces imported to Pandowdy.EmuCore*
+*Last Updated: Phase 3 Complete - All disk image providers and 82 tests imported to Pandowdy.EmuCore*
