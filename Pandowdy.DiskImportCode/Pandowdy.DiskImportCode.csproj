@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -9,5 +9,16 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <Optimize>True</Optimize>
   </PropertyGroup>
+
+  <!-- 
+    This project is a READ-ONLY STAGING AREA for reference code.
+    Files are NOT compiled - they are imported into Pandowdy.EmuCore after transformation.
+    See docs/DiskII-Integration-Plan.md for details.
+  -->
+  <ItemGroup>
+    <Compile Remove="**\*.cs" />
+    <None Include="**\*.cs" />
+    <None Include="**\*.axaml" />
+  </ItemGroup>
 
 </Project>

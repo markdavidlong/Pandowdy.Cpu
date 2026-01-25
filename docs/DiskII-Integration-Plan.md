@@ -6,25 +6,30 @@
 
 | Status | Details |
 |--------|---------|
-| **Progress** | Phases 1-7 Complete ✅ |
-| **Tests** | 1224 total (259 Disk II tests) |
-| **Branch** | `re_disking` (was `piecemealing`) |
-| **Next Step** | Phase 8: GUI Status Display |
+| **Progress** | Phases 1-7 Complete ✅, Phase 8A In Progress |
+| **Tests** | Build currently broken (telemetry removal in progress) |
+| **Branch** | `notelem` (was `re_disking`) |
+| **Next Step** | Phase 8A: Remove Telemetry, Replace with DiskStatusServices |
 
 **What's Done:**
-- ✅ Phase 1: Foundation (VBlankOccurred event, DiskIIConstants, telemetry payloads)
+- ✅ Phase 1: Foundation (VBlankOccurred event, DiskIIConstants, ~~telemetry payloads~~)
 - ✅ Phase 2: Interfaces (IDiskImageProvider, IDiskIIDrive, IDiskImageFactory, IDiskIIFactory)
 - ✅ Phase 3: Disk Image Providers (GcrEncoder, NibDiskImageProvider, SectorDiskImageProvider, InternalWozDiskImageProvider, WozDiskImageProvider, DiskImageFactory)
-- ✅ Phase 4: Drive Implementation (NullDiskIIDrive, DiskIIDrive, DiskIIDebugDecorator, DiskIIFactory, MockTelemetryAggregator)
+- ✅ Phase 4: Drive Implementation (NullDiskIIDrive, DiskIIDrive, DiskIIDebugDecorator, DiskIIFactory, ~~MockTelemetryAggregator~~)
 - ✅ Phase 5: Controller Card (DiskIIControllerCard base, 16-sector, 13-sector variants + 53 tests)
 - ✅ Phase 6: Factory Registration (DI registrations in Program.cs, Slot 6 initialization)
-- ✅ Phase 7: Integration Tests (28 tests covering telemetry flow, motor timeout, multi-drive)
+- ✅ Phase 7: Integration Tests (28 tests covering ~~telemetry flow~~, motor timeout, multi-drive)
+- ⏳ Phase 8A: Remove Telemetry Infrastructure (files moved to `_Hold_`)
+- ⏳ Phase 8B: Import DiskStatusServices (IDiskStatusProvider/IDiskStatusMutator pattern)
+- ⏳ Phase 8C: Update Disk II Components (replace telemetry with status decorator)
+- ⏳ Phase 8D: Update Tests (replace MockTelemetryAggregator with MockDiskStatusProvider)
+- ⏳ Phase 8E: GUI Status Display (uses DiskStatusServices directly)
 
 **What's Next:**
-- Phase 8: GUI Status Display for disk drives
+- Complete Phase 8A-8E to restore build and implement GUI status
 
 **Key Decision Made:**
-- `DiskIIStatusDecorator` was **NOT imported** - its functionality was replaced by direct telemetry publishing in `DiskIIDrive`. See Issue #2 in Integration Issues section.
+- ⚠️ **ARCHITECTURAL REVISION**: The telemetry-based approach (Phases 1-7) proved to be over-engineered for disk status messaging. We are reverting to the original `IDiskStatusMutator`/`DiskIIStatusDecorator` pattern. See [Architectural Revision](#architectural-revision-telemetry-to-diskstatusservices) section.
 
 ---
 
@@ -45,13 +50,13 @@ This document provides a comprehensive plan for integrating the Disk II emulatio
 > 2. **Create new file** in `Pandowdy.EmuCore\{target-folder}\{file}.cs`
 > 3. **Apply transformations** during creation:
 >    - Update namespace to match target location
->    - Replace `IDiskStatusMutator` with `ITelemetryAggregator`
 >    - Use `DiskIIConstants` instead of magic numbers
 >    - Fix code style per project standards
 > 4. **Verify build** after each file import
 >
-> Some files (like `DiskIIStatusDecorator.cs`) are **not imported at all** because their
-> functionality is replaced by the telemetry pattern.
+> **Note:** The original plan called for replacing `IDiskStatusMutator` with telemetry.
+> This has been **reversed** - we now use the original `DiskStatusServices` pattern.
+> See [Architectural Revision](#architectural-revision-telemetry-to-diskstatusservices).
 
 ---
 
@@ -60,19 +65,23 @@ This document provides a comprehensive plan for integrating the Disk II emulatio
 1. [Source Code Inventory](#source-code-inventory)
 2. [Architecture Overview](#architecture-overview)
 3. [Integration Issues & Resolutions](#integration-issues--resolutions)
-4. [Target File Structure](#target-file-structure)
-5. [Phase 1: Foundation](#phase-1-foundation) ✅ COMPLETED
-6. [Phase 2: Interfaces](#phase-2-interfaces) ✅ COMPLETED
-7. [Phase 3: Disk Image Providers](#phase-3-disk-image-providers) ✅ COMPLETED
-8. [Phase 4: Drive Implementation](#phase-4-drive-implementation) ✅ COMPLETED
-9. [Phase 5: Controller Card](#phase-5-controller-card) ✅ COMPLETED
-10. [Phase 6: Factory Registration](#phase-6-factory-registration) ✅ COMPLETED
-11. [Phase 7: Tests](#phase-7-tests) ✅ COMPLETED
-12. [Phase 8: GUI Status Display](#phase-8-gui-status-display)
-13. [Telemetry Integration](#telemetry-integration)
-14. [Code Style Corrections](#code-style-corrections)
-15. [Verification Checklist](#verification-checklist)
-16. [Next Steps (Post-Integration)](#next-steps-post-integration)
+4. [Architectural Revision: Telemetry to DiskStatusServices](#architectural-revision-telemetry-to-diskstatusservices) ⚠️ NEW
+5. [Target File Structure](#target-file-structure)
+6. [Phase 1: Foundation](#phase-1-foundation) ✅ COMPLETED
+7. [Phase 2: Interfaces](#phase-2-interfaces) ✅ COMPLETED
+8. [Phase 3: Disk Image Providers](#phase-3-disk-image-providers) ✅ COMPLETED
+9. [Phase 4: Drive Implementation](#phase-4-drive-implementation) ✅ COMPLETED
+10. [Phase 5: Controller Card](#phase-5-controller-card) ✅ COMPLETED
+11. [Phase 6: Factory Registration](#phase-6-factory-registration) ✅ COMPLETED
+12. [Phase 7: Tests](#phase-7-tests) ✅ COMPLETED
+13. [Phase 8A: Remove Telemetry Infrastructure](#phase-8a-remove-telemetry-infrastructure) ⏳ IN PROGRESS
+14. [Phase 8B: Import DiskStatusServices](#phase-8b-import-diskstatusservices)
+15. [Phase 8C: Update Disk II Components](#phase-8c-update-disk-ii-components)
+16. [Phase 8D: Update Tests](#phase-8d-update-tests)
+17. [Phase 8E: GUI Status Display](#phase-8e-gui-status-display)
+18. [Code Style Corrections](#code-style-corrections)
+19. [Verification Checklist](#verification-checklist)
+20. [Next Steps (Post-Integration)](#next-steps-post-integration)
 
 ---
 
@@ -160,25 +169,42 @@ This document provides a comprehensive plan for integrating the Disk II emulatio
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Decorator Chain (Current - TO BE CHANGED)
+### Decorator Chain (Original Import Code)
 
 ```
-Current:    DiskIIDebugDecorator → DiskIIStatusDecorator → DiskIIDrive
+Original:   DiskIIDebugDecorator → DiskIIStatusDecorator → DiskIIDrive
                    │                        │
                    ▼                        ▼
-            Debug.WriteLine()      IDiskStatusMutator (doesn't exist!)
+            Debug.WriteLine()      IDiskStatusMutator
 ```
 
-### Decorator Chain (New - Using Telemetry)
+### Decorator Chain (Phases 1-7 - ABANDONED)
 
 ```
-New:        DiskIIDebugDecorator → DiskIIDrive
+Telemetry:  DiskIIDebugDecorator → DiskIIDrive
                                        │
                                        ▼
                               ITelemetryAggregator
                                        │
                               Publishes: TelemetryMessage
                               Category: "DiskII"
+
+⚠️ This approach was abandoned in Phase 8A due to over-engineering.
+```
+
+### Decorator Chain (Phase 8+ - CURRENT TARGET)
+
+```
+Final:      DiskIIDebugDecorator → DiskIIStatusDecorator → DiskIIDrive
+                   │                        │
+                   ▼                        ▼
+            Debug.WriteLine()      IDiskStatusMutator
+                                          │
+                                   DiskStatusProvider
+                                          │
+                                   BehaviorSubject<DiskStatusSnapshot>
+                                          │
+                                   GUI (DiskStatusPanelViewModel)
 ```
 
 ---
@@ -226,28 +252,51 @@ New components should subscribe to `ClockCounters.VBlankOccurred`.
 
 ### Issue 2: IDiskStatusMutator Doesn't Exist
 
-**Problem:** The original code in `Pandowdy.DiskImportCode` uses `IDiskStatusMutator` for status updates, but this interface doesn't exist in `Pandowdy.EmuCore` and we don't want to create it.
+**Problem:** The original code in `Pandowdy.DiskImportCode` uses `IDiskStatusMutator` for status updates, but this interface doesn't exist in `Pandowdy.EmuCore`.
 
-**Resolution:** Replace with `ITelemetryAggregator` pattern during import. Files are copied from the read-only `Pandowdy.DiskImportCode` staging area and modified during import into `Pandowdy.EmuCore`.
+**Original Resolution (Phases 1-7):** ~~Replace with `ITelemetryAggregator` pattern during import.~~
 
-**Files Affected During Import:**
+**Revised Resolution (Phase 8A+):** ⚠️ **REVERSED** - Import the `DiskStatusServices.cs` pattern instead.
 
-| Source File | Action | Changes During Import |
-|-------------|--------|----------------------|
-| `DiskIIStatusDecorator.cs` | **DO NOT IMPORT** | Entire file skipped - pattern replaced by telemetry |
-| `DiskIIDrive.cs` | Import + Modify | Add `ITelemetryAggregator` dependency, publish telemetry |
-| `DiskIIFactory.cs` | Import + Modify | Remove `IDiskStatusMutator`, remove decorator from chain |
-| `DiskIIControllerCards.cs` | Import + Modify | Replace `_diskStatusMutator` with `_telemetry` |
+**Rationale for Reversal:**
+1. **Over-Engineering:** The telemetry system was designed for general-purpose observability, not specifically for disk status UI updates
+2. **Complexity:** Required typed payloads, message routing, category filtering, and resend requests
+3. **UI Integration:** The GUI reference code (`DiskStatusPanelViewModel`, `DiskStatusWidgetViewModel`) was already designed for `IDiskStatusProvider` pattern
+4. **Simpler is Better:** Direct observable pattern with `BehaviorSubject<DiskStatusSnapshot>` is cleaner for this use case
 
-**Old Pattern (in DiskIIStatusDecorator - will not be imported):**
+**New Pattern (DiskStatusServices):**
 ```csharp
+// Mutation (in DiskIIStatusDecorator):
 _statusMutator.MutateDrive(_slotNumber, _driveNumber, builder =>
 {
     builder.MotorOn = value;
+    builder.Track = _innerDrive.Track;
 });
+
+// Observation (in DiskStatusPanelViewModel):
+_statusProvider.Stream
+    .ObserveOn(RxApp.MainThreadScheduler)
+    .Subscribe(snapshot => UpdateDrives(snapshot));
 ```
 
-**New Pattern (in DiskIIDrive after import to Pandowdy.EmuCore):**
+**Files Now Being Imported:**
+
+| Source File | Target Location | Action |
+|-------------|-----------------|--------|
+| `DiskStatusServices.cs` | `Services/DiskStatusServices.cs` | Import (contains interfaces, records, builders, provider) |
+| `DiskIIStatusDecorator.cs` | `DiskII/DiskIIStatusDecorator.cs` | Import (decorator for status updates) |
+
+**Files Moved to `_Hold_` (telemetry infrastructure):**
+
+| File | Original Location | Notes |
+|------|-------------------|-------|
+| `TelemetryTypes.cs` | `DataTypes/` | Core telemetry types |
+| `DiskIITelemetryPayloads.cs` | `DataTypes/` | Disk II payload records |
+| `ITelemetryAggregator.cs` | `Interfaces/` | Telemetry interface |
+| `TelemetryAggregator.cs` | `Services/` | Implementation |
+| `MockTelemetryAggregator.cs` | `Tests/Helpers/` | Test mock |
+| `TelemetryAggregatorTests.cs` | `Tests/` | Unit tests |
+| `TelemetryIntegrationTests.cs` | `Tests/IntegrationTests/` | Integration tests |
 ```csharp
 // Simple debug messages during development
 _telemetry.Publish(new TelemetryMessage(_telemetryId, "debug", 
@@ -1017,11 +1066,309 @@ Created in Phase 4.2 (DiskIIDrive with telemetry).
 
 ---
 
-## Phase 8: GUI Status Display
+## Architectural Revision: Telemetry to DiskStatusServices
 
-**Goal:** Add GUI components to display Disk II drive status (motor on/off, track position, disk inserted).
+> ⚠️ **IMPORTANT:** This section documents a significant architectural change made during Phase 8.
 
-> **Status:** Reference code imported ✅. Ready for transformation.
+### Background
+
+During Phases 1-7, the plan called for replacing the `IDiskStatusMutator`/`DiskIIStatusDecorator` pattern 
+with a general-purpose telemetry system (`ITelemetryAggregator`). This was implemented, including:
+- `TelemetryTypes.cs` with `TelemetryMessage`, `TelemetryId`, etc.
+- `ITelemetryAggregator` interface and `TelemetryAggregator` implementation
+- `DiskIITelemetryPayloads.cs` with typed message records
+- Integration in `DiskIIDrive`, `DiskIIControllerCard`, `DiskIIFactory`
+- `MockTelemetryAggregator` for testing
+
+### Why the Telemetry Approach Failed
+
+1. **Over-Engineering:** The telemetry system was designed for general observability (debugging, logging,
+   metrics) but disk status UI only needs simple state change notifications.
+
+2. **Complexity Mismatch:** The GUI reference code (`DiskStatusWidgetViewModel`) expects 
+   `DiskDriveStatusSnapshot` records with all drive state in one object. The telemetry approach
+   required:
+   - Typed payloads for each state change type
+   - Message routing based on `TelemetryId`
+   - Resend requests to populate initial state
+   - Pattern matching on payload types in the UI
+
+3. **Simpler Alternative Exists:** The original `DiskStatusServices.cs` pattern provides:
+   - Single `BehaviorSubject<DiskStatusSnapshot>` for reactive updates
+   - `IDiskStatusProvider` for read-only observation (UI)
+   - `IDiskStatusMutator` for write access (EmuCore)
+   - Builder pattern for efficient partial updates
+   - Automatic initial state replay to new subscribers
+
+4. **Less Code Churn:** The GUI ViewModels were already designed for the `DiskStatusSnapshot` pattern.
+   Using telemetry would have required complete rewrites.
+
+### Decision
+
+**Revert to the original `DiskStatusServices` pattern.**
+
+### Files Relocated to `_Hold_`
+
+| Original Location | File | Status |
+|-------------------|------|--------|
+| `EmuCore\DataTypes\` | `TelemetryTypes.cs` | Moved to `_Hold_\` |
+| `EmuCore\DataTypes\` | `DiskIITelemetryPayloads.cs` | Moved to `_Hold_\` |
+| `EmuCore\Interfaces\` | `ITelemetryAggregator.cs` | Moved to `_Hold_\` |
+| `EmuCore\Services\` | `TelemetryAggregator.cs` | Moved to `_Hold_\` |
+| `EmuCore.Tests\Helpers\` | `MockTelemetryAggregator.cs` | Moved to `_Hold_\` |
+| `EmuCore.Tests\` | `TelemetryAggregatorTests.cs` | Moved to `_Hold_\` |
+| `EmuCore.Tests\IntegrationTests\` | `TelemetryIntegrationTests.cs` | Moved to `_Hold_\` |
+
+### Future Telemetry Use
+
+The telemetry system may still be useful for:
+- CPU instruction tracing
+- Memory access logging
+- Performance metrics
+- General debugging
+
+The files are preserved in `_Hold_` directories for potential future use.
+
+---
+
+## Phase 8A: Remove Telemetry Infrastructure
+
+**Goal:** Move telemetry files to `_Hold_` directories and prepare for DiskStatusServices import.
+
+**Status:** ⏳ IN PROGRESS
+
+### Step 8A.1: Create _Hold_ Directories ✅ COMPLETED
+
+```
+Pandowdy.EmuCore\_Hold_\           (created)
+Pandowdy.EmuCore.Tests\_Hold_\     (created)
+```
+
+### Step 8A.2: Move Telemetry Files ✅ COMPLETED
+
+**Files moved using `git mv` to preserve history:**
+
+| Source | Destination |
+|--------|-------------|
+| `DataTypes\TelemetryTypes.cs` | `_Hold_\TelemetryTypes.cs` |
+| `DataTypes\DiskIITelemetryPayloads.cs` | `_Hold_\DiskIITelemetryPayloads.cs` |
+| `Interfaces\ITelemetryAggregator.cs` | `_Hold_\ITelemetryAggregator.cs` |
+| `Services\TelemetryAggregator.cs` | `_Hold_\TelemetryAggregator.cs` |
+| `Tests\Helpers\MockTelemetryAggregator.cs` | `Tests\_Hold_\MockTelemetryAggregator.cs` |
+| `Tests\TelemetryAggregatorTests.cs` | `Tests\_Hold_\TelemetryAggregatorTests.cs` |
+| `Tests\IntegrationTests\TelemetryIntegrationTests.cs` | `Tests\_Hold_\TelemetryIntegrationTests.cs` |
+
+### Step 8A.3: Identify Files With Broken References
+
+Files that will have compile errors after telemetry removal:
+
+| File | Telemetry Dependencies |
+|------|------------------------|
+| `DiskIIControllerCard.cs` | `ITelemetryAggregator`, `TelemetryId`, `TelemetryMessage` |
+| `DiskIIControllerCard16Sector.cs` | Constructor passes `ITelemetryAggregator` |
+| `DiskIIControllerCard13Sector.cs` | Constructor passes `ITelemetryAggregator` |
+| `DiskIIDrive.cs` | `ITelemetryAggregator`, `TelemetryId`, `TelemetryMessage` |
+| `DiskIIFactory.cs` | `ITelemetryAggregator` |
+| `VA2M.cs` | `ITelemetryAggregator` property/reference |
+| `IEmulatorCoreInterface.cs` | `ITelemetryAggregator` property |
+| `Program.cs` | DI registration for `TelemetryAggregator` |
+| `VA2MTestHelpers.cs` | `MockTelemetryAggregator` in test factory |
+| `DiskIIControllerCardTests.cs` | `MockTelemetryAggregator` |
+| `DiskIIDriveTests.cs` | `MockTelemetryAggregator` |
+| `DiskIIFactoryTests.cs` | `MockTelemetryAggregator` |
+| `DiskIIIntegrationTests.cs` | `MockTelemetryAggregator` |
+
+---
+
+## Phase 8B: Import DiskStatusServices
+
+**Goal:** Import `DiskStatusServices.cs` and `DiskIIStatusDecorator.cs` from staging area.
+
+### Step 8B.1: Import DiskStatusServices.cs
+
+**Source:** `Pandowdy.DiskImportCode\DiskStatusServices.cs`  
+**Target:** `Pandowdy.EmuCore\Services\DiskStatusServices.cs`
+
+**Contents (all in one file for simplicity):**
+- `DiskDriveStatusSnapshot` - Immutable record for single drive state
+- `DiskStatusSnapshot` - Immutable record for all drives
+- `IDiskStatusProvider` - Read-only interface (UI consumption)
+- `IDiskStatusMutator` - Write interface (EmuCore updates)
+- `DiskStatusProvider` - Implementation with `BehaviorSubject`
+- `DiskDriveStatusBuilder` - Builder for single drive
+- `DiskStatusSnapshotBuilder` - Builder for batch updates
+
+**Changes During Import:**
+- Namespace is already correct (`Pandowdy.EmuCore.Services`)
+- Remove unused `using Pandowdy.EmuCore.Interfaces;` if not needed
+- Verify code style compliance
+
+### Step 8B.2: Import DiskIIStatusDecorator.cs
+
+**Source:** `Pandowdy.DiskImportCode\DiskIIStatusDecorator.cs`  
+**Target:** `Pandowdy.EmuCore\DiskII\DiskIIStatusDecorator.cs`
+
+**Changes During Import:**
+- Update namespace to `Pandowdy.EmuCore.DiskII`
+- Ensure using directives are correct
+
+### Step 8B.3: Verify Build (Expected to Fail)
+
+Build will fail because existing Disk II components still reference telemetry.
+This is expected - Phase 8C will fix these references.
+
+---
+
+## Phase 8C: Update Disk II Components
+
+**Goal:** Replace telemetry references with `IDiskStatusMutator` in all Disk II components.
+
+### Step 8C.1: Update DiskIIDrive.cs
+
+**Changes:**
+1. Remove `ITelemetryAggregator` dependency
+2. Remove `TelemetryId` field
+3. Remove telemetry publishing code (motor, track, disk insert/eject)
+4. Remove resend request subscription
+5. Keep core drive mechanics unchanged
+
+**Note:** Status updates are handled by `DiskIIStatusDecorator`, not the drive itself.
+
+### Step 8C.2: Update DiskIIFactory.cs
+
+**Changes:**
+1. Replace `ITelemetryAggregator` with `IDiskStatusMutator` in constructor
+2. Update `CreateDrive()` to wrap with `DiskIIStatusDecorator`:
+   ```csharp
+   var coreDrive = new DiskIIDrive(name, _diskImageFactory);
+   var statusDrive = new DiskIIStatusDecorator(coreDrive, _statusMutator, slot, drive);
+   var debugDrive = new DiskIIDebugDecorator(statusDrive);
+   return debugDrive;
+   ```
+3. Parse slot/drive from drive name for decorator
+
+### Step 8C.3: Update DiskIIControllerCard.cs
+
+**Changes:**
+1. Replace `ITelemetryAggregator` with `IDiskStatusMutator` in constructor
+2. Remove `_telemetryId` field
+3. Replace telemetry publishes with status mutations:
+   ```csharp
+   // Old:
+   _telemetry.Publish(new TelemetryMessage(_telemetryId, "phase", new DiskIIMessage(...)));
+   
+   // New:
+   _statusMutator.MutateDrive(_slotNumber, driveNumber, builder => {
+       builder.PhaseState = _currentPhase;
+   });
+   ```
+4. Update methods: `UpdatePhaseState()`, `UpdateMotorOffScheduledStatus()`, `UpdateTrackAndSector()`
+
+### Step 8C.4: Update DiskIIControllerCard16Sector.cs
+
+**Changes:**
+1. Update constructor to accept `IDiskStatusMutator` instead of `ITelemetryAggregator`
+2. Pass to base class constructor
+
+### Step 8C.5: Update DiskIIControllerCard13Sector.cs
+
+**Changes:**
+1. Update constructor to accept `IDiskStatusMutator` instead of `ITelemetryAggregator`
+2. Pass to base class constructor
+
+### Step 8C.6: Update VA2M.cs
+
+**Changes:**
+1. Remove `ITelemetryAggregator` field/property if only used for disk
+2. If telemetry is used elsewhere, keep it but note it's in `_Hold_`
+
+### Step 8C.7: Update IEmulatorCoreInterface.cs
+
+**Changes:**
+1. Remove `ITelemetryAggregator` property if present
+2. Add `IDiskStatusProvider` property if UI needs it
+
+### Step 8C.8: Update Program.cs
+
+**Changes:**
+1. Remove DI registration for `TelemetryAggregator`
+2. Add DI registration for `DiskStatusProvider`:
+   ```csharp
+   services.AddSingleton<DiskStatusProvider>();
+   services.AddSingleton<IDiskStatusProvider>(sp => sp.GetRequiredService<DiskStatusProvider>());
+   services.AddSingleton<IDiskStatusMutator>(sp => sp.GetRequiredService<DiskStatusProvider>());
+   ```
+
+### Step 8C.9: Verify Build
+
+Build should succeed after all components are updated.
+
+---
+
+## Phase 8D: Update Tests
+
+**Goal:** Update test files to use `MockDiskStatusMutator` instead of `MockTelemetryAggregator`.
+
+### Step 8D.1: Create MockDiskStatusMutator
+
+**Target:** `Pandowdy.EmuCore.Tests\Helpers\MockDiskStatusMutator.cs`
+
+**Features:**
+- Implements `IDiskStatusMutator`
+- Records all mutations for test assertions
+- Provides helper methods: `GetMutationCount()`, `GetLastMutation()`, etc.
+
+### Step 8D.2: Update DiskIIDriveTests.cs
+
+**Changes:**
+- Remove telemetry-specific tests (publishing, resend requests)
+- Focus on core drive mechanics (motor, track, disk operations)
+- Status update tests are covered in `DiskIIStatusDecoratorTests`
+
+### Step 8D.3: Update DiskIIFactoryTests.cs
+
+**Changes:**
+- Replace `MockTelemetryAggregator` with `MockDiskStatusMutator`
+- Update assertions to check status mutations
+
+### Step 8D.4: Update DiskIIControllerCardTests.cs
+
+**Changes:**
+- Replace `MockTelemetryAggregator` with `MockDiskStatusMutator`
+- Update assertions for phase, motor-off-scheduled, track/sector updates
+
+### Step 8D.5: Create DiskIIStatusDecoratorTests.cs
+
+**Target:** `Pandowdy.EmuCore.Tests\DiskII\DiskIIStatusDecoratorTests.cs`
+
+**Test Categories:**
+- Constructor registers drive with status provider
+- Motor state changes update status
+- Track stepping updates status
+- Disk insert/eject updates status
+- Reset syncs full status
+
+### Step 8D.6: Update DiskIIIntegrationTests.cs
+
+**Changes:**
+- Replace telemetry flow tests with status flow tests
+- Update test helpers
+
+### Step 8D.7: Update VA2MTestHelpers.cs
+
+**Changes:**
+- Remove `MockTelemetryAggregator` from test factory
+- Add `MockDiskStatusMutator` if needed
+
+### Step 8D.8: Run Full Test Suite
+
+Verify all tests pass after updates.
+
+---
+
+## Phase 8E: GUI Status Display
+
+**Goal:** Import GUI components that use `DiskStatusServices` directly.
 
 ### Source Files in `Pandowdy.DiskImportCode`
 
@@ -1029,191 +1376,76 @@ Created in Phase 4.2 (DiskIIDrive with telemetry).
 |------|---------|---------------------|
 | `DiskStatusPanel.axaml` | Container panel with header + scrollable drive list | Keep layout, update namespace |
 | `DiskStatusPanel.axaml.cs` | Code-behind (simple) | Keep as-is |
-| `DiskStatusPanelViewModel.cs` | Container ViewModel, manages drive widgets | Replace `IDiskStatusProvider` with `ITelemetryAggregator` |
+| `DiskStatusPanelViewModel.cs` | Container ViewModel, manages drive widgets | Uses `IDiskStatusProvider` directly ✅ |
 | `DiskStatusWidget.axaml` | Single drive status display | Keep layout, update namespace |
 | `DiskStatusWidget.axaml.cs` | Code-behind (simple) | Keep as-is |
-| `DiskStatusWidgetViewModel.cs` | Drive state display with formatting | Replace `DiskDriveStatusSnapshot` with telemetry |
+| `DiskStatusWidgetViewModel.cs` | Drive state display with formatting | Uses `DiskDriveStatusSnapshot` directly ✅ |
 
-### Step 8.1: Design Telemetry Message Format ⏳
-
-**Goal:** Define typed telemetry payloads to replace the `DiskDriveStatusSnapshot` pattern.
-
-**Current Problem:**
-- Reference code uses `IDiskStatusProvider` + `DiskDriveStatusSnapshot` (doesn't exist)
-- Need to convert to telemetry-based approach
-
-**Data Required by Widget (from `DiskStatusWidgetViewModel`):**
-
-| Property | Type | Source |
-|----------|------|--------|
-| `DiskId` | string | e.g., "S6D1" - slot + drive identifier |
-| `DiskImageFilename` | string | Filename only (no path) |
-| `DiskImagePath` | string | Full path for tooltip |
-| `IsReadOnly` | bool | Write protection status |
-| `Track` | double | Current track (0-34.75) |
-| `Sector` | int | Current sector (-1 if unknown) |
-| `PhaseState` | byte | 4-bit stepper motor phases |
-| `MotorOn` | bool | Motor running |
-| `MotorOffScheduled` | bool | Motor-off pending |
-| `SlotNumber` | int | For ordering (1-7) |
-| `DriveNumber` | int | For ordering (1-2) |
-
-**Proposed Telemetry Payloads:**
-
-```csharp
-// In Pandowdy.EmuCore\DataTypes\DiskIITelemetryPayloads.cs
-
-/// <summary>Full drive state snapshot for UI consumption.</summary>
-public readonly record struct DiskIIDriveStatePayload(
-    int SlotNumber,
-    int DriveNumber,
-    string DiskId,
-    string? DiskImageFilename,
-    string? DiskImagePath,
-    bool IsReadOnly,
-    double Track,
-    int Sector,
-    bool MotorOn,
-    bool MotorOffScheduled,
-    byte PhaseState);
-
-/// <summary>Motor state change notification.</summary>
-public readonly record struct DiskIIMotorPayload(bool MotorOn);
-
-/// <summary>Track/sector position update.</summary>
-public readonly record struct DiskIIPositionPayload(double Track, int Sector);
-
-/// <summary>Disk inserted notification.</summary>
-public readonly record struct DiskIIDiskInsertedPayload(string Filename, string Path, bool IsReadOnly);
-
-/// <summary>Disk ejected notification.</summary>
-public readonly record struct DiskIIDiskEjectedPayload();
-
-/// <summary>Phase state update.</summary>
-public readonly record struct DiskIIPhasePayload(byte PhaseState);
-
-/// <summary>Motor-off scheduled/cancelled.</summary>
-public readonly record struct DiskIIMotorOffScheduledPayload(bool Scheduled);
-```
-
-**Message Type Keys:**
-
-| Payload Type | MessageType Key |
-|--------------|-----------------|
-| `DiskIIDriveStatePayload` | "state" |
-| `DiskIIMotorPayload` | "motor" |
-| `DiskIIPositionPayload` | "position" |
-| `DiskIIDiskInsertedPayload` | "disk-inserted" |
-| `DiskIIDiskEjectedPayload` | "disk-ejected" |
-| `DiskIIPhasePayload` | "phase" |
-| `DiskIIMotorOffScheduledPayload` | "motor-off-scheduled" |
-
-### Step 8.2: Update DiskIIDrive Telemetry Publishing
-
-**File:** `Pandowdy.EmuCore\DiskII\DiskIIDrive.cs`
-
-**Changes:**
-1. Replace `DiskIIMessage` with typed payloads
-2. Publish `DiskIIDriveStatePayload` on resend requests
-3. Publish specific payloads for each state change
-
-### Step 8.3: Update DiskIIControllerCard Telemetry Publishing
-
-**File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`
-
-**Changes:**
-1. Replace `DiskIIMessage` with typed payloads
-2. Publish `DiskIIPhasePayload` for phase changes
-3. Publish `DiskIIMotorOffScheduledPayload` for motor-off scheduling
-
-### Step 8.4: Create Controls Directory Structure
-
-**Target Structure:**
-```
-Pandowdy.UI/
-├── Controls/
-│   ├── DiskStatusPanel.axaml         (from DiskImportCode)
-│   ├── DiskStatusPanel.axaml.cs      (from DiskImportCode)
-│   ├── DiskStatusWidget.axaml        (from DiskImportCode)
-│   └── DiskStatusWidget.axaml.cs     (from DiskImportCode)
-└── ViewModels/
-    ├── DiskStatusPanelViewModel.cs   (transformed)
-    └── DiskStatusWidgetViewModel.cs  (transformed)
-```
-
-### Step 8.5: Import and Transform DiskStatusWidgetViewModel
+### Step 8E.1: Import DiskStatusWidgetViewModel.cs
 
 **Source:** `Pandowdy.DiskImportCode\DiskStatusWidgetViewModel.cs`  
 **Target:** `Pandowdy.UI\ViewModels\DiskStatusWidgetViewModel.cs`
 
 **Changes:**
-1. Remove `DiskDriveStatusSnapshot` dependency
-2. Store state locally with individual properties
-3. Update via `UpdateFromPayload(DiskIIDriveStatePayload)` method
-4. Keep all display formatting logic (TrackSectorText, PhaseText, MotorText)
+- Update namespace to `Pandowdy.UI.ViewModels`
+- Verify `using Pandowdy.EmuCore.Services;` for snapshot types
 
-### Step 8.6: Import and Transform DiskStatusPanelViewModel
+### Step 8E.2: Import DiskStatusPanelViewModel.cs
 
 **Source:** `Pandowdy.DiskImportCode\DiskStatusPanelViewModel.cs`  
 **Target:** `Pandowdy.UI\ViewModels\DiskStatusPanelViewModel.cs`
 
 **Changes:**
-1. Remove `IDiskStatusProvider` dependency
-2. Add `ITelemetryAggregator` dependency
-3. Subscribe to telemetry stream filtered by `DiskIIConstants.TelemetryCategory`
-4. Route messages to correct widget based on `TelemetryId`
-5. Request resend on initialization to populate initial state
+- Update namespace to `Pandowdy.UI.ViewModels`
+- Verify `using Pandowdy.EmuCore.Services;` for provider interface
 
-**Pattern:**
-```csharp
-public DiskStatusPanelViewModel(ITelemetryAggregator telemetry)
-{
-    _telemetry = telemetry;
-    Drives = new ObservableCollection<DiskStatusWidgetViewModel>();
-    
-    // Subscribe to DiskII telemetry
-    _telemetry.Stream
-        .Where(m => m.SourceId.Category == DiskIIConstants.TelemetryCategory)
-        .ObserveOn(RxApp.MainThreadScheduler)
-        .Subscribe(HandleTelemetryMessage);
-    
-    // Request current state from all drives
-    _telemetry.RequestResend(DiskIIConstants.TelemetryCategory);
-}
+### Step 8E.3: Create Controls Directory
 
-private void HandleTelemetryMessage(TelemetryMessage msg)
-{
-    switch (msg.Payload)
-    {
-        case DiskIIDriveStatePayload state:
-            UpdateOrCreateWidget(msg.SourceId, state);
-            break;
-        case DiskIIMotorPayload motor:
-            UpdateWidgetMotor(msg.SourceId, motor.MotorOn);
-            break;
-        // ... etc
-    }
-}
-```
+**Target:** `Pandowdy.UI\Controls\`
 
-### Step 8.7: Import AXAML Controls
+### Step 8E.4: Import DiskStatusWidget.axaml
 
-**Action:** Copy AXAML files with namespace updates.
+**Source:** `Pandowdy.DiskImportCode\DiskStatusWidget.axaml`  
+**Target:** `Pandowdy.UI\Controls\DiskStatusWidget.axaml`
 
-1. Copy `DiskStatusPanel.axaml` → `Pandowdy.UI\Controls\`
-2. Copy `DiskStatusPanel.axaml.cs` → `Pandowdy.UI\Controls\`
-3. Copy `DiskStatusWidget.axaml` → `Pandowdy.UI\Controls\`
-4. Copy `DiskStatusWidget.axaml.cs` → `Pandowdy.UI\Controls\`
+**Changes:**
+- Update `x:Class` namespace
+- Update `xmlns:vm` namespace
 
-### Step 8.8: Integrate with MainWindow
+### Step 8E.5: Import DiskStatusWidget.axaml.cs
+
+**Source:** `Pandowdy.DiskImportCode\DiskStatusWidget.axaml.cs`  
+**Target:** `Pandowdy.UI\Controls\DiskStatusWidget.axaml.cs`
+
+**Changes:**
+- Update namespace to `Pandowdy.UI.Controls`
+
+### Step 8E.6: Import DiskStatusPanel.axaml
+
+**Source:** `Pandowdy.DiskImportCode\DiskStatusPanel.axaml`  
+**Target:** `Pandowdy.UI\Controls\DiskStatusPanel.axaml`
+
+**Changes:**
+- Update `x:Class` namespace
+- Update `xmlns:vm` and `xmlns:controls` namespaces
+
+### Step 8E.7: Import DiskStatusPanel.axaml.cs
+
+**Source:** `Pandowdy.DiskImportCode\DiskStatusPanel.axaml.cs`  
+**Target:** `Pandowdy.UI\Controls\DiskStatusPanel.axaml.cs`
+
+**Changes:**
+- Update namespace to `Pandowdy.UI.Controls`
+
+### Step 8E.8: Integrate with MainWindow
 
 **File:** `Pandowdy.UI\MainWindow.axaml`
 
 **Changes:**
-- Add `DiskStatusPanel` to right side of window
-- Wire up `DiskStatusPanelViewModel` in DI
+- Add `xmlns:controls` for controls namespace
+- Add `<controls:DiskStatusPanel>` to right side panel
 
-### Step 8.9: Register DI Services
+### Step 8E.9: Register DI Services
 
 **File:** `Pandowdy\Program.cs`
 
@@ -1222,13 +1454,13 @@ private void HandleTelemetryMessage(TelemetryMessage msg)
 services.AddTransient<DiskStatusPanelViewModel>();
 ```
 
-### Step 8.10: Add Unit Tests
+### Step 8E.10: Add Unit Tests
 
 **Files to Create:**
 - `Pandowdy.UI.Tests\ViewModels\DiskStatusWidgetViewModelTests.cs`
 - `Pandowdy.UI.Tests\ViewModels\DiskStatusPanelViewModelTests.cs`
 
-### Step 8.11: Verify Build and Test
+### Step 8E.11: Verify Build and Test
 
 - Ensure all components compile
 - Run unit tests
@@ -1236,61 +1468,13 @@ services.AddTransient<DiskStatusPanelViewModel>();
 
 ---
 
-## Telemetry Integration
+## ~~Telemetry Integration~~ (ARCHIVED)
 
-### Current Approach (Simplified for Development)
-
-During initial development, we use a single simple `DiskIIMessage` type for debug output:
-
-```csharp
-// Publisher:
-_telemetry.Publish(new TelemetryMessage(_telemetryId, "debug", 
-    new DiskIIMessage("Disk Motor is now ON")));
-
-// Subscriber (debug logging):
-telemetry.Stream
-    .Where(m => m.SourceId.Category == "DiskII")
-    .Subscribe(m => Debug.WriteLine($"[{m.SourceId}] {m.Payload}"));
-```
-
-### Future Approach (Typed Payloads)
-
-When the GUI is ready to consume telemetry, replace `DiskIIMessage` with typed records:
-
-| Future Payload Type | Key | Value(s) | Description |
-|---------------------|-----|----------|-------------|
-| `DiskIIMotorMessage` | "motor" | `bool Value` | Motor on/off |
-| `DiskIITrackMessage` | "track" | `double Value` | Track position (0-34.75) |
-| `DiskIITrackSectorMessage` | "track-sector" | `double Track, int Sector` | Track + sector |
-| `DiskIIDiskInsertedMessage` | "disk-inserted" | `string Value` | Disk filename |
-| `DiskIIDiskEjectedMessage` | "disk-ejected" | (none) | Disk removed |
-| `DiskIIWriteProtectMessage` | "write-protect" | `bool Value` | Write protection |
-| `DiskIIPhaseMessage` | "phase" | `int DriveIndex, byte Value` | Stepper phases |
-| `DiskIIMotorOffScheduledMessage` | "motor-off-scheduled" | `int DriveIndex, bool Value` | Motor-off pending |
-| `DiskIIStateMessage` | "state" | (full state snapshot) | Complete state |
-
-### Future UI Subscription Pattern
-
-```csharp
-// In DiskStatusViewModel (future):
-private void HandleDiskTelemetry(TelemetryMessage msg)
-{
-    // Pattern match on payload type - no string switching needed!
-    switch (msg.Payload)
-    {
-        case DiskIIMotorMessage motor:
-            UpdateMotorState(msg.SourceId.Id, motor.Value);
-            break;
-        case DiskIITrackMessage track:
-            UpdateTrack(msg.SourceId.Id, track.Value);
-            break;
-        case DiskIIStateMessage state:
-            UpdateFullState(state);
-            break;
-        // ... etc
-    }
-}
-```
+> ⚠️ **This section is archived.** The telemetry approach was abandoned in Phase 8A.
+> See [Architectural Revision](#architectural-revision-telemetry-to-diskstatusservices) for details.
+> 
+> Telemetry files are preserved in `_Hold_` directories for potential future use with
+> CPU tracing, memory logging, or performance metrics.
 
 ---
 
@@ -1626,7 +1810,8 @@ After the Disk II integration is complete, the following refactoring tasks shoul
 | `WozDiskImageProvider.cs` | `DiskII/Providers/` | Import | Use `DiskIIConstants` |
 
 
+
 ---
 
 *Document Created: 2025*  
-*Last Updated: Phase 8 detailed with reference code analysis and telemetry message design*
+*Last Updated: Architectural Revision - Telemetry abandoned, reverting to DiskStatusServices pattern (Phase 8A-8E)*

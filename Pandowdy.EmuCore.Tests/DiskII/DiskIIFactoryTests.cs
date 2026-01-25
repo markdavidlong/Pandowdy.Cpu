@@ -51,18 +51,7 @@ public class DiskIIFactoryTests : IDisposable
 
     #region CreateDrive Tests
 
-    [Fact]
-    public void CreateDrive_ReturnsWrappedDrive()
-    {
-        // Arrange
-        var factory = new DiskIIFactory(_imageFactory, _telemetry);
 
-        // Act
-        IDiskIIDrive drive = factory.CreateDrive("Slot6-D1");
-
-        // Assert - should be wrapped in debug decorator
-        Assert.IsType<DiskIIDebugDecorator>(drive);
-    }
 
     [Fact]
     public void CreateDrive_SetsCorrectName()
@@ -90,23 +79,6 @@ public class DiskIIFactoryTests : IDisposable
         Assert.False(drive.HasDisk);
     }
 
-    [Fact]
-    public void CreateDrive_RegistersTelemetryId()
-    {
-        // Arrange
-        var factory = new DiskIIFactory(_imageFactory, _telemetry);
-        _telemetry.Clear();
-
-        // Act
-        IDiskIIDrive drive = factory.CreateDrive("Slot6-D1");
-
-        // Trigger telemetry by changing motor state
-        drive.MotorOn = true;
-
-        // Assert - telemetry was published
-        Assert.NotEmpty(_telemetry.PublishedMessages);
-        Assert.Equal(DiskIIConstants.TelemetryCategory, _telemetry.PublishedMessages[0].SourceId.Category);
-    }
 
     #endregion
 
@@ -148,23 +120,6 @@ public class DiskIIFactoryTests : IDisposable
         Assert.Equal("Slot5-D2", drive.Name);
     }
 
-    [Fact]
-    public void CreateDriveWithDisk_ReturnsWrappedDrive()
-    {
-        // Arrange
-        if (!TestDiskImages.TestImagesAvailable)
-        {
-            return; // Skip if test images not available
-        }
-
-        var factory = new DiskIIFactory(_imageFactory, _telemetry);
-
-        // Act
-        IDiskIIDrive drive = factory.CreateDriveWithDisk("Slot6-D1", TestDiskImages.TestNib);
-
-        // Assert - should be wrapped in debug decorator
-        Assert.IsType<DiskIIDebugDecorator>(drive);
-    }
 
     #endregion
 

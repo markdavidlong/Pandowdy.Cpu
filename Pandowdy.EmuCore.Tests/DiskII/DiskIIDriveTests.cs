@@ -49,19 +49,6 @@ public class DiskIIDriveTests : IDisposable
             new DiskIIDrive("Test", null!, 6, 1));
     }
 
-    [Fact]
-    public void Constructor_CreatesTelemetryId()
-    {
-        // Act
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
-
-        // Assert - telemetry ID should have been created
-        // Verify by checking that CreateId was called (we can see the ID via messages)
-        _drive.MotorOn = true;
-        var message = _telemetry.LastMessage;
-        Assert.NotNull(message);
-        Assert.Equal(DiskIIConstants.TelemetryCategory, message.Value.SourceId.Category);
-    }
 
     [Fact]
     public void Constructor_InitializesAtTrack17()
@@ -136,39 +123,6 @@ public class DiskIIDriveTests : IDisposable
     #region Motor Tests
 
     [Fact]
-    public void MotorOn_WhenSet_PublishesTelemetry()
-    {
-        // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
-        _telemetry.Clear();
-
-        // Act
-        _drive.MotorOn = true;
-
-        // Assert
-        var motorMessages = _telemetry.GetMessagesByType("motor").ToList();
-        Assert.Single(motorMessages);
-        Assert.Contains("ON", motorMessages[0].Payload?.ToString());
-    }
-
-    [Fact]
-    public void MotorOn_WhenCleared_PublishesTelemetry()
-    {
-        // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
-        _drive.MotorOn = true;
-        _telemetry.Clear();
-
-        // Act
-        _drive.MotorOn = false;
-
-        // Assert
-        var motorMessages = _telemetry.GetMessagesByType("motor").ToList();
-        Assert.Single(motorMessages);
-        Assert.Contains("OFF", motorMessages[0].Payload?.ToString());
-    }
-
-    [Fact]
     public void MotorOn_SameValue_DoesNotPublishTelemetry()
     {
         // Arrange
@@ -201,20 +155,6 @@ public class DiskIIDriveTests : IDisposable
         Assert.Equal(initialQuarterTrack + 1, _drive.QuarterTrack);
     }
 
-    [Fact]
-    public void StepToHigherTrack_PublishesTrackTelemetry()
-    {
-        // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
-        _telemetry.Clear();
-
-        // Act
-        _drive.StepToHigherTrack();
-
-        // Assert
-        var trackMessages = _telemetry.GetMessagesByType("track").ToList();
-        Assert.Single(trackMessages);
-    }
 
     [Fact]
     public void StepToLowerTrack_DecrementsQuarterTrack()
@@ -230,20 +170,7 @@ public class DiskIIDriveTests : IDisposable
         Assert.Equal(initialQuarterTrack - 1, _drive.QuarterTrack);
     }
 
-    [Fact]
-    public void StepToLowerTrack_PublishesTrackTelemetry()
-    {
-        // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
-        _telemetry.Clear();
 
-        // Act
-        _drive.StepToLowerTrack();
-
-        // Assert
-        var trackMessages = _telemetry.GetMessagesByType("track").ToList();
-        Assert.Single(trackMessages);
-    }
 
     [Fact]
     public void StepToHigherTrack_ClampsAtMax()
@@ -345,21 +272,6 @@ public class DiskIIDriveTests : IDisposable
         Assert.True(mockProvider.WasFlushed);
     }
 
-    [Fact]
-    public void EjectDisk_PublishesTelemetry()
-    {
-        // Arrange
-        var mockProvider = new MockDiskImageProvider();
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1, mockProvider);
-        _telemetry.Clear();
-
-        // Act
-        _drive.EjectDisk();
-
-        // Assert
-        var ejectMessages = _telemetry.GetMessagesByType("disk-ejected").ToList();
-        Assert.Single(ejectMessages);
-    }
 
     [Fact]
     public void IsWriteProtected_ReturnsFalse_WhenNoDisk()
@@ -478,25 +390,6 @@ public class DiskIIDriveTests : IDisposable
 
     #endregion
 
-    #region Resend Request Tests
-
-    [Fact]
-    public void ResendRequest_PublishesFullState()
-    {
-        // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
-        _drive.MotorOn = true;
-        _telemetry.Clear();
-
-        // Act - simulate a resend request
-        _telemetry.PublishResendRequest(ResendRequest.All);
-
-        // Assert
-        var stateMessages = _telemetry.GetMessagesByType("state").ToList();
-        Assert.Single(stateMessages);
-    }
-
-    #endregion
 
     #region Helper Classes
 

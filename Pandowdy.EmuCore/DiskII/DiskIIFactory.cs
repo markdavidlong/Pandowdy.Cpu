@@ -61,8 +61,9 @@ public class DiskIIFactory : IDiskIIFactory
             imageProvider: null,
             diskImageFactory: _imageFactory);
 
+        return coreDrive;
         // Wrap in debug decorator for diagnostic logging (outermost layer)
-        return new DiskIIDebugDecorator(coreDrive);
+       // return new DiskIIDebugDecorator(coreDrive);
     }
 
     /// <summary>
@@ -88,8 +89,9 @@ public class DiskIIFactory : IDiskIIFactory
             imageProvider: provider,
             diskImageFactory: _imageFactory);
 
+        return coreDrive;
         // Wrap in debug decorator (outermost layer)
-        return new DiskIIDebugDecorator(coreDrive);
+      //  return new DiskIIDebugDecorator(coreDrive);
     }
 
     /// <summary>

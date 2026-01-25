@@ -162,69 +162,7 @@ public class DiskIIIntegrationTests : IDisposable
 
     #endregion
 
-    #region Telemetry Flow Tests
-
-    [Fact]
-    public void TelemetryFlow_ControllerCreation_RegistersTelemetryId()
-    {
-        _telemetry.Clear();
-
-        var controller = CreateController();
-
-        // Controller should have created a telemetry ID
-        // (No messages published yet, but ID is created)
-        Assert.NotNull(controller);
-    }
-
-    [Fact]
-    public void TelemetryFlow_MotorOn_PublishesTelemetry()
-    {
-        var controller = CreateController();
-        InstallController(controller);
-        _telemetry.Clear();
-
-        // Turn motor on
-        controller.ReadIO(0x09);
-
-        // Drive should publish motor-on telemetry
-        var motorMessages = _telemetry.GetMessagesByType("motor");
-        Assert.NotEmpty(motorMessages);
-    }
-
-    [Fact]
-    public void TelemetryFlow_PhaseChange_PublishesTelemetry()
-    {
-        var controller = CreateController();
-        InstallController(controller);
-        _telemetry.Clear();
-
-        // Activate phase 0
-        controller.ReadIO(0x01);
-
-        // Controller should publish phase telemetry
-        var phaseMessages = _telemetry.GetMessagesByType("phase");
-        Assert.NotEmpty(phaseMessages);
-    }
-
-    [Fact]
-    public void TelemetryFlow_MotorOffScheduled_PublishesTelemetry()
-    {
-        var controller = CreateController();
-        InstallController(controller);
-
-        // Turn motor on first
-        controller.ReadIO(0x09);
-        _telemetry.Clear();
-
-        // Schedule motor off
-        controller.ReadIO(0x08);
-
-        // Should publish motor-off-scheduled telemetry
-        var scheduledMessages = _telemetry.GetMessagesByType("motor-off-scheduled");
-        Assert.NotEmpty(scheduledMessages);
-    }
-
-    #endregion
+ 
 
     #region Motor Timeout Tests (VBlank-based)
 
@@ -392,20 +330,7 @@ public class DiskIIIntegrationTests : IDisposable
 
     #region Phase Control Integration Tests
 
-    [Fact]
-    public void PhaseControl_ActivatingPhases_UpdatesControllerState()
-    {
-        var controller = CreateController();
-        InstallController(controller);
-        _telemetry.Clear();
 
-        // Activate phase 0
-        controller.ReadIO(0x01);
-
-        // Should publish phase telemetry
-        var phaseMessages = _telemetry.GetMessagesByType("phase").ToList();
-        Assert.NotEmpty(phaseMessages);
-    }
 
     [Fact]
     public void PhaseControl_SequentialPhases_StepHead()
@@ -482,14 +407,6 @@ public class DiskIIIntegrationTests : IDisposable
         Assert.Equal("Slot6-D1", drive.Name);
     }
 
-    [Fact]
-    public void Factory_DrivesAreWrappedInDebugDecorator()
-    {
-        var drive = _driveFactory.CreateDrive("Slot6-D1");
-
-        // Factory should wrap in DiskIIDebugDecorator
-        Assert.IsType<DiskIIDebugDecorator>(drive);
-    }
 
     [Fact]
     public void Factory_CreatesIndependentDrives()
@@ -524,26 +441,7 @@ public class DiskIIIntegrationTests : IDisposable
         Assert.False(controller.Drives[0].MotorOn);
     }
 
-    [Fact]
-    public void FullStack_TelemetryFlowsFromDriveToAggregator()
-    {
-        var controller = CreateController();
-        InstallController(controller);
-        _telemetry.Clear();
 
-        // Motor on publishes telemetry from drive
-        controller.ReadIO(0x09);
-
-        // Verify telemetry was received
-        Assert.NotEmpty(_telemetry.PublishedMessages);
-
-        // Find motor-related messages
-        var motorMessages = _telemetry.PublishedMessages
-            .Where(m => m.MessageType == "motor")
-            .ToList();
-
-        Assert.NotEmpty(motorMessages);
-    }
 
     [Fact]
     public void FullStack_13SectorController_WorksSameAs16Sector()

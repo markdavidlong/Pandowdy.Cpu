@@ -174,11 +174,14 @@ namespace Pandowdy
             if (slots.GetCardIn(SlotNumber.Slot6) is DiskIIControllerCard diskController)
             {
                 // Example: Insert a disk image into Drive 1
-//                diskController.Drives[0].InsertDisk(@"E:\XPS Diagnostic IIe 1.0.5.nib");
-                diskController.Drives[0].InsertDisk(@"E:\A2eDiagnostics_v2.1.nib");
+                // diskController.Drives[0].InsertDisk(@"E:\XPS Diagnostic IIe 1.0.5.nib");
+                diskController.Drives[0].InsertDisk(@"E:\test.nib");
+                // diskController.Drives[0].InsertDisk(@"E:\A2eDiagnostics_v2.1.nib");
+                // diskController.Drives[0].InsertDisk(@"E:\missing_ring_good.nib");
 
                 // Example: Insert a disk image into Drive 2
                 // diskController.Drives[1].InsertDisk(@"C:\path\to\data.dsk");
+                diskController.Drives[1].InsertDisk(@"E:\blank.nib");
             }
 
             return Task.CompletedTask;

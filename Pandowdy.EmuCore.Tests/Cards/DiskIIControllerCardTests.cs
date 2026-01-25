@@ -319,20 +319,7 @@ public class DiskIIControllerCardTests : IDisposable
         }
     }
 
-    [Fact]
-    public void ReadIO_PhaseOn_PublishesTelemetry()
-    {
-        var card = CreateCard();
-        card.OnInstalled(SlotNumber.Slot6);
-        _telemetry.Clear();
 
-        // Turn on phase 0
-        card.ReadIO(0x01);
-
-        // Should publish phase telemetry
-        var phaseMessages = _telemetry.GetMessagesByType("phase");
-        Assert.NotEmpty(phaseMessages);
-    }
 
     #endregion
 
@@ -368,27 +355,7 @@ public class DiskIIControllerCardTests : IDisposable
         Assert.True(card.Drives[0].MotorOn);
     }
 
-    [Fact]
-    public void ReadIO_MotorOff_SchedulesMotorOff()
-    {
-        var card = CreateCard();
-        card.OnInstalled(SlotNumber.Slot6);
-        _telemetry.Clear();
 
-        // Turn motor on first
-        card.ReadIO(0x09);
-        _telemetry.Clear();
-
-        // Request motor off
-        card.ReadIO(0x08);
-
-        // Motor should still be on (1-second delay)
-        Assert.True(card.Drives[0].MotorOn);
-
-        // Should publish motor-off-scheduled telemetry
-        var scheduledMessages = _telemetry.GetMessagesByType("motor-off-scheduled");
-        Assert.NotEmpty(scheduledMessages);
-    }
 
     #endregion
 
@@ -466,18 +433,7 @@ public class DiskIIControllerCardTests : IDisposable
 
     #region I/O Write Tests
 
-    [Fact]
-    public void WriteIO_PhaseOn_UpdatesPhaseState()
-    {
-        var card = CreateCard();
-        card.OnInstalled(SlotNumber.Slot6);
-        _telemetry.Clear();
 
-        card.WriteIO(0x01, 0x00); // Phase 0 on
-
-        var phaseMessages = _telemetry.GetMessagesByType("phase");
-        Assert.NotEmpty(phaseMessages);
-    }
 
     [Fact]
     public void WriteIO_MotorOn_TurnsOnMotor()
@@ -524,24 +480,7 @@ public class DiskIIControllerCardTests : IDisposable
         Assert.False(card.Drives[1].MotorOn);
     }
 
-    [Fact]
-    public void Reset_CancelsMotorOffSchedule()
-    {
-        var card = CreateCard();
-        card.OnInstalled(SlotNumber.Slot6);
 
-        // Turn on and schedule off
-        card.ReadIO(0x09);
-        card.ReadIO(0x08);
-        _telemetry.Clear();
-
-        // Reset
-        card.Reset();
-
-        // Verify motor-off-scheduled telemetry shows cancelled
-        var scheduledMessages = _telemetry.GetMessagesByType("motor-off-scheduled");
-        Assert.NotEmpty(scheduledMessages);
-    }
 
     [Fact]
     public void Reset_SelectsDrive1()
