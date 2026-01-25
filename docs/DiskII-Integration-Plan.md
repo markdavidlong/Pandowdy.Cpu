@@ -36,7 +36,7 @@ This document provides a comprehensive plan for integrating the Disk II emulatio
 5. [Phase 1: Foundation](#phase-1-foundation) ✅ COMPLETED
 6. [Phase 2: Interfaces](#phase-2-interfaces) ✅ COMPLETED
 7. [Phase 3: Disk Image Providers](#phase-3-disk-image-providers) ✅ COMPLETED
-8. [Phase 4: Drive Implementation](#phase-4-drive-implementation)
+8. [Phase 4: Drive Implementation](#phase-4-drive-implementation) ✅ COMPLETED
 9. [Phase 5: Controller Card](#phase-5-controller-card)
 10. [Phase 6: Factory Registration](#phase-6-factory-registration)
 11. [Phase 7: Tests](#phase-7-tests)
@@ -635,149 +635,111 @@ Build successful. CiderPress2 project references added to Pandowdy.EmuCore.cspro
 
 **Goal:** Add drive implementation with telemetry integration.
 
-### Step 4.1: Copy NullDiskIIDrive
+### Step 4.1: Copy NullDiskIIDrive ✅ COMPLETED
 
 **Source:** `Pandowdy.DiskImportCode\NullDiskIIDrive.cs`  
 **Target:** `Pandowdy.EmuCore\DiskII\NullDiskIIDrive.cs`
 
 **Changes:**
 - Update namespace to `Pandowdy.EmuCore.DiskII`
-- Fix brace style (see Code Style Corrections)
+- Fix brace style and indentation
+- Use `DiskIIConstants.MaxQuarterTracks` instead of magic number
+- Enhanced XML documentation
 
-### Step 4.2: Create DiskIIDrive with Telemetry
+**Tests:** `Pandowdy.EmuCore.Tests\DiskII\NullDiskIIDriveTests.cs` (21 tests) ✅
+- Constructor initializes name and state correctly
+- Reset restores track 17 and motor off
+- Motor state can be toggled
+- StepToHigherTrack/StepToLowerTrack work with clamping
+- Disk operations are no-ops (InsertDisk, EjectDisk)
+- GetBit always returns null, SetBit always returns false
+- HasDisk always returns false
+
+### Step 4.2: Create DiskIIDrive with Telemetry ✅ COMPLETED
 
 **Source:** `Pandowdy.DiskImportCode\DiskIIDrive.cs`  
 **Target:** `Pandowdy.EmuCore\DiskII\DiskIIDrive.cs`
 
 **Major Changes:**
 1. Update namespace to `Pandowdy.EmuCore.DiskII`
-2. Add `ITelemetryAggregator` dependency
-3. Create telemetry ID in constructor
-4. Publish telemetry on state changes
-5. Subscribe to resend requests
-6. Remove dependency on `IDiskImageFactory` from constructor (simplify)
+2. Add `ITelemetryAggregator` dependency (required parameter)
+3. Add `slotNumber` and `driveNumber` parameters for telemetry identification
+4. Create telemetry ID in constructor
+5. Publish telemetry on motor, track, disk insert/eject state changes
+6. Subscribe to resend requests for full state publishing
+7. Use `DiskIIConstants.MaxQuarterTracks` instead of local constant
+8. Call `IDiskImageProvider.Dispose()` directly (interface now extends IDisposable)
 
-**Modified Constructor:**
-```csharp
-public DiskIIDrive(
-    string name, 
-    ITelemetryAggregator telemetry,
-    int slotNumber,
-    int driveNumber,
-    IDiskImageProvider? imageProvider = null)
-{
-    Name = name ?? "Unnamed";
-    _telemetry = telemetry;
-    _slotNumber = slotNumber;
-    _driveNumber = driveNumber;
-    _imageProvider = imageProvider;
-    
-    // Register with telemetry system
-    _telemetryId = telemetry.CreateId(DiskIIConstants.TelemetryCategory);
-    
-    // Subscribe to resend requests
-    telemetry.ResendRequests
-        .Where(r => r.MatchesProvider(_telemetryId))
-        .Subscribe(_ => PublishFullState());
-    
-    Reset();
-    _imageProvider?.SetQuarterTrack(_quarterSteps);
-}
-```
+**Tests:** `Pandowdy.EmuCore.Tests\DiskII\DiskIIDriveTests.cs` (33 tests) ✅
+- Constructor tests: name, null handling, telemetry ID creation, initial state
+- Reset tests: track restoration, motor off
+- Motor tests: telemetry publishing on state change, no publish on same value
+- Track stepping tests: increment/decrement, clamping, telemetry, provider notification
+- Disk operations tests: HasDisk, InsertDisk throws without factory, EjectDisk disposes/flushes
+- Bit operations tests: GetBit/SetBit delegation, null/off handling
+- Resend request tests: full state published on request
 
-**Add Telemetry Publishing:**
-```csharp
-private void PublishFullState()
-{
-    var state = new DiskIIState(
-        _slotNumber,
-        _driveNumber,
-        _motorOn,
-        Track,
-        -1, // Sector unknown at drive level
-        _imageProvider?.FilePath ?? string.Empty,
-        IsWriteProtected(),
-        0, // Phase state managed by controller
-        false); // Motor-off scheduled managed by controller
-    
-    _telemetry.Publish(new TelemetryMessage(_telemetryId, "state", state));
-}
+**Helper Created:** `Pandowdy.EmuCore.Tests\Helpers\MockTelemetryAggregator.cs`
+- Mock implementation of ITelemetryAggregator for unit testing
+- Records all published messages and resend requests
+- Provides helper methods for test assertions
 
-// Modify MotorOn setter:
-public bool MotorOn
-{
-    get => _motorOn;
-    set
-    {
-        if (_motorOn != value)
-        {
-            _motorOn = value;
-            _telemetry.Publish(new TelemetryMessage(_telemetryId, "motor", value));
-            Debug.WriteLine($"Drive motor turned {(value ? "ON" : "OFF")}");
-        }
-    }
-}
-
-// Add telemetry to StepToHigherTrack/StepToLowerTrack:
-// After position changes:
-_telemetry.Publish(new TelemetryMessage(_telemetryId, "track", Track));
-```
-
-### Step 4.3: Copy DiskIIDebugDecorator
+### Step 4.3: Copy DiskIIDebugDecorator ✅ COMPLETED
 
 **Source:** `Pandowdy.DiskImportCode\DiskIIDebugDecorator.cs`  
 **Target:** `Pandowdy.EmuCore\DiskII\DiskIIDebugDecorator.cs`
 
 **Changes:**
 - Update namespace to `Pandowdy.EmuCore.DiskII`
-- Fix brace style
+- Fix brace style and indentation
+- Use `DiskIIConstants.TrackCount` instead of magic number 35
+- Enhanced XML documentation with usage examples
+- Renamed interface references from `IDiskDrive` to `IDiskIIDrive` in comments
 
-### Step 4.4: Remove DiskIIStatusDecorator
+**Tests:** `Pandowdy.EmuCore.Tests\DiskII\DiskIIDebugDecoratorTests.cs` (17 tests) ✅
+- Constructor tests: null rejection, wrapping
+- Property delegation tests: Name, Track, QuarterTrack, MotorOn (get/set), HasDisk
+- Method delegation tests: Reset, StepToHigherTrack, StepToLowerTrack, GetBit, SetBit, IsWriteProtected, InsertDisk, EjectDisk
+- Decorator chain tests: can wrap another decorator
+
+### Step 4.4: Remove DiskIIStatusDecorator ✅ COMPLETED
 
 **Action:** Do NOT copy this file. Functionality replaced by telemetry in DiskIIDrive.
 
-### Step 4.5: Create DiskIIFactory
+### Step 4.5: Create DiskIIFactory ✅ COMPLETED
 
 **Source:** `Pandowdy.DiskImportCode\DiskIIFactory.cs`  
 **Target:** `Pandowdy.EmuCore\DiskII\DiskIIFactory.cs`
 
 **Major Changes:**
 1. Update namespace to `Pandowdy.EmuCore.DiskII`
-2. Remove `IDiskStatusMutator` parameter
-3. Add `ITelemetryAggregator` parameter
-4. Remove `DiskIIStatusDecorator` from chain
-5. Pass telemetry, slot, and drive to DiskIIDrive
+2. Remove `IDiskStatusMutator` parameter - replaced with `ITelemetryAggregator`
+3. Remove `DiskIIStatusDecorator` from decorator chain
+4. Pass telemetry, slot, and drive numbers to DiskIIDrive constructor
+5. Added CreateDriveWithDisk method for loading disks at creation
+6. Improved ParseDriveName with TryParse for robustness
+7. Made ParseDriveName internal for test access
 
-**Simplified Factory:**
-```csharp
-namespace Pandowdy.EmuCore.DiskII;
+**Tests:** `Pandowdy.EmuCore.Tests\DiskII\DiskIIFactoryTests.cs` (25 tests) ✅
+- Constructor tests: null parameter rejection
+- CreateDrive tests: returns wrapped drive, sets name, creates empty, registers telemetry
+- CreateDriveWithDisk tests: loads disk, sets name, returns wrapped drive
+- ParseDriveName tests: valid formats, invalid formats, null handling
 
-public class DiskIIFactory(
-    IDiskImageFactory imageFactory, 
-    ITelemetryAggregator telemetry) : IDiskIIFactory
-{
-    public IDiskIIDrive CreateDrive(string driveName)
-    {
-        var (slotNumber, driveNumber) = ParseDriveName(driveName);
-        
-        // Create core drive with telemetry integration
-        var coreDrive = new DiskIIDrive(
-            driveName, 
-            telemetry, 
-            slotNumber, 
-            driveNumber);
-        
-        // Wrap in debug decorator (outermost layer)
-        return new DiskIIDebugDecorator(coreDrive);
-    }
-    
-    // ... ParseDriveName unchanged
-}
-```
+### Step 4.6: Verify Build ✅ COMPLETED
 
-### Step 4.6: Verify Build
+All drive components compile correctly. Full test suite passes (1089 tests).
 
-Ensure all drive components compile correctly.
+---
+
+## Phase 4: Drive Implementation ✅ COMPLETED
+
+**Summary:** All drive implementation steps complete. Phase 4 added:
+- NullDiskIIDrive (21 tests)
+- DiskIIDrive with telemetry (33 tests)
+- DiskIIDebugDecorator (17 tests)
+- DiskIIFactory (25 tests)
+- MockTelemetryAggregator helper
 
 ---
 
@@ -1222,4 +1184,4 @@ After the Disk II integration is complete, the following refactoring tasks shoul
 ---
 
 *Document Created: 2025*  
-*Last Updated: Phase 3 Complete - All disk image providers and 82 tests imported to Pandowdy.EmuCore*
+*Last Updated: Phase 4 Complete - Drive Implementation with telemetry (1089 total tests)*

@@ -229,10 +229,11 @@ public class SectorDiskImageProviderTests : IDisposable
         }
 
         // Arrange
-        _provider = new SectorDiskImageProvider(TestDiskImages.DosDsk);
-
-        // Act
-        _provider.IsWriteProtected = true;
+        _provider = new SectorDiskImageProvider(TestDiskImages.DosDsk)
+        {
+            // Act
+            IsWriteProtected = true
+        };
 
         // Assert
         Assert.True(_provider.IsWriteProtected);

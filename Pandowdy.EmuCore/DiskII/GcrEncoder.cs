@@ -42,7 +42,7 @@ public class GcrEncoder
     /// <param name="track">Track number (0-34).</param>
     /// <param name="sector">Sector number (0-15).</param>
     /// <returns>Number of bytes written.</returns>
-    public int WriteAddressField(byte[] buffer, int offset, byte volume, int track, int sector)
+    public static int WriteAddressField(byte[] buffer, int offset, byte volume, int track, int sector)
     {
         int start = offset;
 
@@ -85,7 +85,7 @@ public class GcrEncoder
     /// <param name="offset">Starting offset in buffer.</param>
     /// <param name="sectorData">256 bytes of logical sector data.</param>
     /// <returns>Number of bytes written.</returns>
-    public int WriteDataField(byte[] buffer, int offset, byte[] sectorData)
+    public static int WriteDataField(byte[] buffer, int offset, byte[] sectorData)
     {
         if (sectorData.Length != 256)
         {
@@ -134,7 +134,7 @@ public class GcrEncoder
     /// <param name="offset">Starting offset in buffer.</param>
     /// <param name="gapSize">Number of sync bytes to write.</param>
     /// <returns>Number of bytes written.</returns>
-    public int WriteSyncGap(byte[] buffer, int offset, int gapSize)
+    public static int WriteSyncGap(byte[] buffer, int offset, int gapSize)
     {
         for (int i = 0; i < gapSize; i++)
         {

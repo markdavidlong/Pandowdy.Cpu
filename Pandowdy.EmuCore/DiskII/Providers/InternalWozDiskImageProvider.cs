@@ -392,7 +392,7 @@ public class InternalWozDiskImageProvider : IDiskImageProvider, IDisposable
         {
             _stream.Read(trackDescriptor);
 
-            ushort startingBlock = BitConverter.ToUInt16(trackDescriptor.Slice(0, 2));
+            ushort startingBlock = BitConverter.ToUInt16(trackDescriptor[..2]);
             ushort blockCount = BitConverter.ToUInt16(trackDescriptor.Slice(2, 2));
             uint bitCount = BitConverter.ToUInt32(trackDescriptor.Slice(4, 4));
 

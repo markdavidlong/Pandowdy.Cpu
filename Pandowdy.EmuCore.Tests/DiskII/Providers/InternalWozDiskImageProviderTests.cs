@@ -210,8 +210,10 @@ public class InternalWozDiskImageProviderTests : IDisposable
         }
 
         // Arrange
-        _provider = new InternalWozDiskImageProvider(TestDiskImages.TestWoz);
-        _provider.IsWriteProtected = true;
+        _provider = new InternalWozDiskImageProvider(TestDiskImages.TestWoz)
+        {
+            IsWriteProtected = true
+        };
 
         // Act
         bool result = _provider.WriteBit(true, 0);
@@ -233,10 +235,11 @@ public class InternalWozDiskImageProviderTests : IDisposable
         }
 
         // Arrange
-        _provider = new InternalWozDiskImageProvider(TestDiskImages.TestWoz);
-
-        // Act
-        _provider.IsWriteProtected = true;
+        _provider = new InternalWozDiskImageProvider(TestDiskImages.TestWoz)
+        {
+            // Act
+            IsWriteProtected = true
+        };
 
         // Assert
         Assert.True(_provider.IsWriteProtected);

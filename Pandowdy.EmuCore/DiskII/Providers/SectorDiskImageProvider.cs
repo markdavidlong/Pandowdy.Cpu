@@ -220,11 +220,11 @@ public class SectorDiskImageProvider : IDiskImageProvider, IDisposable
             }
 
             // Write address field
-            offset += _encoder.WriteAddressField(trackData, offset,
+            offset += GcrEncoder.WriteAddressField(trackData, offset,
                 volume: 254, track, sector);
 
             // Write data field (6&2 encoded)
-            offset += _encoder.WriteDataField(trackData, offset, sectorData);
+            offset += GcrEncoder.WriteDataField(trackData, offset, sectorData);
 
             // Write gap between sectors (if not the last sector)
             if (sector < DiskIIConstants.SectorsPerTrack16 - 1)
@@ -233,7 +233,7 @@ public class SectorDiskImageProvider : IDiskImageProvider, IDisposable
                 int sectorsLeft = DiskIIConstants.SectorsPerTrack16 - sector - 1;
                 int gapSize = remainingSpace / (sectorsLeft + 1);  // Distribute remaining space
                 gapSize = Math.Min(Math.Max(gapSize, 10), 50);  // Clamp between 10-50 bytes
-                offset += _encoder.WriteSyncGap(trackData, offset, gapSize);
+                offset += GcrEncoder.WriteSyncGap(trackData, offset, gapSize);
             }
         }
 
@@ -253,6 +253,12 @@ public class SectorDiskImageProvider : IDiskImageProvider, IDisposable
     {
         if (!_disposed)
         {
+            // Dispose the disk image first (CiderPress2 requires this before stream disposal)
+            if (_diskImage is IDisposable disposableDisk)
+            {
+                disposableDisk.Dispose();
+            }
+
             _stream?.Dispose();
             _disposed = true;
             GC.SuppressFinalize(this);

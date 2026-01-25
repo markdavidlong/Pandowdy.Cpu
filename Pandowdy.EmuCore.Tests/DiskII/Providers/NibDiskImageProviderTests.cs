@@ -233,8 +233,10 @@ public class NibDiskImageProviderTests : IDisposable
         }
 
         // Arrange
-        _provider = new NibDiskImageProvider(TestDiskImages.TestNib);
-        _provider.IsWriteProtected = true;
+        _provider = new NibDiskImageProvider(TestDiskImages.TestNib)
+        {
+            IsWriteProtected = true
+        };
 
         // Act
         bool result = _provider.WriteBit(true, 0);
@@ -290,10 +292,11 @@ public class NibDiskImageProviderTests : IDisposable
         }
 
         // Arrange
-        _provider = new NibDiskImageProvider(TestDiskImages.TestNib);
-
-        // Act
-        _provider.IsWriteProtected = true;
+        _provider = new NibDiskImageProvider(TestDiskImages.TestNib)
+        {
+            // Act
+            IsWriteProtected = true
+        };
 
         // Assert
         Assert.True(_provider.IsWriteProtected);
