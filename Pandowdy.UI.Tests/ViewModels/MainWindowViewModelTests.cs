@@ -48,16 +48,19 @@ public class MainWindowViewModelTests
         public TestEmulatorState EmulatorState { get; }
         public EmulatorStateViewModel EmulatorStateViewModel { get; }
         public SystemStatusViewModel SystemStatusViewModel { get; }
+        public DiskStatusPanelViewModel DiskStatusViewModel { get; }
         public MainWindowViewModel ViewModel { get; }
 
         public MainWindowViewModelFixture()
         {
             EmulatorState = new TestEmulatorState();
             var statusProvider = new SystemStatusProvider();
-            
+            var diskStatusProvider = new DiskStatusProvider();
+
             EmulatorStateViewModel = new EmulatorStateViewModel(EmulatorState);
             SystemStatusViewModel = new SystemStatusViewModel(statusProvider);
-            ViewModel = new MainWindowViewModel(EmulatorStateViewModel, EmulatorState, SystemStatusViewModel);
+            DiskStatusViewModel = new DiskStatusPanelViewModel(diskStatusProvider);
+            ViewModel = new MainWindowViewModel(EmulatorStateViewModel, EmulatorState, SystemStatusViewModel, DiskStatusViewModel);
         }
     }
 

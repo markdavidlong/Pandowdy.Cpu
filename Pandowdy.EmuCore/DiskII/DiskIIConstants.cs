@@ -10,7 +10,7 @@ namespace Pandowdy.EmuCore.DiskII;
 /// </para>
 /// <para>
 /// <strong>Timing Basis:</strong> The Apple II CPU runs at 1.023 MHz while the Disk II
-/// reads/writes at 250 kHz (4μs per bit). This creates a ratio of exactly 45/11 CPU
+/// reads/writes at 250 kHz (4Î¼s per bit). This creates a ratio of exactly 45/11 CPU
 /// cycles per bit, which must be maintained for accurate disk timing.
 /// </para>
 /// </remarks>
@@ -20,8 +20,8 @@ public static class DiskIIConstants
     /// Cycles per bit for accurate Apple II Disk II timing.
     /// </summary>
     /// <remarks>
-    /// The disk reads at 250 kHz (4μs per bit) while the CPU runs at 1.023 MHz.
-    /// This gives exactly 45/11 cycles per bit ≈ 4.090909 cycles/bit.
+    /// The disk reads at 250 kHz (4Î¼s per bit) while the CPU runs at 1.023 MHz.
+    /// This gives exactly 45/11 cycles per bit â‰ˆ 4.090909 cycles/bit.
     /// </remarks>
     public const double CyclesPerBit = 45.0 / 11.0; // 4.090909...
 
@@ -36,7 +36,7 @@ public static class DiskIIConstants
     public const int BytesPerNibTrack = 6656;
 
     /// <summary>
-    /// Bits per track (6656 bytes × 8 bits = 53,248 bits).
+    /// Bits per track (6656 bytes Ã— 8 bits = 53,248 bits).
     /// </summary>
     public const int BitsPerTrack = BytesPerNibTrack * 8;
 
@@ -44,7 +44,7 @@ public static class DiskIIConstants
     /// Maximum quarter-track position.
     /// </summary>
     /// <remarks>
-    /// 35 tracks × 4 quarter-steps per track = 140, plus position 0 = 141 total positions.
+    /// 35 tracks Ã— 4 quarter-steps per track = 140, plus position 0 = 141 total positions.
     /// Valid positions are 0-140, representing tracks 0.00 to 35.00.
     /// </remarks>
     public const int MaxQuarterTracks = 35 * 4; // 140
@@ -65,12 +65,12 @@ public static class DiskIIConstants
     public const int BytesPerSector = 256;
 
     /// <summary>
-    /// Total bytes per disk in 16-sector format (35 tracks × 16 sectors × 256 bytes).
+    /// Total bytes per disk in 16-sector format (35 tracks Ã— 16 sectors Ã— 256 bytes).
     /// </summary>
     public const int TotalBytes16Sector = TrackCount * SectorsPerTrack16 * BytesPerSector; // 143,360
 
     /// <summary>
-    /// Total bytes per disk in 13-sector format (35 tracks × 13 sectors × 256 bytes).
+    /// Total bytes per disk in 13-sector format (35 tracks Ã— 13 sectors Ã— 256 bytes).
     /// </summary>
     public const int TotalBytes13Sector = TrackCount * SectorsPerTrack13 * BytesPerSector; // 116,480
 

@@ -343,7 +343,7 @@ public abstract class DiskIIControllerCard : ICard
             MoveHead(direction);
 
 #if ControllerDebug
-            Debug.WriteLine($"[{_clocking.TotalCycles}] 🔄 Head moved: Position {lastPosition}→{targetPosition}, Direction={direction:+0;-0}, QuarterTrack={SelectedDrive.QuarterTrack}, Track={SelectedDrive.Track:F2}");
+            Debug.WriteLine($"[{_clocking.TotalCycles}] ðŸ”„ Head moved: Position {lastPosition}â†’{targetPosition}, Direction={direction:+0;-0}, QuarterTrack={SelectedDrive.QuarterTrack}, Track={SelectedDrive.Track:F2}");
 #endif
         }
     }
@@ -395,7 +395,7 @@ public abstract class DiskIIControllerCard : ICard
                 if (_motorOffScheduledCycle > 0)
                 { 
 #if ControllerDebug
-                    Debug.WriteLine($"[{_clocking.TotalCycles}] ⏹️ MOTOR-OFF CANCELLED (was scheduled for cycle {_motorOffScheduledCycle})");
+                    Debug.WriteLine($"[{_clocking.TotalCycles}] â¹ï¸ MOTOR-OFF CANCELLED (was scheduled for cycle {_motorOffScheduledCycle})");
 #endif
                     _motorOffScheduledCycle = 0;
 
@@ -406,7 +406,7 @@ public abstract class DiskIIControllerCard : ICard
                 if (!SelectedDrive.MotorOn)
                 {
 #if ControllerDebug
-                Debug.WriteLine($"[{_clocking.TotalCycles}] 🔵 MOTOR ON - Drive {_selectedDriveIndex + 1}, Track {SelectedDrive.Track:F2}");
+                Debug.WriteLine($"[{_clocking.TotalCycles}] ðŸ”µ MOTOR ON - Drive {_selectedDriveIndex + 1}, Track {SelectedDrive.Track:F2}");
 #endif
                     _lastBitShiftCycle = _clocking.TotalCycles;  // Only reset timing (matches TypeScript cycleRemainder = 0)
                     // DON'T clear _shiftRegister - it must maintain state across motor cycles!
@@ -427,7 +427,7 @@ public abstract class DiskIIControllerCard : ICard
                 {
                     _motorOffScheduledCycle = _clocking.TotalCycles + MotorOffDelayCycles;
 #if ControllerDebug
-                Debug.WriteLine($"[{_clocking.TotalCycles}] ⏱️ MOTOR-OFF SCHEDULED for cycle {_motorOffScheduledCycle} (~1 sec delay)");
+                Debug.WriteLine($"[{_clocking.TotalCycles}] â±ï¸ MOTOR-OFF SCHEDULED for cycle {_motorOffScheduledCycle} (~1 sec delay)");
 #endif
                     // Update status: motor-off now scheduled
                     UpdateMotorOffScheduledStatus(true);
@@ -446,7 +446,7 @@ public abstract class DiskIIControllerCard : ICard
         if (_motorOffScheduledCycle > 0 && _clocking.TotalCycles >= _motorOffScheduledCycle && SelectedDrive != null)
         {
 #if ControllerDebug
-            Debug.WriteLine($"[{_clocking.TotalCycles}] 🔴 MOTOR OFF (delayed) - Drive {_selectedDriveIndex + 1}, Track {SelectedDrive.Track:F2}");
+            Debug.WriteLine($"[{_clocking.TotalCycles}] ðŸ”´ MOTOR OFF (delayed) - Drive {_selectedDriveIndex + 1}, Track {SelectedDrive.Track:F2}");
 #endif
 
             // Clear the schedule before turning motor off
@@ -469,7 +469,7 @@ public abstract class DiskIIControllerCard : ICard
     /// </summary>
     /// <remarks>
     /// This ensures motor-off countdown happens even when software isn't accessing the disk.
-    /// Granularity: ±16.6ms (1.7% of 1-second motor-off delay) - acceptable for mechanical timing.
+    /// Granularity: Â±16.6ms (1.7% of 1-second motor-off delay) - acceptable for mechanical timing.
     /// </remarks>
     private void OnVBlankTick()
     {
@@ -543,7 +543,7 @@ public abstract class DiskIIControllerCard : ICard
                 if (oldDriveIndex != _selectedDriveIndex)
                 {
         #if ControllerDebug
-                    Debug.WriteLine($"[{_clocking.TotalCycles}] 💿 DRIVE SELECT: Drive {_selectedDriveIndex + 1} (was Drive {oldDriveIndex + 1})");
+                    Debug.WriteLine($"[{_clocking.TotalCycles}] ðŸ’¿ DRIVE SELECT: Drive {_selectedDriveIndex + 1} (was Drive {oldDriveIndex + 1})");
         #endif
 
                     // Handle OLD drive: schedule motor-off and clear phases
@@ -553,7 +553,7 @@ public abstract class DiskIIControllerCard : ICard
                         // Schedule motor-off for the deselected drive (1-second delay)
                         _motorOffScheduledCycle = _clocking.TotalCycles + MotorOffDelayCycles;
         #if ControllerDebug
-                        Debug.WriteLine($"[{_clocking.TotalCycles}] ⏱️ MOTOR-OFF SCHEDULED for Drive {oldDriveIndex + 1} at cycle {_motorOffScheduledCycle}");
+                        Debug.WriteLine($"[{_clocking.TotalCycles}] â±ï¸ MOTOR-OFF SCHEDULED for Drive {oldDriveIndex + 1} at cycle {_motorOffScheduledCycle}");
         #endif
 
                         // Update status for old drive's motor-off scheduling
@@ -663,7 +663,7 @@ public abstract class DiskIIControllerCard : ICard
     /// <remarks>
     /// <para>
     /// This method ensures the virtual disk "spins" in sync with CPU cycles.
-    /// It processes one bit for every 45/11 CPU cycles (≈4.09 cycles) elapsed since the last call.
+    /// It processes one bit for every 45/11 CPU cycles (â‰ˆ4.09 cycles) elapsed since the last call.
     /// </para>
     /// <para>
     /// The cycle-based disk position in NibDiskImageProvider already handles
@@ -766,9 +766,9 @@ public abstract class DiskIIControllerCard : ICard
                     // Verify checksum
                     byte calculatedChecksum = (byte)(volume ^ track ^ sector);
 #if ControllerDebug
-                    string checksumStatus = (checksum == calculatedChecksum) ? "✓" : "✗ FAIL";
+                    string checksumStatus = (checksum == calculatedChecksum) ? "âœ“" : "âœ— FAIL";
 
-                    Debug.WriteLine($"     📍 Address Field: Vol={volume:D3} Track={track:D2} Sector={sector:D2} Checksum={checksum:X2} {checksumStatus}");
+                    Debug.WriteLine($"     ðŸ“ Address Field: Vol={volume:D3} Track={track:D2} Sector={sector:D2} Checksum={checksum:X2} {checksumStatus}");
 #endif
 
                     // Update disk status with current track and sector
@@ -783,15 +783,15 @@ public abstract class DiskIIControllerCard : ICard
                 // Expect DE AA EB
                 if (_addressFieldIndex == 0 && detectedByte != 0xDE)
                 {
-                    Debug.WriteLine($"     ⚠️ Address epilogue error: Expected DE, got {detectedByte:X2}");
+                    Debug.WriteLine($"     âš ï¸ Address epilogue error: Expected DE, got {detectedByte:X2}");
                 }
                 else if (_addressFieldIndex == 1 && detectedByte != 0xAA)
                 {
-                    Debug.WriteLine($"     ⚠️ Address epilogue error: Expected AA, got {detectedByte:X2}");
+                    Debug.WriteLine($"     âš ï¸ Address epilogue error: Expected AA, got {detectedByte:X2}");
                 }
                 else if (_addressFieldIndex == 2 && detectedByte != 0xEB)
                 {
-                    Debug.WriteLine($"     ⚠️ Address epilogue error: Expected EB, got {detectedByte:X2}");
+                    Debug.WriteLine($"     âš ï¸ Address epilogue error: Expected EB, got {detectedByte:X2}");
                 }
 
                 _addressFieldIndex++;
@@ -828,15 +828,15 @@ public abstract class DiskIIControllerCard : ICard
                 // Expect DE AA EB
                 if (_dataFieldIndex == 0 && detectedByte != 0xDE)
                 {
-                    Debug.WriteLine($"     ⚠️ Data epilogue error: Expected DE, got {detectedByte:X2}");
+                    Debug.WriteLine($"     âš ï¸ Data epilogue error: Expected DE, got {detectedByte:X2}");
                 }
                 else if (_dataFieldIndex == 1 && detectedByte != 0xAA)
                 {
-                    Debug.WriteLine($"     ⚠️ Data epilogue error: Expected AA, got {detectedByte:X2}");
+                    Debug.WriteLine($"     âš ï¸ Data epilogue error: Expected AA, got {detectedByte:X2}");
                 }
                 else if (_dataFieldIndex == 2 && detectedByte != 0xEB)
                 {
-                    Debug.WriteLine($"     ⚠️ Data epilogue error: Expected EB, got {detectedByte:X2}");
+                    Debug.WriteLine($"     âš ï¸ Data epilogue error: Expected EB, got {detectedByte:X2}");
                 }
 
                 _dataFieldIndex++;
@@ -1080,7 +1080,7 @@ public abstract class DiskIIControllerCard : ICard
             if (drive != null && drive.MotorOn)
             {
 #if ControllerDebug
-                Debug.WriteLine($"[{_clocking.TotalCycles}] 🔴 RESET: Immediate motor-off on {drive.Name}");
+                Debug.WriteLine($"[{_clocking.TotalCycles}] ðŸ”´ RESET: Immediate motor-off on {drive.Name}");
 #endif
                 drive.MotorOn = false;
             }

@@ -901,14 +901,14 @@ public class DiskIIControllerCardTests
             Assert.True(initialQuarterTrack < DiskIIConstants.MaxQuarterTracks, "Initial quarter track should allow stepping to higher tracks");
 
             // Sync phase state to head position (quarterTrack 68 = position 4, which is Phase 2)
-            card.ReadIO(0x05); // Phase 2 on → _currentPhase = 4, pos = 4
+            card.ReadIO(0x05); // Phase 2 on â†’ _currentPhase = 4, pos = 4
 
             // Step forward using proper overlapping phases (add next phase, then remove previous)
-            // Position sequence: 4 → 5 → 6 → 7 → 0
-            card.ReadIO(0x07); // Phase 3 on (2+3 = pos 5) → +1
-            card.ReadIO(0x04); // Phase 2 off (3 only = pos 6) → +1
-            card.ReadIO(0x01); // Phase 0 on (3+0 = pos 7) → +1
-            card.ReadIO(0x06); // Phase 3 off (0 only = pos 0) → +1
+            // Position sequence: 4 â†’ 5 â†’ 6 â†’ 7 â†’ 0
+            card.ReadIO(0x07); // Phase 3 on (2+3 = pos 5) â†’ +1
+            card.ReadIO(0x04); // Phase 2 off (3 only = pos 6) â†’ +1
+            card.ReadIO(0x01); // Phase 0 on (3+0 = pos 7) â†’ +1
+            card.ReadIO(0x06); // Phase 3 off (0 only = pos 0) â†’ +1
 
             // Verify head moved from initial position
             int afterForwardQuarterTrack = card.Drives[0].QuarterTrack;
@@ -917,11 +917,11 @@ public class DiskIIControllerCardTests
             Assert.Equal(initialQuarterTrack + 4, afterForwardQuarterTrack);
 
             // Step backward using reverse overlapping phases
-            // Position sequence: 0 → 7 → 6 → 5 → 4
-            card.ReadIO(0x07); // Phase 3 on (0+3 = pos 7) → -1
-            card.ReadIO(0x00); // Phase 0 off (3 only = pos 6) → -1
-            card.ReadIO(0x05); // Phase 2 on (3+2 = pos 5) → -1
-            card.ReadIO(0x06); // Phase 3 off (2 only = pos 4) → -1
+            // Position sequence: 0 â†’ 7 â†’ 6 â†’ 5 â†’ 4
+            card.ReadIO(0x07); // Phase 3 on (0+3 = pos 7) â†’ -1
+            card.ReadIO(0x00); // Phase 0 off (3 only = pos 6) â†’ -1
+            card.ReadIO(0x05); // Phase 2 on (3+2 = pos 5) â†’ -1
+            card.ReadIO(0x06); // Phase 3 off (2 only = pos 4) â†’ -1
 
             // Verify head returned to initial position
             int afterBackwardQuarterTrack = card.Drives[0].QuarterTrack;
@@ -945,10 +945,10 @@ public class DiskIIControllerCardTests
             card.ReadIO(0x01); // Phase 0 on
 
             // Try to step toward lower tracks using overlapping phases (backward sequence)
-            card.ReadIO(0x07); // Phase 3 on (0+3 = pos 7) → would be -1
-            card.ReadIO(0x00); // Phase 0 off (3 only = pos 6) → would be -1
-            card.ReadIO(0x05); // Phase 2 on (3+2 = pos 5) → would be -1
-            card.ReadIO(0x06); // Phase 3 off (2 only = pos 4) → would be -1
+            card.ReadIO(0x07); // Phase 3 on (0+3 = pos 7) â†’ would be -1
+            card.ReadIO(0x00); // Phase 0 off (3 only = pos 6) â†’ would be -1
+            card.ReadIO(0x05); // Phase 2 on (3+2 = pos 5) â†’ would be -1
+            card.ReadIO(0x06); // Phase 3 off (2 only = pos 4) â†’ would be -1
 
             // Quarter track should still be 0 (clamped at boundary)
             Assert.Equal(0, card.Drives[0].QuarterTrack);
@@ -974,10 +974,10 @@ public class DiskIIControllerCardTests
             card.ReadIO(0x05); // Phase 2 on (1+2 = pos 3)
 
             // Try to step toward higher tracks using overlapping phases (forward sequence)
-            card.ReadIO(0x02); // Phase 1 off (2 only = pos 4) → would be +1
-            card.ReadIO(0x07); // Phase 3 on (2+3 = pos 5) → would be +1
-            card.ReadIO(0x04); // Phase 2 off (3 only = pos 6) → would be +1
-            card.ReadIO(0x01); // Phase 0 on (3+0 = pos 7) → would be +1
+            card.ReadIO(0x02); // Phase 1 off (2 only = pos 4) â†’ would be +1
+            card.ReadIO(0x07); // Phase 3 on (2+3 = pos 5) â†’ would be +1
+            card.ReadIO(0x04); // Phase 2 off (3 only = pos 6) â†’ would be +1
+            card.ReadIO(0x01); // Phase 0 on (3+0 = pos 7) â†’ would be +1
 
             // Quarter track should still be at max (clamped at boundary)
             Assert.Equal(DiskIIConstants.MaxQuarterTracks, card.Drives[0].QuarterTrack);

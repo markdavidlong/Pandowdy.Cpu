@@ -461,7 +461,7 @@ public sealed class SystemStatusViewModel : ReactiveObject
     /// <value>True during VBlank (70 scanlines), false during visible display (192 scanlines).</value>
     /// <remarks>
     /// <para>
-    /// The vertical blanking interval occurs during scanlines 192-261 (70 scanlines × 65 cycles = 4,550 cycles)
+    /// The vertical blanking interval occurs during scanlines 192-261 (70 scanlines Ã— 65 cycles = 4,550 cycles)
     /// of each frame. During VBlank, the CRT electron beam returns from bottom to top.
     /// </para>
     /// <para>

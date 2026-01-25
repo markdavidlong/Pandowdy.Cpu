@@ -108,7 +108,7 @@ public sealed class RenderingService : IDisposable
     /// <para>
     /// <strong>Dual-Renderer Architecture:</strong> With two render threads, we can process up to
     /// 2 frames concurrently, effectively doubling rendering throughput. This allows the system
-    /// to handle frame times up to ~33ms (2× the 16.67ms VBlank interval) while maintaining 60 FPS.
+    /// to handle frame times up to ~33ms (2Ã— the 16.67ms VBlank interval) while maintaining 60 FPS.
     /// </para>
     /// <para>
     /// <strong>Performance:</strong> This method completes in ~100 nanoseconds (atomic check +

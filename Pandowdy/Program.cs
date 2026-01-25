@@ -151,8 +151,9 @@ namespace Pandowdy
 
                     // ViewModels
                     services.AddTransient<EmulatorStateViewModel>();
-                    services.AddTransient<MainWindowViewModel>();
                     services.AddTransient<SystemStatusViewModel>();
+                    services.AddTransient<DiskStatusPanelViewModel>();
+                    services.AddTransient<MainWindowViewModel>();
 
                     services.AddSingleton<VA2M>();
                     
@@ -172,19 +173,34 @@ namespace Pandowdy
             // Install Disk II controller in slot 6 (standard Apple II configuration)
             var slots = services.GetRequiredService<ISlots>();
             slots.InstallCard(10, SlotNumber.Slot6); // 10 = DiskIIControllerCard16Sector
+            slots.InstallCard(10, SlotNumber.Slot5); // 10 = DiskIIControllerCard16Sector
 
             // Insert a disk into Drive 1 (optional - for testing)
-            if (slots.GetCardIn(SlotNumber.Slot6) is DiskIIControllerCard diskController)
+            if (slots.GetCardIn(SlotNumber.Slot6) is DiskIIControllerCard diskController6)
             {
                 // Example: Insert a disk image into Drive 1
-                // diskController.Drives[0].InsertDisk(@"E:\XPS Diagnostic IIe 1.0.5.nib");
-                diskController.Drives[0].InsertDisk(@"E:\test.woz");
-                // diskController.Drives[0].InsertDisk(@"E:\A2eDiagnostics_v2.1.nib");
-                // diskController.Drives[0].InsertDisk(@"E:\missing_ring_good.nib");
+                // diskController6.Drives[0].InsertDisk(@"E:\XPS Diagnostic IIe 1.0.5.nib");
+                diskController6.Drives[0].InsertDisk(@"E:\test.nib");
+                // diskController6.Drives[0].InsertDisk(@"E:\A2eDiagnostics_v2.1.nib");
+                // diskController6.Drives[0].InsertDisk(@"E:\missing_ring_good.nib");
 
                 // Example: Insert a disk image into Drive 2
-                // diskController.Drives[1].InsertDisk(@"C:\path\to\data.dsk");
-                //diskController.Drives[1].InsertDisk(@"E:\blank.nib");
+                // diskController6.Drives[1].InsertDisk(@"C:\path\to\data.dsk");
+                diskController6.Drives[1].InsertDisk(@"E:\blank.nib");
+            }
+
+            // Insert a disk into Drive 1 (optional - for testing)
+            if (slots.GetCardIn(SlotNumber.Slot5) is DiskIIControllerCard diskController5)
+            {
+                // Example: Insert a disk image into Drive 1
+                // diskController5.Drives[0].InsertDisk(@"E:\XPS Diagnostic IIe 1.0.5.nib");
+                diskController5.Drives[0].InsertDisk(@"E:\prodos.nib");
+                // diskController5.Drives[0].InsertDisk(@"E:\A2eDiagnostics_v2.1.nib");
+                // diskController5.Drives[0].InsertDisk(@"E:\missing_ring_good.nib");
+
+                // Example: Insert a disk image into Drive 2
+                // diskController5.Drives[1].InsertDisk(@"C:\path\to\data.dsk");
+                //diskController5.Drives[1].InsertDisk(@"E:\blank.nib");
             }
 
             return Task.CompletedTask;

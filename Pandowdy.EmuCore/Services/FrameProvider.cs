@@ -52,7 +52,7 @@ public sealed class FrameProvider : IFrameProvider
         if (Width != 560 || Height != 192)
         {
             throw new InvalidOperationException(
-                $"Expected 560×192, got {Width}×{Height}");
+                $"Expected 560Ã—192, got {Width}Ã—{Height}");
         }
 
         // Allocate 5 buffers total
@@ -108,7 +108,7 @@ public sealed class FrameProvider : IFrameProvider
     /// complete and never in a partial state.
     /// </para>
     /// <para>
-    /// <strong>Performance:</strong> Copying 215KB takes ~100-200μs on modern CPUs (at 1-2 GB/s).
+    /// <strong>Performance:</strong> Copying 215KB takes ~100-200Î¼s on modern CPUs (at 1-2 GB/s).
     /// This is acceptable overhead to eliminate ALL race conditions.
     /// </para>
     /// </remarks>

@@ -3,7 +3,7 @@ using Pandowdy.EmuCore.DataTypes;
 namespace Pandowdy.EmuCore.Tests;
 
 /// <summary>
-/// Tests for BitmapDataArray - the 560×192 pixel array that stores Apple II display data.
+/// Tests for BitmapDataArray - the 560Ã—192 pixel array that stores Apple II display data.
 /// Each pixel uses a BitField16 to support multiple independent bitplanes for colors
 /// and rendering attributes.
 /// </summary>

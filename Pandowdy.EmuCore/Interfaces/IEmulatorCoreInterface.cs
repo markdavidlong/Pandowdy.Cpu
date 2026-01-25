@@ -210,7 +210,7 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
     /// <summary>
     /// Gets the frame provider observable for receiving rendered video frames.
     /// </summary>
-    /// <value>Observable that publishes rendered video frames (560×192 pixels with soft switch state).</value>
+    /// <value>Observable that publishes rendered video frames (560Ã—192 pixels with soft switch state).</value>
     /// <remarks>
     /// <para>
     /// <strong>Thread Safety:</strong> Thread-safe read-only property. The returned <see cref="IFrameProvider"/>
@@ -222,7 +222,7 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
     /// </para>
     /// <para>
     /// <strong>Use Cases:</strong> Display Apple IIe video output, capture screenshots, record video.
-    /// Frames include both the bitmap data (560×192) and soft switch state for mode-accurate rendering.
+    /// Frames include both the bitmap data (560Ã—192) and soft switch state for mode-accurate rendering.
     /// </para>
     /// </remarks>
     IFrameProvider FrameProvider { get; }

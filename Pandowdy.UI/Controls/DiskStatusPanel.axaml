@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Pandowdy.UI.ViewModels"
+             xmlns:controls="using:Pandowdy.UI.Controls"
+             x:Class="Pandowdy.UI.Controls.DiskStatusPanel"
+             x:DataType="vm:DiskStatusPanelViewModel"
+             Width="180">
+
+    <Border Background="#1A1A1A"
+            BorderBrush="#303030"
+            BorderThickness="1,0,0,0">
+        
+        <DockPanel>
+            <!-- Header -->
+            <Border DockPanel.Dock="Top"
+                    Background="#252525"
+                    Padding="8"
+                    BorderBrush="#303030"
+                    BorderThickness="0,0,0,1">
+                <TextBlock Text="DISK STATUS"
+                           FontSize="12"
+                           FontWeight="Bold"
+                           Foreground="#00FF00"
+                           HorizontalAlignment="Center" />
+            </Border>
+
+            <!-- Drive Status Widgets (scrollable) -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          Padding="8">
+                <ItemsControl ItemsSource="{Binding Drives}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:DiskStatusWidgetViewModel">
+                            <controls:DiskStatusWidget DataContext="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</UserControl>

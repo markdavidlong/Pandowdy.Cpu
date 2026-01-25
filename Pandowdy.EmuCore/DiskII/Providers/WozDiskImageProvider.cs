@@ -22,8 +22,8 @@ namespace Pandowdy.EmuCore.DiskII.Providers;
 /// </para>
 /// <para>
 /// <strong>Timing Information:</strong><br/>
-/// This implementation uses cycle-accurate bit timing at 4μs per bit cell (250 kHz bit rate).
-/// The Apple II CPU runs at 1.023 MHz, giving exactly 45/11 cycles per bit (≈4.090909 cycles).
+/// This implementation uses cycle-accurate bit timing at 4Î¼s per bit cell (250 kHz bit rate).
+/// The Apple II CPU runs at 1.023 MHz, giving exactly 45/11 cycles per bit (â‰ˆ4.090909 cycles).
 /// Disk position is calculated from absolute CPU cycle count, modeling a continuously spinning
 /// disk where reads occur at the current rotational position.
 /// </para>
@@ -115,7 +115,7 @@ public class WozDiskImageProvider : IDiskImageProvider, IDisposable
                     $"Only 5.25\" GCR disks are supported. Found: {_wozImage.DiskKind}");
             }
 
-            // Create cache for track buffers (35 tracks × 4 quarter-tracks = 140 positions)
+            // Create cache for track buffers (35 tracks Ã— 4 quarter-tracks = 140 positions)
             _trackCache = new CircularBitBuffer?[MaxTracks * QuartersPerTrack];
             _trackBitCounts = new ulong[MaxTracks * QuartersPerTrack];
         }
@@ -168,7 +168,7 @@ public class WozDiskImageProvider : IDiskImageProvider, IDisposable
     /// <remarks>
     /// <para>
     /// <strong>Cycle-Accurate Timing:</strong> This implementation models a continuously spinning
-    /// disk where position is tied to the system clock. The disk "spins" at 250 kHz (4μs per bit),
+    /// disk where position is tied to the system clock. The disk "spins" at 250 kHz (4Î¼s per bit),
     /// and with the CPU at 1.023 MHz, each bit takes exactly 45/11 cycles.
     /// </para>
     /// <para>

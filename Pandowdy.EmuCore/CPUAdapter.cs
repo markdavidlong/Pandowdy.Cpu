@@ -1,7 +1,7 @@
 //------------------------------------------------------------------------------
 // CPUAdapter.cs
 //
-// ⚠️ STOPGAP IMPLEMENTATION - PLANNED FOR REPLACEMENT ⚠️
+// âš ï¸ STOPGAP IMPLEMENTATION - PLANNED FOR REPLACEMENT âš ï¸
 //
 // This adapter wraps a third-party 6502 CPU emulator (legacy/6502.NET/Emulator)
 // to provide compatibility with Pandowdy's ICpu interface. It is a temporary
@@ -40,7 +40,7 @@ namespace Pandowdy.EmuCore;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>⚠️ TEMPORARY IMPLEMENTATION:</strong> This adapter wraps the legacy
+/// <strong>âš ï¸ TEMPORARY IMPLEMENTATION:</strong> This adapter wraps the legacy
 /// <c>Emulator.CPU</c> class from the 6502.NET project to provide compatibility with
 /// Pandowdy's <see cref="ICpu"/> interface. It will be replaced by a native 6502
 /// implementation in a future update.

@@ -29,7 +29,7 @@ namespace Pandowdy.UI;
 /// <item>Monochrome mode (green/amber phosphor simulation)</item>
 /// <item>Scanline effect for CRT authenticity</item>
 /// <item>Aspect ratio preservation with letterboxing</item>
-/// <item>Double-scanline rendering (192 → 384 vertical resolution)</item>
+/// <item>Double-scanline rendering (192 â†’ 384 vertical resolution)</item>
 /// </list>
 /// </para>
 /// <para>
@@ -229,7 +229,7 @@ public class Apple2Display : Control
     private const double SourceHeight = 384;
     
     /// <summary>
-    /// Source aspect ratio (563:384 ≈ 1.466).
+    /// Source aspect ratio (563:384 â‰ˆ 1.466).
     /// </summary>
     private const double SourceAspect = SourceWidth / SourceHeight;
 

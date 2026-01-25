@@ -26,7 +26,7 @@ namespace Pandowdy.UI;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>⚠️ Construction:</strong> Do not construct this class directly. Use <see cref="MainWindowFactory"/>
+/// <strong>âš ï¸ Construction:</strong> Do not construct this class directly. Use <see cref="MainWindowFactory"/>
 /// to create properly initialized instances with all dependencies injected.
 /// </para>
 /// <para>
@@ -194,7 +194,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <strong>⚠️ Important:</strong> Do not construct MainWindow directly. Use <see cref="MainWindowFactory"/>
+    /// <strong>âš ï¸ Important:</strong> Do not construct MainWindow directly. Use <see cref="MainWindowFactory"/>
     /// instead, which properly handles two-phase initialization and dependency injection.
     /// </para>
     /// <para>
@@ -255,7 +255,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         {
             var oldState = _previousWindowState;
             var newState = WindowState;
-            System.Diagnostics.Debug.WriteLine($"[MainWindow] WindowState changed: {oldState} → {newState}");
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] WindowState changed: {oldState} â†’ {newState}");
             
             _previousWindowState = newState;
             
@@ -345,7 +345,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <exception cref="InvalidOperationException">Thrown if Initialize() is called more than once.</exception>
     /// <remarks>
     /// <para>
-    /// <strong>⚠️ Two-Phase Construction:</strong> This method must be called exactly once
+    /// <strong>âš ï¸ Two-Phase Construction:</strong> This method must be called exactly once
     /// immediately after construction. Do not call directly - use <see cref="MainWindowFactory.Create"/>
     /// which handles both phases automatically.
     /// </para>
@@ -399,10 +399,10 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <para>
     /// <strong>Command Bridging:</strong> Links view model commands to code-behind event handlers:
     /// <list type="bullet">
-    /// <item>StartEmu → OnEmuStartClicked</item>
-    /// <item>StopEmu → OnEmuStopClicked</item>
-    /// <item>ResetEmu → OnEmuResetClicked</item>
-    /// <item>StepOnce → OnEmuStepOnceClicked</item>
+    /// <item>StartEmu â†’ OnEmuStartClicked</item>
+    /// <item>StopEmu â†’ OnEmuStopClicked</item>
+    /// <item>ResetEmu â†’ OnEmuResetClicked</item>
+    /// <item>StepOnce â†’ OnEmuStepOnceClicked</item>
     /// </list>
     /// </para>
     /// <para>

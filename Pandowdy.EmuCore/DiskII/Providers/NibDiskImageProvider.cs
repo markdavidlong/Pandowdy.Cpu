@@ -20,9 +20,9 @@ namespace Pandowdy.EmuCore.DiskII.Providers;
 /// store full tracks. This implementation rounds quarter tracks to the nearest full track,
 /// with half-tracks rounding down:
 /// <list type="bullet">
-/// <item>Quarter tracks 0, 1, 2, 3 → Track 0</item>
-/// <item>Quarter tracks 4, 5, 6, 7 → Track 1</item>
-/// <item>Quarter tracks 8, 9, 10, 11 → Track 2</item>
+/// <item>Quarter tracks 0, 1, 2, 3 â†’ Track 0</item>
+/// <item>Quarter tracks 4, 5, 6, 7 â†’ Track 1</item>
+/// <item>Quarter tracks 8, 9, 10, 11 â†’ Track 2</item>
 /// <item>etc.</item>
 /// </list>
 /// </para>
@@ -104,7 +104,7 @@ public class NibDiskImageProvider : IDiskImageProvider, IDisposable
             _diskData = new byte[_stream.Length];
             _stream.Read(_diskData, 0, _diskData.Length);
 
-            // Validate file size (should be 35 tracks × 6656 bytes = 232,960 bytes)
+            // Validate file size (should be 35 tracks Ã— 6656 bytes = 232,960 bytes)
             int expectedSize = DiskIIConstants.TrackCount * DiskIIConstants.BytesPerNibTrack;
             if (_diskData.Length != expectedSize)
             {
@@ -161,9 +161,9 @@ public class NibDiskImageProvider : IDiskImageProvider, IDisposable
     /// Quarter tracks are converted to full tracks using integer division (qTrack / 4).
     /// This means half-tracks round down:
     /// <list type="bullet">
-    /// <item>qTrack 0-3 → track 0</item>
-    /// <item>qTrack 4-7 → track 1</item>
-    /// <item>qTrack 8-11 → track 2</item>
+    /// <item>qTrack 0-3 â†’ track 0</item>
+    /// <item>qTrack 4-7 â†’ track 1</item>
+    /// <item>qTrack 8-11 â†’ track 2</item>
     /// </list>
     /// </para>
     /// <para>
@@ -192,7 +192,7 @@ public class NibDiskImageProvider : IDiskImageProvider, IDisposable
     /// <para>
     /// <strong>Cycle-Based Position Model:</strong> This implementation models a continuously
     /// spinning disk where position is tied to the system clock, not the number of reads.
-    /// The disk "spins" at a constant rate (45/11 cycles per bit ≈ 4.090909), and when you read,
+    /// The disk "spins" at a constant rate (45/11 cycles per bit â‰ˆ 4.090909), and when you read,
     /// you get whatever bit happens to be under the head at that moment.
     /// </para>
     /// <para>
@@ -205,7 +205,7 @@ public class NibDiskImageProvider : IDiskImageProvider, IDisposable
     /// <para>
     /// <strong>Calculation:</strong> Position = (cycleCount / CYCLES_PER_BIT) % BITS_PER_TRACK
     /// <list type="bullet">
-    /// <item>Divide by 45/11: Each bit takes 45/11 CPU cycles (≈4.09) at 1.023 MHz = 4μs per bit</item>
+    /// <item>Divide by 45/11: Each bit takes 45/11 CPU cycles (â‰ˆ4.09) at 1.023 MHz = 4Î¼s per bit</item>
     /// <item>Modulo BITS_PER_TRACK: Wrap at track boundary (disk is a loop)</item>
     /// <item>Result: Disk position tied to time, continues spinning between reads</item>
     /// </list>

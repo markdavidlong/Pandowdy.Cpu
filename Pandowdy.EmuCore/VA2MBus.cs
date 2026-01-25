@@ -122,7 +122,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// instead. CpuClockingCounters is the single source of truth for VBlank timing.
     /// </para>
     /// <para>
-    /// <strong>Timing:</strong> Fires at 1,023,000 Hz / 17,030 cycles ≈ 60.06 Hz (NTSC).
+    /// <strong>Timing:</strong> Fires at 1,023,000 Hz / 17,030 cycles â‰ˆ 60.06 Hz (NTSC).
     /// </para>
     /// <para>
     /// <strong>Thread Context:</strong> Always raised on the emulator thread. UI subscribers

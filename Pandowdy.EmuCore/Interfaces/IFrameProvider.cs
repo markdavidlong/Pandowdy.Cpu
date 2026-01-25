@@ -26,7 +26,7 @@ public interface IFrameProvider
     /// <value>
     /// The frame width in pixels. For Apple IIe standard modes, this is typically 560 pixels
     /// (280 pixels doubled for HGR, individual for DHGR, 14 (or 7) pixels per
-    /// character × 40 (or 80) columns). 
+    /// character Ã— 40 (or 80) columns). 
     /// </value>
     /// <remarks>
     /// Currently, this value is determined by the default implementation of
@@ -42,7 +42,7 @@ public interface IFrameProvider
     /// </summary>
     /// <value>
     /// The frame height in scanlines. For Apple IIe, this is 192 scanlines (24 text rows
-    /// × 8 scanlines per row).
+    /// Ã— 8 scanlines per row).
     /// </value>
     int Height { get; }
     
@@ -55,7 +55,7 @@ public interface IFrameProvider
     /// <remarks>
     /// This property reflects the state of the TEXT soft switch. When false (text mode),
     /// the display shows 40-column or 80-column text. When true (graphics mode), the
-    /// display shows lo-res (40×48 color blocks) or hi-res (280×192 pixels) graphics.
+    /// display shows lo-res (40Ã—48 color blocks) or hi-res (280Ã—192 pixels) graphics.
     /// The primary purpose of this flag is to give the UI renderer a hint to use NTSC
     /// color generation and fringing when applicable.
     /// </remarks>

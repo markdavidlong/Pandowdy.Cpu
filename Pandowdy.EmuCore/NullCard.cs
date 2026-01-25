@@ -100,7 +100,7 @@ public class NullCard : ICard
     /// which is formalized in the <see cref="ISlots.IsEmpty"/> convenience method.
     /// </para>
     /// <para>
-    /// All other card types must use IDs ≥ 1 to avoid conflicts. The <see cref="ICardFactory"/>
+    /// All other card types must use IDs â‰¥ 1 to avoid conflicts. The <see cref="ICardFactory"/>
     /// validates that no registered card uses ID 0 during registration.
     /// </para>
     /// </remarks>

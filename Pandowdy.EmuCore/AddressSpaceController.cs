@@ -36,10 +36,10 @@ public sealed class MemoryAccessEventArgs : EventArgs
 /// <para>
 /// <strong>Address Space Routing ($0000-$FFFF):</strong>
 /// <list type="bullet">
-/// <item><strong>$0000-$BFFF:</strong> System RAM (48KB) → ISystemRamSelector (handles main/aux banking via soft switches)</item>
+/// <item><strong>$0000-$BFFF:</strong> System RAM (48KB) â†’ ISystemRamSelector (handles main/aux banking via soft switches)</item>
 /// <item><strong>$C000-$C08F:</strong> System I/O (intercepted by VA2MBus, never reaches this class)</item>
-/// <item><strong>$C090-$CFFF:</strong> Slot I/O and ROM (3952 bytes) → ISlots (handles slot cards and internal ROM via SystemRomProvider)</item>
-/// <item><strong>$D000-$FFFF:</strong> Language Card (12KB) → ILanguageCard (handles RAM/ROM banking via SystemRomProvider)</item>
+/// <item><strong>$C090-$CFFF:</strong> Slot I/O and ROM (3952 bytes) â†’ ISlots (handles slot cards and internal ROM via SystemRomProvider)</item>
+/// <item><strong>$D000-$FFFF:</strong> Language Card (12KB) â†’ ILanguageCard (handles RAM/ROM banking via SystemRomProvider)</item>
 /// </list>
 /// </para>
 /// <para>

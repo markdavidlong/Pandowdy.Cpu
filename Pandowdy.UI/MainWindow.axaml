@@ -5,13 +5,14 @@
 		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 		xmlns:local="clr-namespace:Pandowdy.UI"
 		xmlns:viewmodels="clr-namespace:Pandowdy.UI.ViewModels"
+		xmlns:controls="clr-namespace:Pandowdy.UI.Controls"
 		mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="480"
 		x:Class="Pandowdy.UI.MainWindow"
 		Title="Pandowdy"
 		Width="800" Height="600"
 		MinWidth="800" MinHeight="600"
-        WindowStartupLocation="Manual"
-        Icon="assets/ico/pandowdy.ico"
+				WindowStartupLocation="Manual"
+				Icon="assets/ico/pandowdy.ico"
 		KeyDown="OnMainWindowKeyDown">
 	<DockPanel>
 		<Menu x:Name="MainMenu" DockPanel.Dock="Top" DataContext="{Binding}">
@@ -44,10 +45,15 @@
 			</MenuItem>
 		</Menu>
 
-		<!-- Right-side status panel -->
+		<!-- Right-side status panel (SoftSwitch) -->
 		<local:SoftSwitchStatusPanel x:Name="SoftSwitchStatusPanel" 
 									 DockPanel.Dock="Right"
 									 DataContext="{Binding SystemStatus}" />
+
+		<!-- Disk status panel (between display and soft switch panel) -->
+		<controls:DiskStatusPanel x:Name="DiskStatusPanel"
+									DockPanel.Dock="Right"
+									DataContext="{Binding DiskStatus}" />
 
 		<!-- Apple2Display centered with black background, padding, margin, and rounded corners -->
 <Border Background="#D4C5A9" 

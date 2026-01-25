@@ -13,18 +13,18 @@ namespace Pandowdy.EmuCore.DiskII.Providers;
 /// </para>
 /// <para>
 /// <strong>WOZ Format Support:</strong><br/>
-/// - WOZ 1.0: Fixed 6656-byte track storage (35 tracks × 4 quarters)
+/// - WOZ 1.0: Fixed 6656-byte track storage (35 tracks Ã— 4 quarters)
 /// - WOZ 2.0: Variable-length track storage in 512-byte blocks
 /// </para>
 /// <para>
 /// <strong>File Structure:</strong><br/>
 /// - Header (12 bytes): Signature + CRC + metadata
 /// - INFO chunk (+$14, 60 bytes): Disk metadata
-/// - TMAP chunk (+$58, 160 bytes): Track map (quarter-track → track index)
+/// - TMAP chunk (+$58, 160 bytes): Track map (quarter-track â†’ track index)
 /// - TRKS chunk (+$100): Actual bit stream data per track
 /// </para>
 /// <para>
-/// <strong>Timing:</strong> Uses 45/11 cycles per bit (≈4.090909) for cycle-accurate
+/// <strong>Timing:</strong> Uses 45/11 cycles per bit (â‰ˆ4.090909) for cycle-accurate
 /// disk rotation at 250 kHz bit rate with 1.023 MHz CPU.
 /// </para>
 /// </remarks>
@@ -40,10 +40,10 @@ public class InternalWozDiskImageProvider : IDiskImageProvider, IDisposable
     private bool _isWriteProtected;
     private bool _isSynchronized;      // From INFO chunk
     private byte _bootSectorFormat;    // From INFO chunk
-    private byte _optimalBitTiming = 32;   // From INFO chunk (default 32 = 4μs per bit)
+    private byte _optimalBitTiming = 32;   // From INFO chunk (default 32 = 4Î¼s per bit)
 
     // Track data structures
-    private readonly byte[] _trackMap = new byte[160];      // TMAP: quarter-track → track index
+    private readonly byte[] _trackMap = new byte[160];      // TMAP: quarter-track â†’ track index
     private readonly byte[][] _trackData = new byte[160][]; // Track bit stream data
     private readonly int[] _trackBitCount = new int[160];   // Bits per track
 
@@ -261,7 +261,7 @@ public class InternalWozDiskImageProvider : IDiskImageProvider, IDisposable
         // Byte 39: Boot sector format
         _bootSectorFormat = infoData[39];
 
-        // Byte 40: Optimal bit timing (4μs = 32)
+        // Byte 40: Optimal bit timing (4Î¼s = 32)
         _optimalBitTiming = infoData[40];
         if (_optimalBitTiming == 0)
         {

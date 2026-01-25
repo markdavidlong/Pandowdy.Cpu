@@ -340,24 +340,24 @@ public class DiskIIIntegrationTests
         // The drive starts at quarterTrack 68, which is position 68 & 7 = 4 (S)
         // Phase 2 alone maps to position 4 in MagnetToPosition.
         // We must sync the phase state to match the head position before stepping.
-        controller.ReadIO(0x05); // Phase 2 on → _currentPhase = 4, pos = 4
+        controller.ReadIO(0x05); // Phase 2 on â†’ _currentPhase = 4, pos = 4
 
         // Step forward 4 quarter-tracks using overlapping phases:
-        // Position sequence: 4 → 5 → 6 → 7 → 0
-        controller.ReadIO(0x07); // Phase 3 on (2+3 = pos 5) → +1
-        controller.ReadIO(0x04); // Phase 2 off (3 only = pos 6) → +1
-        controller.ReadIO(0x01); // Phase 0 on (3+0 = pos 7) → +1
-        controller.ReadIO(0x06); // Phase 3 off (0 only = pos 0) → +1
+        // Position sequence: 4 â†’ 5 â†’ 6 â†’ 7 â†’ 0
+        controller.ReadIO(0x07); // Phase 3 on (2+3 = pos 5) â†’ +1
+        controller.ReadIO(0x04); // Phase 2 off (3 only = pos 6) â†’ +1
+        controller.ReadIO(0x01); // Phase 0 on (3+0 = pos 7) â†’ +1
+        controller.ReadIO(0x06); // Phase 3 off (0 only = pos 0) â†’ +1
 
         int afterForwardQuarterTrack = controller.Drives[0].QuarterTrack;
         Assert.Equal(initialQuarterTrack + 4, afterForwardQuarterTrack);
 
         // Step backward 4 quarter-tracks using reverse overlapping sequence:
-        // Position sequence: 0 → 7 → 6 → 5 → 4
-        controller.ReadIO(0x07); // Phase 3 on (0+3 = pos 7) → -1
-        controller.ReadIO(0x00); // Phase 0 off (3 only = pos 6) → -1
-        controller.ReadIO(0x05); // Phase 2 on (3+2 = pos 5) → -1
-        controller.ReadIO(0x06); // Phase 3 off (2 only = pos 4) → -1
+        // Position sequence: 0 â†’ 7 â†’ 6 â†’ 5 â†’ 4
+        controller.ReadIO(0x07); // Phase 3 on (0+3 = pos 7) â†’ -1
+        controller.ReadIO(0x00); // Phase 0 off (3 only = pos 6) â†’ -1
+        controller.ReadIO(0x05); // Phase 2 on (3+2 = pos 5) â†’ -1
+        controller.ReadIO(0x06); // Phase 3 off (2 only = pos 4) â†’ -1
 
         int finalQuarterTrack = controller.Drives[0].QuarterTrack;
 

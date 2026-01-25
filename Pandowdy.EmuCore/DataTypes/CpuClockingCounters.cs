@@ -31,7 +31,7 @@ public class CpuClockingCounters
     public event Action? VBlankOccurred;
 
     /// <summary>
-    /// Number of CPU cycles between VBlank events (17,030 = 262 scanlines × 65 cycles/scanline).
+    /// Number of CPU cycles between VBlank events (17,030 = 262 scanlines Ã— 65 cycles/scanline).
     /// </summary>
     /// <remarks>
     /// <para>
@@ -39,8 +39,8 @@ public class CpuClockingCounters
     /// <list type="bullet">
     /// <item>192 visible scanlines (cycles 0-12,479)</item>
     /// <item>70 vertical blanking scanlines (cycles 12,480-17,029)</item>
-    /// <item>Total: 262 scanlines × 65 cycles/scanline = 17,030 cycles/frame</item>
-    /// <item>Frame rate: 1,023,000 Hz / 17,030 cycles ≈ 60.06 Hz (NTSC)</item>
+    /// <item>Total: 262 scanlines Ã— 65 cycles/scanline = 17,030 cycles/frame</item>
+    /// <item>Frame rate: 1,023,000 Hz / 17,030 cycles â‰ˆ 60.06 Hz (NTSC)</item>
     /// </list>
     /// </para>
     /// </remarks>
@@ -59,7 +59,7 @@ public class CpuClockingCounters
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <strong>Visible Display Ends:</strong> After 192 visible scanlines × 65 cycles/scanline
+    /// <strong>Visible Display Ends:</strong> After 192 visible scanlines Ã— 65 cycles/scanline
     /// = 12,480 cycles, the video scanner enters vertical blanking. This is when RD_VERTBLANK_
     /// ($C019) transitions from $00 to $80.
     /// </para>

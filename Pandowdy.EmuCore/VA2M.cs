@@ -36,8 +36,8 @@
 //    - VBlank event handling for frame rendering (~60 Hz)
 //    - Performance reporting every 5 seconds
 //
-// DESIGN PATTERN: Façade + Coordinator
-// VA2M acts as a façade over the emulator subsystems (Bus, Memory, CPU) and
+// DESIGN PATTERN: FaÃ§ade + Coordinator
+// VA2M acts as a faÃ§ade over the emulator subsystems (Bus, Memory, CPU) and
 // coordinates their interactions. Input handling is delegated to specialized
 // subsystems (SingularKeyHandler for keyboard, SimpleGameController for buttons),
 // ensuring single source of truth and event-driven state updates.
@@ -117,7 +117,7 @@ namespace Pandowdy.EmuCore;
 /// <list type="bullet">
 /// <item><strong>Keyboard:</strong> Delegates to IKeyboardSetter (SingularKeyHandler, 26 tests)</item>
 /// <item><strong>Game Controller:</strong> Delegates to IGameControllerStatus (SimpleGameController, 32 tests)</item>
-/// <item><strong>Rendering:</strong> Threaded via RenderingService (non-blocking, ~1-3μs capture)</item>
+/// <item><strong>Rendering:</strong> Threaded via RenderingService (non-blocking, ~1-3Î¼s capture)</item>
 /// <item><strong>State Updates:</strong> Event-driven via SystemStatusProvider (no manual polling)</item>
 /// </list>
 /// </para>
@@ -274,7 +274,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// <summary>
     /// Gets the frame provider observable for receiving rendered video frames.
     /// </summary>
-    /// <value>Observable that publishes rendered video frames (560×192 pixels with soft switch state).</value>
+    /// <value>Observable that publishes rendered video frames (560Ã—192 pixels with soft switch state).</value>
     /// <remarks>
     /// <para>
     /// <strong>Implementation:</strong> Returns the injected <see cref="IFrameProvider"/> instance
@@ -458,7 +458,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// fires ButtonChanged and PaddleChanged events that SystemStatusProvider observes directly.
     /// VA2M delegates SetPushButton() calls to this controller.</item>
     /// <item><strong>Rendering:</strong> The <paramref name="renderingService"/> runs on a separate thread,
-    /// processing snapshots allocated from <paramref name="snapshotPool"/>. Capture is non-blocking (~1-3μs).</item>
+    /// processing snapshots allocated from <paramref name="snapshotPool"/>. Capture is non-blocking (~1-3Î¼s).</item>
     /// </list>
     /// </para>
     /// <para>
@@ -657,7 +657,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </para>
     /// <para>
     /// <strong>Thread Context:</strong> Called on the emulator thread (VBlank is raised
-    /// during Bus.Clock() execution). Never blocks - snapshot capture is ~1-3 μs.
+    /// during Bus.Clock() execution). Never blocks - snapshot capture is ~1-3 Î¼s.
     /// </para>
     /// </remarks>
     private void OnVBlank(object? sender, EventArgs e)

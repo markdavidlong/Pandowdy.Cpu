@@ -67,7 +67,7 @@ public interface IKeyboardSetter
     /// {
     ///     if (e.Key == Key.A)
     ///     {
-    ///         _keyboardSetter.EnqueueKey(0x41);  // ⚠️ Race condition!
+    ///         _keyboardSetter.EnqueueKey(0x41);  // âš ï¸ Race condition!
     ///     }
     /// }
     /// </code>

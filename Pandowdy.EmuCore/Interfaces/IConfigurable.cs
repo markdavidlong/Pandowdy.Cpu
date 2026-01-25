@@ -242,7 +242,7 @@ public interface IConfigurable
     /// <item><description>Use a hybrid approach based on business logic requirements</description></item>
     /// </list>
     /// <para>
-    /// The choice depends on the relationship between parent and child—tightly coupled components
+    /// The choice depends on the relationship between parent and childâ€”tightly coupled components
     /// (like a controller and its drives) typically use embedded metadata, while loosely coupled
     /// components might prefer external references.
     /// </para>

@@ -19,9 +19,9 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// <para>
 /// <strong>Strobe Lifecycle:</strong>
 /// <list type="number">
-/// <item>Key pressed → Strobe set (bit 7 = 1), value = ASCII + 128</item>
-/// <item>Program reads $C000 → Returns key with strobe (e.g., 0xC1 for 'A')</item>
-/// <item>Program reads $C010 → Strobe cleared (bit 7 = 0), subsequent reads return ASCII only (e.g., 0x41)</item>
+/// <item>Key pressed â†’ Strobe set (bit 7 = 1), value = ASCII + 128</item>
+/// <item>Program reads $C000 â†’ Returns key with strobe (e.g., 0xC1 for 'A')</item>
+/// <item>Program reads $C010 â†’ Strobe cleared (bit 7 = 0), subsequent reads return ASCII only (e.g., 0x41)</item>
 /// </list>
 /// </para>
 /// <para>

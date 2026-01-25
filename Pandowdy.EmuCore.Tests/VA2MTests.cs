@@ -16,7 +16,7 @@ namespace Pandowdy.EmuCore.Tests;
 /// <para>
 /// <strong>What VA2M Does:</strong>
 /// <list type="bullet">
-/// <item>Enqueue commands for cross-thread execution (UI → emulator thread)</item>
+/// <item>Enqueue commands for cross-thread execution (UI â†’ emulator thread)</item>
 /// <item>Process pending commands at instruction boundaries</item>
 /// <item>Pass commands to Bus unchanged (no transformation)</item>
 /// <item>Coordinate Clock(), Reset(), and state publishing</item>

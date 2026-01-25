@@ -209,7 +209,7 @@ public class NibDiskImageProviderTests : IDisposable
         _provider.SetQuarterTrack(0);
 
         // Calculate cycles for one complete rotation
-        // BitsPerTrack = 53,248, CyclesPerBit ≈ 4.09
+        // BitsPerTrack = 53,248, CyclesPerBit â‰ˆ 4.09
         ulong cyclesPerRotation = (ulong)(DiskIIConstants.BitsPerTrack * DiskIIConstants.CyclesPerBit);
 
         // Act - read at same position should give same bit

@@ -187,7 +187,7 @@ public interface ISystemStatusMutator : ISystemStatusProvider
     /// <param name="hires">True for hi-res graphics mode; false for lo-res graphics mode.</param>
     /// <remarks>
     /// In graphics mode (TEXT off), controls whether to display hi-res graphics
-    /// (280×192 pixels, 6 colors) or lo-res graphics (40×48 color blocks, 16 colors).
+    /// (280Ã—192 pixels, 6 colors) or lo-res graphics (40Ã—48 color blocks, 16 colors).
     /// Has no effect when TEXT mode is enabled.
     /// </remarks>
     void SetHiRes(bool hires);

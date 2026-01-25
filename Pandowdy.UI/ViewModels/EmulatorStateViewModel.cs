@@ -146,9 +146,9 @@ public sealed class EmulatorStateViewModel : ReactiveObject, IActivatableViewMod
     /// <para>
     /// <strong>Example Values:</strong>
     /// <list type="bullet">
-    /// <item>1,023,000 cycles ≈ 1 second of emulation</item>
-    /// <item>17,063 cycles ≈ 1 video frame (~60 Hz)</item>
-    /// <item>61,380,000 cycles ≈ 1 minute of emulation</item>
+    /// <item>1,023,000 cycles â‰ˆ 1 second of emulation</item>
+    /// <item>17,063 cycles â‰ˆ 1 video frame (~60 Hz)</item>
+    /// <item>61,380,000 cycles â‰ˆ 1 minute of emulation</item>
     /// </list>
     /// </para>
     /// <para>

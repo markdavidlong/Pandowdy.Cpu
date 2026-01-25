@@ -1,5 +1,6 @@
 using ReactiveUI;
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Services;
 using System.Reactive;
 
 namespace Pandowdy.UI.ViewModels;
@@ -48,6 +49,12 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     /// <value>View model showing soft switch states and pushbutton status.</value>
     public SystemStatusViewModel SystemStatus { get; }
+
+    /// <summary>
+    /// Gets the view model for displaying disk drive status.
+    /// </summary>
+    /// <value>View model showing disk drive states (motor, track, disk images).</value>
+    public DiskStatusPanelViewModel DiskStatus { get; }
 
     #endregion
 
@@ -411,6 +418,7 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <param name="emulatorState">View model for displaying CPU state.</param>
     /// <param name="emuState">Emulator state provider for control commands.</param>
     /// <param name="systemStatus">View model for displaying system status.</param>
+    /// <param name="diskStatus">View model for displaying disk drive status.</param>
     /// <remarks>
     /// <para>
     /// <strong>Dependency Injection:</strong> All dependencies are injected via constructor,
@@ -436,13 +444,15 @@ public sealed class MainWindowViewModel : ReactiveObject
                                //ErrorLogViewModel errorLog,
                                //DisassemblyViewModel disassembly,
                                IEmulatorState emuState,
-                               SystemStatusViewModel systemStatus)
+                               SystemStatusViewModel systemStatus,
+                               DiskStatusPanelViewModel diskStatus)
     {
         EmulatorState = emulatorState;
         //ErrorLog = errorLog;
         //Disassembly = disassembly;
         _emuState = emuState;
         SystemStatus = systemStatus;
+        DiskStatus = diskStatus;
 
         // Initialize emulator control commands
         PauseCommand = ReactiveCommand.Create(() => _emuState.RequestPause());

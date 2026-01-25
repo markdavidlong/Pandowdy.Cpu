@@ -16,7 +16,7 @@ namespace Pandowdy.EmuCore.DiskII;
 /// <strong>Layering:</strong> Typically sits between the actual drive implementation and the
 /// <see cref="DiskIIDebugDecorator"/>:
 /// <code>
-/// DiskIIDebugDecorator → DiskIIStatusDecorator → DiskIIDrive
+/// DiskIIDebugDecorator â†’ DiskIIStatusDecorator â†’ DiskIIDrive
 /// </code>
 /// This ensures status updates happen before debug logging.
 /// </para>

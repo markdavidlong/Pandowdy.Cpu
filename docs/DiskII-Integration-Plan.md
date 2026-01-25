@@ -6,10 +6,10 @@
 
 | Status | Details |
 |--------|---------|
-| **Progress** | Phases 1-8D Complete ✅ |
-| **Tests** | Build successful ✅ |
+| **Progress** | Phases 1-8E Complete ✅ |
+| **Tests** | 1224 tests passing ✅ |
 | **Branch** | `notelem` (was `re_disking`) |
-| **Next Step** | Phase 8E: GUI Status Display |
+| **Next Step** | Integration Complete - See Post-Integration Tasks |
 
 **What's Done:**
 - ✅ Phase 1: Foundation (VBlankOccurred event, DiskIIConstants, ~~telemetry payloads~~)
@@ -23,10 +23,10 @@
 - ✅ Phase 8B: Import DiskStatusServices (DiskStatusServices.cs, DiskIIStatusDecorator.cs)
 - ✅ Phase 8C: Update Disk II Components (DiskIIDrive, DiskIIFactory, DiskIIControllerCard*, VA2M, IEmulatorCoreInterface, Program.cs)
 - ✅ Phase 8D: Update Tests (replaced MockTelemetryAggregator with DiskStatusProvider)
-- ⏳ Phase 8E: GUI Status Display (uses DiskStatusServices directly)
+- ✅ Phase 8E: GUI Status Display (DiskStatusPanel, DiskStatusWidget, ViewModels)
 
 **What's Next:**
-- Phase 8E: Import GUI components (DiskStatusPanel, DiskStatusWidget, ViewModels)
+- See [Next Steps (Post-Integration)](#next-steps-post-integration) for GUI disk management features
 
 **Key Decision Made:**
 - ⚠️ **ARCHITECTURAL REVISION**: The telemetry-based approach (Phases 1-7) proved to be over-engineered for disk status messaging. We reverted to the original `IDiskStatusMutator`/`DiskIIStatusDecorator` pattern. See [Architectural Revision](#architectural-revision-telemetry-to-diskstatusservices) section.
@@ -78,7 +78,7 @@ This document provides a comprehensive plan for integrating the Disk II emulatio
 14. [Phase 8B: Import DiskStatusServices](#phase-8b-import-diskstatusservices) ✅ COMPLETED
 15. [Phase 8C: Update Disk II Components](#phase-8c-update-disk-ii-components) ✅ COMPLETED
 16. [Phase 8D: Update Tests](#phase-8d-update-tests) ✅ COMPLETED
-17. [Phase 8E: GUI Status Display](#phase-8e-gui-status-display) ⏳ IN PROGRESS
+17. [Phase 8E: GUI Status Display](#phase-8e-gui-status-display) ✅ COMPLETED
 18. [Code Style Corrections](#code-style-corrections)
 19. [Verification Checklist](#verification-checklist)
 20. [Next Steps (Post-Integration)](#next-steps-post-integration)
@@ -1376,7 +1376,7 @@ Proceeded to Phase 8C.
 
    ---
 
-## Phase 8E: GUI Status Display
+## Phase 8E: GUI Status Display ✅ COMPLETED
 
 **Goal:** Import GUI components that use `DiskStatusServices` directly.
 
@@ -1391,90 +1391,103 @@ Proceeded to Phase 8C.
 | `DiskStatusWidget.axaml.cs` | Code-behind (simple) | Keep as-is |
 | `DiskStatusWidgetViewModel.cs` | Drive state display with formatting | Uses `DiskDriveStatusSnapshot` directly ✅ |
 
-### Step 8E.1: Import DiskStatusWidgetViewModel.cs
+### Step 8E.1: Import DiskStatusWidgetViewModel.cs ✅ COMPLETED
 
 **Source:** `Pandowdy.DiskImportCode\DiskStatusWidgetViewModel.cs`  
 **Target:** `Pandowdy.UI\ViewModels\DiskStatusWidgetViewModel.cs`
 
-**Changes:**
-- Update namespace to `Pandowdy.UI.ViewModels`
-- Verify `using Pandowdy.EmuCore.Services;` for snapshot types
+**Changes Applied:**
+- Namespace already set to `Pandowdy.UI.ViewModels`
+- Uses `using Pandowdy.EmuCore.Services;` for snapshot types
 
-### Step 8E.2: Import DiskStatusPanelViewModel.cs
+### Step 8E.2: Import DiskStatusPanelViewModel.cs ✅ COMPLETED
 
 **Source:** `Pandowdy.DiskImportCode\DiskStatusPanelViewModel.cs`  
 **Target:** `Pandowdy.UI\ViewModels\DiskStatusPanelViewModel.cs`
 
-**Changes:**
-- Update namespace to `Pandowdy.UI.ViewModels`
-- Verify `using Pandowdy.EmuCore.Services;` for provider interface
+**Changes Applied:**
+- Namespace already set to `Pandowdy.UI.ViewModels`
+- Uses `using Pandowdy.EmuCore.Services;` for provider interface
 
-### Step 8E.3: Create Controls Directory
+### Step 8E.3: Create Controls Directory ✅ COMPLETED
 
-**Target:** `Pandowdy.UI\Controls\`
+**Created:** `Pandowdy.UI\Controls\`
 
-### Step 8E.4: Import DiskStatusWidget.axaml
+### Step 8E.4: Import DiskStatusWidget.axaml ✅ COMPLETED
 
 **Source:** `Pandowdy.DiskImportCode\DiskStatusWidget.axaml`  
 **Target:** `Pandowdy.UI\Controls\DiskStatusWidget.axaml`
 
-**Changes:**
-- Update `x:Class` namespace
-- Update `xmlns:vm` namespace
+**Changes Applied:**
+- `x:Class` set to `Pandowdy.UI.Controls.DiskStatusWidget`
+- `xmlns:vm` set to `using:Pandowdy.UI.ViewModels`
 
-### Step 8E.5: Import DiskStatusWidget.axaml.cs
+### Step 8E.5: Import DiskStatusWidget.axaml.cs ✅ COMPLETED
 
 **Source:** `Pandowdy.DiskImportCode\DiskStatusWidget.axaml.cs`  
 **Target:** `Pandowdy.UI\Controls\DiskStatusWidget.axaml.cs`
 
-**Changes:**
-- Update namespace to `Pandowdy.UI.Controls`
+**Changes Applied:**
+- Namespace set to `Pandowdy.UI.Controls`
 
-### Step 8E.6: Import DiskStatusPanel.axaml
+### Step 8E.6: Import DiskStatusPanel.axaml ✅ COMPLETED
 
 **Source:** `Pandowdy.DiskImportCode\DiskStatusPanel.axaml`  
 **Target:** `Pandowdy.UI\Controls\DiskStatusPanel.axaml`
 
-**Changes:**
-- Update `x:Class` namespace
-- Update `xmlns:vm` and `xmlns:controls` namespaces
+**Changes Applied:**
+- `x:Class` set to `Pandowdy.UI.Controls.DiskStatusPanel`
+- `xmlns:vm` set to `using:Pandowdy.UI.ViewModels`
+- `xmlns:controls` set to `using:Pandowdy.UI.Controls`
 
-### Step 8E.7: Import DiskStatusPanel.axaml.cs
+### Step 8E.7: Import DiskStatusPanel.axaml.cs ✅ COMPLETED
 
 **Source:** `Pandowdy.DiskImportCode\DiskStatusPanel.axaml.cs`  
 **Target:** `Pandowdy.UI\Controls\DiskStatusPanel.axaml.cs`
 
-**Changes:**
-- Update namespace to `Pandowdy.UI.Controls`
+**Changes Applied:**
+- Namespace set to `Pandowdy.UI.Controls`
 
-### Step 8E.8: Integrate with MainWindow
+### Step 8E.8: Integrate with MainWindow ✅ COMPLETED
 
 **File:** `Pandowdy.UI\MainWindow.axaml`
 
-**Changes:**
-- Add `xmlns:controls` for controls namespace
-- Add `<controls:DiskStatusPanel>` to right side panel
+**Changes Applied:**
+- Added `xmlns:controls="clr-namespace:Pandowdy.UI.Controls"` namespace declaration
+- Added `<controls:DiskStatusPanel x:Name="DiskStatusPanel" DockPanel.Dock="Right" DataContext="{Binding DiskStatus}" />`
+- Positioned between Apple2Display and SoftSwitchStatusPanel (docked to right)
 
-### Step 8E.9: Register DI Services
+### Step 8E.9: Register DI Services ✅ COMPLETED
 
 **File:** `Pandowdy\Program.cs`
 
-**Add:**
+**Changes Applied:**
 ```csharp
 services.AddTransient<DiskStatusPanelViewModel>();
 ```
 
-### Step 8E.10: Add Unit Tests
+### Step 8E.10: Update MainWindowViewModel ✅ COMPLETED
 
-**Files to Create:**
-- `Pandowdy.UI.Tests\ViewModels\DiskStatusWidgetViewModelTests.cs`
-- `Pandowdy.UI.Tests\ViewModels\DiskStatusPanelViewModelTests.cs`
+**File:** `Pandowdy.UI\ViewModels\MainWindowViewModel.cs`
 
-### Step 8E.11: Verify Build and Test
+**Changes Applied:**
+- Added `using Pandowdy.EmuCore.Services;`
+- Added `DiskStatus` property of type `DiskStatusPanelViewModel`
+- Updated constructor to accept and store `DiskStatusPanelViewModel`
 
-- Ensure all components compile
-- Run unit tests
-- Manual testing with disk operations
+### Step 8E.11: Update MainWindowViewModel Tests ✅ COMPLETED
+
+**File:** `Pandowdy.UI.Tests\ViewModels\MainWindowViewModelTests.cs`
+
+**Changes Applied:**
+- Updated `MainWindowViewModelFixture` to include `DiskStatusPanelViewModel`
+- All 25 MainWindowViewModel tests pass
+
+### Step 8E.12: Verify Build and Test ✅ COMPLETED
+
+- Build successful
+- All 1224 tests pass (1170 EmuCore + 54 UI)
+- Manual testing pending
 
 ---
 
@@ -1824,4 +1837,4 @@ After the Disk II integration is complete, the following refactoring tasks shoul
 ---
 
 *Document Created: 2025*  
-*Last Updated: Architectural Revision - Telemetry abandoned, reverting to DiskStatusServices pattern (Phase 8A-8E)*
+*Last Updated: Phase 8E Complete - Disk II Integration Complete (1224 tests passing)*

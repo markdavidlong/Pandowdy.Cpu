@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 namespace Pandowdy.EmuCore.DataTypes
 {
     /// <summary>
-    /// Multi-bitplane bitmap storage for Apple IIe display rendering (560×192 pixels, 16 bitplanes).
+    /// Multi-bitplane bitmap storage for Apple IIe display rendering (560Ã—192 pixels, 16 bitplanes).
     /// </summary>
     /// <remarks>
     /// <para>
@@ -13,12 +13,12 @@ namespace Pandowdy.EmuCore.DataTypes
     /// multi-channel bitmap data.
     /// </para>
     /// <para>
-    /// <strong>Apple IIe Dimensions:</strong> Fixed at 560×192 pixels to match Apple IIe
+    /// <strong>Apple IIe Dimensions:</strong> Fixed at 560Ã—192 pixels to match Apple IIe
     /// video output:
     /// <list type="bullet">
-    /// <item><strong>Width (560):</strong> 280 hi-res pixels × 2 (horizontal doubling for square pixels),
-    /// or 80 columns × 7 pixels per character</item>
-    /// <item><strong>Height (192):</strong> 24 text rows × 8 scanlines per row</item>
+    /// <item><strong>Width (560):</strong> 280 hi-res pixels Ã— 2 (horizontal doubling for square pixels),
+    /// or 80 columns Ã— 7 pixels per character</item>
+    /// <item><strong>Height (192):</strong> 24 text rows Ã— 8 scanlines per row</item>
     /// </list>
     /// These dimensions are hardcoded constants to optimize performance and memory layout.
     /// </para>
@@ -34,9 +34,9 @@ namespace Pandowdy.EmuCore.DataTypes
     /// or implementing multi-layer rendering without changing the storage format.
     /// </para>
     /// <para>
-    /// <strong>Memory Layout:</strong> Stored as a flat array of <c>560 × 192 = 107,520</c>
+    /// <strong>Memory Layout:</strong> Stored as a flat array of <c>560 Ã— 192 = 107,520</c>
     /// <see cref="BitField16"/> values (215 KB). Pixels are stored row-major (left-to-right,
-    /// top-to-bottom). Offset calculation: <c>offset = x + (y × width)</c>.
+    /// top-to-bottom). Offset calculation: <c>offset = x + (y Ã— width)</c>.
     /// </para>
     /// <para>
     /// <strong>Thread Safety:</strong> Not thread-safe. Multiple concurrent writes or
@@ -53,21 +53,21 @@ namespace Pandowdy.EmuCore.DataTypes
     public class BitmapDataArray
     {
         /// <summary>
-        /// Apple IIe display height in scanlines (24 rows × 8 scanlines/row).
+        /// Apple IIe display height in scanlines (24 rows Ã— 8 scanlines/row).
         /// </summary>
         private const int _height = 192;
         
         /// <summary>
-        /// Apple IIe display width in pixels (280 hi-res pixels doubled, or 80 columns × 7 pixels).
+        /// Apple IIe display width in pixels (280 hi-res pixels doubled, or 80 columns Ã— 7 pixels).
         /// </summary>
         private const int _width = 560;
 
         /// <summary>
-        /// Flat array storing all pixels (560 × 192 = 107,520 BitField16 values).
+        /// Flat array storing all pixels (560 Ã— 192 = 107,520 BitField16 values).
         /// </summary>
         /// <remarks>
         /// Row-major layout: each row of 560 pixels is stored contiguously, then the next row.
-        /// Total memory: 107,520 × 2 bytes = 215,040 bytes (210 KB).
+        /// Total memory: 107,520 Ã— 2 bytes = 215,040 bytes (210 KB).
         /// </remarks>
         private readonly BitField16[] _data;
 
@@ -147,7 +147,7 @@ namespace Pandowdy.EmuCore.DataTypes
         /// <returns>Array offset where this pixel's data is stored.</returns>
         /// <remarks>
         /// <para>
-        /// <strong>Formula:</strong> <c>offset = x + (y × width)</c>
+        /// <strong>Formula:</strong> <c>offset = x + (y Ã— width)</c>
         /// </para>
         /// <para>
         /// <strong>Row-Major Layout:</strong> Pixels are stored left-to-right, top-to-bottom.
@@ -156,11 +156,11 @@ namespace Pandowdy.EmuCore.DataTypes
         /// <para>
         /// <strong>Example:</strong>
         /// <code>
-        /// Pixel (0, 0) → offset 0
-        /// Pixel (1, 0) → offset 1
-        /// Pixel (559, 0) → offset 559
-        /// Pixel (0, 1) → offset 560 (start of row 1)
-        /// Pixel (100, 50) → offset 100 + (50 × 560) = 28,100
+        /// Pixel (0, 0) â†’ offset 0
+        /// Pixel (1, 0) â†’ offset 1
+        /// Pixel (559, 0) â†’ offset 559
+        /// Pixel (0, 1) â†’ offset 560 (start of row 1)
+        /// Pixel (100, 50) â†’ offset 100 + (50 Ã— 560) = 28,100
         /// </code>
         /// </para>
         /// <para>

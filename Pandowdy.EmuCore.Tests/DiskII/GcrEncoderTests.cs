@@ -37,7 +37,7 @@ public class GcrEncoderTests
         int bytesWritten = GcrEncoder.WriteAddressField(buffer, 0, volume: 254, track: 0, sector: 0);
 
         // Assert - epilogue at end of field
-        // 10 sync + 3 prologue + 8 data (vol,trk,sec,chk × 2 each) + 3 epilogue = 24 bytes
+        // 10 sync + 3 prologue + 8 data (vol,trk,sec,chk Ã— 2 each) + 3 epilogue = 24 bytes
         Assert.Equal(24, bytesWritten);
         Assert.Equal(0xDE, buffer[21]); // Epilogue byte 1
         Assert.Equal(0xAA, buffer[22]); // Epilogue byte 2
@@ -55,7 +55,7 @@ public class GcrEncoderTests
         GcrEncoder.WriteAddressField(buffer, 0, volume: 254, track: 17, sector: 5);
 
         // Assert - 4-4 encoded values follow prologue
-        // Volume 254 = 0xFE → high bits: 0xAA | (0x7F) = 0xFF, low bits: 0xAA | 0x54 = 0xFE
+        // Volume 254 = 0xFE â†’ high bits: 0xAA | (0x7F) = 0xFF, low bits: 0xAA | 0x54 = 0xFE
         // Note: Encode44High = 0xAA | ((value >> 1) & 0x55)
         //       Encode44Low  = 0xAA | (value & 0x55)
         // For value 254 (0xFE):

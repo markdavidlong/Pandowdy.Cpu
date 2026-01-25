@@ -11,7 +11,7 @@ namespace Pandowdy.EmuCore.DiskII;
 /// <para>
 /// <strong>Decorator Chain:</strong> Creates drives wrapped in decorators:
 /// <code>
-/// DiskIIDebugDecorator → DiskIIStatusDecorator → DiskIIDrive
+/// DiskIIDebugDecorator â†’ DiskIIStatusDecorator â†’ DiskIIDrive
 /// </code>
 /// - <see cref="DiskIIDrive"/>: Core drive implementation
 /// - <see cref="DiskIIStatusDecorator"/>: Synchronizes state with <see cref="IDiskStatusMutator"/>
@@ -24,7 +24,7 @@ namespace Pandowdy.EmuCore.DiskII;
 /// </para>
 /// <para>
 /// <strong>Slot/Drive Parsing:</strong> Parses drive names in the format "SlotX-DY"
-/// (e.g., "Slot6-D1" → Slot 6, Drive 1) to assign proper slot and drive numbers
+/// (e.g., "Slot6-D1" â†’ Slot 6, Drive 1) to assign proper slot and drive numbers
 /// for status tracking.
 /// </para>
 /// </remarks>

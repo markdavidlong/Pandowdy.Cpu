@@ -1,3 +1,4 @@
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.3.11218.70
@@ -68,8 +69,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy", "Pandowdy\Pandowdy.csproj", "{FBE7AB7D-69EB-AFD8-76CA-D4ABD968AD6C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy.UI.Tests", "Pandowdy.UI.Tests\Pandowdy.UI.Tests.csproj", "{6F0FCD27-4FCE-495A-9688-861452001EB9}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy.DiskImportCode", "Pandowdy.DiskImportCode\Pandowdy.DiskImportCode.csproj", "{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -350,18 +349,6 @@ Global
 		{6F0FCD27-4FCE-495A-9688-861452001EB9}.RelWithDebInfo|x64.Build.0 = Debug|Any CPU
 		{6F0FCD27-4FCE-495A-9688-861452001EB9}.RelWithDebInfo|x86.ActiveCfg = Debug|Any CPU
 		{6F0FCD27-4FCE-495A-9688-861452001EB9}.RelWithDebInfo|x86.Build.0 = Debug|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.MinSizeRel|Any CPU.ActiveCfg = Release|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.MinSizeRel|x64.ActiveCfg = Release|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.MinSizeRel|x86.ActiveCfg = Release|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.Release|x64.ActiveCfg = Release|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.Release|x86.ActiveCfg = Release|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.RelWithDebInfo|Any CPU.ActiveCfg = Debug|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.RelWithDebInfo|x64.ActiveCfg = Debug|Any CPU
-		{6504A9C0-0FDF-47BB-952D-A77F71F5F28B}.RelWithDebInfo|x86.ActiveCfg = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -213,7 +213,7 @@ public interface ISystemStatusProvider
     /// it takes for the paddle value to time out by polling $C064 (bit 7).
     /// </para>
     /// <para>
-    /// <strong>Timing:</strong> The paddle timer counts from 0 to approximately 2805 μs
+    /// <strong>Timing:</strong> The paddle timer counts from 0 to approximately 2805 Î¼s
     /// (at 1.023 MHz). The value stored here represents the pre-calculated time-out
     /// period for emulator efficiency.
     /// </para>
@@ -278,7 +278,7 @@ public interface ISystemStatusProvider
     /// </value>
     /// <remarks>
     /// In graphics mode (TEXT off), controls whether to display hi-res graphics
-    /// (280×192 pixels, 6 colors) or lo-res graphics (40×48 color blocks, 16 colors).
+    /// (280Ã—192 pixels, 6 colors) or lo-res graphics (40Ã—48 color blocks, 16 colors).
     /// Has no effect when TEXT mode is enabled.
     /// </remarks>
     bool StateHiRes { get; }

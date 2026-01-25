@@ -80,7 +80,7 @@ public class SystemIoHandler : ISystemIoHandler
     /// when VBlank starts (every 17,030 cycles at cycle offset 12,480).
     /// </para>
     /// <para>
-    /// <strong>Apple IIe Timing:</strong> VBlank is active for 4,550 cycles (70 scanlines × 65
+    /// <strong>Apple IIe Timing:</strong> VBlank is active for 4,550 cycles (70 scanlines Ã— 65
     /// cycles/scanline) starting at cycle 12,480 of each 17,030-cycle frame. Software uses this
     /// period for graphics updates, page flipping, and other operations that should not cause
     /// visual artifacts during active display.
@@ -153,7 +153,7 @@ public class SystemIoHandler : ISystemIoHandler
     /// </summary>
     /// <param name="offset">Zero-based offset (0x00-0x8F).</param>
     /// <returns>Byte value from I/O handler.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown if offset ≥ 0x90.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if offset â‰¥ 0x90.</exception>
     /// <remarks>
     /// Translates offset to absolute address ($C000 + offset) and delegates to ReadFromIOSpace().
     /// </remarks>
@@ -174,7 +174,7 @@ public class SystemIoHandler : ISystemIoHandler
     /// </summary>
     /// <param name="offset">Zero-based offset (0x00-0x8F).</param>
     /// <param name="data">Byte to write (usually ignored by handlers).</param>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown if offset ≥ 0x90.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if offset â‰¥ 0x90.</exception>
     /// <remarks>
     /// Translates offset to absolute address ($C000 + offset) and delegates to WriteToIOSpace().
     /// Most handlers ignore data value and toggle switches based on address.
@@ -645,7 +645,7 @@ public class SystemIoHandler : ISystemIoHandler
         _ioWriteHandlers[CLRAN3_ - 0xC000] = _ => _softSwitches.Set(SoftSwitches.SoftSwitchId.An3, false);
         _ioWriteHandlers[SETAN3_ - 0xC000] = _ => _softSwitches.Set(SoftSwitches.SoftSwitchId.An3, true);
 
-        // Banked block writes (unrolled) — note write-path semantics differ from read-path
+        // Banked block writes (unrolled) â€” note write-path semantics differ from read-path
         _ioWriteHandlers[B2_RD_RAM_NO_WRT_ - 0xC000] = _ => ApplyBankIoWriteFlags(false, B2_RD_RAM_NO_WRT_);
         _ioWriteHandlers[B2_RD_RAM_NO_WRT_ALT_ - 0xC000] = _ => ApplyBankIoWriteFlags(false, B2_RD_RAM_NO_WRT_ALT_);
         _ioWriteHandlers[B2_RD_ROM_WRT_RAM_ - 0xC000] = _ => ApplyBankIoWriteFlags(false, B2_RD_ROM_WRT_RAM_);

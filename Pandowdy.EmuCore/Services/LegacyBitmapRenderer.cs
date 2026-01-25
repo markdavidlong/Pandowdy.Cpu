@@ -1,7 +1,7 @@
 //------------------------------------------------------------------------------
 // LegacyBitmapRenderer.cs
 //
-// ⚠️ STOPGAP IMPLEMENTATION - PLANNED FOR REPLACEMENT ⚠️
+// âš ï¸ STOPGAP IMPLEMENTATION - PLANNED FOR REPLACEMENT âš ï¸
 //
 // This renderer provides basic Apple IIe monochrome bitmap output but has
 // known limitations and is intended to be replaced by a more accurate,
@@ -38,7 +38,7 @@ namespace Pandowdy.EmuCore.Services;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>⚠️ TEMPORARY IMPLEMENTATION:</strong> This renderer is a stopgap solution
+/// <strong>âš ï¸ TEMPORARY IMPLEMENTATION:</strong> This renderer is a stopgap solution
 /// providing basic Apple IIe monochrome bitmap output. It will be replaced by a more
 /// accurate scanline-based renderer in a future update.
 /// </para>
@@ -52,8 +52,8 @@ namespace Pandowdy.EmuCore.Services;
 /// <strong>Supported Modes:</strong>
 /// <list type="bullet">
 /// <item>Text Mode: 40-column (fully supported), 80-column (basic support)</item>
-/// <item>Lo-Res Graphics: 40×48 blocks (fully supported)</item>
-/// <item>Hi-Res Graphics: 280×192 pixels (basic support)</item>
+/// <item>Lo-Res Graphics: 40Ã—48 blocks (fully supported)</item>
+/// <item>Hi-Res Graphics: 280Ã—192 pixels (basic support)</item>
 /// <item>Mixed Mode: Graphics + 4-line text status area (supported)</item>
 /// </list>
 /// </para>
@@ -68,7 +68,7 @@ namespace Pandowdy.EmuCore.Services;
 /// </para>
 /// <para>
 /// <strong>Rendering Approach:</strong> This renderer uses a cell-based approach,
-/// iterating through 24 rows × 40 columns and rendering each 8-scanline cell based
+/// iterating through 24 rows Ã— 40 columns and rendering each 8-scanline cell based
 /// on the current video mode. Memory addresses are calculated using Apple IIe's
 /// interleaved scanline pattern, and pixels are written to bitplane 0 of the frame buffer.
 /// </para>
@@ -117,7 +117,7 @@ public class LegacyBitmapRenderer : IDisplayBitmapRenderer
     /// <list type="number">
     /// <item>Stores <paramref name="context"/> in instance field for access by rendering methods</item>
     /// <item>Calls <see cref="RenderScreen"/> to perform cell-based rendering</item>
-    /// <item>Iterates 24 rows × 40 columns, rendering each cell based on video mode</item>
+    /// <item>Iterates 24 rows Ã— 40 columns, rendering each cell based on video mode</item>
     /// <item>Writes output to bitplane 0 of the frame buffer</item>
     /// </list>
     /// </para>
@@ -143,9 +143,9 @@ public class LegacyBitmapRenderer : IDisplayBitmapRenderer
     /// <param name="buf">Frame buffer to render into.</param>
     /// <remarks>
     /// <para>
-    /// <strong>Cell-Based Rendering:</strong> Iterates 24 rows × 40 columns, calculating
+    /// <strong>Cell-Based Rendering:</strong> Iterates 24 rows Ã— 40 columns, calculating
     /// the video memory address for each cell using <see cref="GetAddressForXY"/>. Each
-    /// cell represents 14 horizontal pixels (7 doubled) × 8 scanlines.
+    /// cell represents 14 horizontal pixels (7 doubled) Ã— 8 scanlines.
     /// </para>
     /// <para>
     /// <strong>Address Ranges:</strong>
@@ -167,7 +167,7 @@ public class LegacyBitmapRenderer : IDisplayBitmapRenderer
         bool text80col = _context!.SystemStatus.StateShow80Col;
         bool gr80col = text80col && !_context!.SystemStatus.StateAnn3_DGR;
 
-        // Iterate through all 24 rows × 40 columns
+        // Iterate through all 24 rows Ã— 40 columns
         for (int row = 0; row < 24; row++)
         {
             for (int col = 0; col < 40; col++)
@@ -235,7 +235,7 @@ public class LegacyBitmapRenderer : IDisplayBitmapRenderer
     /// simplified approach - the replacement renderer will implement more accurate fringing.
     /// </para>
     /// <para>
-    /// <strong>⚠️ LEGACY METHOD:</strong> This method uses individual SetPixel calls which
+    /// <strong>âš ï¸ LEGACY METHOD:</strong> This method uses individual SetPixel calls which
     /// are slow. Use <see cref="InsertHgrByteAt_Span"/> instead for 3-5x better performance.
     /// </para>
     /// </remarks>
@@ -314,7 +314,7 @@ public class LegacyBitmapRenderer : IDisplayBitmapRenderer
     }
 
     /// <summary>
-    /// Renders a hi-res graphics cell (7×8 or 14×8 pixels depending on mode).
+    /// Renders a hi-res graphics cell (7Ã—8 or 14Ã—8 pixels depending on mode).
     /// </summary>
     /// <param name="address">Base address of the cell in hi-res memory.</param>
     /// <param name="row">Row index (0-23).</param>
@@ -372,12 +372,12 @@ public class LegacyBitmapRenderer : IDisplayBitmapRenderer
     /// <param name="x">Starting X coordinate.</param>
     /// <param name="y">Y coordinate (scanline).</param>
     /// <param name="value">Byte value (only lower 7 bits used).</param>
-    /// <param name="expand">If true, doubles each pixel horizontally (7→14 pixels).</param>
+    /// <param name="expand">If true, doubles each pixel horizontally (7â†’14 pixels).</param>
     /// <remarks>
     /// Used for both text rendering (with expand=true for 40-column, expand=false for 80-column)
     /// and lo-res graphics rendering.
     /// <para>
-    /// <strong>⚠️ LEGACY METHOD:</strong> This method uses individual SetPixel calls which
+    /// <strong>âš ï¸ LEGACY METHOD:</strong> This method uses individual SetPixel calls which
     /// are slow. Use <see cref="Insert7BitLsbAt_Span"/> instead for better performance.
     /// </para>
     /// </remarks>
@@ -394,7 +394,7 @@ public class LegacyBitmapRenderer : IDisplayBitmapRenderer
     /// <param name="bitplane">Bitplane to render into.</param>
     /// <param name="x">Starting X coordinate.</param>
     /// <param name="value">Byte value (only lower 7 bits used).</param>
-    /// <param name="expand">If true, doubles each pixel horizontally (7→14 pixels).</param>
+    /// <param name="expand">If true, doubles each pixel horizontally (7â†’14 pixels).</param>
     /// <remarks>
     /// <para>
     /// <strong>Performance Optimization:</strong> Eliminates 7-14 offset calculations per
@@ -575,7 +575,7 @@ public class LegacyBitmapRenderer : IDisplayBitmapRenderer
     }
 
     /// <summary>
-    /// Renders a lo-res graphics cell (40×48 blocks).
+    /// Renders a lo-res graphics cell (40Ã—48 blocks).
     /// </summary>
     /// <param name="row">Row index (0-23).</param>
     /// <param name="col">Column index (0-39).</param>
@@ -585,7 +585,7 @@ public class LegacyBitmapRenderer : IDisplayBitmapRenderer
     /// <para>
     /// <strong>Lo-Res Memory Format:</strong> Each byte contains two 4-bit color values:
     /// lower nibble for scanlines 0-3, upper nibble for scanlines 4-7. This creates
-    /// 40×48 color blocks (40 columns × 24 rows, each row split into 2 blocks).
+    /// 40Ã—48 color blocks (40 columns Ã— 24 rows, each row split into 2 blocks).
     /// </para>
     /// <para>
     /// <strong>Monochrome Pattern Generation:</strong> Uses <see cref="MakeGrColor"/> to
