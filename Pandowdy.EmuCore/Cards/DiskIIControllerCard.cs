@@ -96,7 +96,16 @@ public abstract class DiskIIControllerCard : ICard
 
     // Diagnostic counters for troubleshooting
     private static ulong _totalReads = 0;
-    private byte[] _lastThreeBytes = new byte[3]; // Track last 3 bytes for pattern detection
+    /// <summary>
+    /// Tracks last 3 bytes for prologue pattern detection (D5 AA 96 or D5 AA AD).
+    /// </summary>
+    /// <remarks>
+    /// <strong>Known Issue:</strong> This buffer is shared across both drives. When switching
+    /// drives, stale bytes from the previous drive's data stream may cause false prologue
+    /// detection. Consider clearing this buffer in <see cref="HandleDriveSelection"/> if
+    /// cross-drive prologue detection becomes problematic.
+    /// </remarks>
+    private byte[] _lastThreeBytes = new byte[3];
     private byte _diagnosticShiftReg = 0;         // Independent shift register for logging
     private int _diagnosticByteCount = 0;         // Count bytes since last data prologue
     private int _latchedReadCount = 0;            // Count latched reads by controller
@@ -848,7 +857,8 @@ public abstract class DiskIIControllerCard : ICard
     /// <summary>
     /// Checks for address and data prologues in the byte stream.
     /// </summary>
-    private void CheckForPrologues(IDiskIIDrive drive)
+    // TODO: This takes a drive, which probably should be honored at some point.  This will be dealt with as I deep-dive debug this class.
+    private void CheckForPrologues(IDiskIIDrive _)
     {
         if (_lastThreeBytes[0] == 0xD5 && _lastThreeBytes[1] == 0xAA && _lastThreeBytes[2] == 0x96)
         {

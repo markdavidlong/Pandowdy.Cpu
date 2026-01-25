@@ -28,21 +28,15 @@ namespace Pandowdy.EmuCore.DiskII;
 /// for status tracking.
 /// </para>
 /// </remarks>
-public class DiskIIFactory : IDiskIIFactory
+/// <remarks>
+/// Initializes a new instance of the <see cref="DiskIIFactory"/> class.
+/// </remarks>
+/// <param name="imageFactory">Factory for creating disk image providers.</param>
+/// <param name="statusMutator">Status mutator for registering drives and publishing state.</param>
+public class DiskIIFactory(IDiskImageFactory imageFactory, IDiskStatusMutator statusMutator) : IDiskIIFactory
 {
-    private readonly IDiskImageFactory _imageFactory;
-    private readonly IDiskStatusMutator _statusMutator;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DiskIIFactory"/> class.
-    /// </summary>
-    /// <param name="imageFactory">Factory for creating disk image providers.</param>
-    /// <param name="statusMutator">Status mutator for registering drives and publishing state.</param>
-    public DiskIIFactory(IDiskImageFactory imageFactory, IDiskStatusMutator statusMutator)
-    {
-        _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
-        _statusMutator = statusMutator ?? throw new ArgumentNullException(nameof(statusMutator));
-    }
+    private readonly IDiskImageFactory _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
+    private readonly IDiskStatusMutator _statusMutator = statusMutator ?? throw new ArgumentNullException(nameof(statusMutator));
 
     /// <summary>
     /// Creates a Disk II drive with no disk inserted.

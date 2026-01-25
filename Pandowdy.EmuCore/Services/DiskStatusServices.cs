@@ -200,7 +200,7 @@ public sealed class DiskStatusProvider : IDiskStatusMutator
     public DiskStatusProvider()
     {
         // Start with an empty array - drives will be registered dynamically
-        _current = new DiskStatusSnapshot(Array.Empty<DiskDriveStatusSnapshot>());
+        _current = new DiskStatusSnapshot([]);
         _subject = new System.Reactive.Subjects.BehaviorSubject<DiskStatusSnapshot>(_current);
     }
 
@@ -340,58 +340,43 @@ public sealed class DiskStatusProvider : IDiskStatusMutator
 /// Provides a mutable workspace for constructing new drive status snapshots.
 /// All fields can be freely modified before building the immutable snapshot.
 /// </remarks>
-public sealed class DiskDriveStatusBuilder
+/// <remarks>
+/// Initializes a new builder from an existing snapshot.
+/// </remarks>
+public sealed class DiskDriveStatusBuilder(DiskDriveStatusSnapshot snapshot)
 {
     /// <summary>Expansion slot number (1-7).</summary>
-    public int SlotNumber;
+    public int SlotNumber = snapshot.SlotNumber;
 
     /// <summary>Drive number on controller (1-2).</summary>
-    public int DriveNumber;
+    public int DriveNumber = snapshot.DriveNumber;
 
     /// <summary>Full path to disk image file.</summary>
-    public string DiskImagePath;
+    public string DiskImagePath = snapshot.DiskImagePath;
 
     /// <summary>Filename only of disk image.</summary>
-    public string DiskImageFilename;
+    public string DiskImageFilename = snapshot.DiskImageFilename;
 
     /// <summary>True if disk is write-protected.</summary>
-    public bool IsReadOnly;
+    public bool IsReadOnly = snapshot.IsReadOnly;
 
     /// <summary>Current track position (0.00-34.75).</summary>
-    public double Track;
+    public double Track = snapshot.Track;
 
     /// <summary>Current sector number (0-15, or -1 if unknown).</summary>
-    public int Sector;
+    public int Sector = snapshot.Sector;
 
     /// <summary>True if motor is running.</summary>
-    public bool MotorOn;
+    public bool MotorOn = snapshot.MotorOn;
 
     /// <summary>True if motor-off has been scheduled.</summary>
-    public bool MotorOffScheduled;
+    public bool MotorOffScheduled = snapshot.MotorOffScheduled;
 
     /// <summary>Phase state (low nibble: bits 3-0 = phases 3-0).</summary>
-    public byte PhaseState;
+    public byte PhaseState = snapshot.PhaseState;
 
     /// <summary>True if current track has valid data.</summary>
-    public bool HasValidTrackData;
-
-    /// <summary>
-    /// Initializes a new builder from an existing snapshot.
-    /// </summary>
-    public DiskDriveStatusBuilder(DiskDriveStatusSnapshot snapshot)
-    {
-        SlotNumber = snapshot.SlotNumber;
-        DriveNumber = snapshot.DriveNumber;
-        DiskImagePath = snapshot.DiskImagePath;
-        DiskImageFilename = snapshot.DiskImageFilename;
-        IsReadOnly = snapshot.IsReadOnly;
-        Track = snapshot.Track;
-        Sector = snapshot.Sector;
-        MotorOn = snapshot.MotorOn;
-        MotorOffScheduled = snapshot.MotorOffScheduled;
-        PhaseState = snapshot.PhaseState;
-        HasValidTrackData = snapshot.HasValidTrackData;
-    }
+    public bool HasValidTrackData = snapshot.HasValidTrackData;
 
     /// <summary>
     /// Builds an immutable <see cref="DiskDriveStatusSnapshot"/>.

@@ -3,7 +3,7 @@ using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.DiskII.Providers;
 using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Tests.Helpers;
+using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Tests.DiskII;
 
@@ -13,36 +13,30 @@ namespace Pandowdy.EmuCore.Tests.DiskII;
 /// <remarks>
 /// These tests verify the interaction between:
 /// - DiskIIControllerCard (16-sector and 13-sector variants)
-/// - DiskIIDrive with telemetry
+/// - DiskIIDrive with status decorator
 /// - DiskImageFactory and providers
 /// - CpuClockingCounters (VBlank timing)
 /// </remarks>
-public class DiskIIIntegrationTests : IDisposable
+public class DiskIIIntegrationTests
 {
     private readonly CpuClockingCounters _clocking = new();
-    private readonly MockTelemetryAggregator _telemetry = new();
+    private readonly DiskStatusProvider _statusProvider = new();
     private readonly DiskImageFactory _imageFactory = new();
     private readonly DiskIIFactory _driveFactory;
 
     public DiskIIIntegrationTests()
     {
-        _driveFactory = new DiskIIFactory(_imageFactory, _telemetry);
-    }
-
-    public void Dispose()
-    {
-        _telemetry.Dispose();
-        GC.SuppressFinalize(this);
+        _driveFactory = new DiskIIFactory(_imageFactory, _statusProvider);
     }
 
     #region Helper Methods
 
     private DiskIIControllerCard16Sector CreateController()
     {
-        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
+        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
     }
 
-    private void InstallController(DiskIIControllerCard16Sector controller, SlotNumber slot = SlotNumber.Slot6)
+    private static void InstallController(DiskIIControllerCard16Sector controller, SlotNumber slot = SlotNumber.Slot6)
     {
         controller.OnInstalled(slot);
     }
@@ -333,7 +327,7 @@ public class DiskIIIntegrationTests : IDisposable
 
 
     [Fact]
-    public void PhaseControl_SequentialPhases_StepHead()
+    public void PhaseControl_SequentialPhases_StepHeadAndReturn()
     {
         var controller = CreateController();
         InstallController(controller);
@@ -343,7 +337,12 @@ public class DiskIIIntegrationTests : IDisposable
 
         int initialQuarterTrack = controller.Drives[0].QuarterTrack;
 
-        // Activate phases in sequence to step outward
+        // Sanity check: ensure there's room to move in either direction
+        // Drive starts at track 17 (quarter track 68) - arbitrary middle position
+        Assert.True(initialQuarterTrack > 0, "Initial quarter track should allow stepping to lower tracks");
+        Assert.True(initialQuarterTrack < DiskIIConstants.MaxQuarterTracks, "Initial quarter track should allow stepping to higher tracks");
+
+        // Step 1: Activate phases in sequence to step outward (toward higher tracks)
         // Phase sequence: 0 -> 1 -> 2 -> 3 moves head outward
         controller.ReadIO(0x01); // Phase 0 on
         controller.ReadIO(0x00); // Phase 0 off
@@ -353,10 +352,23 @@ public class DiskIIIntegrationTests : IDisposable
         controller.ReadIO(0x04); // Phase 2 off
         controller.ReadIO(0x07); // Phase 3 on
 
-        // Head should have moved (actual movement depends on stepper logic)
-        // Just verify no crash and track changed or stayed same
-        int newQuarterTrack = controller.Drives[0].QuarterTrack;
-        Assert.True(newQuarterTrack >= 0 && newQuarterTrack <= DiskIIConstants.MaxQuarterTracks);
+        // Verify head moved from initial position
+        int afterForwardQuarterTrack = controller.Drives[0].QuarterTrack;
+        Assert.True(afterForwardQuarterTrack >= 0 && afterForwardQuarterTrack <= DiskIIConstants.MaxQuarterTracks);
+        Assert.NotEqual(initialQuarterTrack, afterForwardQuarterTrack);
+
+        // Step 2: Reverse the phase sequence to step back (toward lower tracks)
+        // Phase sequence: 3 -> 2 -> 1 -> 0 moves head inward
+        controller.ReadIO(0x06); // Phase 3 off
+        controller.ReadIO(0x05); // Phase 2 on
+        controller.ReadIO(0x04); // Phase 2 off
+        controller.ReadIO(0x03); // Phase 1 on
+        controller.ReadIO(0x02); // Phase 1 off
+        controller.ReadIO(0x01); // Phase 0 on
+
+        // Verify head returned to original position
+        int finalQuarterTrack = controller.Drives[0].QuarterTrack;
+        Assert.Equal(initialQuarterTrack, finalQuarterTrack);
     }
 
     #endregion
@@ -397,16 +409,13 @@ public class DiskIIIntegrationTests : IDisposable
     #region Factory Integration Tests
 
     [Fact]
-    public void Factory_CreatesDrivesWithTelemetry()
+    public void Factory_CreatesDrivesWithStatusDecorator()
     {
-        _telemetry.Clear();
-
         var drive = _driveFactory.CreateDrive("Slot6-D1");
 
         Assert.NotNull(drive);
         Assert.Equal("Slot6-D1", drive.Name);
     }
-
 
     [Fact]
     public void Factory_CreatesIndependentDrives()
@@ -443,19 +452,19 @@ public class DiskIIIntegrationTests : IDisposable
 
 
 
-    [Fact]
-    public void FullStack_13SectorController_WorksSameAs16Sector()
-    {
-        var controller13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _telemetry);
-        controller13.OnInstalled(SlotNumber.Slot6);
+        [Fact]
+        public void FullStack_13SectorController_WorksSameAs16Sector()
+        {
+            var controller13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
+            controller13.OnInstalled(SlotNumber.Slot6);
 
-        // Should create 2 drives just like 16-sector
-        Assert.Equal(2, controller13.Drives.Length);
+            // Should create 2 drives just like 16-sector
+            Assert.Equal(2, controller13.Drives.Length);
 
-        // Motor control should work
-        controller13.ReadIO(0x09);
-        Assert.True(controller13.Drives[0].MotorOn);
+            // Motor control should work
+            controller13.ReadIO(0x09);
+            Assert.True(controller13.Drives[0].MotorOn);
+        }
+
+        #endregion
     }
-
-    #endregion
-}

@@ -18,7 +18,16 @@ namespace Pandowdy.EmuCore.Cards;
 /// and transfers control to the loaded code.
 /// </para>
 /// </remarks>
-public class DiskIIControllerCard16Sector : DiskIIControllerCard
+/// <remarks>
+/// Initializes a new instance of the <see cref="DiskIIControllerCard16Sector"/> class.
+/// </remarks>
+/// <param name="cpuClocking">The CPU clocking counters for timing operations.</param>
+/// <param name="factory">Factory for creating drive instances.</param>
+/// <param name="statusMutator">Status mutator for publishing controller state changes.</param>
+public class DiskIIControllerCard16Sector(
+    CpuClockingCounters cpuClocking,
+    IDiskIIFactory factory,
+    IDiskStatusMutator statusMutator) : DiskIIControllerCard(cpuClocking, factory, statusMutator)
 {
     private static readonly byte[] Rom =
     [
@@ -39,20 +48,6 @@ public class DiskIIControllerCard16Sector : DiskIIControllerCard
         0x03, 0x2A, 0x5E, 0x00, 0x03, 0x2A, 0x91, 0x26, 0xC8, 0xD0, 0xEE, 0xE6, 0x27, 0xE6, 0x3D, 0xA5, // $C6E0
         0x3D, 0xCD, 0x00, 0x08, 0xA6, 0x2B, 0x90, 0xDB, 0x4C, 0x01, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00  // $C6F0
     ];
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DiskIIControllerCard16Sector"/> class.
-    /// </summary>
-    /// <param name="cpuClocking">The CPU clocking counters for timing operations.</param>
-    /// <param name="factory">Factory for creating drive instances.</param>
-    /// <param name="statusMutator">Status mutator for publishing controller state changes.</param>
-    public DiskIIControllerCard16Sector(
-        CpuClockingCounters cpuClocking,
-        IDiskIIFactory factory,
-        IDiskStatusMutator statusMutator)
-        : base(cpuClocking, factory, statusMutator)
-    {
-    }
 
     /// <inheritdoc />
     public override string Name => "Disk II";

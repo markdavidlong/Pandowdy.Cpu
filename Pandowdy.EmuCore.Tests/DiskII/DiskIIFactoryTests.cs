@@ -1,23 +1,17 @@
 using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.DiskII.Providers;
 using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Tests.Helpers;
+using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Tests.DiskII;
 
 /// <summary>
-/// Tests for DiskIIFactory - drive creation with telemetry.
+/// Tests for DiskIIFactory - drive creation with status decorator.
 /// </summary>
-public class DiskIIFactoryTests : IDisposable
+public class DiskIIFactoryTests
 {
-    private readonly MockTelemetryAggregator _telemetry = new();
+    private readonly DiskStatusProvider _statusProvider = new();
     private readonly DiskImageFactory _imageFactory = new();
-
-    public void Dispose()
-    {
-        _telemetry.Dispose();
-        GC.SuppressFinalize(this);
-    }
 
     #region Constructor Tests
 
@@ -26,11 +20,11 @@ public class DiskIIFactoryTests : IDisposable
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new DiskIIFactory(null!, _telemetry));
+            new DiskIIFactory(null!, _statusProvider));
     }
 
     [Fact]
-    public void Constructor_ThrowsOnNullTelemetry()
+    public void Constructor_ThrowsOnNullStatusMutator()
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
@@ -41,7 +35,7 @@ public class DiskIIFactoryTests : IDisposable
     public void Constructor_Succeeds_WithValidParameters()
     {
         // Act
-        var factory = new DiskIIFactory(_imageFactory, _telemetry);
+        var factory = new DiskIIFactory(_imageFactory, _statusProvider);
 
         // Assert - no exception
         Assert.NotNull(factory);
@@ -51,13 +45,11 @@ public class DiskIIFactoryTests : IDisposable
 
     #region CreateDrive Tests
 
-
-
     [Fact]
     public void CreateDrive_SetsCorrectName()
     {
         // Arrange
-        var factory = new DiskIIFactory(_imageFactory, _telemetry);
+        var factory = new DiskIIFactory(_imageFactory, _statusProvider);
 
         // Act
         IDiskIIDrive drive = factory.CreateDrive("Slot6-D1");
@@ -70,7 +62,7 @@ public class DiskIIFactoryTests : IDisposable
     public void CreateDrive_CreatesEmptyDrive()
     {
         // Arrange
-        var factory = new DiskIIFactory(_imageFactory, _telemetry);
+        var factory = new DiskIIFactory(_imageFactory, _statusProvider);
 
         // Act
         IDiskIIDrive drive = factory.CreateDrive("Slot6-D1");
@@ -78,7 +70,6 @@ public class DiskIIFactoryTests : IDisposable
         // Assert - no disk inserted
         Assert.False(drive.HasDisk);
     }
-
 
     #endregion
 
@@ -93,7 +84,7 @@ public class DiskIIFactoryTests : IDisposable
             return; // Skip if test images not available
         }
 
-        var factory = new DiskIIFactory(_imageFactory, _telemetry);
+        var factory = new DiskIIFactory(_imageFactory, _statusProvider);
 
         // Act
         IDiskIIDrive drive = factory.CreateDriveWithDisk("Slot6-D1", TestDiskImages.TestNib);
@@ -111,7 +102,7 @@ public class DiskIIFactoryTests : IDisposable
             return; // Skip if test images not available
         }
 
-        var factory = new DiskIIFactory(_imageFactory, _telemetry);
+        var factory = new DiskIIFactory(_imageFactory, _statusProvider);
 
         // Act
         IDiskIIDrive drive = factory.CreateDriveWithDisk("Slot5-D2", TestDiskImages.TestNib);
@@ -119,7 +110,6 @@ public class DiskIIFactoryTests : IDisposable
         // Assert
         Assert.Equal("Slot5-D2", drive.Name);
     }
-
 
     #endregion
 

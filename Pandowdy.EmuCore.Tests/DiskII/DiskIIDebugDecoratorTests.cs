@@ -71,8 +71,10 @@ public class DiskIIDebugDecoratorTests
     public void MotorOn_Get_DelegatesToInner()
     {
         // Arrange
-        var inner = new NullDiskIIDrive();
-        inner.MotorOn = true;
+        var inner = new NullDiskIIDrive
+        {
+            MotorOn = true
+        };
         var decorator = new DiskIIDebugDecorator(inner);
 
         // Assert
@@ -84,10 +86,11 @@ public class DiskIIDebugDecoratorTests
     {
         // Arrange
         var inner = new NullDiskIIDrive();
-        var decorator = new DiskIIDebugDecorator(inner);
-
-        // Act
-        decorator.MotorOn = true;
+        var decorator = new DiskIIDebugDecorator(inner)
+        {
+            // Act
+            MotorOn = true
+        };
 
         // Assert
         Assert.True(inner.MotorOn);
@@ -112,8 +115,10 @@ public class DiskIIDebugDecoratorTests
     public void Reset_DelegatesToInner()
     {
         // Arrange
-        var inner = new NullDiskIIDrive();
-        inner.MotorOn = true;
+        var inner = new NullDiskIIDrive
+        {
+            MotorOn = true
+        };
         inner.StepToHigherTrack();
         var decorator = new DiskIIDebugDecorator(inner);
 

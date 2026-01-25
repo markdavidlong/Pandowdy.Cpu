@@ -2,35 +2,24 @@ using Pandowdy.EmuCore.Cards;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Tests.Helpers;
+using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Tests.Cards;
 
 /// <summary>
 /// Tests for DiskIIControllerCard and its variants.
 /// </summary>
-public class DiskIIControllerCardTests : IDisposable
+public class DiskIIControllerCardTests
 {
     private readonly CpuClockingCounters _clocking = new();
-    private readonly MockTelemetryAggregator _telemetry = new();
-    private readonly MockDiskIIFactory _driveFactory;
-
-    public DiskIIControllerCardTests()
-    {
-        _driveFactory = new MockDiskIIFactory(_telemetry);
-    }
-
-    public void Dispose()
-    {
-        _telemetry.Dispose();
-        GC.SuppressFinalize(this);
-    }
+    private readonly DiskStatusProvider _statusProvider = new();
+    private readonly MockDiskIIFactory _driveFactory = new();
 
     #region Helper Methods
 
     private DiskIIControllerCard16Sector CreateCard()
     {
-        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
+        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
     }
 
     private void AdvanceCycles(int cycles)
@@ -56,18 +45,18 @@ public class DiskIIControllerCardTests : IDisposable
     public void Constructor_ThrowsOnNullClocking()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new DiskIIControllerCard16Sector(null!, _driveFactory, _telemetry));
+            new DiskIIControllerCard16Sector(null!, _driveFactory, _statusProvider));
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullDriveFactory()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new DiskIIControllerCard16Sector(_clocking, null!, _telemetry));
+            new DiskIIControllerCard16Sector(_clocking, null!, _statusProvider));
     }
 
     [Fact]
-    public void Constructor_ThrowsOnNullTelemetry()
+    public void Constructor_ThrowsOnNullStatusMutator()
     {
         Assert.Throws<ArgumentNullException>(() =>
             new DiskIIControllerCard16Sector(_clocking, _driveFactory, null!));
@@ -80,18 +69,6 @@ public class DiskIIControllerCardTests : IDisposable
         Assert.NotNull(card);
     }
 
-    [Fact]
-    public void Constructor_RegistersTelemetryId()
-    {
-        // The mock telemetry CreateId is called during construction
-        int initialCount = _telemetry.PublishedMessages.Count;
-        var card = CreateCard();
-
-        // Telemetry ID is created in constructor
-        // No message is published immediately - just ID creation
-        Assert.NotNull(card);
-    }
-
     #endregion
 
     #region ICard Interface Tests - 16 Sector
@@ -99,39 +76,63 @@ public class DiskIIControllerCardTests : IDisposable
     [Fact]
     public void Card16Sector_Name_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
         Assert.Equal("Disk II", card.Name);
     }
 
     [Fact]
     public void Card16Sector_Description_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
         Assert.Equal("Disk II Controller - 16-Sector ROM", card.Description);
     }
 
     [Fact]
     public void Card16Sector_Id_Returns10()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
         Assert.Equal(10, card.Id);
     }
 
     [Fact]
     public void Card16Sector_Slot_ReturnsUnslotted_BeforeInstall()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
         Assert.Equal(SlotNumber.Unslotted, card.Slot);
     }
 
     [Fact]
     public void Card16Sector_Clone_ReturnsNewInstance()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
         var clone = card.Clone();
 
         Assert.NotSame(card, clone);
         Assert.IsType<DiskIIControllerCard16Sector>(clone);
+    }
+
+    [Fact]
+    public void Card16Sector_Clone_IsUnslotted()
+    {
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        card.OnInstalled(SlotNumber.Slot6);
+
+        var clone = card.Clone();
+
+        // Clone should be in initial state (unslotted)
+        Assert.Equal(SlotNumber.Unslotted, ((DiskIIControllerCard16Sector)clone).Slot);
+    }
+
+    [Fact]
+    public void Card16Sector_Clone_HasSameProperties()
+    {
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var clone = (DiskIIControllerCard16Sector)card.Clone();
+
+        // Clone should have same metadata
+        Assert.Equal(card.Name, clone.Name);
+        Assert.Equal(card.Description, clone.Description);
+        Assert.Equal(card.Id, clone.Id);
     }
 
     #endregion
@@ -141,32 +142,44 @@ public class DiskIIControllerCardTests : IDisposable
     [Fact]
     public void Card13Sector_Name_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
         Assert.Equal("Disk II (13-Sector)", card.Name);
     }
 
     [Fact]
     public void Card13Sector_Description_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
         Assert.Equal("Disk II Controller - 13-Sector ROM", card.Description);
     }
 
     [Fact]
     public void Card13Sector_Id_Returns11()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
         Assert.Equal(11, card.Id);
     }
 
     [Fact]
     public void Card13Sector_Clone_ReturnsNewInstance()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
         var clone = card.Clone();
 
         Assert.NotSame(card, clone);
         Assert.IsType<DiskIIControllerCard13Sector>(clone);
+    }
+
+    [Fact]
+    public void Card13Sector_Clone_IsUnslotted()
+    {
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
+        card.OnInstalled(SlotNumber.Slot5);
+
+        var clone = card.Clone();
+
+        // Clone should be in initial state (unslotted)
+        Assert.Equal(SlotNumber.Unslotted, ((DiskIIControllerCard13Sector)clone).Slot);
     }
 
     #endregion
@@ -238,7 +251,7 @@ public class DiskIIControllerCardTests : IDisposable
     [Fact]
     public void Card16Sector_ReadRom_ReturnsValidBytes()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
 
         // First byte should be 0xA2 (LDX #$20)
         Assert.Equal((byte)0xA2, card.ReadRom(0x00));
@@ -247,7 +260,7 @@ public class DiskIIControllerCardTests : IDisposable
     [Fact]
     public void Card16Sector_ReadRom_ReturnsNullForOutOfBounds()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
 
         // ROM is 256 bytes, offset 0x100 is out of bounds
         // ReadRom takes byte, so we can only test up to 255
@@ -260,7 +273,7 @@ public class DiskIIControllerCardTests : IDisposable
     [Fact]
     public void Card16Sector_ReadRom_ContainsBootSignature()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
 
         // Check for known boot ROM pattern at $C6F8 (offset 0xF8)
         // JMP $0801 = 4C 01 08
@@ -276,7 +289,7 @@ public class DiskIIControllerCardTests : IDisposable
     [Fact]
     public void Card13Sector_ReadRom_ReturnsValidBytes()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _telemetry);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
 
         // First byte should be 0xA2 (LDX #$20) - same as 16-sector
         Assert.Equal((byte)0xA2, card.ReadRom(0x00));
@@ -285,8 +298,8 @@ public class DiskIIControllerCardTests : IDisposable
     [Fact]
     public void Card13Sector_ReadRom_DiffersFrom16Sector()
     {
-        var card16 = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _telemetry);
-        var card13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _telemetry);
+        var card16 = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
 
         // The ROMs should differ at some point
         bool foundDifference = false;
@@ -355,7 +368,49 @@ public class DiskIIControllerCardTests : IDisposable
         Assert.True(card.Drives[0].MotorOn);
     }
 
+    [Fact]
+    public void ReadIO_MotorOff_WhilePending_IsIgnored()
+    {
+        var card = CreateCard();
+        card.OnInstalled(SlotNumber.Slot6);
 
+        // Turn motor on
+        card.ReadIO(0x09);
+        Assert.True(card.Drives[0].MotorOn);
+
+        // Request motor off (schedules pending motor-off)
+        card.ReadIO(0x08);
+
+        // Request motor off again (should be ignored since already pending)
+        card.ReadIO(0x08);
+
+        // Motor should still be on (delayed off)
+        Assert.True(card.Drives[0].MotorOn);
+
+        // Advance time - should still turn off after 1 second (not 2 seconds)
+        for (int i = 0; i < 60; i++)
+        {
+            AdvanceToVBlank();
+        }
+
+        Assert.False(card.Drives[0].MotorOn);
+    }
+
+    [Fact]
+    public void ReadIO_MotorOn_WhileMotorAlreadyOn_DoesNotReset()
+    {
+        var card = CreateCard();
+        card.OnInstalled(SlotNumber.Slot6);
+
+        // Turn motor on
+        card.ReadIO(0x09);
+        Assert.True(card.Drives[0].MotorOn);
+
+        // Turn motor on again (should not cause issues)
+        card.ReadIO(0x09);
+
+        Assert.True(card.Drives[0].MotorOn);
+    }
 
     #endregion
 
@@ -397,6 +452,92 @@ public class DiskIIControllerCardTests : IDisposable
         Assert.True(card.Drives[1].MotorOn);
     }
 
+    [Fact]
+    public void ReadIO_SwitchDrives_OldDriveMotorStaysOnInitially()
+    {
+        var card = CreateCard();
+        card.OnInstalled(SlotNumber.Slot6);
+
+        // Turn motor on for drive 1
+        card.ReadIO(0x09);
+        Assert.True(card.Drives[0].MotorOn);
+
+        // Switch to drive 2 - schedules motor-off (but the current implementation
+        // only tracks one pending motor-off for the currently selected drive)
+        card.ReadIO(0x0B);
+
+        // Drive 1 motor should still be on immediately after switch
+        Assert.True(card.Drives[0].MotorOn);
+    }
+
+    [Fact]
+    public void ReadIO_SwitchDrives_ThenMotorOn_NewDriveMotorTurnsOn()
+    {
+        var card = CreateCard();
+        card.OnInstalled(SlotNumber.Slot6);
+
+        // Turn motor on for drive 1
+        card.ReadIO(0x09);
+        Assert.True(card.Drives[0].MotorOn);
+
+        // Switch to drive 2
+        card.ReadIO(0x0B);
+
+        // Turn motor on for drive 2
+        card.ReadIO(0x09);
+
+        Assert.True(card.Drives[1].MotorOn);
+    }
+
+    [Fact]
+    public void ReadIO_SelectSameDrive_DoesNotScheduleMotorOff()
+    {
+        var card = CreateCard();
+        card.OnInstalled(SlotNumber.Slot6);
+
+        // Turn motor on for drive 1
+        card.ReadIO(0x09);
+        Assert.True(card.Drives[0].MotorOn);
+
+        // Select drive 1 again (same drive)
+        card.ReadIO(0x0A);
+
+        // Motor should still be on without any scheduling
+        for (int i = 0; i < 60; i++)
+        {
+            AdvanceToVBlank();
+        }
+
+        // Motor stays on because no motor-off was scheduled
+        Assert.True(card.Drives[0].MotorOn);
+    }
+
+    [Fact]
+    public void ReadIO_SwitchDrives_SwitchBack_CancelsMotorOff()
+    {
+        var card = CreateCard();
+        card.OnInstalled(SlotNumber.Slot6);
+
+        // Turn motor on for drive 1
+        card.ReadIO(0x09);
+        Assert.True(card.Drives[0].MotorOn);
+
+        // Switch to drive 2 (schedules motor-off for drive 1)
+        card.ReadIO(0x0B);
+
+        // Immediately switch back to drive 1 and turn motor on (cancels pending off)
+        card.ReadIO(0x0A);
+        card.ReadIO(0x09);
+
+        // After delay, drive 1 motor should still be on (pending was cancelled)
+        for (int i = 0; i < 60; i++)
+        {
+            AdvanceToVBlank();
+        }
+
+        Assert.True(card.Drives[0].MotorOn);
+    }
+
     #endregion
 
     #region I/O Read Tests - Q6/Q7 Control (0xC-0xF)
@@ -426,12 +567,97 @@ public class DiskIIControllerCardTests : IDisposable
         var result = card.ReadIO(0x0D); // Q6H
 
         // No disk = not write protected = 0x00
-        Assert.Equal((byte)0x00, result);
-    }
+            Assert.Equal((byte)0x00, result);
+        }
 
-    #endregion
+        [Fact]
+        public void ReadIO_Q7L_Q6L_IsReadMode()
+        {
+            var card = CreateCard();
+            card.OnInstalled(SlotNumber.Slot6);
 
-    #region I/O Write Tests
+            // Q7=0, Q6=0 = READ MODE (read shift register)
+            card.ReadIO(0x0E); // Q7L (Q7=0)
+            card.ReadIO(0x0C); // Q6L (Q6=0)
+
+            // In read mode, reading returns shift register value
+            var result = card.ReadIO(0x0C);
+            Assert.NotNull(result);
+        }
+
+        [Fact]
+        public void ReadIO_Q7L_Q6H_IsSenseWriteProtect()
+        {
+            var card = CreateCard();
+            card.OnInstalled(SlotNumber.Slot6);
+
+            // Q7=0, Q6=1 = SENSE WRITE PROTECT
+            card.ReadIO(0x0E); // Q7L (Q7=0)
+            card.ReadIO(0x0D); // Q6H (Q6=1)
+
+            // Reading returns write protect status (bit 7)
+            var result = card.ReadIO(0x0D);
+            Assert.NotNull(result);
+            Assert.Equal((byte)0x00, result); // Not write protected (no disk)
+        }
+
+        [Fact]
+        public void ReadIO_Q7H_Q6L_IsWriteLoadMode()
+        {
+            var card = CreateCard();
+            card.OnInstalled(SlotNumber.Slot6);
+
+            // Q7=1, Q6=0 = WRITE LOAD (timing/prep mode)
+            card.ReadIO(0x0F); // Q7H (Q7=1)
+            card.ReadIO(0x0C); // Q6L (Q6=0)
+
+            // In write load mode, read returns timing value (typically 0x00)
+            var result = card.ReadIO(0x0C);
+            Assert.NotNull(result);
+        }
+
+        [Fact]
+        public void ReadIO_Q7H_Q6H_IsWriteMode()
+        {
+            var card = CreateCard();
+            card.OnInstalled(SlotNumber.Slot6);
+
+            // Q7=1, Q6=1 = WRITE MODE
+            card.ReadIO(0x0F); // Q7H (Q7=1)
+            card.ReadIO(0x0D); // Q6H (Q6=1)
+
+            // In write mode, read returns 0x00
+            var result = card.ReadIO(0x0D);
+            Assert.NotNull(result);
+            Assert.Equal((byte)0x00, result);
+        }
+
+        [Fact]
+        public void ReadIO_Q6Q7_ModeTransition_ReadToWriteAndBack()
+        {
+            var card = CreateCard();
+            card.OnInstalled(SlotNumber.Slot6);
+
+            // Start in read mode (Q6=0, Q7=0)
+            card.ReadIO(0x0E); // Q7L
+            card.ReadIO(0x0C); // Q6L
+
+            // Transition to write mode (Q6=1, Q7=1)
+            card.ReadIO(0x0F); // Q7H
+            card.ReadIO(0x0D); // Q6H
+
+            // Transition back to read mode
+            card.ReadIO(0x0E); // Q7L
+            card.ReadIO(0x0C); // Q6L
+
+            // Should be back in read mode - reading returns shift register
+            var result = card.ReadIO(0x0C);
+            Assert.NotNull(result);
+        }
+
+        #endregion
+
+        #region I/O Write Tests
 
 
 
@@ -499,6 +725,44 @@ public class DiskIIControllerCardTests : IDisposable
         card.ReadIO(0x09);
         Assert.True(card.Drives[0].MotorOn);
         Assert.False(card.Drives[1].MotorOn);
+    }
+
+    [Fact]
+    public void Reset_CancelsPendingMotorOff()
+    {
+        var card = CreateCard();
+        card.OnInstalled(SlotNumber.Slot6);
+
+        // Turn motor on
+        card.ReadIO(0x09);
+
+        // Request motor off (schedules pending)
+        card.ReadIO(0x08);
+
+        // Reset - should cancel pending motor-off AND turn motor off immediately
+        card.Reset();
+
+        // Motor should be off immediately (not waiting for timer)
+        Assert.False(card.Drives[0].MotorOn);
+    }
+
+    [Fact]
+    public void Reset_ResetsQ6Q7ToReadMode()
+    {
+        var card = CreateCard();
+        card.OnInstalled(SlotNumber.Slot6);
+
+        // Set to write mode (Q6=1, Q7=1)
+        card.ReadIO(0x0F); // Q7H
+        card.ReadIO(0x0D); // Q6H
+
+        // Reset
+        card.Reset();
+
+        // After reset, Q6=0 and Q7=0 (read mode)
+        // Reading Q6L should return shift register (read mode behavior)
+        var result = card.ReadIO(0x0C);
+        Assert.NotNull(result);
     }
 
     #endregion
@@ -618,46 +882,211 @@ public class DiskIIControllerCardTests : IDisposable
 
     #endregion
 
-    #region Stepper Motor Tests
+        #region Stepper Motor Tests
 
-    [Fact]
-    public void PhaseControl_MovesHead()
-    {
-        var card = CreateCard();
-        card.OnInstalled(SlotNumber.Slot6);
+        [Fact]
+        public void PhaseControl_MovesHeadInBothDirections()
+        {
+            var card = CreateCard();
+            card.OnInstalled(SlotNumber.Slot6);
 
-        // Turn motor on
-        card.ReadIO(0x09);
+            // Turn motor on
+            card.ReadIO(0x09);
 
-        int initialTrack = card.Drives[0].QuarterTrack;
+            int initialQuarterTrack = card.Drives[0].QuarterTrack;
 
-        // Activate phase 0
-        card.ReadIO(0x01);
-        // Activate phase 1 (with phase 0 off)
-        card.ReadIO(0x00);
-        card.ReadIO(0x03);
+            // Sanity check: ensure there's room to move in either direction
+            // Drive starts at track 17 (quarter track 68) - arbitrary middle position
+            Assert.True(initialQuarterTrack > 0, "Initial quarter track should allow stepping to lower tracks");
+            Assert.True(initialQuarterTrack < DiskIIConstants.MaxQuarterTracks, "Initial quarter track should allow stepping to higher tracks");
 
-        // Track should have changed
-        // (Actual movement depends on the stepper logic)
-        // At minimum, verify no crash
-        Assert.True(true);
-    }
+            // Step outward (toward higher tracks) using phase sequence: 0 -> 1 -> 2 -> 3
+            card.ReadIO(0x01); // Phase 0 on
+            card.ReadIO(0x00); // Phase 0 off
+            card.ReadIO(0x03); // Phase 1 on
+            card.ReadIO(0x02); // Phase 1 off
+            card.ReadIO(0x05); // Phase 2 on
+            card.ReadIO(0x04); // Phase 2 off
+            card.ReadIO(0x07); // Phase 3 on
 
-    #endregion
-}
+            // Verify head moved from initial position
+            int afterForwardQuarterTrack = card.Drives[0].QuarterTrack;
+            Assert.True(afterForwardQuarterTrack >= 0 && afterForwardQuarterTrack <= DiskIIConstants.MaxQuarterTracks,
+                "Quarter track should be in valid range");
+            Assert.NotEqual(initialQuarterTrack, afterForwardQuarterTrack);
+
+            // Step inward (reverse phase sequence) - phases: 3 -> 2 -> 1 -> 0
+            card.ReadIO(0x06); // Phase 3 off
+            card.ReadIO(0x05); // Phase 2 on
+            card.ReadIO(0x04); // Phase 2 off
+            card.ReadIO(0x03); // Phase 1 on
+            card.ReadIO(0x02); // Phase 1 off
+            card.ReadIO(0x01); // Phase 0 on
+
+            // Verify head moved in the opposite direction
+            int afterBackwardQuarterTrack = card.Drives[0].QuarterTrack;
+            Assert.NotEqual(afterForwardQuarterTrack, afterBackwardQuarterTrack);
+        }
+
+                [Fact]
+                public void PhaseControl_AtTrack0_CannotStepLower()
+                {
+                    var card = CreateCard();
+                    card.OnInstalled(SlotNumber.Slot6);
+
+                    // Set drive to track 0
+                    var mockDrive = (MockDiskIIDrive)card.Drives[0];
+                    mockDrive.SetQuarterTrack(0);
+
+                    // Turn motor on
+                    card.ReadIO(0x09);
+
+                    // Try to step toward lower tracks (phase sequence: 3 -> 2 -> 1 -> 0)
+                    card.ReadIO(0x07); // Phase 3 on
+                    card.ReadIO(0x06); // Phase 3 off
+                    card.ReadIO(0x05); // Phase 2 on
+                    card.ReadIO(0x04); // Phase 2 off
+                    card.ReadIO(0x03); // Phase 1 on
+                    card.ReadIO(0x02); // Phase 1 off
+                    card.ReadIO(0x01); // Phase 0 on
+
+                    // Quarter track should still be 0 (clamped)
+                    Assert.Equal(0, card.Drives[0].QuarterTrack);
+                }
+
+                [Fact]
+                public void PhaseControl_AtMaxTrack_CannotStepHigher()
+                {
+                    var card = CreateCard();
+                    card.OnInstalled(SlotNumber.Slot6);
+
+                    // Set drive to max track
+                    var mockDrive = (MockDiskIIDrive)card.Drives[0];
+                    mockDrive.SetQuarterTrack(DiskIIConstants.MaxQuarterTracks);
+
+                    // Turn motor on
+                    card.ReadIO(0x09);
+
+                    // Try to step toward higher tracks (phase sequence: 0 -> 1 -> 2 -> 3)
+                    card.ReadIO(0x01); // Phase 0 on
+                    card.ReadIO(0x00); // Phase 0 off
+                    card.ReadIO(0x03); // Phase 1 on
+                    card.ReadIO(0x02); // Phase 1 off
+                    card.ReadIO(0x05); // Phase 2 on
+                    card.ReadIO(0x04); // Phase 2 off
+                    card.ReadIO(0x07); // Phase 3 on
+
+                    // Quarter track should still be at max (clamped)
+                    Assert.Equal(DiskIIConstants.MaxQuarterTracks, card.Drives[0].QuarterTrack);
+                }
+
+                [Fact]
+                public void PhaseControl_MotorOff_DoesNotMoveHead()
+                {
+                    var card = CreateCard();
+                    card.OnInstalled(SlotNumber.Slot6);
+
+                    int initialQuarterTrack = card.Drives[0].QuarterTrack;
+
+                    // Motor is OFF - phases should not move head
+                    card.ReadIO(0x01); // Phase 0 on
+                    card.ReadIO(0x03); // Phase 1 on
+                    card.ReadIO(0x05); // Phase 2 on
+                    card.ReadIO(0x07); // Phase 3 on
+
+                    // Head should not have moved
+                    Assert.Equal(initialQuarterTrack, card.Drives[0].QuarterTrack);
+                }
+
+                #endregion
+
+                #region Write Protection Tests
+
+                [Fact]
+                public void ReadIO_WriteProtect_ReturnsProtectedStatus_WhenDiskProtected()
+                {
+                    var card = CreateCard();
+                    card.OnInstalled(SlotNumber.Slot6);
+
+                    // Set drive to write-protected
+                    var mockDrive = (MockDiskIIDrive)card.Drives[0];
+                    mockDrive.SetWriteProtected(true);
+
+                    // Q6=1, Q7=0 = SENSE WRITE PROTECT
+                    card.ReadIO(0x0E); // Q7L
+                    var result = card.ReadIO(0x0D); // Q6H
+
+                    // Bit 7 should be set (write protected)
+                    Assert.Equal((byte)0x80, result);
+                }
+
+                [Fact]
+                public void ReadIO_WriteProtect_ReturnsUnprotectedStatus_WhenDiskNotProtected()
+                {
+                    var card = CreateCard();
+                    card.OnInstalled(SlotNumber.Slot6);
+
+                    // Drive is not write-protected by default
+                    var mockDrive = (MockDiskIIDrive)card.Drives[0];
+                    mockDrive.SetWriteProtected(false);
+
+                    // Q6=1, Q7=0 = SENSE WRITE PROTECT
+                    card.ReadIO(0x0E); // Q7L
+                    var result = card.ReadIO(0x0D); // Q6H
+
+                    // Bit 7 should be clear (not write protected)
+                    Assert.Equal((byte)0x00, result);
+                }
+
+                #endregion
+
+                #region Write Operation Tests
+
+                [Fact]
+                public void WriteIO_Q7H_Q6H_LoadsWriteLatch()
+                {
+                    var card = CreateCard();
+                    card.OnInstalled(SlotNumber.Slot6);
+
+                    // Set to write mode (Q7=1, Q6=1)
+                    card.ReadIO(0x0F); // Q7H
+                    card.ReadIO(0x0D); // Q6H
+
+                    // Write a value - should load write latch
+                    card.WriteIO(0x0D, 0xAB);
+
+                    // No exception means success (actual write depends on motor/disk state)
+                }
+
+                [Fact]
+                public void WriteIO_PhaseControl_HasSameEffectAsRead()
+                {
+                    var card = CreateCard();
+                    card.OnInstalled(SlotNumber.Slot6);
+
+                    // Turn motor on via write
+                    card.WriteIO(0x09, 0x00);
+
+                    int initialQuarterTrack = card.Drives[0].QuarterTrack;
+
+                    // Use WriteIO for phase control
+                    card.WriteIO(0x01, 0x00); // Phase 0 on
+                    card.WriteIO(0x00, 0x00); // Phase 0 off
+                    card.WriteIO(0x03, 0x00); // Phase 1 on
+
+                    // Head should have moved
+                    Assert.NotEqual(initialQuarterTrack, card.Drives[0].QuarterTrack);
+                }
+
+                #endregion
+            }
 
 /// <summary>
 /// Mock implementation of IDiskIIFactory for testing.
 /// </summary>
 internal class MockDiskIIFactory : IDiskIIFactory
 {
-    private readonly ITelemetryAggregator _telemetry;
     private readonly List<MockDiskIIDrive> _createdDrives = [];
-
-    public MockDiskIIFactory(ITelemetryAggregator telemetry)
-    {
-        _telemetry = telemetry;
-    }
 
     public IReadOnlyList<MockDiskIIDrive> CreatedDrives => _createdDrives;
 
@@ -672,17 +1101,29 @@ internal class MockDiskIIFactory : IDiskIIFactory
 /// <summary>
 /// Mock implementation of IDiskIIDrive for testing.
 /// </summary>
-internal class MockDiskIIDrive : IDiskIIDrive
+internal class MockDiskIIDrive(string name) : IDiskIIDrive
 {
-    public string Name { get; }
+    public string Name { get; } = name;
     public double Track => QuarterTrack / 4.0;
     public int QuarterTrack { get; private set; } = 68; // Track 17
     public bool MotorOn { get; set; }
     public bool HasDisk => false;
+    private bool _writeProtected = false;
 
-    public MockDiskIIDrive(string name)
+    /// <summary>
+    /// Sets the quarter track position for testing boundary conditions.
+    /// </summary>
+    public void SetQuarterTrack(int quarterTrack)
     {
-        Name = name;
+        QuarterTrack = quarterTrack;
+    }
+
+    /// <summary>
+    /// Sets the write-protected status for testing.
+    /// </summary>
+    public void SetWriteProtected(bool isProtected)
+    {
+        _writeProtected = isProtected;
     }
 
     public void Reset()
@@ -711,7 +1152,7 @@ internal class MockDiskIIDrive : IDiskIIDrive
 
     public bool SetBit(bool value) => false;
 
-    public bool IsWriteProtected() => false;
+    public bool IsWriteProtected() => _writeProtected;
 
     public void InsertDisk(string diskImagePath) { }
 

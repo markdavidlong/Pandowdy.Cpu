@@ -1,23 +1,21 @@
-using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Tests.Helpers;
 
 namespace Pandowdy.EmuCore.Tests.DiskII;
 
 /// <summary>
-/// Tests for DiskIIDrive - core drive implementation with telemetry.
+/// Tests for DiskIIDrive - core drive implementation.
 /// </summary>
-public class DiskIIDriveTests : IDisposable
+/// <remarks>
+/// <para>
+/// After the telemetry removal refactoring (Phase 8C), <see cref="DiskIIDrive"/> is now a
+/// pure drive implementation without status publishing. Status updates are handled by
+/// <see cref="DiskIIStatusDecorator"/> which wraps the drive.
+/// </para>
+/// </remarks>
+public class DiskIIDriveTests
 {
-    private readonly MockTelemetryAggregator _telemetry = new();
     private DiskIIDrive? _drive;
-
-    public void Dispose()
-    {
-        _telemetry.Dispose();
-        GC.SuppressFinalize(this);
-    }
 
     #region Constructor Tests
 
@@ -25,7 +23,7 @@ public class DiskIIDriveTests : IDisposable
     public void Constructor_SetsName()
     {
         // Act
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
 
         // Assert
         Assert.Equal("TestDrive", _drive.Name);
@@ -35,26 +33,17 @@ public class DiskIIDriveTests : IDisposable
     public void Constructor_WithNullName_SetsUnnamed()
     {
         // Act
-        _drive = new DiskIIDrive(null!, _telemetry, 6, 1);
+        _drive = new DiskIIDrive(null!);
 
         // Assert
         Assert.Equal("Unnamed", _drive.Name);
     }
 
     [Fact]
-    public void Constructor_ThrowsOnNullTelemetry()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() =>
-            new DiskIIDrive("Test", null!, 6, 1));
-    }
-
-
-    [Fact]
     public void Constructor_InitializesAtTrack17()
     {
         // Act
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
 
         // Assert
         Assert.Equal(17.0, _drive.Track);
@@ -65,7 +54,7 @@ public class DiskIIDriveTests : IDisposable
     public void Constructor_InitializesMotorOff()
     {
         // Act
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
 
         // Assert
         Assert.False(_drive.MotorOn);
@@ -78,7 +67,7 @@ public class DiskIIDriveTests : IDisposable
         var mockProvider = new MockDiskImageProvider();
 
         // Act
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1, mockProvider);
+        _drive = new DiskIIDrive("TestDrive", mockProvider);
 
         // Assert - provider should have been notified of initial track
         Assert.Equal(68, mockProvider.CurrentQuarterTrack); // Track 17
@@ -92,7 +81,7 @@ public class DiskIIDriveTests : IDisposable
     public void Reset_RestoresTrackTo17()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
         _drive.StepToHigherTrack();
         _drive.StepToHigherTrack();
 
@@ -107,9 +96,10 @@ public class DiskIIDriveTests : IDisposable
     public void Reset_TurnsMotorOff()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
-        _drive.MotorOn = true;
-        _telemetry.Clear();
+        _drive = new DiskIIDrive("TestDrive")
+        {
+            MotorOn = true
+        };
 
         // Act
         _drive.Reset();
@@ -123,18 +113,17 @@ public class DiskIIDriveTests : IDisposable
     #region Motor Tests
 
     [Fact]
-    public void MotorOn_SameValue_DoesNotPublishTelemetry()
+    public void MotorOn_CanBeToggled()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
-        _drive.MotorOn = true;
-        _telemetry.Clear();
+        _drive = new DiskIIDrive("TestDrive");
 
-        // Act - set to same value
+        // Act & Assert
+        Assert.False(_drive.MotorOn);
         _drive.MotorOn = true;
-
-        // Assert - no new messages
-        Assert.Empty(_telemetry.GetMessagesByType("motor"));
+        Assert.True(_drive.MotorOn);
+        _drive.MotorOn = false;
+        Assert.False(_drive.MotorOn);
     }
 
     #endregion
@@ -145,7 +134,7 @@ public class DiskIIDriveTests : IDisposable
     public void StepToHigherTrack_IncrementsQuarterTrack()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
         int initialQuarterTrack = _drive.QuarterTrack;
 
         // Act
@@ -155,12 +144,11 @@ public class DiskIIDriveTests : IDisposable
         Assert.Equal(initialQuarterTrack + 1, _drive.QuarterTrack);
     }
 
-
     [Fact]
     public void StepToLowerTrack_DecrementsQuarterTrack()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
         int initialQuarterTrack = _drive.QuarterTrack;
 
         // Act
@@ -170,13 +158,11 @@ public class DiskIIDriveTests : IDisposable
         Assert.Equal(initialQuarterTrack - 1, _drive.QuarterTrack);
     }
 
-
-
     [Fact]
     public void StepToHigherTrack_ClampsAtMax()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
 
         // Act - step way beyond max
         for (int i = 0; i < 200; i++)
@@ -192,7 +178,7 @@ public class DiskIIDriveTests : IDisposable
     public void StepToLowerTrack_ClampsAtZero()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
 
         // Act - step way below zero
         for (int i = 0; i < 200; i++)
@@ -209,7 +195,7 @@ public class DiskIIDriveTests : IDisposable
     {
         // Arrange
         var mockProvider = new MockDiskImageProvider();
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1, mockProvider);
+        _drive = new DiskIIDrive("TestDrive", mockProvider);
         int initialTrack = mockProvider.CurrentQuarterTrack;
 
         // Act
@@ -227,7 +213,7 @@ public class DiskIIDriveTests : IDisposable
     public void HasDisk_ReturnsFalse_WhenNoDisk()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
 
         // Assert
         Assert.False(_drive.HasDisk);
@@ -238,7 +224,7 @@ public class DiskIIDriveTests : IDisposable
     {
         // Arrange
         var mockProvider = new MockDiskImageProvider();
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1, mockProvider);
+        _drive = new DiskIIDrive("TestDrive", mockProvider);
 
         // Assert
         Assert.True(_drive.HasDisk);
@@ -248,7 +234,7 @@ public class DiskIIDriveTests : IDisposable
     public void InsertDisk_ThrowsWithoutFactory()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
 
         // Act & Assert
         Assert.Throws<InvalidOperationException>(() =>
@@ -260,8 +246,7 @@ public class DiskIIDriveTests : IDisposable
     {
         // Arrange
         var mockProvider = new MockDiskImageProvider();
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1, mockProvider);
-        _telemetry.Clear();
+        _drive = new DiskIIDrive("TestDrive", mockProvider);
 
         // Act
         _drive.EjectDisk();
@@ -272,12 +257,11 @@ public class DiskIIDriveTests : IDisposable
         Assert.True(mockProvider.WasFlushed);
     }
 
-
     [Fact]
     public void IsWriteProtected_ReturnsFalse_WhenNoDisk()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
+        _drive = new DiskIIDrive("TestDrive");
 
         // Assert
         Assert.False(_drive.IsWriteProtected());
@@ -288,7 +272,7 @@ public class DiskIIDriveTests : IDisposable
     {
         // Arrange
         var mockProvider = new MockDiskImageProvider { IsWriteProtected = true };
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1, mockProvider);
+        _drive = new DiskIIDrive("TestDrive", mockProvider);
 
         // Assert
         Assert.True(_drive.IsWriteProtected());
@@ -303,8 +287,10 @@ public class DiskIIDriveTests : IDisposable
     {
         // Arrange
         var mockProvider = new MockDiskImageProvider();
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1, mockProvider);
-        _drive.MotorOn = false;
+        _drive = new DiskIIDrive("TestDrive", mockProvider)
+        {
+            MotorOn = false
+        };
 
         // Act
         bool? bit = _drive.GetBit(1000);
@@ -317,8 +303,10 @@ public class DiskIIDriveTests : IDisposable
     public void GetBit_ReturnsNull_WhenNoDisk()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
-        _drive.MotorOn = true;
+        _drive = new DiskIIDrive("TestDrive")
+        {
+            MotorOn = true
+        };
 
         // Act
         bool? bit = _drive.GetBit(1000);
@@ -332,8 +320,10 @@ public class DiskIIDriveTests : IDisposable
     {
         // Arrange
         var mockProvider = new MockDiskImageProvider { NextBitValue = true };
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1, mockProvider);
-        _drive.MotorOn = true;
+        _drive = new DiskIIDrive("TestDrive", mockProvider)
+        {
+            MotorOn = true
+        };
 
         // Act
         bool? bit = _drive.GetBit(1000);
@@ -348,8 +338,10 @@ public class DiskIIDriveTests : IDisposable
     {
         // Arrange
         var mockProvider = new MockDiskImageProvider();
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1, mockProvider);
-        _drive.MotorOn = false;
+        _drive = new DiskIIDrive("TestDrive", mockProvider)
+        {
+            MotorOn = false
+        };
 
         // Act
         bool result = _drive.SetBit(true);
@@ -362,8 +354,10 @@ public class DiskIIDriveTests : IDisposable
     public void SetBit_ReturnsFalse_WhenNoDisk()
     {
         // Arrange
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1);
-        _drive.MotorOn = true;
+        _drive = new DiskIIDrive("TestDrive")
+        {
+            MotorOn = true
+        };
 
         // Act
         bool result = _drive.SetBit(true);
@@ -377,8 +371,10 @@ public class DiskIIDriveTests : IDisposable
     {
         // Arrange
         var mockProvider = new MockDiskImageProvider { WriteBitReturnValue = true };
-        _drive = new DiskIIDrive("TestDrive", _telemetry, 6, 1, mockProvider);
-        _drive.MotorOn = true;
+        _drive = new DiskIIDrive("TestDrive", mockProvider)
+        {
+            MotorOn = true
+        };
 
         // Act
         bool result = _drive.SetBit(true);
@@ -389,7 +385,6 @@ public class DiskIIDriveTests : IDisposable
     }
 
     #endregion
-
 
     #region Helper Classes
 
