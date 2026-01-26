@@ -636,5 +636,114 @@ public class QueuedKeyHandlerTests
         Assert.Equal(0, handler.NumKeysPending());
     }
 
-    #endregion
-}
+        #endregion
+
+        #region Reset Tests (6 tests)
+
+        [Fact]
+        public void Reset_ClearsStrobeBit_PreservesKeyValue()
+        {
+            // Arrange
+            using var handler = new QueuedKeyHandler();
+            handler.EnqueueKey(0x41); // 'A' with strobe set (0xC1)
+
+            // Act
+            handler.Reset();
+
+            // Assert
+            Assert.False(handler.StrobePending()); // Strobe cleared
+            Assert.Equal(0x41, handler.PeekCurrentKeyValue()); // Key value preserved
+            Assert.Equal(0x41, handler.PeekCurrentKeyAndStrobe()); // Full value without strobe
+        }
+
+        [Fact]
+        public void Reset_ClearsPendingQueue()
+        {
+            // Arrange
+            using var handler = new QueuedKeyHandler();
+            handler.EnqueueKey(0x41); // 'A' - loads with strobe
+            handler.EnqueueKey(0x42); // 'B' - queued
+            handler.EnqueueKey(0x43); // 'C' - queued
+            Assert.Equal(3, handler.NumKeysPending()); // 1 in latch + 2 in queue
+
+            // Act
+            handler.Reset();
+
+            // Assert
+            Assert.Equal(0, handler.NumKeysPending()); // Queue cleared
+            Assert.False(handler.StrobePending()); // Strobe cleared
+            Assert.Equal(0x41, handler.PeekCurrentKeyValue()); // Current key preserved (no strobe)
+        }
+
+        [Fact]
+        public async Task Reset_CancelsTimerCallback()
+        {
+            // Arrange
+            using var handler = new QueuedKeyHandler(delayMilliseconds: 10);
+            handler.EnqueueKey(0x41); // 'A' - loads with strobe
+            handler.EnqueueKey(0x42); // 'B' - queued
+            handler.ClearStrobe(); // Start timer to feed 'B' after 10ms
+
+            // Act - Reset before timer fires
+            handler.Reset();
+            await Task.Delay(30); // Wait past timer window
+
+            // Assert - 'B' should not have been fed
+            Assert.False(handler.StrobePending()); // Strobe still clear
+            Assert.Equal(0x41, handler.PeekCurrentKeyValue()); // Still 'A', not 'B'
+            Assert.Equal(0, handler.NumKeysPending()); // Queue cleared
+        }
+
+        [Fact]
+        public void Reset_WhenNoKeyPresent_DoesNotThrow()
+        {
+            // Arrange
+            using var handler = new QueuedKeyHandler();
+
+            // Act & Assert - Should not throw
+            handler.Reset();
+            Assert.False(handler.StrobePending());
+            Assert.Equal(0, handler.NumKeysPending());
+        }
+
+        [Fact]
+        public void Reset_AllowsNewKeysAfterReset()
+        {
+            // Arrange
+            using var handler = new QueuedKeyHandler();
+            handler.EnqueueKey(0x41); // 'A'
+            handler.EnqueueKey(0x42); // 'B'
+            handler.Reset();
+
+            // Act - Enqueue new keys after reset
+            handler.EnqueueKey(0x43); // 'C'
+            handler.EnqueueKey(0x44); // 'D'
+
+            // Assert - New keys loaded normally
+            Assert.True(handler.StrobePending());
+            Assert.Equal(0x43, handler.PeekCurrentKeyValue()); // 'C' in latch
+            Assert.Equal(2, handler.NumKeysPending()); // 'C' in latch + 'D' queued
+            }
+
+            [Fact]
+            public async Task Reset_WithActiveTimer_PreventsFeedingQueuedKeys()
+            {
+                // Arrange - Use longer delay to ensure timer doesn't fire before reset
+                using var handler = new QueuedKeyHandler(delayMilliseconds: 100);
+                handler.EnqueueKey(0x41); // 'A'
+                handler.EnqueueKey(0x42); // 'B' - queued
+                handler.EnqueueKey(0x43); // 'C' - queued
+                handler.ClearStrobe(); // Start timer
+
+                // Act - Reset immediately (well before 100ms timer fires)
+                handler.Reset();
+                await Task.Delay(150); // Wait past timer window
+
+                // Assert - Timer was canceled, 'B' not fed despite waiting past delay
+                Assert.False(handler.StrobePending());
+                Assert.Equal(0x41, handler.PeekCurrentKeyValue()); // Still 'A', not 'B'
+                Assert.Equal(0, handler.NumKeysPending()); // Queue cleared
+            }
+
+            #endregion
+        }

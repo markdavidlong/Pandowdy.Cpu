@@ -115,6 +115,56 @@ public interface IKeyboardSetter
     /// <item>Buffered implementations - Enqueues key into FIFO buffer for processing</item>
     /// </list>
     /// </para>
-    /// </remarks>
-    public void EnqueueKey(byte key);
-}
+        /// </remarks>
+        public void EnqueueKey(byte key);
+
+        /// <summary>
+        /// Resets the keyboard state to power-on defaults, clearing pending keystrokes and strobe.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <strong>Purpose:</strong> This method simulates a hardware reset (power cycle) of the Apple IIe
+        /// keyboard system. It is typically called when the emulator performs a cold boot or system reset.
+        /// </para>
+        /// <para>
+        /// <strong>Reset Behavior:</strong>
+        /// <list type="bullet">
+        /// <item><strong>Strobe Clearing:</strong> If a key is currently latched with strobe set (bit 7 = 1),
+        /// the strobe is cleared (bit 7 set to 0) but the key's low 7 bits are preserved. This matches
+        /// the Apple IIe hardware behavior where the keyboard latch retains the last key but clears the
+        /// "unread" flag.</item>
+        /// <item><strong>Queue Clearing (buffered implementations):</strong> For keyboard handlers with
+        /// queuing (such as QueuedKeyHandler), all pending keys in the buffer are discarded. This prevents
+        /// stale keystrokes from being injected after reset.</item>
+        /// <item><strong>Timer Cancellation (buffered implementations):</strong> Any pending automatic
+        /// key feed timers are canceled to prevent scheduled keys from appearing after reset.</item>
+        /// </list>
+        /// </para>
+        /// <para>
+        /// <strong>Thread Safety:</strong> Like <see cref="EnqueueKey"/>, this method is <em>not</em>
+        /// thread-safe and must be called from the emulator's CPU thread. Use appropriate synchronization
+        /// (command queue, dispatcher) when calling from other threads.
+        /// </para>
+        /// <para>
+        /// <strong>Use Cases:</strong>
+        /// <list type="bullet">
+        /// <item><strong>System Reset:</strong> User presses Reset button or emulator performs cold boot</item>
+        /// <item><strong>Clear Stuck Keys:</strong> Recovery from keyboard handler being in unexpected state</item>
+        /// <item><strong>Clean State for Tests:</strong> Test fixtures can reset keyboard to known state</item>
+        /// </list>
+        /// </para>
+        /// <para>
+        /// <strong>Example Usage:</strong>
+        /// <code>
+        /// // In VA2M.Reset() - full system reset
+        /// public void Reset()
+        /// {
+        ///     _keyboardSetter.Reset();  // Clear pending keys, preserve latch with strobe cleared
+        ///     Bus.Reset();               // Reset CPU, memory, etc.
+        ///     // ... other reset operations
+        /// }
+        /// </code>
+        /// </para>
+        /// </remarks>
+        public void Reset();
+    }

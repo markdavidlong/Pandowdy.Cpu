@@ -231,17 +231,26 @@ if (Bus is VA2MBus vb)
 
 ### Task 6: Clear Pending Keystrokes on Reset (Low Priority)
 
+**Status:** ✅ COMPLETED (2025-01-25)
+
 **Problem:** When `Reset()` is called, any pending keystrokes in the `QueuedKeyHandler` buffer should be cleared.
 
-**Current Behavior:** Unknown - needs investigation.
+**Solution Implemented:**
+- Added `Reset()` method to `IKeyboardSetter` interface
+- Implemented in `SingularKeyHandler`: Clears strobe bit while preserving key value
+- Implemented in `QueuedKeyHandler`: Cancels timer, clears queue, clears strobe bit
+- Called in `VA2M.Reset()` before `Bus.Reset()`
+- Added 11 unit tests (5 for SingularKeyHandler, 6 for QueuedKeyHandler)
 
-**Expected Behavior:** Reset clears the keyboard buffer to prevent stale input after reset.
+**Files Modified:**
+- `Pandowdy.EmuCore\Interfaces\IKeyboardSetter.cs` - Added Reset() method
+- `Pandowdy.EmuCore\Services\SingularKeyHandler.cs` - Implemented Reset()
+- `Pandowdy.EmuCore\Services\QueuedKeyHandler.cs` - Implemented Reset() with queue clearing
+- `Pandowdy.EmuCore\VA2M.cs` - Calls keyboard Reset() on system reset
+- `Pandowdy.EmuCore.Tests\SingularKeyHandlerTests.cs` - Added 5 Reset() tests
+- `Pandowdy.EmuCore.Tests\QueuedKeyHandlerTests.cs` - Added 6 Reset() tests
 
-**Files to Modify:**
-- `Pandowdy.EmuCore\QueuedKeyHandler.cs` - Add buffer clear on reset
-- Possibly hook into VA2M reset sequence
-
-**Priority:** Low
+**Test Results:** All 1235 tests passing ✅
 
 ---
 
@@ -369,6 +378,34 @@ Debug.WriteLine($"WARNING: Disk image size {size} does not match expected {expec
 ---
 
 ## Completed Tasks
+
+### ✅ Task 6: Clear Pending Keystrokes on Reset
+
+**Completed:** 2025-01-25 - All 1235 tests passing
+
+**Summary:**
+- Added Reset() method to IKeyboardSetter interface
+- Implemented in SingularKeyHandler (clears strobe, preserves key)
+- Implemented in QueuedKeyHandler (cancels timer, clears queue, clears strobe)
+- Integrated into VA2M.Reset() for system-wide keyboard reset
+- Added 11 unit tests verifying Reset() behavior
+
+**Key Behavior:**
+- On reset, strobe bit is cleared (bit 7 → 0)
+- Key value's low 7 bits are preserved (matches Apple IIe hardware)
+- QueuedKeyHandler clears all pending keys from buffer
+- QueuedKeyHandler cancels any active timer callbacks
+- Prevents stale keystrokes from appearing after system reset
+
+**Files Modified:**
+- `IKeyboardSetter.cs` - Interface
+- `SingularKeyHandler.cs` - Implementation
+- `QueuedKeyHandler.cs` - Implementation with queue clearing
+- `VA2M.cs` - Integration
+- `SingularKeyHandlerTests.cs` - 5 tests
+- `QueuedKeyHandlerTests.cs` - 6 tests
+
+---
 
 ### ✅ Disk II Integration (Phases 1-8E)
 

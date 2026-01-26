@@ -481,5 +481,87 @@ public class SingularKeyHandlerTests
         Assert.Equal(0x45, handler.PeekCurrentKeyAndStrobe()); // No strobe bit
     }
 
-    #endregion
-}
+        #endregion
+
+        #region Reset Tests
+
+        [Fact]
+        public void Reset_ClearsStrobeBit_PreservesKeyValue()
+        {
+            // Arrange
+            var handler = new SingularKeyHandler();
+            handler.EnqueueKey(0x41); // 'A' with strobe set (0xC1)
+
+            // Act
+            handler.Reset();
+
+            // Assert
+            Assert.False(handler.StrobePending()); // Strobe cleared
+            Assert.Equal(0x41, handler.PeekCurrentKeyValue()); // Key value preserved
+            Assert.Equal(0x41, handler.PeekCurrentKeyAndStrobe()); // Full value without strobe
+        }
+
+        [Fact]
+        public void Reset_WhenNoKeyPresent_DoesNotThrow()
+        {
+            // Arrange
+            var handler = new SingularKeyHandler();
+
+            // Act & Assert - Should not throw
+            handler.Reset();
+            Assert.False(handler.StrobePending());
+            Assert.Equal(0, handler.PeekCurrentKeyValue());
+        }
+
+        [Fact]
+        public void Reset_AfterClearStrobe_LeavesKeyUnchanged()
+        {
+            // Arrange
+            var handler = new SingularKeyHandler();
+            handler.EnqueueKey(0x42); // 'B'
+            handler.ClearStrobe(); // Already cleared
+
+            // Act
+            handler.Reset();
+
+            // Assert - Key still there, strobe still clear
+            Assert.False(handler.StrobePending());
+            Assert.Equal(0x42, handler.PeekCurrentKeyValue());
+        }
+
+        [Fact]
+        public void Reset_MultipleTimes_IsIdempotent()
+        {
+            // Arrange
+            var handler = new SingularKeyHandler();
+            handler.EnqueueKey(0x43); // 'C'
+
+            // Act - Reset multiple times
+            handler.Reset();
+            handler.Reset();
+            handler.Reset();
+
+            // Assert - Same result as single reset
+            Assert.False(handler.StrobePending());
+            Assert.Equal(0x43, handler.PeekCurrentKeyValue());
+        }
+
+        [Fact]
+        public void Reset_AllowsNewKeyAfterReset()
+        {
+            // Arrange
+            var handler = new SingularKeyHandler();
+            handler.EnqueueKey(0x41); // 'A'
+            handler.Reset();
+
+            // Act - Enqueue new key after reset
+            handler.EnqueueKey(0x42); // 'B'
+
+            // Assert - New key loaded with strobe
+            Assert.True(handler.StrobePending());
+            Assert.Equal(0x42, handler.PeekCurrentKeyValue());
+            Assert.Equal(0xC2, handler.PeekCurrentKeyAndStrobe());
+        }
+
+        #endregion
+    }

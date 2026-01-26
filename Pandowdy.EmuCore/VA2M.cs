@@ -917,10 +917,10 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// <para>
     /// <strong>Operations Performed:</strong>
     /// <list type="bullet">
+    /// <item>Clear keyboard latch and pending keystrokes</item>
     /// <item>Reset CPU registers (PC loaded from $FFFC/$FFFD, SP = $FF)</item>
     /// <item>Reset all soft switches to power-on state</item>
     /// <item>Reset memory bank mappings</item>
-    /// <item>Clear keyboard latch</item>
     /// <item>Reset cycle counter to zero</item>
     /// <item>Restart throttle stopwatch</item>
     /// <item>Reset performance measurement counters</item>
@@ -940,14 +940,17 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     {
         Enqueue(() =>
         {
+            // Reset keyboard state (clear pending keystrokes and strobe)
+            _keyboardSetter.Reset();
+
             Bus.Reset();
             _throttleCycles = 0;
             _throttleSw.Restart();
-            
+
             // Reset performance tracking
             _perfLastCycles = 0;
             _perfLastReportTicks = _perfSw.ElapsedTicks;
-            
+
             // Reset adaptive throttling state
             _throttleErrorAccumulator = 0;
             _throttleLastError = 0;

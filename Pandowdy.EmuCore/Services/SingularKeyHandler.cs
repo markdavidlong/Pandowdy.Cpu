@@ -171,11 +171,36 @@ public class SingularKeyHandler : IKeyboardReader, IKeyboardSetter
     /// </code>
     /// </para>
     /// </remarks>
-    public void EnqueueKey(byte key) => _key = (byte)(key | 0x80);
+        public void EnqueueKey(byte key) => _key = (byte)(key | 0x80);
 
 
-    public byte ClearStrobe() { _key &= 0x7f; return _key; }
+        public byte ClearStrobe() { _key &= 0x7f; return _key; }
 
 
-    public int NumKeysPending() => ((_key & 0x80) == 0x80) ? 1 : 0; 
-}
+        public int NumKeysPending() => ((_key & 0x80) == 0x80) ? 1 : 0;
+
+        /// <inheritdoc />
+        /// <remarks>
+        /// <para>
+        /// <strong>Implementation:</strong> Clears the strobe bit (bit 7) while preserving the low 7 bits
+        /// of the current key value. This matches Apple IIe hardware behavior where the keyboard latch
+        /// retains the last key character but clears the "unread" indicator.
+        /// </para>
+        /// <para>
+        /// <strong>Example:</strong>
+        /// <code>
+        /// // Before reset: _key = 0xC1 ('A' with strobe set)
+        /// Reset();
+        /// // After reset: _key = 0x41 ('A' with strobe cleared)
+        /// </code>
+        /// </para>
+        /// <para>
+        /// <strong>Power-On State:</strong> After reset, the keyboard appears as if the last key was read
+        /// (strobe cleared). Subsequent reads of $C000 will return the key value without the strobe bit set.
+        /// </para>
+        /// </remarks>
+        public void Reset()
+        {
+            _key &= 0x7F; // Clear strobe bit, preserve low 7 bits
+        }
+    }

@@ -372,12 +372,67 @@ public sealed class QueuedKeyHandler : IKeyboardReader, IKeyboardSetter, IDispos
             {
                 _currentKey = (byte)(nextKey | 0x80); // Load with strobe set
             }
+            }
         }
-    }
 
-    /// <summary>
-    /// Disposes the QueuedKeyHandler, stopping timer and releasing resources.
-    /// </summary>
+        /// <inheritdoc />
+        /// <remarks>
+        /// <para>
+        /// <strong>Implementation:</strong> Performs a comprehensive reset of the keyboard handler state:
+        /// <list type="number">
+        /// <item><strong>Cancel Timer:</strong> Stops any pending automatic key feed timer</item>
+        /// <item><strong>Clear Queue:</strong> Drains all pending keys from the queue</item>
+        /// <item><strong>Clear Strobe:</strong> Clears strobe bit on current key (if present) while preserving
+        /// the low 7 bits, matching Apple IIe hardware behavior where the latch retains the last key but
+        /// clears the "unread" indicator</item>
+        /// </list>
+        /// </para>
+        /// <para>
+        /// <strong>Example:</strong>
+        /// <code>
+        /// // Before reset: 
+        /// // _currentKey = 0xC1 ('A' with strobe set)
+        /// // _keyQueue = [0x42 ('B'), 0x43 ('C')]
+        /// 
+        /// keyboard.Reset();
+        /// 
+        /// // After reset:
+        /// // _currentKey = 0x41 ('A' with strobe cleared)
+        /// // _keyQueue = [] (empty)
+        /// // Timer canceled
+        /// </code>
+        /// </para>
+        /// <para>
+        /// <strong>Thread Safety:</strong> Lock protects all state changes to prevent race conditions
+        /// between emulator thread calling Reset() and timer thread attempting key feed.
+        /// </para>
+        /// <para>
+        /// <strong>Use Case:</strong> Called during emulator system reset (power cycle) to clear
+        /// any pending keystrokes that shouldn't persist after reset. Prevents stale buffered keys
+        /// from being injected into the freshly reset system.
+        /// </para>
+        /// </remarks>
+        public void Reset()
+        {
+            lock (_lock)
+            {
+                // Cancel any pending timer callback
+                _feedTimer.Change(Timeout.Infinite, Timeout.Infinite);
+
+                // Clear all queued keys
+                while (_keyQueue.TryDequeue(out _))
+                {
+                    // Drain queue
+                }
+
+                // Clear strobe bit on current key, preserve low 7 bits
+                _currentKey &= 0x7F;
+            }
+        }
+
+        /// <summary>
+        /// Disposes the QueuedKeyHandler, stopping timer and releasing resources.
+        /// </summary>
     /// <remarks>
     /// <para>
     /// <strong>Cleanup Operations:</strong>
