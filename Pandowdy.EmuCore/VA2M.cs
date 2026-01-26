@@ -1001,11 +1001,12 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </remarks>
     public void UserReset()
     {
-        Enqueue(() =>
-        {
-            Debug.WriteLine("Calling UserReset() in VA2M");
-            (Bus as VA2MBus)!.UserReset();
-        });
+        Reset();
+        //Enqueue(() =>
+        //{
+        //    Debug.WriteLine("Calling UserReset() in VA2M");
+        //    (Bus as VA2MBus)!.UserReset();
+        //});
     }
 
     /// <summary>
