@@ -24,7 +24,6 @@
 2. [Backlog](#backlog)
    - [Task 1: Migrate VA2M to CpuClockingCounters.VBlankOccurred](#task-1-migrate-va2m-to-cpuclockingcountersvblankoccurred-low-priority)
    - [Task 2: Remove VA2MBus.VBlank Event](#task-2-remove-va2mbusvblank-event-low-priority)
-   - [Task 3: Consider IAppleIIBus Interface Update](#task-3-consider-iappleiibus-interface-update-low-priority)
    - [Task 4: HGR Flicker Investigation](#task-4-hgr-flicker-investigation-medium-priority)
    - [Task 6: Clear Pending Keystrokes on Reset](#task-6-clear-pending-keystrokes-on-reset-low-priority)
    - [Task 7: Handle BRK Loops in Interrupt Handler](#task-7-handle-brk-loops-in-interrupt-handler-low-priority)
@@ -37,6 +36,7 @@
    - [Task 16: Research Cross-Platform Shader Rendering for Avalonia](#task-16-research-cross-platform-shader-rendering-for-avalonia-low-priority)
    - [Task 17: Research Compute-Shader Toolkits for Bitplane Processing](#task-17-research-compute-shader-toolkits-for-bitplane-processing-medium-priority)
 3. [Completed Tasks](#completed-tasks)
+   - [Task 3: Removed](#task-3-removed)
    - [Task 6: Clear Pending Keystrokes on Reset](#task-6-clear-pending-keystrokes-on-reset)
 4. [Code Style Guidelines](#code-style-guidelines)
 5. [Git Best Practices](#git-best-practices)
@@ -304,24 +304,7 @@ if (Bus is VA2MBus vb)
 
 ---
 
-### Task 3: Consider IAppleIIBus Interface Update (Low Priority)
-
-**Current State:**
-- `IAppleIIBus` doesn't expose `ClockCounters`
-- Components that need timing must cast to `VA2MBus`
-
-**Proposed:**
-- Add `CpuClockingCounters ClockCounters { get; }` to `IAppleIIBus` interface
-- Or create a new interface `ITimingProvider` that components can request
-
-**Impact:** Would allow Disk II controller to receive `IAppleIIBus` instead of needing direct `CpuClockingCounters` injection.
-
-**Files to Modify:**
-- `Pandowdy.EmuCore\Interfaces\IAppleIIBus.cs`
-- `Pandowdy.EmuCore\VA2MBus.cs`
-- `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs` - Update constructor
-
-**Priority:** Low
+### Task 3: Removed
 
 ---
 
@@ -1181,6 +1164,94 @@ public bool IsEnabled { get; set; } = true;
 - Prefer using Primary Constructors when class initialization is straightforward
 - Prefer field default initializers for small, read‑only arrays and collections; use new[] { ... } for literal content and Array.Empty<T>() for empty arrays to avoid unnecessary allocations.
 - Use `var` for other local variables when type is obvious
+
+### 4. Dependency Injection and Architecture
+
+**Prefer Dependency Injection over other patterns:**
+- ✅ **Use Constructor Injection** for required dependencies
+- ✅ **Depend on interfaces** rather than concrete implementations
+- ✅ **Register services in DI container** (`Program.cs`) with appropriate lifetimes
+- ❌ **Avoid Chain of Command** patterns where classes pass references through multiple layers
+- ❌ **Avoid internal `new` instantiation** of dependencies (hard to test, tight coupling)
+- ❌ **Avoid Service Locator** pattern (anti-pattern in modern .NET)
+
+**Benefits:**
+- **Testability:** Easy to inject mocks/fakes in unit tests
+- **Separation of Concerns:** Classes don't manage creation of dependencies
+- **Flexibility:** Easy to swap implementations without changing dependent code
+- **Explicit Dependencies:** Constructor parameters document what a class needs
+
+**Examples:**
+
+```csharp
+// ✅ Correct: Dependencies injected via constructor
+public class AudioGenerator(
+    IAudioProvider audioProvider,
+    ISystemStatusProvider statusProvider)
+{
+    private readonly IAudioProvider _audioProvider = audioProvider;
+    private readonly ISystemStatusProvider _statusProvider = statusProvider;
+
+    public void GenerateSamples()
+    {
+        // Use injected dependencies
+        if (_statusProvider.CurrentMhz > 2.8)
+        {
+            return; // Audio disabled at high speeds
+        }
+        _audioProvider.QueueSamples(...);
+    }
+}
+
+// ✅ Register in Program.cs
+services.AddSingleton<IAudioProvider, OpenALAudioProvider>();
+services.AddSingleton<ISystemStatusProvider, SystemStatusProvider>();
+services.AddSingleton<AudioGenerator>();
+
+// ❌ Incorrect: Chain of Command - passing through multiple layers
+public class VA2M
+{
+    public VA2M(ISystemStatusProvider statusProvider)
+    {
+        var renderer = new Renderer(statusProvider); // Don't do this!
+    }
+}
+
+// ❌ Incorrect: Internal instantiation
+public class AudioGenerator
+{
+    private readonly IAudioProvider _audioProvider = new OpenALAudioProvider(); // Hard to test!
+
+    public void GenerateSamples()
+    {
+        _audioProvider.QueueSamples(...);
+    }
+}
+
+// ❌ Incorrect: Service Locator (anti-pattern)
+public class AudioGenerator
+{
+    public void GenerateSamples()
+    {
+        var provider = ServiceLocator.Get<IAudioProvider>(); // Hidden dependency!
+        provider.QueueSamples(...);
+    }
+}
+```
+
+**Constructor Guidelines:**
+- For classes with many dependencies (>5 parameters), consider:
+  - Grouping related dependencies into facade interfaces
+  - Using primary constructors for cleaner syntax (when appropriate)
+  - Reviewing whether class has too many responsibilities (SRP violation)
+- Document constructor parameters when dependency purpose isn't obvious
+- Prefer readonly fields for injected dependencies
+
+**Lifetime Guidelines:**
+- **Singleton:** Stateless services, global state providers (`ISystemStatusProvider`)
+- **Scoped:** Per-request or per-window services (Avalonia windows)
+- **Transient:** Lightweight, stateless services created per use
+- Avoid Singleton for services that hold mutable state accessed by multiple threads
 
 ---
 
