@@ -11,6 +11,7 @@ module Pipelines =
 
     let private IrqBrkVector = 0xFFFEus
 
+    // NMOS 6502 BRK - does NOT clear decimal flag
     let brk : MicroOp[] = [|
         fetchOpcode
         fetchImmediate
@@ -21,6 +22,21 @@ module Pipelines =
         microOp (fun prev next bus ->
             (readVectorHigh IrqBrkVector).Invoke(prev, next, bus)
             setInterruptDisable.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // 65C02 BRK - clears decimal flag (65C02 behavior)
+    let brk_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchImmediate
+        pushPCH
+        pushPCL
+        pushP
+        readVectorLow IrqBrkVector
+        microOp (fun prev next bus ->
+            (readVectorHigh IrqBrkVector).Invoke(prev, next, bus)
+            setInterruptDisable.Invoke(prev, next, bus)
+            cld.Invoke(prev, next, bus)  // 65C02 clears decimal mode on interrupt
             markComplete.Invoke(prev, next, bus))
     |]
 
@@ -2754,244 +2770,7 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    //let pipelines65C02 : MicroOp[][] =
-    //    let table = Array.create 256 unimplemented
-    //    table.[0x00] <- brk
-    //    table.[0x85] <- sta_zp
-    //    table.[0x95] <- sta_zpx       // STA zp,X
-    //    table.[0x8D] <- sta_abs       // STA abs
-    //    table.[0x9D] <- sta_absx      // STA abs,X
-    //    table.[0x99] <- sta_absy      // STA abs,Y
-    //    table.[0x81] <- sta_izx       // STA (zp,X)
-    //    table.[0x91] <- sta_izy       // STA (zp),Y
-    //    table.[0x92] <- sta_izp       // STA (zp) - 65C02
-    //    table.[0x4C] <- jmp_abs
-    //    table.[0x6C] <- jmp_ind       // JMP (ind)
-    //    table.[0x7C] <- jmp_absx_ind  // JMP (abs,X) - 65C02
-    //    table.[0xEA] <- nop
-
-    //    // TRB/TSB (65C02)
-    //    table.[0x14] <- trb_zp        // TRB zp
-    //    table.[0x1C] <- trb_abs       // TRB abs
-    //    table.[0x04] <- tsb_zp        // TSB zp
-    //    table.[0x0C] <- tsb_abs       // TSB abs
-
-    //    // LDA - all addressing modes
-    //    table.[0xA9] <- lda_imm      // LDA #imm
-    //    table.[0xA5] <- lda_zp       // LDA zp
-    //    table.[0xB5] <- lda_zpx      // LDA zp,X
-    //    table.[0xAD] <- lda_abs      // LDA abs
-    //    table.[0xBD] <- lda_absx     // LDA abs,X
-    //    table.[0xB9] <- lda_absy     // LDA abs,Y
-    //    table.[0xA1] <- lda_izx      // LDA (zp,X)
-    //    table.[0xB1] <- lda_izy      // LDA (zp),Y
-    //    table.[0xB2] <- lda_izp      // LDA (zp) - 65C02 only
-
-    //    // Phase 2: ADC - all addressing modes
-    //    table.[0x69] <- adc_imm      // ADC #imm
-    //    table.[0x65] <- adc_zp       // ADC zp
-    //    table.[0x75] <- adc_zpx      // ADC zp,X
-    //    table.[0x6D] <- adc_abs      // ADC abs
-    //    table.[0x7D] <- adc_absx     // ADC abs,X
-    //    table.[0x79] <- adc_absy     // ADC abs,Y
-    //    table.[0x61] <- adc_izx      // ADC (zp,X)
-    //    table.[0x71] <- adc_izy      // ADC (zp),Y
-    //    table.[0x72] <- adc_izp      // ADC (zp) - 65C02
-
-    //    // Phase 2: SBC - all addressing modes
-    //    table.[0xE9] <- sbc_imm      // SBC #imm
-    //    table.[0xE5] <- sbc_zp       // SBC zp
-    //    table.[0xF5] <- sbc_zpx      // SBC zp,X
-    //    table.[0xED] <- sbc_abs      // SBC abs
-    //    table.[0xFD] <- sbc_absx     // SBC abs,X
-    //    table.[0xF9] <- sbc_absy     // SBC abs,Y
-    //    table.[0xE1] <- sbc_izx      // SBC (zp,X)
-    //    table.[0xF1] <- sbc_izy      // SBC (zp),Y
-    //    table.[0xF2] <- sbc_izp      // SBC (zp) - 65C02
-
-    //    // Phase 2: AND - all addressing modes
-    //    table.[0x29] <- and_imm      // AND #imm
-    //    table.[0x25] <- and_zp       // AND zp
-    //    table.[0x35] <- and_zpx      // AND zp,X
-    //    table.[0x2D] <- and_abs      // AND abs
-    //    table.[0x3D] <- and_absx     // AND abs,X
-    //    table.[0x39] <- and_absy     // AND abs,Y
-    //    table.[0x21] <- and_izx      // AND (zp,X)
-    //    table.[0x31] <- and_izy      // AND (zp),Y
-    //    table.[0x32] <- and_izp      // AND (zp) - 65C02
-
-    //    // Phase 2: ORA - all addressing modes
-    //    table.[0x09] <- ora_imm      // ORA #imm
-    //    table.[0x05] <- ora_zp       // ORA zp
-    //    table.[0x15] <- ora_zpx      // ORA zp,X
-    //    table.[0x0D] <- ora_abs      // ORA abs
-    //    table.[0x1D] <- ora_absx     // ORA abs,X
-    //    table.[0x19] <- ora_absy     // ORA abs,Y
-    //    table.[0x01] <- ora_izx      // ORA (zp,X)
-    //    table.[0x11] <- ora_izy      // ORA (zp),Y
-    //    table.[0x12] <- ora_izp      // ORA (zp) - 65C02
-
-    //    // Phase 2: EOR - all addressing modes
-    //    table.[0x49] <- eor_imm      // EOR #imm
-    //    table.[0x45] <- eor_zp       // EOR zp
-    //    table.[0x55] <- eor_zpx      // EOR zp,X
-    //    table.[0x4D] <- eor_abs      // EOR abs
-    //    table.[0x5D] <- eor_absx     // EOR abs,X
-    //    table.[0x59] <- eor_absy     // EOR abs,Y
-    //    table.[0x41] <- eor_izx      // EOR (zp,X)
-    //    table.[0x51] <- eor_izy      // EOR (zp),Y
-    //    table.[0x52] <- eor_izp      // EOR (zp) - 65C02
-
-    //    // Phase 2: CMP - all addressing modes
-    //    table.[0xC9] <- cmp_imm      // CMP #imm
-    //    table.[0xC5] <- cmp_zp       // CMP zp
-    //    table.[0xD5] <- cmp_zpx      // CMP zp,X
-    //    table.[0xCD] <- cmp_abs      // CMP abs
-    //    table.[0xDD] <- cmp_absx     // CMP abs,X
-    //    table.[0xD9] <- cmp_absy     // CMP abs,Y
-    //    table.[0xC1] <- cmp_izx      // CMP (zp,X)
-    //    table.[0xD1] <- cmp_izy      // CMP (zp),Y
-    //    table.[0xD2] <- cmp_izp      // CMP (zp) - 65C02
-
-    //    // Phase 2: CPX
-    //    table.[0xE0] <- cpx_imm      // CPX #imm
-    //    table.[0xE4] <- cpx_zp       // CPX zp
-    //    table.[0xEC] <- cpx_abs      // CPX abs
-
-    //    // Phase 2: CPY
-    //    table.[0xC0] <- cpy_imm      // CPY #imm
-    //    table.[0xC4] <- cpy_zp       // CPY zp
-    //    table.[0xCC] <- cpy_abs      // CPY abs
-
-    //    // Phase 2: BIT
-    //    table.[0x89] <- bit_imm      // BIT #imm - 65C02
-    //    table.[0x24] <- bit_zp       // BIT zp
-    //    table.[0x34] <- bit_zpx      // BIT zp,X - 65C02
-    //    table.[0x2C] <- bit_abs      // BIT abs
-    //    table.[0x3C] <- bit_absx     // BIT abs,X - 65C02
-
-    //    // Phase 3: Increment/Decrement
-    //    table.[0xE8] <- inx_impl     // INX
-    //    table.[0xC8] <- iny_impl     // INY
-    //    table.[0xCA] <- dex_impl     // DEX
-    //    table.[0x88] <- dey_impl     // DEY
-    //    table.[0x1A] <- inc_a        // INC A (65C02)
-    //    table.[0x3A] <- dec_a        // DEC A (65C02)
-
-    //    // Phase 3: Transfers
-    //    table.[0xAA] <- tax_impl     // TAX
-    //    table.[0x8A] <- txa_impl     // TXA
-    //    table.[0xA8] <- tay_impl     // TAY
-    //    table.[0x98] <- tya_impl     // TYA
-    //    table.[0xBA] <- tsx_impl     // TSX
-    //    table.[0x9A] <- txs_impl     // TXS
-
-    //    // Phase 3: INC memory
-    //    table.[0xE6] <- inc_zp       // INC zp
-    //    table.[0xF6] <- inc_zpx      // INC zp,X
-    //    table.[0xEE] <- inc_abs      // INC abs
-    //    table.[0xFE] <- inc_absx     // INC abs,X
-
-    //    // Phase 3: DEC memory
-    //    table.[0xC6] <- dec_zp       // DEC zp
-    //    table.[0xD6] <- dec_zpx      // DEC zp,X
-    //    table.[0xCE] <- dec_abs      // DEC abs
-    //    table.[0xDE] <- dec_absx     // DEC abs,X
-
-    //    // Phase 4: ASL
-    //    table.[0x0A] <- asl_a        // ASL A
-    //    table.[0x06] <- asl_zp       // ASL zp
-    //    table.[0x16] <- asl_zpx      // ASL zp,X
-    //    table.[0x0E] <- asl_abs      // ASL abs
-    //    table.[0x1E] <- asl_absx     // ASL abs,X
-
-    //    // Phase 4: LSR
-    //    table.[0x4A] <- lsr_a        // LSR A
-    //    table.[0x46] <- lsr_zp       // LSR zp
-    //    table.[0x56] <- lsr_zpx      // LSR zp,X
-    //    table.[0x4E] <- lsr_abs      // LSR abs
-    //    table.[0x5E] <- lsr_absx     // LSR abs,X
-
-    //    // Phase 4: ROL
-    //    table.[0x2A] <- rol_a        // ROL A
-    //    table.[0x26] <- rol_zp       // ROL zp
-    //    table.[0x36] <- rol_zpx      // ROL zp,X
-    //    table.[0x2E] <- rol_abs      // ROL abs
-    //    table.[0x3E] <- rol_absx     // ROL abs,X
-
-    //    // Phase 4: ROR
-    //    table.[0x6A] <- ror_a        // ROR A
-    //    table.[0x66] <- ror_zp       // ROR zp
-    //    table.[0x76] <- ror_zpx      // ROR zp,X
-    //    table.[0x6E] <- ror_abs      // ROR abs
-    //    table.[0x7E] <- ror_absx     // ROR abs,X
-
-    //    // Phase 7: LDX
-    //    table.[0xA2] <- ldx_imm      // LDX #imm
-    //    table.[0xA6] <- ldx_zp       // LDX zp
-    //    table.[0xB6] <- ldx_zpy      // LDX zp,Y
-    //    table.[0xAE] <- ldx_abs      // LDX abs
-    //    table.[0xBE] <- ldx_absy     // LDX abs,Y
-
-    //    // Phase 7: LDY
-    //    table.[0xA0] <- ldy_imm      // LDY #imm
-    //    table.[0xA4] <- ldy_zp       // LDY zp
-    //    table.[0xB4] <- ldy_zpx      // LDY zp,X
-    //    table.[0xAC] <- ldy_abs      // LDY abs
-    //    table.[0xBC] <- ldy_absx     // LDY abs,X
-
-    //    // Phase 7: STX
-    //    table.[0x86] <- stx_zp       // STX zp
-    //    table.[0x96] <- stx_zpy      // STX zp,Y
-    //    table.[0x8E] <- stx_abs      // STX abs
-
-    //    // Phase 7: STY
-    //    table.[0x84] <- sty_zp       // STY zp
-    //    table.[0x94] <- sty_zpx      // STY zp,X
-    //    table.[0x8C] <- sty_abs      // STY abs
-
-    //    // Phase 7: STZ (65C02 only)
-    //    table.[0x64] <- stz_zp       // STZ zp
-    //    table.[0x74] <- stz_zpx      // STZ zp,X
-    //    table.[0x9C] <- stz_abs      // STZ abs
-    //    table.[0x9E] <- stz_absx     // STZ abs,X
-
-    //    // Phase 5: Branch Instructions
-    //    table.[0xF0] <- beq          // BEQ - Branch if Equal
-    //    table.[0xD0] <- bne          // BNE - Branch if Not Equal
-    //    table.[0xB0] <- bcs          // BCS - Branch if Carry Set
-    //    table.[0x90] <- bcc          // BCC - Branch if Carry Clear
-    //    table.[0x30] <- bmi          // BMI - Branch if Minus
-    //    table.[0x10] <- bpl          // BPL - Branch if Plus
-    //    table.[0x70] <- bvs          // BVS - Branch if Overflow Set
-    //    table.[0x50] <- bvc          // BVC - Branch if Overflow Clear
-    //    table.[0x80] <- bra          // BRA - Branch Always (65C02)
-
-    //    // Phase 8: Flag Operations
-    //    table.[0x18] <- clc_impl     // CLC - Clear Carry
-    //    table.[0x38] <- sec_impl     // SEC - Set Carry
-    //    table.[0xD8] <- cld_impl     // CLD - Clear Decimal
-    //    table.[0xF8] <- sed_impl     // SED - Set Decimal
-    //    table.[0x58] <- cli_impl     // CLI - Clear Interrupt Disable
-    //    table.[0x78] <- sei_impl     // SEI - Set Interrupt Disable
-    //    table.[0xB8] <- clv_impl     // CLV - Clear Overflow
-
-    //    // Phase 6: Stack Operations
-    //    table.[0x48] <- pha_impl     // PHA - Push A
-    //    table.[0x68] <- pla_impl     // PLA - Pull A
-    //    table.[0x08] <- php_impl     // PHP - Push P
-    //    table.[0x28] <- plp_impl     // PLP - Pull P
-    //    table.[0xDA] <- phx_impl     // PHX - Push X (65C02)
-    //    table.[0xFA] <- plx_impl     // PLX - Pull X (65C02)
-    //    table.[0x5A] <- phy_impl     // PHY - Push Y (65C02)
-    //    table.[0x7A] <- ply_impl     // PLY - Pull Y (65C02)
-
-    //        // Phase 6: Subroutine Operations
-    //    table.[0x20] <- jsr          // JSR - Jump to Subroutine
-    //    table.[0x60] <- rts          // RTS - Return from Subroutine
-    //    table.[0x40] <- rti          // RTI - Return from Interrupt
-
-    //    table
+  
 
     /// Base pipeline table with all instructions common to 6502 and 65C02
     /// Uses NMOS JMP indirect (with page boundary bug) as default
@@ -3002,171 +2781,260 @@ module Pipelines =
 
         table.[0x00] <- brk
         table.[0x01] <- ora_izx
+        //02
+        //03
+        //04
         table.[0x05] <- ora_zp
         table.[0x06] <- asl_zp
+        //07
         table.[0x08] <- php_impl
         table.[0x09] <- ora_imm
         table.[0x0A] <- asl_a
+        //0B
+        //0C
         table.[0x0D] <- ora_abs
         table.[0x0E] <- asl_abs
-
+        //0F
         table.[0x10] <- bpl
         table.[0x11] <- ora_izy
+        //12
+        //13
+        //14
         table.[0x15] <- ora_zpx
         table.[0x16] <- asl_zpx
+        //17
         table.[0x18] <- clc_impl
         table.[0x19] <- ora_absy
+        //1A
+        //1B
+        //1C
         table.[0x1D] <- ora_absx
         table.[0x1E] <- asl_absx
-
+        //1F
         table.[0x20] <- jsr
         table.[0x21] <- and_izx
+        //22
+        //23
         table.[0x24] <- bit_zp
         table.[0x25] <- and_zp
         table.[0x26] <- rol_zp
+        //27
         table.[0x28] <- plp_impl
         table.[0x29] <- and_imm
         table.[0x2A] <- rol_a
+        //2B
         table.[0x2C] <- bit_abs
         table.[0x2D] <- and_abs
         table.[0x2E] <- rol_abs
-
+        //2F
         table.[0x30] <- bmi
         table.[0x31] <- and_izy
+        //32
+        //33
+        //34
         table.[0x35] <- and_zpx
         table.[0x36] <- rol_zpx
+        //37
         table.[0x38] <- sec_impl
         table.[0x39] <- and_absy
+        //3A
+        //3B
+        //3C
         table.[0x3D] <- and_absx
         table.[0x3E] <- rol_absx
-
+        //3F
         table.[0x40] <- rti
         table.[0x41] <- eor_izx
+        //42
+        //43
+        //44
         table.[0x45] <- eor_zp
         table.[0x46] <- lsr_zp
+        //47
         table.[0x48] <- pha_impl
         table.[0x49] <- eor_imm
         table.[0x4A] <- lsr_a
+        //4B
         table.[0x4C] <- jmp_abs
         table.[0x4D] <- eor_abs
         table.[0x4E] <- lsr_abs
-
+        //4F
         table.[0x50] <- bvc
         table.[0x51] <- eor_izy
+        //52
+        //53
+        //54
         table.[0x55] <- eor_zpx
         table.[0x56] <- lsr_zpx
+        //57
         table.[0x58] <- cli_impl
         table.[0x59] <- eor_absy
+        //5A
+        //5B
+        //5C
         table.[0x5D] <- eor_absx
         table.[0x5E] <- lsr_absx
-
+        //5F
         table.[0x60] <- rts
         table.[0x61] <- adc_izx
+        //62
+        //63
+        //64
         table.[0x65] <- adc_zp
         table.[0x66] <- ror_zp
+        //67
         table.[0x68] <- pla_impl
         table.[0x69] <- adc_imm
         table.[0x6A] <- ror_a
+        //6B
         table.[0x6C] <- jmp_ind_nmos
         table.[0x6D] <- adc_abs
         table.[0x6E] <- ror_abs
-
+        //6F
         table.[0x70] <- bvs
         table.[0x71] <- adc_izy
+        //72
+        //73
+        //74
         table.[0x75] <- adc_zpx
         table.[0x76] <- ror_zpx
+        //77
         table.[0x78] <- sei_impl
         table.[0x79] <- adc_absy
+        //7A
+        //7B
+        //7C
         table.[0x7D] <- adc_absx
         table.[0x7E] <- ror_absx
-
+        //7F
+        //80
         table.[0x81] <- sta_izx
+        //82
+        //83
         table.[0x84] <- sty_zp
         table.[0x85] <- sta_zp
         table.[0x86] <- stx_zp
+        //87
         table.[0x88] <- dey_impl
+        //89
         table.[0x8A] <- txa_impl
+        //8B
         table.[0x8C] <- sty_abs
         table.[0x8D] <- sta_abs
         table.[0x8E] <- stx_abs
-
+        //8F
         table.[0x90] <- bcc
         table.[0x91] <- sta_izy
+        //92
+        //93
         table.[0x94] <- sty_zpx
         table.[0x95] <- sta_zpx
         table.[0x96] <- stx_zpy
+        //97
         table.[0x98] <- tya_impl
         table.[0x99] <- sta_absy
         table.[0x9A] <- txs_impl
+        //9B
+        //9C
         table.[0x9D] <- sta_absx
-
+        //9E
+        //9F
         table.[0xA0] <- ldy_imm
         table.[0xA1] <- lda_izx
         table.[0xA2] <- ldx_imm
+        //A3
         table.[0xA4] <- ldy_zp
         table.[0xA5] <- lda_zp
         table.[0xA6] <- ldx_zp
+        //A7
         table.[0xA8] <- tay_impl
         table.[0xA9] <- lda_imm
         table.[0xAA] <- tax_impl
+        //AB
         table.[0xAC] <- ldy_abs
         table.[0xAD] <- lda_abs
         table.[0xAE] <- ldx_abs
-
+        //AF
         table.[0xB0] <- bcs
         table.[0xB1] <- lda_izy
+        //B2
+        //B3
         table.[0xB4] <- ldy_zpx
         table.[0xB5] <- lda_zpx
         table.[0xB6] <- ldx_zpy
+        //B7
         table.[0xB8] <- clv_impl
         table.[0xB9] <- lda_absy
         table.[0xBA] <- tsx_impl
+        //BB
         table.[0xBC] <- ldy_absx
         table.[0xBD] <- lda_absx
         table.[0xBE] <- ldx_absy
-
+        //BF
         table.[0xC0] <- cpy_imm
         table.[0xC1] <- cmp_izx
+        //C2
+        //C3
         table.[0xC4] <- cpy_zp
         table.[0xC5] <- cmp_zp
         table.[0xC6] <- dec_zp
+        //C7
         table.[0xC8] <- iny_impl
         table.[0xC9] <- cmp_imm
         table.[0xCA] <- dex_impl
+        //CB
         table.[0xCC] <- cpy_abs
         table.[0xCD] <- cmp_abs
         table.[0xCE] <- dec_abs
-        
+        //CF
         table.[0xD0] <- bne
         table.[0xD1] <- cmp_izy
+        //D2
+        //D3
+        //D4
         table.[0xD5] <- cmp_zpx
         table.[0xD6] <- dec_zpx
+        //D7
         table.[0xD8] <- cld_impl
         table.[0xD9] <- cmp_absy
+        //DA
+        //DB
+        //DC
         table.[0xDD] <- cmp_absx
         table.[0xDE] <- dec_absx
-        
+        //DF
         table.[0xE0] <- cpx_imm
         table.[0xE1] <- sbc_izx
+        //E2
+        //E3
         table.[0xE4] <- cpx_zp
         table.[0xE5] <- sbc_zp
         table.[0xE6] <- inc_zp
+        //E7
         table.[0xE8] <- inx_impl
         table.[0xE9] <- sbc_imm
         table.[0xEA] <- nop
+        //EB
         table.[0xEC] <- cpx_abs
         table.[0xED] <- sbc_abs
         table.[0xEE] <- inc_abs
-
+        //EF
         table.[0xF0] <- beq
         table.[0xF1] <- sbc_izy
+        //F2
+        //F3
+        //F4
         table.[0xF5] <- sbc_zpx
         table.[0xF6] <- inc_zpx
+        //F7
         table.[0xF8] <- sed_impl
         table.[0xF9] <- sbc_absy
+        //FA
+        //FB
+        //FC
         table.[0xFD] <- sbc_absx
         table.[0xFE] <- inc_absx
-
+        //FF
         table
 
     /// NMOS 6502 without undocumented opcodes - treats undefined opcodes as NOPs
@@ -3343,6 +3211,9 @@ module Pipelines =
     let pipelines65C02 : MicroOp[][] =
         let table = Array.copy pipelinesBase6502
 
+        // 65C02 BRK clears decimal flag
+        table.[0x00] <- brk_65c02
+
         // Fix JMP indirect page boundary bug
         table.[0x6C] <- jmp_ind
 
@@ -3390,6 +3261,61 @@ module Pipelines =
         // 65C02-only STP and WAI
         table.[0xDB] <- stp
         table.[0xCB] <- wai
+
+        // 65C02 undefined opcodes treated as NOPs
+        // 2-byte NOPs (immediate-style: $x2 pattern)
+        table.[0x02] <- nop_imm
+        table.[0x22] <- nop_imm
+        table.[0x42] <- nop_imm
+        table.[0x62] <- nop_imm
+        table.[0x82] <- nop_imm
+        table.[0xC2] <- nop_imm
+        table.[0xE2] <- nop_imm
+
+        // 2-byte NOPs (zp-style: $x4 pattern not already used)
+        table.[0x44] <- nop_zp
+
+        // 2-byte NOPs (zp,x-style: $x4 pattern)
+        table.[0x54] <- nop_zpx
+        table.[0xD4] <- nop_zpx
+        table.[0xF4] <- nop_zpx
+
+        // 3-byte NOPs (abs-style)
+        table.[0x5C] <- nop_abs
+        table.[0xDC] <- nop_abs
+        table.[0xFC] <- nop_abs
+
+        // 1-byte NOPs ($x3, $xB patterns)
+        table.[0x03] <- nop
+        table.[0x13] <- nop
+        table.[0x23] <- nop
+        table.[0x33] <- nop
+        table.[0x43] <- nop
+        table.[0x53] <- nop
+        table.[0x63] <- nop
+        table.[0x73] <- nop
+        table.[0x83] <- nop
+        table.[0x93] <- nop
+        table.[0xA3] <- nop
+        table.[0xB3] <- nop
+        table.[0xC3] <- nop
+        table.[0xD3] <- nop
+        table.[0xE3] <- nop
+        table.[0xF3] <- nop
+        table.[0x0B] <- nop
+        table.[0x1B] <- nop
+        table.[0x2B] <- nop
+        table.[0x3B] <- nop
+        table.[0x4B] <- nop
+        table.[0x5B] <- nop
+        table.[0x6B] <- nop
+        table.[0x7B] <- nop
+        table.[0x8B] <- nop
+        table.[0x9B] <- nop
+        table.[0xAB] <- nop
+        table.[0xBB] <- nop
+        table.[0xEB] <- nop
+        table.[0xFB] <- nop
 
         table
 
