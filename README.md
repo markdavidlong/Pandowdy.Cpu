@@ -1,4 +1,4 @@
-# Pandowdy CPU Emulator
+# Pandowdy.CPU Emulator
 
 A cycle-accurate 6502/65C02 CPU emulator written in C# and F# for .NET 8.
 
