@@ -3,9 +3,11 @@
     <File Path=".gitignore" />
     <File Path="docs/CpuUsageGuide.md" />
     <File Path="LICENSE" />
+    <Project Path="Pandowdy.Cpu.Harte-SST-Tests/Pandowdy.Cpu.Harte-SST-Tests.csproj" Id="bbf81fae-d0f9-4b79-84f2-0b51783a5e8a" />
   </Folder>
   <Folder Name="/Solution Items/docs/">
     <File Path="docs/CpuUsageGuide.md" />
+    <File Path="README.md" />
   </Folder>
   <Project Path="Pandowdy.Cpu.Core/Pandowdy.Cpu.Core.fsproj" />
   <Project Path="Pandowdy.Cpu.Example/Pandowdy.Cpu.Example.csproj">

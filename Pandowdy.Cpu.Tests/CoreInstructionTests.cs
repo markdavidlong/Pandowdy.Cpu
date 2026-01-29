@@ -649,15 +649,10 @@ public abstract class CoreInstructionTests : CpuTestBase
         Assert.Equal(0x1234, CurrentState.PC);
     }
 
-    [Fact]
-    public void JMP_Indirect_Takes5Cycles()
-    {
-        LoadAndReset(0x6C, 0x34, 0x12);
-        SetMemory(0x1234, 0x00);
-        SetMemory(0x1235, 0x80);
-        int cycles = StepInstruction();
-        Assert.Equal(5, cycles);
-    }
+    // Note: JMP_Indirect cycle count differs between variants:
+    // - NMOS 6502: 5 cycles (has page boundary bug)
+    // - 65C02 variants: 6 cycles (bug fixed)
+    // See variant-specific test classes for JMP_Indirect tests.
 
     #endregion
 

@@ -66,7 +66,7 @@ internal class Program
             var current = cpuBuffer.Current;
             PrintState(totalCycles, current);
 
-            bool instructionComplete = Cpu.Clock(CpuVariant.CMOS65C02, cpuBuffer, bus);
+            bool instructionComplete = Cpu.Clock(CpuVariant.WDC65C02, cpuBuffer, bus);
             totalCycles++;
 
             if (instructionComplete)
@@ -105,7 +105,7 @@ internal class Program
             ushort startPC = before.PC;
             byte opcode = bus.CpuRead(startPC);
 
-            int cycles = Cpu.Step(CpuVariant.CMOS65C02, cpuBuffer, bus);
+            int cycles = Cpu.Step(CpuVariant.WDC65C02, cpuBuffer, bus);
             var after = cpuBuffer.Prev;
 
             Console.WriteLine($"  ${startPC:X4}: Opcode ${opcode:X2} - {cycles} cycles");
@@ -214,7 +214,7 @@ internal class Program
         int passed = 0;
         foreach (var test in tests)
         {
-            int cycles = Cpu.Step(CpuVariant.CMOS65C02, cpuBuffer, bus);
+            int cycles = Cpu.Step(CpuVariant.WDC65C02, cpuBuffer, bus);
             byte result = cpuBuffer.Prev.A;
             bool ok = result == test.expected && cycles == test.cycles;
 
@@ -318,7 +318,7 @@ internal class Program
         int passed = 0;
         foreach (var test in tests)
         {
-            int cycles = Cpu.Step(CpuVariant.CMOS65C02, cpuBuffer, bus);
+            int cycles = Cpu.Step(CpuVariant.WDC65C02, cpuBuffer, bus);
             byte result = test.reg switch
             {
                 "A" => cpuBuffer.Prev.A,

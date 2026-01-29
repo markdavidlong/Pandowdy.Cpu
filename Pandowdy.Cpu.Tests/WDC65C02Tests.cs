@@ -17,6 +17,17 @@ public class WDC65C02Tests : CoreInstructionTests
     #region JMP Indirect Bug Fix
 
     [Fact]
+    public void JMP_Indirect_Takes6Cycles()
+    {
+        // 65C02 takes 6 cycles for indirect jump (NMOS takes 5)
+        LoadAndReset(0x6C, 0x34, 0x12);
+        SetMemory(0x1234, 0x00);
+        SetMemory(0x1235, 0x80);
+        int cycles = StepInstruction();
+        Assert.Equal(6, cycles);
+    }
+
+    [Fact]
     public void JMP_Indirect_FixedPageBoundaryBug()
     {
         // On 65C02, JMP ($12FF) correctly reads high byte from $1300
@@ -633,6 +644,91 @@ public class WDC65C02Tests : CoreInstructionTests
         // PC should have advanced past the STP instruction
         StepInstruction();
         Assert.Equal(0x42, CurrentState.A);
+    }
+
+    #endregion
+
+    #region 65C02 BCD Mode Flag Behavior
+
+    [Fact]
+    public void ADC_BCD_NegativeFlag_BasedOnBCDResult_CMOS()
+    {
+        // CMOS 65C02: N flag is set based on the BCD result, not the binary result
+        // 0x79 + 0x10 = 0x89 (BCD result has bit 7 set)
+        LoadAndReset([0x69, 0x10]);  // ADC #$10
+        CpuBuffer.Current.A = 0x79;
+        CpuBuffer.Prev.A = 0x79;
+        CpuBuffer.Current.DecimalFlag = true;
+        CpuBuffer.Prev.DecimalFlag = true;
+        CpuBuffer.Current.CarryFlag = false;
+        CpuBuffer.Prev.CarryFlag = false;
+
+        StepInstruction();
+
+        // BCD result: 0x89 (bit 7 set, so N = true)
+        Assert.Equal(0x89, CurrentState.A);
+        Assert.True(CurrentState.NegativeFlag, "CMOS: N flag should be based on BCD result (0x89 has bit 7 set)");
+    }
+
+    [Fact]
+    public void ADC_BCD_ZeroFlag_BasedOnBCDResult_CMOS()
+    {
+        // CMOS 65C02: Z flag is set based on the BCD result
+        // 0x99 + 0x01 = 0x00 (BCD with carry), Z should be true for CMOS
+        LoadAndReset([0x69, 0x01]);  // ADC #$01
+        CpuBuffer.Current.A = 0x99;
+        CpuBuffer.Prev.A = 0x99;
+        CpuBuffer.Current.DecimalFlag = true;
+        CpuBuffer.Prev.DecimalFlag = true;
+        CpuBuffer.Current.CarryFlag = false;
+        CpuBuffer.Prev.CarryFlag = false;
+
+        StepInstruction();
+
+        // BCD result: 0x00 (zero)
+        Assert.Equal(0x00, CurrentState.A);
+        Assert.True(CurrentState.CarryFlag);  // Carry set due to BCD overflow
+        Assert.True(CurrentState.ZeroFlag, "CMOS: Z flag should be based on BCD result (0x00 is zero)");
+    }
+
+    [Fact]
+    public void SBC_BCD_NegativeFlag_BasedOnBCDResult_CMOS()
+    {
+        // CMOS 65C02: N flag is set based on the BCD result
+        // 0x00 - 0x01 = 0x99 (BCD with borrow), BCD result 0x99 has bit 7 set
+        LoadAndReset([0xE9, 0x01]);  // SBC #$01
+        CpuBuffer.Current.A = 0x00;
+        CpuBuffer.Prev.A = 0x00;
+        CpuBuffer.Current.DecimalFlag = true;
+        CpuBuffer.Prev.DecimalFlag = true;
+        CpuBuffer.Current.CarryFlag = true;  // No borrow
+        CpuBuffer.Prev.CarryFlag = true;
+
+        StepInstruction();
+
+        // BCD result: 0x99 (bit 7 set, so N = true)
+        Assert.Equal(0x99, CurrentState.A);
+        Assert.True(CurrentState.NegativeFlag, "CMOS: N flag should be based on BCD result (0x99 has bit 7 set)");
+    }
+
+    [Fact]
+    public void SBC_BCD_ZeroFlag_BasedOnBCDResult_CMOS()
+    {
+        // CMOS 65C02: Z flag is set based on the BCD result
+        // 0x01 - 0x01 = 0x00 (both BCD and binary are zero)
+        LoadAndReset([0xE9, 0x01]);  // SBC #$01
+        CpuBuffer.Current.A = 0x01;
+        CpuBuffer.Prev.A = 0x01;
+        CpuBuffer.Current.DecimalFlag = true;
+        CpuBuffer.Prev.DecimalFlag = true;
+        CpuBuffer.Current.CarryFlag = true;  // No borrow
+        CpuBuffer.Prev.CarryFlag = true;
+
+        StepInstruction();
+
+        // BCD result: 0x00 (zero)
+        Assert.Equal(0x00, CurrentState.A);
+        Assert.True(CurrentState.ZeroFlag, "Z flag should be set when result is zero");
     }
 
     #endregion

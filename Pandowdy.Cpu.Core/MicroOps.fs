@@ -8,8 +8,8 @@ open System
 
 type CpuVariant =
     | NMOS6502
-    | NMOS6502_NO_UNDOC
-    | CMOS65C02
+    | NMOS6502_NO_ILLEGAL
+    | WDC65C02
     | ROCKWELL65C02
 
 type MicroOp = Action<CpuState, CpuState, IPandowdyCpuBus>
@@ -60,13 +60,56 @@ module MicroOps =
     let writeZeroPage : MicroOp = microOp (fun prev next bus ->
         bus.Write(next.TempAddress &&& 0x00FFus, tempByte next))
 
+    /// Add X to TempAddress (no bus access - for page crossing checks)
     let addX : MicroOp = microOp (fun prev next bus ->
         next.TempAddress <- next.TempAddress + uint16 next.X)
 
+    /// Add X to TempAddress with a dummy read at the partially-computed address
+    /// Used for RMW abs,X instructions which always take the extra cycle
+    /// The 6502 reads from BAH:(BAL+X) before potentially fixing the high byte for page crossing
+    let addXWithDummyRead : MicroOp = microOp (fun prev next bus ->
+        // Calculate the "wrong" address: base high byte + (base low byte + X)
+        let baseAddr = next.TempAddress
+        let lowPlusX = (byte baseAddr + next.X)  // Low byte plus X, may wrap
+        let wrongAddr = (baseAddr &&& 0xFF00us) ||| uint16 lowPlusX
+        bus.CpuRead(wrongAddr) |> ignore
+        // Now set the correct full address
+        next.TempAddress <- baseAddr + uint16 next.X)
+
+    /// Add Y to TempAddress (no bus access)
     let addY : MicroOp = microOp (fun prev next bus ->
         next.TempAddress <- next.TempAddress + uint16 next.Y)
 
+    /// Add Y to TempAddress with a dummy read at the partially-computed address
+    /// Used for store abs,Y instructions which always read before writing
+    let addYWithDummyRead : MicroOp = microOp (fun prev next bus ->
+        let baseAddr = next.TempAddress
+        let lowPlusY = (byte baseAddr + next.Y)
+        let wrongAddr = (baseAddr &&& 0xFF00us) ||| uint16 lowPlusY
+        bus.CpuRead(wrongAddr) |> ignore
+        next.TempAddress <- baseAddr + uint16 next.Y)
+
     let noOp : MicroOp = microOp (fun prev next bus -> ())
+
+    /// Dummy read at PC - used for implied/accumulator addressing modes
+    /// The 6502 always accesses the bus every cycle, so even "internal" operations
+    /// perform a read. This is typically a read at PC that is discarded.
+    let dummyReadPC : MicroOp = microOp (fun prev next bus ->
+        bus.CpuRead(next.PC) |> ignore)
+
+    /// Dummy read at the current TempAddress - used for read-modify-write instructions
+    /// before the final write cycle
+    let dummyReadTempAddress : MicroOp = microOp (fun prev next bus ->
+        bus.CpuRead(next.TempAddress) |> ignore)
+
+    /// Dummy write to TempAddress - used in read-modify-write instructions
+    /// The 6502 writes the original value back before writing the modified value
+    let dummyWriteTempAddress : MicroOp = microOp (fun prev next bus ->
+        bus.Write(next.TempAddress, tempByte next))
+
+    /// Dummy write to zero page TempAddress - used in read-modify-write instructions
+    let dummyWriteZeroPage : MicroOp = microOp (fun prev next bus ->
+        bus.Write(next.TempAddress &&& 0x00FFus, tempByte next))
 
     /// Insert a micro-op after the current operation (making it the next operation to execute after index is incremented)
     /// During micro-op execution, PipelineIndex points to current op. After execution, index is incremented.
@@ -77,9 +120,10 @@ module MicroOps =
         let after = state.Pipeline.[insertIdx..]
         state.Pipeline <- Array.concat [| before; [| op |]; after |]
 
-    /// Add a penalty cycle by inserting noOp after current operation
+    /// Add a penalty cycle by inserting a dummy read after current operation
+    /// The 6502 always accesses the bus, so penalty cycles do a read at the incomplete address
     let addPenaltyCycle (state: CpuState) =
-        insertAfterCurrentOp state noOp
+        insertAfterCurrentOp state dummyReadTempAddress
 
     let checkPageCrossing : MicroOp = microOp (fun prev next bus ->
         let basePage = prev.TempAddress >>> 8
@@ -123,24 +167,57 @@ module MicroOps =
         next.A <- result
         setNZ next next.A)
 
-    let adcDecimal : MicroOp = microOp (fun prev next bus ->
+    /// ADC decimal mode for NMOS 6502: N flag based on intermediate ALU result, Z flag on binary sum
+    let adcDecimalNmos : MicroOp = microOp (fun prev next bus ->
         let a = next.A
         let m = tempByte next
         let c = if next.CarryFlag then 1 else 0
         let mutable lo = (int a &&& 0x0F) + (int m &&& 0x0F) + c
         if lo > 9 then lo <- lo + 6
         let mutable hi = (int a >>> 4) + (int m >>> 4) + (if lo > 0x0F then 1 else 0)
+        // Intermediate result after low nibble adjust, before high nibble adjust (used for N and V)
+        let intermediate = byte (((hi &&& 0x0F) <<< 4) ||| (lo &&& 0x0F))
         let binSum = int a + int m + c
-        next.OverflowFlag <- (((int a ^^^ binSum) &&& (int m ^^^ binSum) &&& 0x80) <> 0)
+        // NMOS: V flag is based on intermediate result (after low adjust, before high adjust)
+        next.OverflowFlag <- (((int a ^^^ int intermediate) &&& (int m ^^^ int intermediate) &&& 0x80) <> 0)
         if hi > 9 then hi <- hi + 6
         next.CarryFlag <- (hi > 0x0F)
         let result = byte (((hi &&& 0x0F) <<< 4) ||| (lo &&& 0x0F))
         next.A <- result
+        // NMOS: Z flag is based on binary sum, N flag is based on intermediate result
+        next.ZeroFlag <- (byte binSum = 0uy)
+        next.NegativeFlag <- ((intermediate &&& 0x80uy) <> 0uy))
+
+    /// ADC decimal mode for CMOS 65C02: N, Z, and V flags based on BCD result
+    let adcDecimalCmos : MicroOp = microOp (fun prev next bus ->
+        let a = next.A
+        let m = tempByte next
+        let c = if next.CarryFlag then 1 else 0
+        let mutable lo = (int a &&& 0x0F) + (int m &&& 0x0F) + c
+        if lo > 9 then lo <- lo + 6
+        let mutable hi = (int a >>> 4) + (int m >>> 4) + (if lo > 0x0F then 1 else 0)
+        // Calculate overflow BEFORE high nibble BCD correction, based on intermediate result
+        // This matches the ALU's internal state after low nibble correction
+        let intermediate = ((hi &&& 0x0F) <<< 4) ||| (lo &&& 0x0F)
+        next.OverflowFlag <- (((int a ^^^ intermediate) &&& (int m ^^^ intermediate) &&& 0x80) <> 0)
+        if hi > 9 then hi <- hi + 6
+        next.CarryFlag <- (hi > 0x0F)
+        let result = byte (((hi &&& 0x0F) <<< 4) ||| (lo &&& 0x0F))
+        next.A <- result
+        // CMOS: N and Z flags are based on the BCD result
         setNZ next next.A)
 
-    let adc : MicroOp = microOp (fun prev next bus ->
+    /// ADC for NMOS 6502
+    let adcNmos : MicroOp = microOp (fun prev next bus ->
         if next.DecimalFlag then
-            adcDecimal.Invoke(prev, next, bus)
+            adcDecimalNmos.Invoke(prev, next, bus)
+        else
+            adcBinary.Invoke(prev, next, bus))
+
+    /// ADC for CMOS 65C02
+    let adcCmos : MicroOp = microOp (fun prev next bus ->
+        if next.DecimalFlag then
+            adcDecimalCmos.Invoke(prev, next, bus)
         else
             adcBinary.Invoke(prev, next, bus))
 
@@ -155,7 +232,8 @@ module MicroOps =
         next.A <- result
         setNZ next next.A)
 
-    let sbcDecimal : MicroOp = microOp (fun prev next bus ->
+    /// SBC decimal mode for NMOS 6502: N and Z flags based on binary result
+    let sbcDecimalNmos : MicroOp = microOp (fun prev next bus ->
         let a = next.A
         let m = tempByte next
         let c = if next.CarryFlag then 0 else 1
@@ -168,11 +246,46 @@ module MicroOps =
         next.OverflowFlag <- (((int a ^^^ binDiff) &&& ((int a ^^^ int m)) &&& 0x80) <> 0)
         let result = byte (((hi &&& 0x0F) <<< 4) ||| (lo &&& 0x0F))
         next.A <- result
+        // NMOS: N and Z flags are based on the binary difference, not the BCD result
+        setNZ next (byte binDiff))
+
+    /// SBC decimal mode for CMOS 65C02: N and Z flags based on BCD result
+    let sbcDecimalCmos : MicroOp = microOp (fun prev next bus ->
+        let a = int next.A
+        let m = int (tempByte next)
+        let c = if next.CarryFlag then 0 else 1
+
+        // Binary subtraction first
+        let binResult = a - m - c
+
+        // BCD correction
+        let mutable result = binResult
+
+        // Low nibble correction: if borrow from low nibble occurred
+        if (a &&& 0x0F) < ((m &&& 0x0F) + c) then
+            result <- result - 6
+
+        // High nibble correction: if borrow from high nibble occurred  
+        if binResult < 0 then
+            result <- result - 0x60
+
+        next.CarryFlag <- (binResult >= 0)
+        next.OverflowFlag <- (((a ^^^ binResult) &&& (a ^^^ m) &&& 0x80) <> 0)
+        next.A <- byte result
+        // CMOS: N and Z flags are based on the BCD result
         setNZ next next.A)
 
-    let sbc : MicroOp = microOp (fun prev next bus ->
+    /// SBC for NMOS 6502
+    let sbcNmos : MicroOp = microOp (fun prev next bus ->
         if next.DecimalFlag then
-            sbcDecimal.Invoke(prev, next, bus)
+            sbcDecimalNmos.Invoke(prev, next, bus)
+        else
+            sbcBinary.Invoke(prev, next, bus))
+
+    /// SBC for CMOS 65C02
+    let sbcCmos : MicroOp = microOp (fun prev next bus ->
+        if next.DecimalFlag then
+            sbcDecimalCmos.Invoke(prev, next, bus)
         else
             sbcBinary.Invoke(prev, next, bus))
 
@@ -344,21 +457,43 @@ module MicroOps =
     /// Branch if condition is met. Handles penalty cycles for taken branches and page crossings.
     /// When branch is taken, appends penalty cycles and completion to the pipeline.
     /// When branch is not taken, marks complete immediately.
+    /// Note: The condition is checked on 'prev' (the state at instruction start) because
+    /// flags should not change during branch instruction execution.
+    ///
+    /// 6502 Branch timing (taken, no page cross - 3 cycles):
+    ///   T0: Read opcode from PC, PC++
+    ///   T1: Read offset from PC, PC++ (PC now points to address after branch instruction)
+    ///   T2: Dummy read from PC (address after branch) while adding offset internally
+    ///
+    /// 6502 Branch timing (taken, page cross - 4 cycles):
+    ///   T0: Read opcode from PC, PC++
+    ///   T1: Read offset from PC, PC++ (PC now points to address after branch instruction)
+    ///   T2: Dummy read from PC (address after branch) while adding offset to PCL
+    ///   T3: Dummy read from "wrong" address (old PCH : new PCL) while fixing PCH
     let branchIf (condition: CpuState -> bool) : MicroOp = microOp (fun prev next bus ->
         let offset = int8 (tempByte next)
-        if condition next then
-            let oldPC = next.PC
+        if condition prev then
+            let oldPC = next.PC  // PC after operand fetch (address following branch instruction)
             let newPC = uint16 (int next.PC + int offset)
             next.PC <- newPC
-            // Create the completion micro-op (marks instruction complete)
-            let completeOp = microOp (fun _ n _ -> n.InstructionComplete <- true)
             if (oldPC >>> 8) <> (newPC >>> 8) then
-                // Page crossing: add noOp then completeOp
-                insertAfterCurrentOp next noOp
-                next.Pipeline <- Array.append next.Pipeline [| completeOp |]
+                // Page crossing: 
+                //   T2: dummy read at oldPC (address after branch instruction)
+                //   T3: dummy read at "wrong" address (old PCH : new PCL), then complete
+                let wrongAddr = (oldPC &&& 0xFF00us) ||| (newPC &&& 0x00FFus)
+                let penaltyT2 = microOp (fun _ n b ->
+                    b.CpuRead(oldPC) |> ignore)
+                let penaltyT3WithComplete = microOp (fun _ n b ->
+                    b.CpuRead(wrongAddr) |> ignore
+                    n.InstructionComplete <- true)
+                insertAfterCurrentOp next penaltyT2
+                next.Pipeline <- Array.append next.Pipeline [| penaltyT3WithComplete |]
             else
-                // No page crossing: just the penalty cycle that also completes
-                insertAfterCurrentOp next completeOp
+                // No page crossing: T2 dummy read at oldPC (address after branch), then complete
+                let penaltyWithComplete = microOp (fun _ n b ->
+                    b.CpuRead(oldPC) |> ignore
+                    n.InstructionComplete <- true)
+                insertAfterCurrentOp next penaltyWithComplete
         else
             // Branch not taken - mark complete immediately
             next.InstructionComplete <- true)
@@ -458,28 +593,84 @@ module MicroOps =
     // ========================================
 
     /// Add X to TempAddress with zero page wrap (result stays in 0x00-0xFF)
-    let addXZeroPage : MicroOp = microOp (fun prev next bus ->
+    /// Includes a dummy read at the original address (before adding X)
+    /// The 6502 always accesses the bus, so the dummy read is cycle-accurate
+    let addXZeroPageWithDummyRead : MicroOp = microOp (fun prev next bus ->
+        // Dummy read at the base zero page address before adding X
+        bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
         next.TempAddress <- (next.TempAddress + uint16 next.X) &&& 0x00FFus)
 
-    /// Add Y to TempAddress with zero page wrap
+    /// Add X to TempAddress with zero page wrap and dummy read (for cycle accuracy)
+    /// This is the standard version for indexed zero page addressing
+    let addXZeroPage : MicroOp = microOp (fun prev next bus ->
+        // Dummy read at the base zero page address while adding X
+        bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+        next.TempAddress <- (next.TempAddress + uint16 next.X) &&& 0x00FFus)
+
+    /// Add Y to TempAddress with zero page wrap and dummy read (for cycle accuracy)
     let addYZeroPage : MicroOp = microOp (fun prev next bus ->
+        // Dummy read at the base zero page address while adding Y
+        bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
         next.TempAddress <- (next.TempAddress + uint16 next.Y) &&& 0x00FFus)
 
     /// Add X to TempAddress and check for page crossing (for abs,X)
+    /// On page crossing, inserts a penalty cycle that reads from the "wrong" address
     let addXCheckPage : MicroOp = microOp (fun prev next bus ->
-        let oldPage = next.TempAddress >>> 8
+        let baseAddr = next.TempAddress
         next.TempAddress <- next.TempAddress + uint16 next.X
+        let basePage = baseAddr >>> 8
         let newPage = next.TempAddress >>> 8
-        if oldPage <> newPage then
-            addPenaltyCycle next)
+        if basePage <> newPage then
+            // Page crossing - insert penalty cycle that reads from "wrong" address
+            // Wrong address = base high byte + (low byte after adding X)
+            let wrongAddr = (baseAddr &&& 0xFF00us) ||| (next.TempAddress &&& 0x00FFus)
+            let penaltyOp = microOp (fun _ n b ->
+                b.CpuRead(wrongAddr) |> ignore)
+            insertAfterCurrentOp next penaltyOp)
+
+    /// Add X to TempAddress and check for page crossing (65C02 version)
+    /// On page crossing, inserts a penalty cycle that reads from the high byte address (T2)
+    /// TempValue must contain the high byte fetch address before calling this
+    let addXCheckPage65C02 : MicroOp = microOp (fun prev next bus ->
+        let baseAddr = next.TempAddress
+        let highByteAddr = next.TempValue  // Saved T2 address
+        next.TempAddress <- next.TempAddress + uint16 next.X
+        let basePage = baseAddr >>> 8
+        let newPage = next.TempAddress >>> 8
+        if basePage <> newPage then
+            // Page crossing - 65C02 reads from high byte address (same as T2)
+            let penaltyOp = microOp (fun _ n b ->
+                b.CpuRead(highByteAddr) |> ignore)
+            insertAfterCurrentOp next penaltyOp)
 
     /// Add Y to TempAddress and check for page crossing (for abs,Y)
+    /// On page crossing, inserts a penalty cycle that reads from the "wrong" address
     let addYCheckPage : MicroOp = microOp (fun prev next bus ->
-        let oldPage = next.TempAddress >>> 8
+        let baseAddr = next.TempAddress
         next.TempAddress <- next.TempAddress + uint16 next.Y
+        let basePage = baseAddr >>> 8
         let newPage = next.TempAddress >>> 8
-        if oldPage <> newPage then
-            addPenaltyCycle next)
+        if basePage <> newPage then
+            // Page crossing - insert penalty cycle that reads from "wrong" address
+            let wrongAddr = (baseAddr &&& 0xFF00us) ||| (next.TempAddress &&& 0x00FFus)
+            let penaltyOp = microOp (fun _ n b ->
+                b.CpuRead(wrongAddr) |> ignore)
+            insertAfterCurrentOp next penaltyOp)
+
+    /// Add Y to TempAddress and check for page crossing (65C02 version)
+    /// On page crossing, inserts a penalty cycle that reads from the high byte address (T2)
+    /// TempValue must contain the high byte fetch address before calling this
+    let addYCheckPage65C02 : MicroOp = microOp (fun prev next bus ->
+        let baseAddr = next.TempAddress
+        let highByteAddr = next.TempValue  // Saved T2 address
+        next.TempAddress <- next.TempAddress + uint16 next.Y
+        let basePage = baseAddr >>> 8
+        let newPage = next.TempAddress >>> 8
+        if basePage <> newPage then
+            // Page crossing - 65C02 reads from high byte address (same as T2)
+            let penaltyOp = microOp (fun _ n b ->
+                b.CpuRead(highByteAddr) |> ignore)
+            insertAfterCurrentOp next penaltyOp)
 
     // ========================================
     // Indirect Addressing Micro-Ops
@@ -498,16 +689,59 @@ module MicroOps =
         let hi = bus.CpuRead(zpAddr)
         next.TempAddress <- next.TempAddress ||| (uint16 hi <<< 8))
 
-    /// Read pointer high byte and add Y with page crossing check (for (zp),Y)
+    /// Read pointer high byte and add Y with page crossing check (for (zp),Y - NMOS)
+    /// On page crossing, inserts a penalty cycle that reads from the "wrong" address
     let readPointerHighZPAddY : MicroOp = microOp (fun prev next bus ->
         let zpAddr = (next.TempValue + 1us) &&& 0x00FFus
         let hi = bus.CpuRead(zpAddr)
         let baseAddr = next.TempAddress ||| (uint16 hi <<< 8)
-        let oldPage = baseAddr >>> 8
         next.TempAddress <- baseAddr + uint16 next.Y
+        let basePage = baseAddr >>> 8
         let newPage = next.TempAddress >>> 8
-        if oldPage <> newPage then
-            addPenaltyCycle next)
+        if basePage <> newPage then
+            // Page crossing - insert penalty cycle that reads from "wrong" address
+            let wrongAddr = (baseAddr &&& 0xFF00us) ||| (next.TempAddress &&& 0x00FFus)
+            let penaltyOp = microOp (fun _ n b ->
+                b.CpuRead(wrongAddr) |> ignore)
+            insertAfterCurrentOp next penaltyOp)
+
+    /// Read pointer high byte and add Y with page crossing check (for (zp),Y - 65C02)
+    /// On page crossing, inserts a penalty cycle that reads from the operand address (T1)
+    /// Uses prev.PC - 1 to get the operand address (PC was incremented after T1)
+    let readPointerHighZPAddY65C02 : MicroOp = microOp (fun prev next bus ->
+        let zpAddr = (next.TempValue + 1us) &&& 0x00FFus
+        let hi = bus.CpuRead(zpAddr)
+        let baseAddr = next.TempAddress ||| (uint16 hi <<< 8)
+        next.TempAddress <- baseAddr + uint16 next.Y
+        let basePage = baseAddr >>> 8
+        let newPage = next.TempAddress >>> 8
+        if basePage <> newPage then
+            // Page crossing - 65C02 reads from operand address
+            // The operand was fetched at PC-1 (PC is now pointing past instruction)
+            let operandAddr = next.PC - 1us
+            let penaltyOp = microOp (fun _ n b ->
+                b.CpuRead(operandAddr) |> ignore)
+            insertAfterCurrentOp next penaltyOp)
+
+    /// Read pointer high byte and add Y for RMW (indirect),Y instructions.
+    /// RMW instructions ALWAYS read from the "wrong" address first (regardless of page crossing),
+    /// then read from the correct address. This stores the wrong and correct addresses.
+    /// T3: Read high byte, calculate addresses, store wrong addr in TempAddress, correct in TempValue
+    let readPointerHighZPSetupRMWIZY : MicroOp = microOp (fun prev next bus ->
+        let zpAddr = (next.TempValue + 1us) &&& 0x00FFus
+        let hi = bus.CpuRead(zpAddr)  // This is the T3 bus access
+        let baseAddr = next.TempAddress ||| (uint16 hi <<< 8)
+        let correctAddr = baseAddr + uint16 next.Y
+        // Calculate the "wrong" address: base high byte with adjusted low byte
+        let wrongAddr = (baseAddr &&& 0xFF00us) ||| (correctAddr &&& 0x00FFus)
+        // Store wrong address for T4, correct address in TempValue for later
+        next.TempAddress <- wrongAddr
+        next.TempValue <- correctAddr)
+
+    /// Read from wrong address (T4) and then set TempAddress to correct address for T5
+    let readWrongAddressFixRMWIZY : MicroOp = microOp (fun prev next bus ->
+        bus.CpuRead(next.TempAddress) |> ignore  // Read from wrong address
+        next.TempAddress <- next.TempValue)       // Set correct address for next read
 
     /// Read pointer low byte from absolute TempAddress (for JMP indirect)
     let readPointerLowAbs : MicroOp = microOp (fun prev next bus ->
@@ -697,18 +931,16 @@ module MicroOps =
         next.ZeroFlag <- (result &&& 0xFF) = 0
         next.NegativeFlag <- (result &&& 0x80) <> 0)
 
-    /// ISC/ISB - Increment memory then Subtract from A
+    /// ISC/ISB - Increment memory then Subtract from A (respects decimal mode on NMOS)
     let iscOp : MicroOp = microOp (fun prev next bus ->
         // Increment memory
         let m = (tempByte next) + 1uy
         setTempByte next m
-        // SBC operation
-        let carry = if next.CarryFlag then 1 else 0
-        let result = int next.A - int m - (1 - carry)
-        next.CarryFlag <- result >= 0
-        next.OverflowFlag <- ((int next.A ^^^ result) &&& (int next.A ^^^ int m) &&& 0x80) <> 0
-        next.A <- byte (result &&& 0xFF)
-        setNZ next next.A)
+        // SBC operation - use decimal mode if D flag is set
+        if next.DecimalFlag then
+            sbcDecimalNmos.Invoke(prev, next, bus)
+        else
+            sbcBinary.Invoke(prev, next, bus))
 
     /// SLO - Shift Left memory then OR with A
     let sloOp : MicroOp = microOp (fun prev next bus ->
@@ -744,7 +976,7 @@ module MicroOps =
         next.A <- next.A ^^^ shifted
         setNZ next next.A)
 
-    /// RRA - Rotate Right memory then ADC with A
+    /// RRA - Rotate Right memory then ADC with A (respects decimal mode on NMOS)
     let rraOp : MicroOp = microOp (fun prev next bus ->
         let m = tempByte next
         let oldCarry = if next.CarryFlag then 0x80uy else 0uy
@@ -752,13 +984,11 @@ module MicroOps =
         next.CarryFlag <- (m &&& 0x01uy) <> 0uy
         let rotated = (m >>> 1) ||| oldCarry
         setTempByte next rotated
-        // ADC
-        let carry = if next.CarryFlag then 1 else 0
-        let result = int next.A + int rotated + carry
-        next.CarryFlag <- result > 0xFF
-        next.OverflowFlag <- ((not ((int next.A ^^^ int rotated) &&& 0x80 <> 0)) && ((int next.A ^^^ result) &&& 0x80 <> 0))
-        next.A <- byte (result &&& 0xFF)
-        setNZ next next.A)
+        // ADC operation - use decimal mode if D flag is set
+        if next.DecimalFlag then
+            adcDecimalNmos.Invoke(prev, next, bus)
+        else
+            adcBinary.Invoke(prev, next, bus))
 
     /// ANC - AND immediate then set Carry from bit 7
     let ancOp : MicroOp = microOp (fun prev next bus ->
@@ -774,14 +1004,45 @@ module MicroOps =
         setNZ next next.A)
 
     /// ARR - AND immediate then ROR A (special flag handling)
+    /// ARR - AND immediate then ROR, with special flag handling
+    /// In decimal mode, ARR has very unusual behavior with BCD fixups
     let arrOp : MicroOp = microOp (fun prev next bus ->
-        next.A <- next.A &&& (tempByte next)
+        let imm = tempByte next
+        let andResult = next.A &&& imm
         let oldCarry = if next.CarryFlag then 0x80uy else 0uy
-        next.A <- (next.A >>> 1) ||| oldCarry
-        setNZ next next.A
-        // Special flag handling for ARR
-        next.CarryFlag <- (next.A &&& 0x40uy) <> 0uy
-        next.OverflowFlag <- ((next.A &&& 0x40uy) ^^^ ((next.A &&& 0x20uy) <<< 1)) <> 0uy)
+        let rorResult = (andResult >>> 1) ||| oldCarry
+
+        if next.DecimalFlag then
+            // Decimal mode: ARR has special BCD behavior
+            // N and Z are set based on the ROR result
+            setNZ next rorResult
+            // V is set if bit 6 changed during the "BCD fixup"
+            next.OverflowFlag <- ((andResult ^^^ rorResult) &&& 0x40uy) <> 0uy
+
+            // BCD fixup on low nibble: if (andResult & 0x0F) + (andResult & 0x01) > 5
+            let lowNibble = andResult &&& 0x0Fuy
+            let mutable result = rorResult
+            if lowNibble + (andResult &&& 0x01uy) > 5uy then
+                result <- (result &&& 0xF0uy) ||| ((result + 6uy) &&& 0x0Fuy)
+
+            // BCD fixup on high nibble: if high nibble of andResult >= 5
+            // (indicating the pre-rotated high nibble would overflow BCD)
+            let highNibble = andResult >>> 4
+            if highNibble >= 5uy then
+                result <- result + 0x60uy
+                next.CarryFlag <- true
+            else
+                next.CarryFlag <- false
+
+            next.A <- result
+        else
+            // Binary mode: standard ARR behavior
+            next.A <- rorResult
+            setNZ next next.A
+            // Carry is set from bit 6 of result
+            next.CarryFlag <- (next.A &&& 0x40uy) <> 0uy
+            // Overflow is bit 6 XOR bit 5
+            next.OverflowFlag <- ((next.A &&& 0x40uy) ^^^ ((next.A &&& 0x20uy) <<< 1)) <> 0uy)
 
     /// AXS/SBX - X = (A AND X) - immediate (no borrow)
     let axsOp : MicroOp = microOp (fun prev next bus ->
@@ -791,6 +1052,79 @@ module MicroOps =
         next.CarryFlag <- andResult >= m
         next.X <- byte (result &&& 0xFF)
         setNZ next next.X)
+
+    // ========================================
+    // Unstable/Unreliable Illegal Opcodes
+    // These have unpredictable behavior on real hardware.
+    // The "magic constant" varies by chip; Harte tests use 0xEE.
+    // ========================================
+
+    /// ANE/XAA - A = (A | const) & X & imm
+    /// The constant is chip-dependent; Harte tests expect 0xEE
+    let aneOp : MicroOp = microOp (fun prev next bus ->
+        let magic = 0xEEuy  // Chip-dependent constant (Harte tests use 0xEE)
+        let imm = tempByte next
+        next.A <- (next.A ||| magic) &&& next.X &&& imm
+        setNZ next next.A)
+
+    /// LXA/LAX imm - A = X = (A | const) & imm
+    /// The constant is chip-dependent; Harte tests expect 0xEE
+    let lxaOp : MicroOp = microOp (fun prev next bus ->
+        let magic = 0xEEuy  // Chip-dependent constant (Harte tests use 0xEE)
+        let imm = tempByte next
+        let result = (next.A ||| magic) &&& imm
+        next.A <- result
+        next.X <- result
+        setNZ next result)
+
+    /// LAS - A = X = SP = SP & mem
+    let lasOp : MicroOp = microOp (fun prev next bus ->
+        let m = tempByte next
+        let result = next.SP &&& m
+        next.A <- result
+        next.X <- result
+        next.SP <- result
+        setNZ next result)
+
+    /// SHA/AHX - Store (A & X & (high byte of BASE address + 1))
+    /// For unstable store opcodes, TempValue holds the BASE address high byte before indexing
+    /// TempAddress holds the final (possibly wrong) address
+    let shaOp : MicroOp = microOp (fun prev next bus ->
+        // TempValue high byte contains the base address high byte (before adding index)
+        let baseHigh = byte (next.TempValue >>> 8)
+        let value = next.A &&& next.X &&& (baseHigh + 1uy)
+        setTempByte next value)
+
+    /// SHX - Store (X & (high byte of BASE address + 1))
+    let shxOp : MicroOp = microOp (fun prev next bus ->
+        let baseHigh = byte (next.TempValue >>> 8)
+        let value = next.X &&& (baseHigh + 1uy)
+        setTempByte next value)
+
+    /// SHY - Store (Y & (high byte of BASE address + 1))
+    let shyOp : MicroOp = microOp (fun prev next bus ->
+        let baseHigh = byte (next.TempValue >>> 8)
+        let value = next.Y &&& (baseHigh + 1uy)
+        setTempByte next value)
+
+    /// TAS/SHS - SP = A & X, then store (A & X & (high + 1))
+    let tasOp : MicroOp = microOp (fun prev next bus ->
+        next.SP <- next.A &&& next.X
+        let baseHigh = byte (next.TempValue >>> 8)
+        let value = next.A &&& next.X &&& (baseHigh + 1uy)
+        setTempByte next value)
+
+    /// Write for unstable store opcodes - handles the weird page-crossing address glitch
+    /// If page crossed, the destination high byte is AND'd with the value
+    let writeUnstableStore : MicroOp = microOp (fun prev next bus ->
+        let value = tempByte next
+        let baseHigh = byte (next.TempValue >>> 8)
+        let finalHigh = byte (next.TempAddress >>> 8)
+        let finalLow = byte (next.TempAddress &&& 0xFFus)
+        // If page crossed (base high != final high), the write address high is base_high & value
+        let writeHigh = if baseHigh <> finalHigh then baseHigh &&& value else finalHigh
+        let writeAddr = (uint16 writeHigh <<< 8) ||| uint16 finalLow
+        bus.Write(writeAddr, value))
 
     /// JAM/KIL - Set status to Jammed (or Bypassed if IgnoreHaltStopWait is true)
     let jamOp : MicroOp = microOp (fun prev next bus ->

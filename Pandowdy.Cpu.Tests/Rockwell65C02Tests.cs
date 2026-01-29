@@ -17,6 +17,17 @@ public class Rockwell65C02Tests : CoreInstructionTests
     #region JMP Indirect Bug Fix (Same as WDC)
 
     [Fact]
+    public void JMP_Indirect_Takes6Cycles()
+    {
+        // 65C02 takes 6 cycles for indirect jump (NMOS takes 5)
+        LoadAndReset(0x6C, 0x34, 0x12);
+        SetMemory(0x1234, 0x00);
+        SetMemory(0x1235, 0x80);
+        int cycles = StepInstruction();
+        Assert.Equal(6, cycles);
+    }
+
+    [Fact]
     public void JMP_Indirect_FixedPageBoundaryBug()
     {
         LoadAndReset(0x6C, 0xFF, 0x12);

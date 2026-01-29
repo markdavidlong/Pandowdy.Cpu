@@ -17,6 +17,17 @@ public class NMOS6502Tests : CoreInstructionTests
     #region JMP Indirect Page Boundary Bug (NMOS specific)
 
     [Fact]
+    public void JMP_Indirect_Takes5Cycles()
+    {
+        // NMOS 6502 takes 5 cycles for indirect jump (unlike 65C02 which takes 6)
+        LoadAndReset(0x6C, 0x34, 0x12);
+        SetMemory(0x1234, 0x00);
+        SetMemory(0x1235, 0x80);
+        int cycles = StepInstruction();
+        Assert.Equal(5, cycles);
+    }
+
+    [Fact]
     public void JMP_Indirect_HasPageBoundaryBug()
     {
         // On NMOS, JMP ($12FF) reads high byte from $1200 instead of $1300
@@ -456,6 +467,92 @@ public class NMOS6502Tests : CoreInstructionTests
                     StepInstruction();
 
                     Assert.Equal(0x42, CurrentState.A);
+                }
+
+                #endregion
+
+                #region NMOS BCD Mode Flag Behavior
+
+                [Fact]
+                public void ADC_BCD_NegativeFlag_BasedOnBinaryResult_NMOS()
+                {
+                    // NMOS 6502: N flag is set based on the BINARY result, not the BCD result
+                    // 0x79 + 0x10 = 0x89 (BCD), but binary sum is 0x89 which has bit 7 set
+                    // So N should be set based on binary calculation
+                    LoadAndReset([0x69, 0x10]);  // ADC #$10
+                    CpuBuffer.Current.A = 0x79;
+                    CpuBuffer.Prev.A = 0x79;
+                    CpuBuffer.Current.DecimalFlag = true;
+                    CpuBuffer.Prev.DecimalFlag = true;
+                    CpuBuffer.Current.CarryFlag = false;
+                    CpuBuffer.Prev.CarryFlag = false;
+
+                    StepInstruction();
+
+                    // Binary: 0x79 + 0x10 = 0x89 (bit 7 set, so N = true)
+                    Assert.Equal(0x89, CurrentState.A);  // BCD result
+                    Assert.True(CurrentState.NegativeFlag, "NMOS: N flag should be based on binary result (0x89 has bit 7 set)");
+                }
+
+                [Fact]
+                public void ADC_BCD_ZeroFlag_BasedOnBinaryResult_NMOS()
+                {
+                    // NMOS 6502: Z flag is set based on the BINARY result, not the BCD result
+                    // 0x99 + 0x01 = 0x00 (BCD with carry), binary sum is 0x9A (not zero)
+                    LoadAndReset([0x69, 0x01]);  // ADC #$01
+                    CpuBuffer.Current.A = 0x99;
+                    CpuBuffer.Prev.A = 0x99;
+                    CpuBuffer.Current.DecimalFlag = true;
+                    CpuBuffer.Prev.DecimalFlag = true;
+                    CpuBuffer.Current.CarryFlag = false;
+                    CpuBuffer.Prev.CarryFlag = false;
+
+                    StepInstruction();
+
+                    // Binary: 0x99 + 0x01 = 0x9A (not zero)
+                    Assert.Equal(0x00, CurrentState.A);  // BCD result wraps to 0x00
+                    Assert.True(CurrentState.CarryFlag);  // Carry set due to BCD overflow
+                    Assert.False(CurrentState.ZeroFlag, "NMOS: Z flag should be based on binary result (0x9A is not zero)");
+                }
+
+                [Fact]
+                public void SBC_BCD_NegativeFlag_BasedOnBinaryResult_NMOS()
+                {
+                    // NMOS 6502: N flag is set based on the BINARY result, not the BCD result
+                    // 0x00 - 0x01 = 0x99 (BCD with borrow), binary diff is 0xFF (bit 7 set)
+                    LoadAndReset([0xE9, 0x01]);  // SBC #$01
+                    CpuBuffer.Current.A = 0x00;
+                    CpuBuffer.Prev.A = 0x00;
+                    CpuBuffer.Current.DecimalFlag = true;
+                    CpuBuffer.Prev.DecimalFlag = true;
+                    CpuBuffer.Current.CarryFlag = true;  // No borrow
+                    CpuBuffer.Prev.CarryFlag = true;
+
+                    StepInstruction();
+
+                    // Binary: 0x00 - 0x01 = 0xFF (bit 7 set, so N = true)
+                    Assert.Equal(0x99, CurrentState.A);  // BCD result
+                    Assert.True(CurrentState.NegativeFlag, "NMOS: N flag should be based on binary result (0xFF has bit 7 set)");
+                }
+
+                [Fact]
+                public void SBC_BCD_ZeroFlag_BasedOnBinaryResult_NMOS()
+                {
+                    // NMOS 6502: Z flag is set based on the BINARY result
+                    // 0x01 - 0x01 = 0x00 (both BCD and binary are zero, so Z = true)
+                    LoadAndReset([0xE9, 0x01]);  // SBC #$01
+                    CpuBuffer.Current.A = 0x01;
+                    CpuBuffer.Prev.A = 0x01;
+                    CpuBuffer.Current.DecimalFlag = true;
+                    CpuBuffer.Prev.DecimalFlag = true;
+                    CpuBuffer.Current.CarryFlag = true;  // No borrow
+                    CpuBuffer.Prev.CarryFlag = true;
+
+                    StepInstruction();
+
+                    // Both BCD and binary result are 0x00
+                    Assert.Equal(0x00, CurrentState.A);
+                    Assert.True(CurrentState.ZeroFlag, "Z flag should be set when result is zero");
                 }
 
                 #endregion

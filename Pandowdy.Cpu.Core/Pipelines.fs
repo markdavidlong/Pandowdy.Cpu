@@ -79,7 +79,7 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // LDA abs,X - Absolute Indexed X (0xBD) - 4 cycles (+1 if page cross)
+    // LDA abs,X - Absolute Indexed X (0xBD) - 4 cycles (+1 if page cross) - NMOS
     let lda_absx : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
@@ -92,13 +92,43 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // LDA abs,Y - Absolute Indexed Y (0xB9) - 4 cycles (+1 if page cross)
+    // LDA abs,X - 65C02 version (page crossing reads from high byte address)
+    let lda_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            loadA.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LDA abs,Y - Absolute Indexed Y (0xB9) - 4 cycles (+1 if page cross) - NMOS
     let lda_absy : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
             fetchAddressHigh.Invoke(prev, next, bus)
             addYCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            loadA.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LDA abs,Y - 65C02 version (page crossing reads from high byte address)
+    let lda_absy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addYCheckPage65C02.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             loadA.Invoke(prev, next, bus)
@@ -118,12 +148,25 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // LDA (zp),Y - Indirect Indexed (0xB1) - 5 cycles (+1 if page cross)
+    // LDA (zp),Y - Indirect Indexed (0xB1) - 5 cycles (+1 if page cross) - NMOS
     let lda_izy : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readPointerLowZP  // Read low byte of pointer
         readPointerHighZPAddY  // Read high byte, add Y with page check
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            loadA.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LDA (zp),Y - Indirect Indexed (0xB1) - 5 cycles (+1 if page cross) - 65C02
+    // Page crossing penalty reads from operand address (T1), not wrong effective address
+    let lda_izy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP  // Read low byte of pointer
+        readPointerHighZPAddY65C02  // Read high byte, add Y with 65C02 page check
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             loadA.Invoke(prev, next, bus)
@@ -142,48 +185,48 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    let adc_imm : MicroOp[] = [|
+    // ========================================
+    // NMOS ADC pipelines (N/Z flags from binary result in BCD mode)
+    // ========================================
+
+    let adc_imm_nmos : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
             fetchImmediate.Invoke(prev, next, bus)
-            adc.Invoke(prev, next, bus)
+            adcNmos.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // ========================================
-    // Phase 2: ADC (remaining addressing modes)
-    // ========================================
-
-    let adc_zp : MicroOp[] = [|
+    let adc_zp_nmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
             readZeroPage.Invoke(prev, next, bus)
-            adc.Invoke(prev, next, bus)
+            adcNmos.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    let adc_zpx : MicroOp[] = [|
+    let adc_zpx_nmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         addXZeroPage
         microOp (fun prev next bus ->
             readZeroPage.Invoke(prev, next, bus)
-            adc.Invoke(prev, next, bus)
+            adcNmos.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    let adc_abs : MicroOp[] = [|
+    let adc_abs_nmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            adc.Invoke(prev, next, bus)
+            adcNmos.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    let adc_absx : MicroOp[] = [|
+    let adc_absx_nmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
@@ -191,11 +234,11 @@ module Pipelines =
             addXCheckPage.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            adc.Invoke(prev, next, bus)
+            adcNmos.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    let adc_absy : MicroOp[] = [|
+    let adc_absy_nmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
@@ -203,11 +246,11 @@ module Pipelines =
             addYCheckPage.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            adc.Invoke(prev, next, bus)
+            adcNmos.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    let adc_izx : MicroOp[] = [|
+    let adc_izx_nmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         addXZeroPage
@@ -215,74 +258,91 @@ module Pipelines =
         readPointerHighZP
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            adc.Invoke(prev, next, bus)
+            adcNmos.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    let adc_izy : MicroOp[] = [|
+    let adc_izy_nmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readPointerLowZP
         readPointerHighZPAddY
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            adc.Invoke(prev, next, bus)
-            markComplete.Invoke(prev, next, bus))
-    |]
-
-    let adc_izp : MicroOp[] = [|
-        fetchOpcode
-        fetchAddressLow
-        readPointerLowZP
-        readPointerHighZP
-        microOp (fun prev next bus ->
-            readFromTempAddress.Invoke(prev, next, bus)
-            adc.Invoke(prev, next, bus)
+            adcNmos.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
     // ========================================
-    // Phase 2: SBC (all addressing modes)
+    // CMOS ADC pipelines (N/Z flags from BCD result in BCD mode)
     // ========================================
 
-    let sbc_imm : MicroOp[] = [|
+    // 65C02 ADC/SBC pipelines add an extra cycle in decimal mode
+    // This helper checks D flag and adds a penalty cycle followed by completion
+    // If D flag is not set, it just marks completion
+    // The penalty cycle re-reads from the operand address (TempAddress)
+    let addDecimalPenaltyAndComplete (state: CpuState) =
+        if state.DecimalFlag then
+            // Insert a penalty cycle that re-reads from the operand address
+            let operandAddr = state.TempAddress
+            let penaltyOp = microOp (fun _ n b ->
+                b.CpuRead(operandAddr) |> ignore
+                n.InstructionComplete <- true)
+            insertAfterCurrentOp state penaltyOp
+        else
+            state.InstructionComplete <- true
+
+    let adc_imm_cmos : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
             fetchImmediate.Invoke(prev, next, bus)
-            sbc.Invoke(prev, next, bus)
-            markComplete.Invoke(prev, next, bus))
+            adcCmos.Invoke(prev, next, bus)
+            // For immediate mode, decimal penalty reads from $007F (WDC)
+            next.TempAddress <- 0x007Fus
+            addDecimalPenaltyAndComplete next)
     |]
 
-    let sbc_zp : MicroOp[] = [|
+    // Rockwell 65C02 uses different penalty address for ADC immediate
+    let adc_imm_rockwell : MicroOp[] = [|
+        fetchOpcode
+        microOp (fun prev next bus ->
+            fetchImmediate.Invoke(prev, next, bus)
+            adcCmos.Invoke(prev, next, bus)
+            // For immediate mode, decimal penalty reads from $0059 (Rockwell)
+            next.TempAddress <- 0x0059us
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let adc_zp_cmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
             readZeroPage.Invoke(prev, next, bus)
-            sbc.Invoke(prev, next, bus)
-            markComplete.Invoke(prev, next, bus))
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
     |]
 
-    let sbc_zpx : MicroOp[] = [|
+    let adc_zpx_cmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         addXZeroPage
         microOp (fun prev next bus ->
             readZeroPage.Invoke(prev, next, bus)
-            sbc.Invoke(prev, next, bus)
-            markComplete.Invoke(prev, next, bus))
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
     |]
 
-    let sbc_abs : MicroOp[] = [|
+    let adc_abs_cmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            sbc.Invoke(prev, next, bus)
-            markComplete.Invoke(prev, next, bus))
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
     |]
 
-    let sbc_absx : MicroOp[] = [|
+    let adc_absx_cmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
@@ -290,11 +350,25 @@ module Pipelines =
             addXCheckPage.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            sbc.Invoke(prev, next, bus)
-            markComplete.Invoke(prev, next, bus))
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
     |]
 
-    let sbc_absy : MicroOp[] = [|
+    let adc_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let adc_absy_cmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
@@ -302,11 +376,25 @@ module Pipelines =
             addYCheckPage.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            sbc.Invoke(prev, next, bus)
-            markComplete.Invoke(prev, next, bus))
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
     |]
 
-    let sbc_izx : MicroOp[] = [|
+    let adc_absy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addYCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let adc_izx_cmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         addXZeroPage
@@ -314,30 +402,272 @@ module Pipelines =
         readPointerHighZP
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            sbc.Invoke(prev, next, bus)
-            markComplete.Invoke(prev, next, bus))
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
     |]
 
-    let sbc_izy : MicroOp[] = [|
+    let adc_izy_cmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readPointerLowZP
         readPointerHighZPAddY
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            sbc.Invoke(prev, next, bus)
-            markComplete.Invoke(prev, next, bus))
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
     |]
 
-    let sbc_izp : MicroOp[] = [|
+    let adc_izp_cmos : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readPointerLowZP
         readPointerHighZP
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
-            sbc.Invoke(prev, next, bus)
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    // ========================================
+    // NMOS SBC pipelines (N/Z flags from binary result in BCD mode)
+    // ========================================
+
+    let sbc_imm_nmos : MicroOp[] = [|
+        fetchOpcode
+        microOp (fun prev next bus ->
+            fetchImmediate.Invoke(prev, next, bus)
+            sbcNmos.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
+    |]
+
+    let sbc_zp_nmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            readZeroPage.Invoke(prev, next, bus)
+            sbcNmos.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let sbc_zpx_nmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        addXZeroPage
+        microOp (fun prev next bus ->
+            readZeroPage.Invoke(prev, next, bus)
+            sbcNmos.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let sbc_abs_nmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        fetchAddressHigh
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcNmos.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let sbc_absx_nmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            fetchAddressHigh.Invoke(prev, next, bus)
+            addXCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcNmos.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let sbc_absy_nmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            fetchAddressHigh.Invoke(prev, next, bus)
+            addYCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcNmos.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let sbc_izx_nmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        addXZeroPage
+        readPointerLowZP
+        readPointerHighZP
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcNmos.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let sbc_izy_nmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP
+        readPointerHighZPAddY
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcNmos.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    /// Unofficial SBC opcode 0xEB (NMOS only) - duplicate of SBC immediate
+    let sbc_imm_unofficial_nmos : MicroOp[] = sbc_imm_nmos
+
+    // ========================================
+    // CMOS SBC pipelines (N/Z flags from BCD result in BCD mode)
+    // 65C02 adds an extra cycle in decimal mode
+    // ========================================
+
+    let sbc_imm_cmos : MicroOp[] = [|
+        fetchOpcode
+        microOp (fun prev next bus ->
+            fetchImmediate.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_zp_cmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            readZeroPage.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_zpx_cmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        addXZeroPage
+        microOp (fun prev next bus ->
+            readZeroPage.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_abs_cmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        fetchAddressHigh
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_absx_cmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            fetchAddressHigh.Invoke(prev, next, bus)
+            addXCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_absy_cmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            fetchAddressHigh.Invoke(prev, next, bus)
+            addYCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_absy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addYCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_izx_cmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        addXZeroPage
+        readPointerLowZP
+        readPointerHighZP
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_izy_cmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP
+        readPointerHighZPAddY
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_izp_cmos : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP
+        readPointerHighZP
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    // 65C02 (zp),Y instructions - page crossing reads from operand address (T1)
+    let adc_izy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP
+        readPointerHighZPAddY65C02
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            adcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
+    |]
+
+    let sbc_izy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP
+        readPointerHighZPAddY65C02
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            sbcCmos.Invoke(prev, next, bus)
+            addDecimalPenaltyAndComplete next)
     |]
 
     // ========================================
@@ -393,12 +723,40 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
+    let and_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            andOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
     let and_absy : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
             fetchAddressHigh.Invoke(prev, next, bus)
             addYCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            andOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let and_absy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addYCheckPage65C02.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             andOp.Invoke(prev, next, bus)
@@ -422,6 +780,17 @@ module Pipelines =
         fetchAddressLow
         readPointerLowZP
         readPointerHighZPAddY
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            andOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let and_izy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP
+        readPointerHighZPAddY65C02
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             andOp.Invoke(prev, next, bus)
@@ -492,6 +861,20 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
+    let ora_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            oraOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
     let ora_absy : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
@@ -504,10 +887,24 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
+    let ora_absy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addYCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            oraOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
     let ora_izx : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
-        addXZeroPage
+        addXZeroPageWithDummyRead  // Dummy read at base address while adding X
         readPointerLowZP
         readPointerHighZP
         microOp (fun prev next bus ->
@@ -521,6 +918,17 @@ module Pipelines =
         fetchAddressLow
         readPointerLowZP
         readPointerHighZPAddY
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            oraOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let ora_izy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP
+        readPointerHighZPAddY65C02
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             oraOp.Invoke(prev, next, bus)
@@ -591,12 +999,40 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
+    let eor_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            eorOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
     let eor_absy : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
             fetchAddressHigh.Invoke(prev, next, bus)
             addYCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            eorOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let eor_absy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addYCheckPage65C02.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             eorOp.Invoke(prev, next, bus)
@@ -620,6 +1056,17 @@ module Pipelines =
         fetchAddressLow
         readPointerLowZP
         readPointerHighZPAddY
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            eorOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let eor_izy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP
+        readPointerHighZPAddY65C02
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             eorOp.Invoke(prev, next, bus)
@@ -690,12 +1137,40 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
+    let cmp_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            cmpOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
     let cmp_absy : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
             fetchAddressHigh.Invoke(prev, next, bus)
             addYCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            cmpOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let cmp_absy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addYCheckPage65C02.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             cmpOp.Invoke(prev, next, bus)
@@ -719,6 +1194,17 @@ module Pipelines =
         fetchAddressLow
         readPointerLowZP
         readPointerHighZPAddY
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            cmpOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    let cmp_izy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP
+        readPointerHighZPAddY65C02
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             cmpOp.Invoke(prev, next, bus)
@@ -851,6 +1337,20 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
+    let bit_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            bitOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
     // ========================================
     // Phase 5: Branch Instructions
     // ========================================
@@ -935,6 +1435,7 @@ module Pipelines =
     let clc_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             clc.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -943,6 +1444,7 @@ module Pipelines =
     let sec_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             sec.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -951,6 +1453,7 @@ module Pipelines =
     let cld_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             cld.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -959,6 +1462,7 @@ module Pipelines =
     let sed_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             sed.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -967,6 +1471,7 @@ module Pipelines =
     let cli_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             cli.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -975,6 +1480,7 @@ module Pipelines =
     let sei_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             sei.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -983,6 +1489,7 @@ module Pipelines =
     let clv_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             clv.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -994,7 +1501,7 @@ module Pipelines =
     // PHA - Push Accumulator (0x48) - 3 cycles
     let pha_impl : MicroOp[] = [|
         fetchOpcode
-        noOp  // Dummy cycle
+        dummyReadPC  // Dummy read at PC (cycle 2)
         microOp (fun prev next bus ->
             pushA.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1003,7 +1510,7 @@ module Pipelines =
     // PLA - Pull Accumulator (0x68) - 4 cycles
     let pla_impl : MicroOp[] = [|
         fetchOpcode
-        noOp  // Dummy cycle
+        dummyReadPC  // Dummy read at PC (cycle 2)
         dummyStackRead  // Increment SP
         microOp (fun prev next bus ->
             pullA.Invoke(prev, next, bus)
@@ -1013,7 +1520,7 @@ module Pipelines =
     // PHP - Push Processor Status (0x08) - 3 cycles
     let php_impl : MicroOp[] = [|
         fetchOpcode
-        noOp  // Dummy cycle
+        dummyReadPC  // Dummy read at PC (cycle 2)
         microOp (fun prev next bus ->
             pushP.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1022,7 +1529,7 @@ module Pipelines =
     // PLP - Pull Processor Status (0x28) - 4 cycles
     let plp_impl : MicroOp[] = [|
         fetchOpcode
-        noOp  // Dummy cycle
+        dummyReadPC  // Dummy read at PC (cycle 2)
         dummyStackRead  // Increment SP
         microOp (fun prev next bus ->
             pullP.Invoke(prev, next, bus)
@@ -1032,7 +1539,7 @@ module Pipelines =
     // PHX - Push X Register (0xDA) - 3 cycles (65C02)
     let phx_impl : MicroOp[] = [|
         fetchOpcode
-        noOp  // Dummy cycle
+        dummyReadPC  // Dummy read at PC (cycle 2)
         microOp (fun prev next bus ->
             pushX.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1041,7 +1548,7 @@ module Pipelines =
     // PLX - Pull X Register (0xFA) - 4 cycles (65C02)
     let plx_impl : MicroOp[] = [|
         fetchOpcode
-        noOp  // Dummy cycle
+        dummyReadPC  // Dummy read at PC (cycle 2)
         dummyStackRead  // Increment SP
         microOp (fun prev next bus ->
             pullX.Invoke(prev, next, bus)
@@ -1051,7 +1558,7 @@ module Pipelines =
     // PHY - Push Y Register (0x5A) - 3 cycles (65C02)
     let phy_impl : MicroOp[] = [|
         fetchOpcode
-        noOp  // Dummy cycle
+        dummyReadPC  // Dummy read at PC (cycle 2)
         microOp (fun prev next bus ->
             pushY.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1060,7 +1567,7 @@ module Pipelines =
     // PLY - Pull Y Register (0x7A) - 4 cycles (65C02)
     let ply_impl : MicroOp[] = [|
         fetchOpcode
-        noOp  // Dummy cycle
+        dummyReadPC  // Dummy read at PC (cycle 2)
         dummyStackRead  // Increment SP
         microOp (fun prev next bus ->
             pullY.Invoke(prev, next, bus)
@@ -1083,19 +1590,21 @@ module Pipelines =
     // RTS - Return from Subroutine (0x60) - 6 cycles
     let rts : MicroOp[] = [|
         fetchOpcode
-        noOp  // Dummy read
-        dummyStackRead  // Increment SP
-        pullPCL
-        pullPCH
+        dummyReadPC  // Dummy read at PC (cycle 2)
+        dummyStackRead  // Increment SP (cycle 3)
+        pullPCL  // Pull low byte of return address (cycle 4)
+        pullPCH  // Pull high byte of return address (cycle 5)
         microOp (fun prev next bus ->
-            incrementPC.Invoke(prev, next, bus)
+            // Cycle 6: Read from current PC (return address), THEN increment
+            bus.CpuRead(next.PC) |> ignore
+            next.PC <- next.PC + 1us
             markComplete.Invoke(prev, next, bus))
     |]
 
     // RTI - Return from Interrupt (0x40) - 6 cycles
     let rti : MicroOp[] = [|
         fetchOpcode
-        noOp  // Dummy read
+        dummyReadPC  // Dummy read at PC
         dummyStackRead  // Increment SP
         microOp (fun prev next bus ->
             pullP.Invoke(prev, next, bus))
@@ -1136,24 +1645,76 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // STA abs,X (0x9D) - 5 cycles
+    // STA abs,X (0x9D) - 5 cycles (NMOS - dummy read at wrong effective address)
     let sta_absx : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX  // No page penalty for stores
+        addXWithDummyRead  // Dummy read at incomplete address, then add X
         microOp (fun prev next bus ->
             storeA.Invoke(prev, next, bus)
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // STA abs,Y (0x99) - 5 cycles
+    // STA abs,X (0x9D) - 5 cycles (65C02 - dummy read at high byte address)
+    // T0: Fetch opcode
+    // T1: Fetch low byte
+    // T2: Fetch high byte (save address for T3)
+    // T3: Dummy read at high byte address (same as T2)
+    // T4: Write to effective address
+    let sta_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            // Fetch high byte and save this address for T3 dummy read
+            let highByteAddr = next.PC
+            let hi = bus.CpuRead(next.PC)
+            next.PC <- next.PC + 1us
+            next.TempAddress <- next.TempAddress ||| (uint16 hi <<< 8)
+            next.TempValue <- highByteAddr)  // Save high byte address for T3
+        microOp (fun prev next bus ->
+            // T3: Dummy read at high byte address, then add X
+            bus.CpuRead(next.TempValue) |> ignore
+            next.TempAddress <- next.TempAddress + uint16 next.X)
+        microOp (fun prev next bus ->
+            storeA.Invoke(prev, next, bus)
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // STA abs,Y (0x99) - 5 cycles (NMOS - dummy read at wrong effective address)
     let sta_absy : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addY  // No page penalty for stores
+        addYWithDummyRead  // Dummy read at incomplete address, then add Y
+        microOp (fun prev next bus ->
+            storeA.Invoke(prev, next, bus)
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // STA abs,Y (0x99) - 5 cycles (65C02 - dummy read at high byte address)
+    // T0: Fetch opcode
+    // T1: Fetch low byte
+    // T2: Fetch high byte (save address for T3)
+    // T3: Dummy read at high byte address (same as T2)
+    // T4: Write to effective address
+    let sta_absy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            // Fetch high byte and save this address for T3 dummy read
+            let highByteAddr = next.PC
+            let hi = bus.CpuRead(next.PC)
+            next.PC <- next.PC + 1us
+            next.TempAddress <- next.TempAddress ||| (uint16 hi <<< 8)
+            next.TempValue <- highByteAddr)  // Save high byte address for T3
+        microOp (fun prev next bus ->
+            // T3: Dummy read at high byte address, then add Y
+            bus.CpuRead(next.TempValue) |> ignore
+            next.TempAddress <- next.TempAddress + uint16 next.Y)
         microOp (fun prev next bus ->
             storeA.Invoke(prev, next, bus)
             writeToTempAddress.Invoke(prev, next, bus)
@@ -1173,14 +1734,49 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // STA (zp),Y (0x91) - 6 cycles
+    // STA (zp),Y (0x91) - 6 cycles (NMOS behavior - dummy read at wrong effective address)
     let sta_izy : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readPointerLowZP
         readPointerHighZP
-        addY  // Separate cycle for adding Y (no page penalty for stores)
+        addYWithDummyRead  // Dummy read at incomplete address, then add Y
         microOp (fun prev next bus ->
+            storeA.Invoke(prev, next, bus)
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // STA (zp),Y (0x91) - 6 cycles (65C02 behavior - dummy read at operand address)
+    // 65C02 does dummy read at the ZP operand address (PC after T0), not at wrong effective address
+    let sta_izy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        microOp (fun prev next bus ->
+            // T1: Fetch ZP operand and save operand PC for later dummy read
+            let operandAddr = next.PC
+            let zpAddr = bus.CpuRead(next.PC)
+            next.PC <- next.PC + 1us
+            next.TempAddress <- uint16 zpAddr  // ZP address for pointer reads
+            next.TempValue <- operandAddr)     // Operand address for T4 dummy read
+        microOp (fun prev next bus ->
+            // T2: Read pointer low from zp
+            let lo = bus.CpuRead(next.TempAddress &&& 0x00FFus)
+            // Store ZP addr in upper bits, pointer low in lower bits temporarily
+            let zpAddr = next.TempAddress
+            next.TempAddress <- uint16 lo ||| (zpAddr <<< 8))
+        microOp (fun prev next bus ->
+            // T3: Read pointer high from zp+1, form base address, add Y
+            let zpAddr = uint16 (byte (next.TempAddress >>> 8))
+            let ptrLo = byte next.TempAddress
+            let zpHiAddr = (zpAddr + 1us) &&& 0x00FFus
+            let ptrHi = bus.CpuRead(zpHiAddr)
+            let baseAddr = uint16 ptrLo ||| (uint16 ptrHi <<< 8)
+            next.TempAddress <- baseAddr + uint16 next.Y)
+        microOp (fun prev next bus ->
+            // T4: Dummy read at operand address (where ZP addr was fetched from)
+            bus.CpuRead(next.TempValue) |> ignore)
+        microOp (fun prev next bus ->
+            // T5: Write A to effective address
             storeA.Invoke(prev, next, bus)
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1207,24 +1803,72 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // JMP (ind) (0x6C) - 5 cycles (65C02 fixes page boundary bug)
+    // JMP (ind) (0x6C) - 6 cycles (65C02 fixes page boundary bug)
+    // When pointer is at $xxFF:
+    //   T3: Read low byte from $xxFF
+    //   T4: Dummy read at $xx00 (where NMOS would incorrectly read high byte)
+    //   T5: Read high byte from correct address (pointer+1, which crosses page)
+    // When pointer is not at $xxFF:
+    //   T3: Read low byte from pointer
+    //   T4: Read high byte from pointer+1
+    //   T5: Dummy read at pointer+1
     let jmp_ind : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        readPointerLowAbs
+        readPointerLowAbs  // T3: Read low byte, store pointer in TempValue
         microOp (fun prev next bus ->
-            readPointerHighAbs.Invoke(prev, next, bus)
-            jumpToTempAddress.Invoke(prev, next, bus)
-            markComplete.Invoke(prev, next, bus))
+            // T4: Check if pointer low byte is $FF (page boundary case)
+            let pointerAddr = next.TempValue
+            if (pointerAddr &&& 0xFFus) = 0xFFus then
+                // Page boundary: dummy read at buggy wrap address ($xx00)
+                let buggyAddr = pointerAddr &&& 0xFF00us
+                bus.CpuRead(buggyAddr) |> ignore
+            else
+                // Normal case: read high byte from pointer+1
+                let hi = bus.CpuRead(pointerAddr + 1us)
+                next.TempAddress <- next.TempAddress ||| (uint16 hi <<< 8))
+        microOp (fun prev next bus ->
+            // T5: Check if we need to read high byte (page boundary) or do dummy read
+            let pointerAddr = next.TempValue
+            if (pointerAddr &&& 0xFFus) = 0xFFus then
+                // Page boundary case: read high byte from correct address
+                let correctAddr = pointerAddr + 1us  // This correctly crosses the page
+                let hi = bus.CpuRead(correctAddr)
+                next.TempAddress <- next.TempAddress ||| (uint16 hi <<< 8)
+            else
+                // Normal case: dummy read at pointer+1
+                bus.CpuRead(pointerAddr + 1us) |> ignore
+            next.PC <- next.TempAddress
+            next.InstructionComplete <- true)
     |]
 
     // JMP (abs,X) (0x7C) - 6 cycles (65C02 only)
+    // T0: Fetch opcode
+    // T1: Fetch low byte (save address for T3)
+    // T2: Fetch high byte
+    // T3: Dummy read at low byte address (same as T1)
+    // T4: Read pointer low from (abs+X)
+    // T5: Read pointer high and jump
     let jmp_absx_ind : MicroOp[] = [|
         fetchOpcode
-        fetchAddressLow
-        fetchAddressHigh
-        addX
+        microOp (fun prev next bus ->
+            // Fetch low byte and save this address for T3 dummy read
+            let lowByteAddr = next.PC
+            let lo = bus.CpuRead(next.PC)
+            next.PC <- next.PC + 1us
+            next.TempAddress <- uint16 lo
+            next.TempValue <- lowByteAddr)  // Save low byte address for T3
+        microOp (fun prev next bus ->
+            // Fetch high byte
+            let hi = bus.CpuRead(next.PC)
+            next.PC <- next.PC + 1us
+            next.TempAddress <- next.TempAddress ||| (uint16 hi <<< 8))
+        microOp (fun prev next bus ->
+            // Dummy read at low byte address (T3)
+            bus.CpuRead(next.TempValue) |> ignore
+            // Now add X to form effective pointer address
+            next.TempAddress <- next.TempAddress + uint16 next.X)
         readPointerLowAbs
         microOp (fun prev next bus ->
             readPointerHighAbs.Invoke(prev, next, bus)
@@ -1245,30 +1889,42 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
+    // Standard NOP - 2 cycles (fetch opcode + dummy read)
     let nop : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
+    |]
+
+    // 1-cycle NOP for 65C02 undefined opcodes ($x3, $xB patterns)
+    // Only fetches opcode, no dummy read
+    let nop_1cycle : MicroOp[] = [|
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.PC) |> ignore  // Fetch opcode
+            next.PC <- next.PC + 1us
+            next.InstructionComplete <- true)
     |]
 
     // Multi-cycle NOPs for undefined opcodes (65C02)
     let nop_3cycle : MicroOp[] = [|
         fetchOpcode
-        noOp
+        dummyReadPC
         microOp (fun prev next bus ->
             markComplete.Invoke(prev, next, bus))
     |]
 
     let nop_4cycle : MicroOp[] = [|
         fetchOpcode
-        noOp
-        noOp
+        dummyReadPC
+        dummyReadPC
         microOp (fun prev next bus ->
             markComplete.Invoke(prev, next, bus))
     |]
 
     // ========================================
     // TRB/TSB - Test and Reset/Set Bits (65C02)
+    // 65C02 RMW instructions do a dummy READ (not write) before the final write
     // ========================================
 
     // TRB zp (0x14) - 5 cycles
@@ -1276,7 +1932,10 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        trbOp
+        microOp (fun prev next bus ->
+            // 65C02: dummy READ (not write) before modification
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            trbOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1288,7 +1947,10 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        trbOp
+        microOp (fun prev next bus ->
+            // 65C02: dummy READ (not write) before modification
+            bus.CpuRead(next.TempAddress) |> ignore
+            trbOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1299,7 +1961,10 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        tsbOp
+        microOp (fun prev next bus ->
+            // 65C02: dummy READ (not write) before modification
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            tsbOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1311,7 +1976,10 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        tsbOp
+        microOp (fun prev next bus ->
+            // 65C02: dummy READ (not write) before modification
+            bus.CpuRead(next.TempAddress) |> ignore
+            tsbOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1325,6 +1993,7 @@ module Pipelines =
     let inx_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             inx.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1333,6 +2002,7 @@ module Pipelines =
     let iny_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             iny.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1341,6 +2011,7 @@ module Pipelines =
     let dex_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             dex.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1349,6 +2020,7 @@ module Pipelines =
     let dey_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             dey.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1357,6 +2029,7 @@ module Pipelines =
     let inc_a : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             incA.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1365,6 +2038,7 @@ module Pipelines =
     let dec_a : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             decA.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1373,6 +2047,7 @@ module Pipelines =
     let tax_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             tax.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1381,6 +2056,7 @@ module Pipelines =
     let txa_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             txa.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1389,6 +2065,7 @@ module Pipelines =
     let tay_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             tay.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1397,6 +2074,7 @@ module Pipelines =
     let tya_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             tya.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1405,6 +2083,7 @@ module Pipelines =
     let tsx_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             tsx.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1413,6 +2092,7 @@ module Pipelines =
     let txs_impl : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             txs.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1422,7 +2102,9 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        incMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)  // Write original value back
+            incMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1434,7 +2116,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        incMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)  // Write original value back
+            incMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1446,7 +2130,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        incMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            incMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1457,9 +2143,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX  // No page penalty for RMW
+        addXWithDummyRead  // Dummy read at base address, then add X
         readFromTempAddress
-        incMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            incMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1470,7 +2158,9 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        decMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            decMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1482,7 +2172,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        decMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            decMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1494,7 +2186,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        decMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            decMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1505,9 +2199,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // Dummy read at base address, then add X
         readFromTempAddress
-        decMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            decMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1521,6 +2217,7 @@ module Pipelines =
     let asl_a : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)  // Dummy read at PC
             aslA.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1530,7 +2227,9 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        aslMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            aslMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1542,7 +2241,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        aslMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            aslMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1554,7 +2255,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        aslMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            aslMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1565,9 +2268,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // Dummy read at base address, then add X
         readFromTempAddress
-        aslMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            aslMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1577,6 +2282,7 @@ module Pipelines =
     let lsr_a : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             lsrA.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1586,7 +2292,9 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        lsrMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            lsrMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1598,7 +2306,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        lsrMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            lsrMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1610,7 +2320,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        lsrMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            lsrMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1621,9 +2333,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // Dummy read at base address, then add X
         readFromTempAddress
-        lsrMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            lsrMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1633,6 +2347,7 @@ module Pipelines =
     let rol_a : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             rolA.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1642,7 +2357,9 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        rolMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            rolMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1654,7 +2371,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        rolMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            rolMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1666,7 +2385,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        rolMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rolMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1677,9 +2398,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // Dummy read at base address, then add X
         readFromTempAddress
-        rolMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rolMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1689,6 +2412,7 @@ module Pipelines =
     let ror_a : MicroOp[] = [|
         fetchOpcode
         microOp (fun prev next bus ->
+            dummyReadPC.Invoke(prev, next, bus)
             rorA.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1698,7 +2422,9 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        rorMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            rorMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1710,7 +2436,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        rorMem
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            rorMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1722,7 +2450,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        rorMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rorMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1733,9 +2463,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // Dummy read at base address, then add X
         readFromTempAddress
-        rorMem
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rorMem.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1786,13 +2518,28 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // LDX abs,Y (0xBE) - 4 cycles (+1 if page cross)
+    // LDX abs,Y (0xBE) - 4 cycles (+1 if page cross) - NMOS
     let ldx_absy : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
             fetchAddressHigh.Invoke(prev, next, bus)
             addYCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            loadX.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LDX abs,Y - 65C02 version
+    let ldx_absy_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addYCheckPage65C02.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             loadX.Invoke(prev, next, bus)
@@ -1840,13 +2587,28 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // LDY abs,X (0xBC) - 4 cycles (+1 if page cross)
+    // LDY abs,X (0xBC) - 4 cycles (+1 if page cross) - NMOS
     let ldy_absx : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
             fetchAddressHigh.Invoke(prev, next, bus)
             addXCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            loadY.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LDY abs,X - 65C02 version
+    let ldy_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             readFromTempAddress.Invoke(prev, next, bus)
             loadY.Invoke(prev, next, bus)
@@ -1949,14 +2711,416 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // STZ abs,X (0x9E) - 5 cycles (65C02)
+    // STZ abs,X (0x9E) - 5 cycles (65C02 - dummy read at high byte address)
+    // T0: Fetch opcode
+    // T1: Fetch low byte
+    // T2: Fetch high byte (save address for T3)
+    // T3: Dummy read at high byte address (same as T2)
+    // T4: Write zero to effective address
     let stz_absx : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
-        fetchAddressHigh
-        addX
+        microOp (fun prev next bus ->
+            // Fetch high byte and save this address for T3 dummy read
+            let highByteAddr = next.PC
+            let hi = bus.CpuRead(next.PC)
+            next.PC <- next.PC + 1us
+            next.TempAddress <- next.TempAddress ||| (uint16 hi <<< 8)
+            next.TempValue <- highByteAddr)  // Save high byte address for T3
+        microOp (fun prev next bus ->
+            // T3: Dummy read at high byte address, then add X
+            bus.CpuRead(next.TempValue) |> ignore
+            next.TempAddress <- next.TempAddress + uint16 next.X)
         microOp (fun prev next bus ->
             storeZ.Invoke(prev, next, bus)
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ========================================
+    // 65C02 RMW Instructions (use dummy READ, not write)
+    // The 65C02 does a dummy read before the final write, unlike NMOS which does a dummy write
+    // ========================================
+
+    // ASL zp - 5 cycles (65C02)
+    let asl_zp_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore  // 65C02: dummy READ
+            aslMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ASL zp,X - 6 cycles (65C02)
+    let asl_zpx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        addXZeroPage
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore  // 65C02: dummy READ
+            aslMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ASL abs - 6 cycles (65C02)
+    let asl_abs_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        fetchAddressHigh
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore  // 65C02: dummy READ
+            aslMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ASL abs,X - 6 cycles (65C02), +1 for page cross
+    // On page cross, penalty cycle reads from high byte address (same as T2)
+    let asl_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore  // 65C02: dummy READ
+            aslMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LSR zp - 5 cycles (65C02)
+    let lsr_zp_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            lsrMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LSR zp,X - 6 cycles (65C02)
+    let lsr_zpx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        addXZeroPage
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            lsrMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LSR abs - 6 cycles (65C02)
+    let lsr_abs_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        fetchAddressHigh
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore
+            lsrMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LSR abs,X - 6 cycles (65C02), +1 for page cross
+    let lsr_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore
+            lsrMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ROL zp - 5 cycles (65C02)
+    let rol_zp_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            rolMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ROL zp,X - 6 cycles (65C02)
+    let rol_zpx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        addXZeroPage
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            rolMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ROL abs - 6 cycles (65C02)
+    let rol_abs_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        fetchAddressHigh
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore
+            rolMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ROL abs,X - 6 cycles (65C02), +1 for page cross
+    let rol_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore
+            rolMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ROR zp - 5 cycles (65C02)
+    let ror_zp_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            rorMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ROR zp,X - 6 cycles (65C02)
+    let ror_zpx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        addXZeroPage
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            rorMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ROR abs - 6 cycles (65C02)
+    let ror_abs_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        fetchAddressHigh
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore
+            rorMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // ROR abs,X - 6 cycles (65C02), +1 for page cross
+    let ror_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr
+            addXCheckPage65C02.Invoke(prev, next, bus))
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore
+            rorMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // INC zp - 5 cycles (65C02)
+    let inc_zp_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            incMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // INC zp,X - 6 cycles (65C02)
+    let inc_zpx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        addXZeroPage
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            incMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // INC abs - 6 cycles (65C02)
+    let inc_abs_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        fetchAddressHigh
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore
+            incMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // INC abs,X - ALWAYS 7 cycles on 65C02
+    // Unlike ASL/LSR/ROL/ROR abs,X which are 6+1, INC/DEC abs,X are always 7 cycles
+    // T0: Fetch opcode
+    // T1: Fetch low byte
+    // T2: Fetch high byte (save address for T3)
+    // T3: Dummy read at high byte address (same as T2)
+    // T4: Read from effective address
+    // T5: Dummy read at effective address
+    // T6: Write to effective address
+    let inc_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            // Fetch high byte and save this address for T3 dummy read
+            let highByteAddr = next.PC
+            let hi = bus.CpuRead(next.PC)
+            next.PC <- next.PC + 1us
+            next.TempAddress <- next.TempAddress ||| (uint16 hi <<< 8)
+            next.TempValue <- highByteAddr)  // Save high byte address for T3
+        microOp (fun prev next bus ->
+            // T3: Dummy read at high byte address, then add X
+            bus.CpuRead(next.TempValue) |> ignore
+            next.TempAddress <- next.TempAddress + uint16 next.X)
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore
+            incMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // DEC zp - 5 cycles (65C02)
+    let dec_zp_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            decMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // DEC zp,X - 6 cycles (65C02)
+    let dec_zpx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        addXZeroPage
+        readZeroPage
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            decMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeZeroPage.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // DEC abs - 6 cycles (65C02)
+    let dec_abs_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        fetchAddressHigh
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore
+            decMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            writeToTempAddress.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // DEC abs,X - ALWAYS 7 cycles on 65C02
+    // Unlike ASL/LSR/ROL/ROR abs,X which are 6+1, INC/DEC abs,X are always 7 cycles
+    // T0: Fetch opcode
+    // T1: Fetch low byte
+    // T2: Fetch high byte (save address for T3)
+    // T3: Dummy read at high byte address (same as T2)
+    // T4: Read from effective address
+    // T5: Dummy read at effective address
+    // T6: Write to effective address
+    let dec_absx_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            // Fetch high byte and save this address for T3 dummy read
+            let highByteAddr = next.PC
+            let hi = bus.CpuRead(next.PC)
+            next.PC <- next.PC + 1us
+            next.TempAddress <- next.TempAddress ||| (uint16 hi <<< 8)
+            next.TempValue <- highByteAddr)  // Save high byte address for T3
+        microOp (fun prev next bus ->
+            // T3: Dummy read at high byte address, then add X
+            bus.CpuRead(next.TempValue) |> ignore
+            next.TempAddress <- next.TempAddress + uint16 next.X)
+        readFromTempAddress
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempAddress) |> ignore
+            decMem.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -1966,11 +3130,19 @@ module Pipelines =
     // ========================================
 
     // RMB0-RMB7 - Reset Memory Bit (0x07, 0x17, 0x27, 0x37, 0x47, 0x57, 0x67, 0x77) - 5 cycles
+    // T0: Fetch opcode
+    // T1: Fetch ZP address
+    // T2: Read from ZP
+    // T3: Dummy read from ZP while modifying
+    // T4: Write to ZP
     let rmb (bit: int) : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        rmbOp bit
+        microOp (fun prev next bus ->
+            // Dummy read at ZP address while modifying
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            rmbOp bit |> fun op -> op.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -1990,7 +3162,10 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        smbOp bit
+        microOp (fun prev next bus ->
+            // Dummy read at ZP address while modifying
+            bus.CpuRead(next.TempAddress &&& 0x00FFus) |> ignore
+            smbOp bit |> fun op -> op.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2005,14 +3180,55 @@ module Pipelines =
     let smb6 = smb 6
     let smb7 = smb 7
 
-    // BBR0-BBR7 - Branch on Bit Reset (0x0F, 0x1F, 0x2F, 0x3F, 0x4F, 0x5F, 0x6F, 0x7F) - 5 cycles (+1/+2)
+    // BBR0-BBR7 - Branch on Bit Reset (0x0F, 0x1F, 0x2F, 0x3F, 0x4F, 0x5F, 0x6F, 0x7F)
+    // Not taken: 5 cycles, Taken (no page cross): 6 cycles, Taken (page cross): 7 cycles
+    // T0: Fetch opcode
+    // T1: Fetch ZP address
+    // T2: Read from ZP
+    // T3: Dummy read from ZP (same address)
+    // T4: Fetch offset
+    // T5: Dummy read at oldPC (if taken)
+    // T6: Dummy read at oldPC again (if page cross)
     let bbr (bit: int) : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
-        readZeroPage
-        noOp  // Internal cycle
         microOp (fun prev next bus ->
-            (bbrOp bit).Invoke(prev, next, bus))
+            // Read ZP and store the value in TempValue for later use
+            let zpAddr = next.TempAddress &&& 0x00FFus
+            let zpValue = bus.CpuRead(zpAddr)
+            next.TempValue <- uint16 zpValue)
+        microOp (fun prev next bus ->
+            // Dummy read at ZP address (same as T2)
+            let zpAddr = next.TempAddress &&& 0x00FFus
+            bus.CpuRead(zpAddr) |> ignore)
+        microOp (fun prev next bus ->
+            // Fetch branch offset
+            let offset = int8 (bus.CpuRead(next.PC))
+            next.PC <- next.PC + 1us
+            // Decide whether to branch
+            let zpValue = byte next.TempValue
+            let mask = 1uy <<< bit
+            if (zpValue &&& mask) = 0uy then
+                let oldPC = next.PC
+                let newPC = uint16 (int next.PC + int offset)
+                next.PC <- newPC
+                if (oldPC >>> 8) <> (newPC >>> 8) then
+                    // Page crossing: T5 dummy read at oldPC, T6 dummy read at oldPC + complete
+                    let penaltyT5 = microOp (fun _ n b ->
+                        b.CpuRead(oldPC) |> ignore)
+                    let penaltyT6 = microOp (fun _ n b ->
+                        b.CpuRead(oldPC) |> ignore
+                        n.InstructionComplete <- true)
+                    insertAfterCurrentOp next penaltyT5
+                    next.Pipeline <- Array.append next.Pipeline [| penaltyT6 |]
+                else
+                    // No page cross: just T5 dummy read at oldPC + complete
+                    let penaltyOp = microOp (fun _ n b ->
+                        b.CpuRead(oldPC) |> ignore
+                        n.InstructionComplete <- true)
+                    insertAfterCurrentOp next penaltyOp
+            else
+                next.InstructionComplete <- true)
     |]
 
     let bbr0 = bbr 0
@@ -2024,14 +3240,55 @@ module Pipelines =
     let bbr6 = bbr 6
     let bbr7 = bbr 7
 
-    // BBS0-BBS7 - Branch on Bit Set (0x8F, 0x9F, 0xAF, 0xBF, 0xCF, 0xDF, 0xEF, 0xFF) - 5 cycles (+1/+2)
+    // BBS0-BBS7 - Branch on Bit Set (0x8F, 0x9F, 0xAF, 0xBF, 0xCF, 0xDF, 0xEF, 0xFF)
+    // Not taken: 5 cycles, Taken (no page cross): 6 cycles, Taken (page cross): 7 cycles
+    // T0: Fetch opcode
+    // T1: Fetch ZP address
+    // T2: Read from ZP
+    // T3: Dummy read from ZP (same address)
+    // T4: Fetch offset
+    // T5: Dummy read at oldPC (if taken)
+    // T6: Dummy read at oldPC again (if page cross)
     let bbs (bit: int) : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
-        readZeroPage
-        noOp  // Internal cycle
         microOp (fun prev next bus ->
-            (bbsOp bit).Invoke(prev, next, bus))
+            // Read ZP and store the value in TempValue for later use
+            let zpAddr = next.TempAddress &&& 0x00FFus
+            let zpValue = bus.CpuRead(zpAddr)
+            next.TempValue <- uint16 zpValue)
+        microOp (fun prev next bus ->
+            // Dummy read at ZP address (same as T2)
+            let zpAddr = next.TempAddress &&& 0x00FFus
+            bus.CpuRead(zpAddr) |> ignore)
+        microOp (fun prev next bus ->
+            // Fetch branch offset
+            let offset = int8 (bus.CpuRead(next.PC))
+            next.PC <- next.PC + 1us
+            // Decide whether to branch
+            let zpValue = byte next.TempValue
+            let mask = 1uy <<< bit
+            if (zpValue &&& mask) <> 0uy then
+                let oldPC = next.PC
+                let newPC = uint16 (int next.PC + int offset)
+                next.PC <- newPC
+                if (oldPC >>> 8) <> (newPC >>> 8) then
+                    // Page crossing: T5 dummy read at oldPC, T6 dummy read at oldPC + complete
+                    let penaltyT5 = microOp (fun _ n b ->
+                        b.CpuRead(oldPC) |> ignore)
+                    let penaltyT6 = microOp (fun _ n b ->
+                        b.CpuRead(oldPC) |> ignore
+                        n.InstructionComplete <- true)
+                    insertAfterCurrentOp next penaltyT5
+                    next.Pipeline <- Array.append next.Pipeline [| penaltyT6 |]
+                else
+                    // No page cross: just T5 dummy read at oldPC + complete
+                    let penaltyOp = microOp (fun _ n b ->
+                        b.CpuRead(oldPC) |> ignore
+                        n.InstructionComplete <- true)
+                    insertAfterCurrentOp next penaltyOp
+            else
+                next.InstructionComplete <- true)
     |]
 
     let bbs0 = bbs 0
@@ -2044,13 +3301,31 @@ module Pipelines =
     let bbs7 = bbs 7
 
     // ========================================
-    // Illegal/Undocumented 6502 Opcodes
+    // Illegal 6502 Opcodes
     // ========================================
 
-    // JAM/KIL - Freeze CPU (2 cycles, then loops forever)
+    // JAM/KIL - Freeze CPU (11 cycles of specific bus activity, then CPU is jammed)
+    // The real 6502 gets stuck in an internal loop reading from the interrupt vector.
+    // Cycle pattern observed on hardware:
+    //   T0: Fetch opcode (PC increments to PC+1)
+    //   T1: Read from PC (does NOT increment - CPU is stuck)
+    //   T2: Read $FFFF
+    //   T3: Read $FFFE
+    //   T4: Read $FFFE
+    //   T5-T10: Read $FFFF (6 times)
     let jam : MicroOp[] = [|
         fetchOpcode
-        microOp (fun prev next bus ->
+        dummyReadPC  // T1: Read from PC but don't increment (CPU is jammed)
+        microOp (fun prev next bus -> bus.CpuRead(0xFFFFus) |> ignore)  // T2
+        microOp (fun prev next bus -> bus.CpuRead(0xFFFEus) |> ignore)  // T3
+        microOp (fun prev next bus -> bus.CpuRead(0xFFFEus) |> ignore)  // T4
+        microOp (fun prev next bus -> bus.CpuRead(0xFFFFus) |> ignore)  // T5
+        microOp (fun prev next bus -> bus.CpuRead(0xFFFFus) |> ignore)  // T6
+        microOp (fun prev next bus -> bus.CpuRead(0xFFFFus) |> ignore)  // T7
+        microOp (fun prev next bus -> bus.CpuRead(0xFFFFus) |> ignore)  // T8
+        microOp (fun prev next bus -> bus.CpuRead(0xFFFFus) |> ignore)  // T9
+        microOp (fun prev next bus ->                                   // T10
+            bus.CpuRead(0xFFFFus) |> ignore
             jamOp.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
@@ -2162,12 +3437,14 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // DCP - Decrement then Compare (RMW timing)
+    // DCP - Decrement then Compare (RMW timing - requires dummy write)
     let dcp_zp : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        dcpOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            dcpOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2178,7 +3455,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        dcpOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            dcpOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2189,7 +3468,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        dcpOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            dcpOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2199,9 +3480,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        dcpOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            dcpOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2211,9 +3494,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addY
+        addYWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        dcpOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            dcpOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2226,7 +3511,9 @@ module Pipelines =
         readPointerLowZP
         readPointerHighZP
         readFromTempAddress
-        dcpOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            dcpOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2236,22 +3523,25 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readPointerLowZP
+        readPointerHighZPSetupRMWIZY  // T3: read high byte, store wrong/correct addresses
+        readWrongAddressFixRMWIZY     // T4: read from wrong address, fix TempAddress
+        readFromTempAddress           // T5: read from correct address
         microOp (fun prev next bus ->
-            readPointerHighZP.Invoke(prev, next, bus)
-            addY.Invoke(prev, next, bus))
-        readFromTempAddress
-        dcpOp
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            dcpOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // ISC/ISB - Increment then Subtract (RMW timing)
+    // ISC/ISB - Increment then Subtract (RMW timing - requires dummy write)
     let isc_zp : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        iscOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            iscOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2262,7 +3552,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        iscOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            iscOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2273,7 +3565,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        iscOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            iscOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2283,9 +3577,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        iscOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            iscOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2295,9 +3591,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addY
+        addYWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        iscOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            iscOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2310,7 +3608,9 @@ module Pipelines =
         readPointerLowZP
         readPointerHighZP
         readFromTempAddress
-        iscOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            iscOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2320,22 +3620,25 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readPointerLowZP
+        readPointerHighZPSetupRMWIZY  // T3: read high byte, store wrong/correct addresses
+        readWrongAddressFixRMWIZY     // T4: read from wrong address, fix TempAddress
+        readFromTempAddress           // T5: read from correct address
         microOp (fun prev next bus ->
-            readPointerHighZP.Invoke(prev, next, bus)
-            addY.Invoke(prev, next, bus))
-        readFromTempAddress
-        iscOp
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            iscOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // SLO - Shift Left then OR (RMW timing)
+    // SLO - Shift Left then OR (RMW timing - requires dummy write)
     let slo_zp : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        sloOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            sloOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2346,7 +3649,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        sloOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            sloOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2357,7 +3662,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        sloOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            sloOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2367,9 +3674,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        sloOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            sloOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2379,9 +3688,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addY
+        addYWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        sloOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            sloOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2394,7 +3705,9 @@ module Pipelines =
         readPointerLowZP
         readPointerHighZP
         readFromTempAddress
-        sloOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            sloOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2404,22 +3717,25 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readPointerLowZP
+        readPointerHighZPSetupRMWIZY  // T3: read high byte, store wrong/correct addresses
+        readWrongAddressFixRMWIZY     // T4: read from wrong address, fix TempAddress
+        readFromTempAddress           // T5: read from correct address
         microOp (fun prev next bus ->
-            readPointerHighZP.Invoke(prev, next, bus)
-            addY.Invoke(prev, next, bus))
-        readFromTempAddress
-        sloOp
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            sloOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // RLA - Rotate Left then AND (RMW timing)
+    // RLA - Rotate Left then AND (RMW timing - requires dummy write)
     let rla_zp : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        rlaOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            rlaOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2430,7 +3746,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        rlaOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            rlaOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2441,7 +3759,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        rlaOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rlaOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2451,9 +3771,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        rlaOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rlaOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2463,9 +3785,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addY
+        addYWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        rlaOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rlaOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2478,7 +3802,9 @@ module Pipelines =
         readPointerLowZP
         readPointerHighZP
         readFromTempAddress
-        rlaOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rlaOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2488,22 +3814,25 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readPointerLowZP
+        readPointerHighZPSetupRMWIZY  // T3: read high byte, store wrong/correct addresses
+        readWrongAddressFixRMWIZY     // T4: read from wrong address, fix TempAddress
+        readFromTempAddress           // T5: read from correct address
         microOp (fun prev next bus ->
-            readPointerHighZP.Invoke(prev, next, bus)
-            addY.Invoke(prev, next, bus))
-        readFromTempAddress
-        rlaOp
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rlaOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // SRE - Shift Right then EOR (RMW timing)
+    // SRE - Shift Right then EOR (RMW timing - requires dummy write)
     let sre_zp : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        sreOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            sreOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2514,7 +3843,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        sreOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            sreOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2525,7 +3856,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        sreOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            sreOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2535,9 +3868,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        sreOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            sreOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2547,9 +3882,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addY
+        addYWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        sreOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            sreOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2562,7 +3899,9 @@ module Pipelines =
         readPointerLowZP
         readPointerHighZP
         readFromTempAddress
-        sreOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            sreOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2572,22 +3911,25 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readPointerLowZP
+        readPointerHighZPSetupRMWIZY  // T3: read high byte, store wrong/correct addresses
+        readWrongAddressFixRMWIZY     // T4: read from wrong address, fix TempAddress
+        readFromTempAddress           // T5: read from correct address
         microOp (fun prev next bus ->
-            readPointerHighZP.Invoke(prev, next, bus)
-            addY.Invoke(prev, next, bus))
-        readFromTempAddress
-        sreOp
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            sreOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // RRA - Rotate Right then ADC (RMW timing)
+    // RRA - Rotate Right then ADC (RMW timing - requires dummy write)
     let rra_zp : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         readZeroPage
-        rraOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            rraOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2598,7 +3940,9 @@ module Pipelines =
         fetchAddressLow
         addXZeroPage
         readZeroPage
-        rraOp
+        microOp (fun prev next bus ->
+            dummyWriteZeroPage.Invoke(prev, next, bus)
+            rraOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeZeroPage.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2609,7 +3953,9 @@ module Pipelines =
         fetchAddressLow
         fetchAddressHigh
         readFromTempAddress
-        rraOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rraOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2619,9 +3965,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addX
+        addXWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        rraOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rraOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2631,9 +3979,11 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
-        addY
+        addYWithDummyRead  // RMW always takes the extra cycle
         readFromTempAddress
-        rraOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rraOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2646,7 +3996,9 @@ module Pipelines =
         readPointerLowZP
         readPointerHighZP
         readFromTempAddress
-        rraOp
+        microOp (fun prev next bus ->
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rraOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2656,11 +4008,12 @@ module Pipelines =
         fetchOpcode
         fetchAddressLow
         readPointerLowZP
+        readPointerHighZPSetupRMWIZY  // T3: read high byte, store wrong/correct addresses
+        readWrongAddressFixRMWIZY     // T4: read from wrong address, fix TempAddress
+        readFromTempAddress           // T5: read from correct address
         microOp (fun prev next bus ->
-            readPointerHighZP.Invoke(prev, next, bus)
-            addY.Invoke(prev, next, bus))
-        readFromTempAddress
-        rraOp
+            dummyWriteTempAddress.Invoke(prev, next, bus)
+            rraOp.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
             writeToTempAddress.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2702,8 +4055,194 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
-    // Unofficial SBC duplicate
-    let sbc_imm_unofficial : MicroOp[] = sbc_imm
+    // ========================================
+    // Unstable/Unreliable Illegal Opcodes
+    // ========================================
+
+    // ANE/XAA - A = (A | const) & X & imm (0x8B) - 2 cycles
+    let ane_imm : MicroOp[] = [|
+        fetchOpcode
+        microOp (fun prev next bus ->
+            fetchImmediate.Invoke(prev, next, bus)
+            aneOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LXA/LAX imm - A = X = (A | const) & imm (0xAB) - 2 cycles
+    let lxa_imm : MicroOp[] = [|
+        fetchOpcode
+        microOp (fun prev next bus ->
+            fetchImmediate.Invoke(prev, next, bus)
+            lxaOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // LAS - A = X = SP = SP & mem (0xBB) - 4+ cycles (abs,Y with page crossing)
+    let las_absy : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            fetchAddressHigh.Invoke(prev, next, bus)
+            addYCheckPage.Invoke(prev, next, bus))
+        microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)
+            lasOp.Invoke(prev, next, bus)
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // SHA/AHX (indirect),Y - Store (A & X & (high+1)) (0x93) - 6 cycles
+    // Uses special address calculation: on page cross, write addr high = base_high & value
+    let sha_izy : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        readPointerLowZP
+        microOp (fun prev next bus ->
+            // Read pointer high byte and combine to get base address
+            let zpAddr = (next.TempValue + 1us) &&& 0x00FFus
+            let hi = bus.CpuRead(zpAddr)
+            let baseAddr = next.TempAddress ||| (uint16 hi <<< 8)
+            let baseHigh = byte (baseAddr >>> 8)
+            // Calculate final address (with Y added)
+            let finalAddr = baseAddr + uint16 next.Y
+            let finalHigh = byte (finalAddr >>> 8)
+            let finalLow = byte (finalAddr &&& 0xFFus)
+            // Store baseHigh in upper byte of TempValue, finalAddr in TempAddress
+            // Also store finalLow in lower byte of TempValue for the wrong address calculation
+            next.TempValue <- (uint16 baseHigh <<< 8) ||| uint16 finalLow
+            next.TempAddress <- finalAddr)
+        microOp (fun prev next bus ->
+            // Dummy read from WRONG address (base_high : final_low)
+            let baseHigh = byte (next.TempValue >>> 8)
+            let finalLow = byte (next.TempValue &&& 0xFFus)
+            let wrongAddr = (uint16 baseHigh <<< 8) ||| uint16 finalLow
+            bus.CpuRead(wrongAddr) |> ignore)
+        microOp (fun prev next bus ->
+            // Calculate value and write
+            let baseHigh = byte (next.TempValue >>> 8)
+            let finalHigh = byte (next.TempAddress >>> 8)
+            let finalLow = byte (next.TempAddress &&& 0xFFus)
+            let value = next.A &&& next.X &&& (baseHigh + 1uy)
+            // If page crossed, write addr high = value, else final_high
+            let writeHigh = if baseHigh <> finalHigh then value else finalHigh
+            let writeAddr = (uint16 writeHigh <<< 8) ||| uint16 finalLow
+            bus.Write(writeAddr, value)
+            next.InstructionComplete <- true)
+    |]
+
+    // SHA/AHX abs,Y - Store (A & X & (high+1)) (0x9F) - 5 cycles
+    let sha_absy : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            fetchAddressHigh.Invoke(prev, next, bus)
+            // Store base address high and low in TempValue
+            let baseHigh = byte (next.TempAddress >>> 8)
+            let baseLow = byte (next.TempAddress &&& 0xFFus)
+            next.TempValue <- next.TempAddress)
+        microOp (fun prev next bus ->
+            // Add Y and do dummy read from WRONG address
+            let baseHigh = byte (next.TempValue >>> 8)
+            let baseLow = byte (next.TempValue &&& 0xFFus)
+            let finalAddr = next.TempValue + uint16 next.Y
+            let finalLow = byte (finalAddr &&& 0xFFus)
+            next.TempAddress <- finalAddr
+            // Wrong address = base_high : final_low
+            let wrongAddr = (uint16 baseHigh <<< 8) ||| uint16 finalLow
+            bus.CpuRead(wrongAddr) |> ignore)
+        microOp (fun prev next bus ->
+            // Calculate value and write
+            let baseHigh = byte (next.TempValue >>> 8)
+            let finalHigh = byte (next.TempAddress >>> 8)
+            let finalLow = byte (next.TempAddress &&& 0xFFus)
+            let value = next.A &&& next.X &&& (baseHigh + 1uy)
+            // If page crossed, write addr high = value, else final_high
+            let writeHigh = if baseHigh <> finalHigh then value else finalHigh
+            let writeAddr = (uint16 writeHigh <<< 8) ||| uint16 finalLow
+            bus.Write(writeAddr, value)
+            next.InstructionComplete <- true)
+    |]
+
+    // SHX - Store (X & (high+1)) abs,Y (0x9E) - 5 cycles
+    let shx_absy : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- next.TempAddress)
+        microOp (fun prev next bus ->
+            let baseHigh = byte (next.TempValue >>> 8)
+            let finalAddr = next.TempValue + uint16 next.Y
+            let finalLow = byte (finalAddr &&& 0xFFus)
+            next.TempAddress <- finalAddr
+            let wrongAddr = (uint16 baseHigh <<< 8) ||| uint16 finalLow
+            bus.CpuRead(wrongAddr) |> ignore)
+        microOp (fun prev next bus ->
+            let baseHigh = byte (next.TempValue >>> 8)
+            let finalHigh = byte (next.TempAddress >>> 8)
+            let finalLow = byte (next.TempAddress &&& 0xFFus)
+            let value = next.X &&& (baseHigh + 1uy)
+            // If page crossed, write addr high = value, else final_high
+            let writeHigh = if baseHigh <> finalHigh then value else finalHigh
+            let writeAddr = (uint16 writeHigh <<< 8) ||| uint16 finalLow
+            bus.Write(writeAddr, value)
+            next.InstructionComplete <- true)
+    |]
+
+    // SHY - Store (Y & (high+1)) abs,X (0x9C) - 5 cycles
+    let shy_absx : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- next.TempAddress)
+        microOp (fun prev next bus ->
+            let baseHigh = byte (next.TempValue >>> 8)
+            let finalAddr = next.TempValue + uint16 next.X
+            let finalLow = byte (finalAddr &&& 0xFFus)
+            next.TempAddress <- finalAddr
+            let wrongAddr = (uint16 baseHigh <<< 8) ||| uint16 finalLow
+            bus.CpuRead(wrongAddr) |> ignore)
+        microOp (fun prev next bus ->
+            let baseHigh = byte (next.TempValue >>> 8)
+            let finalHigh = byte (next.TempAddress >>> 8)
+            let finalLow = byte (next.TempAddress &&& 0xFFus)
+            let value = next.Y &&& (baseHigh + 1uy)
+            // If page crossed, write addr high = value, else final_high
+            let writeHigh = if baseHigh <> finalHigh then value else finalHigh
+            let writeAddr = (uint16 writeHigh <<< 8) ||| uint16 finalLow
+            bus.Write(writeAddr, value)
+            next.InstructionComplete <- true)
+    |]
+
+    // TAS/SHS - SP = A & X, Store (A & X & (high+1)) abs,Y (0x9B) - 5 cycles
+    let tas_absy : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- next.TempAddress)
+        microOp (fun prev next bus ->
+            let baseHigh = byte (next.TempValue >>> 8)
+            let finalAddr = next.TempValue + uint16 next.Y
+            let finalLow = byte (finalAddr &&& 0xFFus)
+            next.TempAddress <- finalAddr
+            let wrongAddr = (uint16 baseHigh <<< 8) ||| uint16 finalLow
+            bus.CpuRead(wrongAddr) |> ignore)
+        microOp (fun prev next bus ->
+            next.SP <- next.A &&& next.X
+            let baseHigh = byte (next.TempValue >>> 8)
+            let finalHigh = byte (next.TempAddress >>> 8)
+            let finalLow = byte (next.TempAddress &&& 0xFFus)
+            let value = next.A &&& next.X &&& (baseHigh + 1uy)
+            // If page crossed, write addr high = value, else final_high
+            let writeHigh = if baseHigh <> finalHigh then value else finalHigh
+            let writeAddr = (uint16 writeHigh <<< 8) ||| uint16 finalLow
+            bus.Write(writeAddr, value)
+            next.InstructionComplete <- true)
+    |]
+
+    // Unofficial SBC duplicate (NMOS only)
+    let sbc_imm_unofficial : MicroOp[] = sbc_imm_nmos
 
     // NOP variants that skip bytes
     let nop_imm : MicroOp[] = [|
@@ -2713,29 +4252,58 @@ module Pipelines =
             markComplete.Invoke(prev, next, bus))
     |]
 
+    // NOP zp - 3 cycles (reads from zero page but discards result)
     let nop_zp : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         microOp (fun prev next bus ->
+            readZeroPage.Invoke(prev, next, bus)  // Read but discard
             markComplete.Invoke(prev, next, bus))
     |]
 
+    // NOP zp,X - 4 cycles (reads from zero page + X but discards result)
     let nop_zpx : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         addXZeroPage
         microOp (fun prev next bus ->
+            readZeroPage.Invoke(prev, next, bus)  // Read but discard
             markComplete.Invoke(prev, next, bus))
     |]
 
+    // NOP abs ($0C) - 4 cycles (NMOS illegal opcode)
+    // T0: Fetch opcode
+    // T1: Fetch low byte
+    // T2: Fetch high byte
+    // T3: Read from effective address (then discard)
     let nop_abs : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
         fetchAddressHigh
         microOp (fun prev next bus ->
+            // Read from effective address but discard
+            bus.CpuRead(next.TempAddress) |> ignore
             markComplete.Invoke(prev, next, bus))
     |]
 
+    // NOP abs ($5C, $DC, $FC) - 4 cycles (65C02)
+    // T0: Fetch opcode
+    // T1: Fetch low byte
+    // T2: Fetch high byte
+    // T3: Dummy read at high byte address (same as T2)
+    let nop_abs_65c02 : MicroOp[] = [|
+        fetchOpcode
+        fetchAddressLow
+        microOp (fun prev next bus ->
+            let highByteAddr = next.PC
+            fetchAddressHigh.Invoke(prev, next, bus)
+            next.TempValue <- highByteAddr)
+        microOp (fun prev next bus ->
+            bus.CpuRead(next.TempValue) |> ignore
+            markComplete.Invoke(prev, next, bus))
+    |]
+
+    // NOP abs,X - 4+ cycles (reads from absolute + X but discards result)
     let nop_absx : MicroOp[] = [|
         fetchOpcode
         fetchAddressLow
@@ -2743,13 +4311,14 @@ module Pipelines =
             fetchAddressHigh.Invoke(prev, next, bus)
             addXCheckPage.Invoke(prev, next, bus))
         microOp (fun prev next bus ->
+            readFromTempAddress.Invoke(prev, next, bus)  // Read but discard
             markComplete.Invoke(prev, next, bus))
     |]
 
     // STP - Stop the processor (0xDB) - 3 cycles (65C02)
     let stp : MicroOp[] = [|
         fetchOpcode
-        noOp
+        dummyReadPC
         microOp (fun prev next bus ->
             stpOp.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2758,7 +4327,7 @@ module Pipelines =
     // WAI - Wait for interrupt (0xCB) - 3 cycles (65C02)
     let wai : MicroOp[] = [|
         fetchOpcode
-        noOp
+        dummyReadPC
         microOp (fun prev next bus ->
             waiOp.Invoke(prev, next, bus)
             markComplete.Invoke(prev, next, bus))
@@ -2876,35 +4445,35 @@ module Pipelines =
         table.[0x5E] <- lsr_absx
         //5F
         table.[0x60] <- rts
-        table.[0x61] <- adc_izx
+        table.[0x61] <- adc_izx_nmos
         //62
         //63
         //64
-        table.[0x65] <- adc_zp
+        table.[0x65] <- adc_zp_nmos
         table.[0x66] <- ror_zp
         //67
         table.[0x68] <- pla_impl
-        table.[0x69] <- adc_imm
+        table.[0x69] <- adc_imm_nmos
         table.[0x6A] <- ror_a
         //6B
         table.[0x6C] <- jmp_ind_nmos
-        table.[0x6D] <- adc_abs
+        table.[0x6D] <- adc_abs_nmos
         table.[0x6E] <- ror_abs
         //6F
         table.[0x70] <- bvs
-        table.[0x71] <- adc_izy
+        table.[0x71] <- adc_izy_nmos
         //72
         //73
         //74
-        table.[0x75] <- adc_zpx
+        table.[0x75] <- adc_zpx_nmos
         table.[0x76] <- ror_zpx
         //77
         table.[0x78] <- sei_impl
-        table.[0x79] <- adc_absy
+        table.[0x79] <- adc_absy_nmos
         //7A
         //7B
         //7C
-        table.[0x7D] <- adc_absx
+        table.[0x7D] <- adc_absx_nmos
         table.[0x7E] <- ror_absx
         //7F
         //80
@@ -3004,41 +4573,41 @@ module Pipelines =
         table.[0xDE] <- dec_absx
         //DF
         table.[0xE0] <- cpx_imm
-        table.[0xE1] <- sbc_izx
+        table.[0xE1] <- sbc_izx_nmos
         //E2
         //E3
         table.[0xE4] <- cpx_zp
-        table.[0xE5] <- sbc_zp
+        table.[0xE5] <- sbc_zp_nmos
         table.[0xE6] <- inc_zp
         //E7
         table.[0xE8] <- inx_impl
-        table.[0xE9] <- sbc_imm
+        table.[0xE9] <- sbc_imm_nmos
         table.[0xEA] <- nop
         //EB
         table.[0xEC] <- cpx_abs
-        table.[0xED] <- sbc_abs
+        table.[0xED] <- sbc_abs_nmos
         table.[0xEE] <- inc_abs
         //EF
         table.[0xF0] <- beq
-        table.[0xF1] <- sbc_izy
+        table.[0xF1] <- sbc_izy_nmos
         //F2
         //F3
         //F4
-        table.[0xF5] <- sbc_zpx
+        table.[0xF5] <- sbc_zpx_nmos
         table.[0xF6] <- inc_zpx
         //F7
         table.[0xF8] <- sed_impl
-        table.[0xF9] <- sbc_absy
+        table.[0xF9] <- sbc_absy_nmos
         //FA
         //FB
         //FC
-        table.[0xFD] <- sbc_absx
+        table.[0xFD] <- sbc_absx_nmos
         table.[0xFE] <- inc_absx
         //FF
         table
 
-    /// NMOS 6502 without undocumented opcodes - treats undefined opcodes as NOPs
-    let pipelines6502NoUndoc : MicroOp[][] = 
+    /// NMOS 6502 without illegal opcodes - treats undefined opcodes as NOPs
+    let pipelines6502NoIllegal : MicroOp[][] = 
         let table = Array.copy pipelinesBase6502
 
         // NOP variants (skip bytes) - same behavior as NMOS6502 but without illegal instructions
@@ -3077,7 +4646,7 @@ module Pipelines =
 
         table
 
-    /// NMOS 6502 with undocumented opcodes
+    /// NMOS 6502 with illegal opcodes
     let pipelines6502 : MicroOp[][] = 
         let table = Array.copy pipelinesBase6502
 
@@ -3205,6 +4774,16 @@ module Pipelines =
         table.[0xDC] <- nop_absx
         table.[0xFC] <- nop_absx
 
+        // Unstable/unreliable illegal opcodes
+        table.[0x8B] <- ane_imm      // ANE/XAA
+        table.[0xAB] <- lxa_imm      // LXA/LAX imm
+        table.[0xBB] <- las_absy     // LAS
+        table.[0x93] <- sha_izy      // SHA/AHX (indirect),Y
+        table.[0x9F] <- sha_absy     // SHA/AHX abs,Y
+        table.[0x9E] <- shx_absy     // SHX
+        table.[0x9C] <- shy_absx     // SHY
+        table.[0x9B] <- tas_absy     // TAS/SHS
+
         table
 
     /// WDC 65C02 - adds 65C02-only instructions and fixes JMP indirect bug
@@ -3217,15 +4796,38 @@ module Pipelines =
         // Fix JMP indirect page boundary bug
         table.[0x6C] <- jmp_ind
 
+        // 65C02 uses CMOS ADC/SBC (N/Z flags from BCD result in decimal mode)
+        table.[0x61] <- adc_izx_cmos
+        table.[0x65] <- adc_zp_cmos
+        table.[0x69] <- adc_imm_cmos
+        table.[0x6D] <- adc_abs_cmos
+        table.[0x71] <- adc_izy_cmos
+        table.[0x75] <- adc_zpx_cmos
+        table.[0x79] <- adc_absy_cmos
+        table.[0x7D] <- adc_absx_cmos
+        table.[0xE1] <- sbc_izx_cmos
+        table.[0xE5] <- sbc_zp_cmos
+        table.[0xE9] <- sbc_imm_cmos
+        table.[0xED] <- sbc_abs_cmos
+        table.[0xF1] <- sbc_izy_cmos
+        table.[0xF5] <- sbc_zpx_cmos
+        table.[0xF9] <- sbc_absy_cmos
+        table.[0xFD] <- sbc_absx_cmos
+
         // 65C02-only addressing modes: (zp) indirect
         table.[0xB2] <- lda_izp
         table.[0x92] <- sta_izp
-        table.[0x72] <- adc_izp
-        table.[0xF2] <- sbc_izp
+        table.[0x72] <- adc_izp_cmos
+        table.[0xF2] <- sbc_izp_cmos
         table.[0x32] <- and_izp
         table.[0x12] <- ora_izp
         table.[0x52] <- eor_izp
         table.[0xD2] <- cmp_izp
+
+        // 65C02 STA modes use dummy read at high byte address (not wrong effective address)
+        table.[0x91] <- sta_izy_65c02
+        table.[0x99] <- sta_absy_65c02
+        table.[0x9D] <- sta_absx_65c02
 
         // 65C02-only BIT modes
         table.[0x89] <- bit_imm
@@ -3262,7 +4864,134 @@ module Pipelines =
         table.[0xDB] <- stp
         table.[0xCB] <- wai
 
-        // 65C02 undefined opcodes treated as NOPs
+        // 65C02 RMW instructions use dummy READ (not write) before final write
+        table.[0x06] <- asl_zp_65c02
+        table.[0x16] <- asl_zpx_65c02
+        table.[0x0E] <- asl_abs_65c02
+        table.[0x1E] <- asl_absx_65c02
+        table.[0x46] <- lsr_zp_65c02
+        table.[0x56] <- lsr_zpx_65c02
+        table.[0x4E] <- lsr_abs_65c02
+        table.[0x5E] <- lsr_absx_65c02
+        table.[0x26] <- rol_zp_65c02
+        table.[0x36] <- rol_zpx_65c02
+        table.[0x2E] <- rol_abs_65c02
+        table.[0x3E] <- rol_absx_65c02
+        table.[0x66] <- ror_zp_65c02
+        table.[0x76] <- ror_zpx_65c02
+        table.[0x6E] <- ror_abs_65c02
+        table.[0x7E] <- ror_absx_65c02
+        table.[0xE6] <- inc_zp_65c02
+        table.[0xF6] <- inc_zpx_65c02
+        table.[0xEE] <- inc_abs_65c02
+        table.[0xFE] <- inc_absx_65c02
+        table.[0xC6] <- dec_zp_65c02
+        table.[0xD6] <- dec_zpx_65c02
+        table.[0xCE] <- dec_abs_65c02
+        table.[0xDE] <- dec_absx_65c02
+
+        // 65C02 indexed instructions use different page crossing penalty address
+        // (zp),Y instructions
+        table.[0xB1] <- lda_izy_65c02
+        table.[0x11] <- ora_izy_65c02
+        table.[0x31] <- and_izy_65c02
+        table.[0x51] <- eor_izy_65c02
+        table.[0x71] <- adc_izy_65c02
+        table.[0xD1] <- cmp_izy_65c02
+        table.[0xF1] <- sbc_izy_65c02
+
+        // abs,Y instructions
+        table.[0xB9] <- lda_absy_65c02
+        table.[0x19] <- ora_absy_65c02
+        table.[0x39] <- and_absy_65c02
+        table.[0x59] <- eor_absy_65c02
+        table.[0x79] <- adc_absy_65c02
+        table.[0xD9] <- cmp_absy_65c02
+        table.[0xF9] <- sbc_absy_65c02
+        table.[0xBE] <- ldx_absy_65c02
+
+        // abs,X instructions
+        table.[0xBD] <- lda_absx_65c02
+        table.[0x1D] <- ora_absx_65c02
+        table.[0x3D] <- and_absx_65c02
+        table.[0x5D] <- eor_absx_65c02
+        table.[0x7D] <- adc_absx_65c02
+        table.[0xDD] <- cmp_absx_65c02
+        table.[0xFD] <- sbc_absx_65c02
+        table.[0xBC] <- ldy_absx_65c02
+        table.[0x3C] <- bit_absx_65c02
+
+        // 65C02 undefined opcodes treated as 1-byte 1-cycle NOPs
+        // $x3 pattern
+        table.[0x03] <- nop_1cycle
+        table.[0x13] <- nop_1cycle
+        table.[0x23] <- nop_1cycle
+        table.[0x33] <- nop_1cycle
+        table.[0x43] <- nop_1cycle
+        table.[0x53] <- nop_1cycle
+        table.[0x63] <- nop_1cycle
+        table.[0x73] <- nop_1cycle
+        table.[0x83] <- nop_1cycle
+        table.[0x93] <- nop_1cycle
+        table.[0xA3] <- nop_1cycle
+        table.[0xB3] <- nop_1cycle
+        table.[0xC3] <- nop_1cycle
+        table.[0xD3] <- nop_1cycle
+        table.[0xE3] <- nop_1cycle
+        table.[0xF3] <- nop_1cycle
+
+        // $x7 pattern - RMB/SMB instructions (WDC 65C02 includes these)
+        table.[0x07] <- rmb0
+        table.[0x17] <- rmb1
+        table.[0x27] <- rmb2
+        table.[0x37] <- rmb3
+        table.[0x47] <- rmb4
+        table.[0x57] <- rmb5
+        table.[0x67] <- rmb6
+        table.[0x77] <- rmb7
+        table.[0x87] <- smb0
+        table.[0x97] <- smb1
+        table.[0xA7] <- smb2
+        table.[0xB7] <- smb3
+        table.[0xC7] <- smb4
+        table.[0xD7] <- smb5
+        table.[0xE7] <- smb6
+        table.[0xF7] <- smb7
+
+        // $xB pattern - 1-byte 1-cycle NOPs
+        table.[0x0B] <- nop_1cycle
+        table.[0x1B] <- nop_1cycle
+        table.[0x2B] <- nop_1cycle
+        table.[0x3B] <- nop_1cycle
+        table.[0x4B] <- nop_1cycle
+        table.[0x5B] <- nop_1cycle
+        table.[0x6B] <- nop_1cycle
+        table.[0x7B] <- nop_1cycle
+        table.[0x8B] <- nop_1cycle
+        table.[0x9B] <- nop_1cycle
+        table.[0xAB] <- nop_1cycle
+        table.[0xBB] <- nop_1cycle
+        table.[0xEB] <- nop_1cycle
+        table.[0xFB] <- nop_1cycle
+
+        // $xF pattern - BBR/BBS instructions (WDC 65C02 includes these)
+        table.[0x0F] <- bbr0
+        table.[0x1F] <- bbr1
+        table.[0x2F] <- bbr2
+        table.[0x3F] <- bbr3
+        table.[0x4F] <- bbr4
+        table.[0x5F] <- bbr5
+        table.[0x6F] <- bbr6
+        table.[0x7F] <- bbr7
+        table.[0x8F] <- bbs0
+        table.[0x9F] <- bbs1
+        table.[0xAF] <- bbs2
+        table.[0xBF] <- bbs3
+        table.[0xCF] <- bbs4
+        table.[0xDF] <- bbs5
+        table.[0xEF] <- bbs6
+        table.[0xFF] <- bbs7
+
         // 2-byte NOPs (immediate-style: $x2 pattern)
         table.[0x02] <- nop_imm
         table.[0x22] <- nop_imm
@@ -3280,42 +5009,10 @@ module Pipelines =
         table.[0xD4] <- nop_zpx
         table.[0xF4] <- nop_zpx
 
-        // 3-byte NOPs (abs-style)
-        table.[0x5C] <- nop_abs
-        table.[0xDC] <- nop_abs
-        table.[0xFC] <- nop_abs
-
-        // 1-byte NOPs ($x3, $xB patterns)
-        table.[0x03] <- nop
-        table.[0x13] <- nop
-        table.[0x23] <- nop
-        table.[0x33] <- nop
-        table.[0x43] <- nop
-        table.[0x53] <- nop
-        table.[0x63] <- nop
-        table.[0x73] <- nop
-        table.[0x83] <- nop
-        table.[0x93] <- nop
-        table.[0xA3] <- nop
-        table.[0xB3] <- nop
-        table.[0xC3] <- nop
-        table.[0xD3] <- nop
-        table.[0xE3] <- nop
-        table.[0xF3] <- nop
-        table.[0x0B] <- nop
-        table.[0x1B] <- nop
-        table.[0x2B] <- nop
-        table.[0x3B] <- nop
-        table.[0x4B] <- nop
-        table.[0x5B] <- nop
-        table.[0x6B] <- nop
-        table.[0x7B] <- nop
-        table.[0x8B] <- nop
-        table.[0x9B] <- nop
-        table.[0xAB] <- nop
-        table.[0xBB] <- nop
-        table.[0xEB] <- nop
-        table.[0xFB] <- nop
+        // 3-byte 8-cycle NOPs (abs-style) - 65C02 specific
+        table.[0x5C] <- nop_abs_65c02
+        table.[0xDC] <- nop_abs_65c02
+        table.[0xFC] <- nop_abs_65c02
 
         table
 
@@ -3363,11 +5060,20 @@ module Pipelines =
         table.[0xEF] <- bbs6
         table.[0xFF] <- bbs7
 
+        // Rockwell does NOT have WAI ($CB) and STP ($DB) - they are NOPs
+        // $CB is a 1-byte 2-cycle NOP (standard implied timing)
+        table.[0xCB] <- nop
+        // $DB is a 2-byte 4-cycle NOP (ZP,X style timing)
+        table.[0xDB] <- nop_zpx
+
+        // Rockwell uses different decimal penalty address for ADC immediate
+        table.[0x69] <- adc_imm_rockwell
+
         table
 
     let getPipelines (variant: CpuVariant) : MicroOp[][] =
         match variant with
         | CpuVariant.NMOS6502 -> pipelines6502
-        | CpuVariant.NMOS6502_NO_UNDOC -> pipelines6502NoUndoc
-        | CpuVariant.CMOS65C02 -> pipelines65C02
+        | CpuVariant.NMOS6502_NO_ILLEGAL -> pipelines6502NoIllegal
+        | CpuVariant.WDC65C02 -> pipelines65C02
         | CpuVariant.ROCKWELL65C02 -> pipelines65C02rockwell

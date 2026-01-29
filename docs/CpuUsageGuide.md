@@ -7,6 +7,7 @@ This guide demonstrates how to use the `Cpu`, `CpuState`, and `CpuStateBuffer` c
 - [Overview](#overview)
 - [Quick Start](#quick-start)
 - [CPU Variants](#cpu-variants)
+- [Validation](#validation)
 - [Setting Up the Bus](#setting-up-the-bus)
 - [CPU Execution](#cpu-execution)
 - [Working with CPU State](#working-with-cpu-state)
@@ -80,7 +81,7 @@ var cpuBuffer = new CpuStateBuffer();
 Cpu.Reset(cpuBuffer, bus);
 
 // 5. Execute instructions
-int cycles = Cpu.Step(CpuVariant.CMOS65C02, cpuBuffer, bus);
+int cycles = Cpu.Step(CpuVariant.WDC65C02, cpuBuffer, bus);
 Console.WriteLine($"Instruction took {cycles} cycles");
 Console.WriteLine($"A = ${cpuBuffer.Current.A:X2}");
 ```
@@ -94,18 +95,18 @@ The emulator supports four CPU variants:
 ```csharp
 public enum CpuVariant
 {
-    NMOS6502,           // Original NMOS 6502 with undocumented opcodes
-    NMOS6502_NO_UNDOC,  // NMOS 6502, undefined opcodes treated as NOPs
-    CMOS65C02,          // WDC 65C02 with new instructions (STZ, PHX, etc.)
-    ROCKWELL65C02       // Rockwell 65C02 with bit manipulation (RMB, SMB, BBR, BBS)
+    NMOS6502,             // Original NMOS 6502 with illegal opcodes
+    NMOS6502_NO_ILLEGAL,  // NMOS 6502, undefined opcodes treated as NOPs
+    WDC65C02,            // WDC 65C02 with new instructions (STZ, PHX, etc.)
+    ROCKWELL65C02         // Rockwell 65C02 with bit manipulation (RMB, SMB, BBR, BBS)
 }
 ```
 
 ### Variant Differences
 
-| Feature | NMOS6502 | NMOS6502_NO_UNDOC | CMOS65C02 | ROCKWELL65C02 |
+| Feature | NMOS6502 | NMOS6502_NO_ILLEGAL | WDC65C02 | ROCKWELL65C02 |
 |---------|----------|-------------------|-----------|---------------|
-| Undocumented opcodes | ✅ | ❌ (NOPs) | ❌ | ❌ |
+| Illegal opcodes | ✅ | ❌ (NOPs) | ❌ | ❌ |
 | JMP ($xxFF) bug | ✅ | ✅ | ❌ (fixed) | ❌ (fixed) |
 | STZ, PHX, PHY, PLX, PLY | ❌ | ❌ | ✅ | ✅ |
 | INC A, DEC A | ❌ | ❌ | ✅ | ✅ |
@@ -117,6 +118,19 @@ public enum CpuVariant
 
 ---
 
+## Validation
+
+All CPU variants pass [Klaus Dormann's 6502/65C02 Functional Tests](https://github.com/Klaus2m5/6502_65C02_functional_tests), a standard test suite for 6502 emulator validation.
+
+| Test | Description | Variants |
+|------|-------------|----------|
+| **6502 Functional Test** | Comprehensive test of all documented 6502 instructions | All |
+| **6502 Decimal Test** | BCD arithmetic validation | All |
+| **65C02 Extended Opcodes Test (WDC)** | 65C02-specific instructions | WDC65C02 |
+| **65C02 Extended Opcodes Test (Rockwell)** | Includes RMB/SMB/BBR/BBS | ROCKWELL65C02 |
+
+---
+
 ## Setting Up the Bus
 
 Implement the `IPandowdyCpuBus` interface to connect the CPU to your memory system:
@@ -125,6 +139,7 @@ Implement the `IPandowdyCpuBus` interface to connect the CPU to your memory syst
 public interface IPandowdyCpuBus
 {
     byte CpuRead(ushort address);
+    byte Peek(ushort address);  // Read without bus cycle tracking
     void Write(ushort address, byte value);
 }
 ```
@@ -137,6 +152,10 @@ public class RamBus : IPandowdyCpuBus
     public byte[] Memory { get; } = new byte[65536];
 
     public byte CpuRead(ushort address) => Memory[address];
+
+    // For simple RAM, Peek is the same as CpuRead.
+    // For cycle-accurate emulation, Peek should not trigger I/O or cycle tracking.
+    public byte Peek(ushort address) => Memory[address];
 
     public void Write(ushort address, byte value) => Memory[address] = value;
 
@@ -220,7 +239,7 @@ public class SystemBus : IPandowdyCpuBus
 Executes one CPU clock cycle. Returns `true` when an instruction completes.
 
 ```csharp
-bool instructionComplete = Cpu.Clock(CpuVariant.CMOS65C02, cpuBuffer, bus);
+bool instructionComplete = Cpu.Clock(CpuVariant.WDC65C02, cpuBuffer, bus);
 
 if (instructionComplete)
 {
@@ -233,7 +252,7 @@ if (instructionComplete)
 Executes cycles until one instruction completes. Returns the cycle count.
 
 ```csharp
-int cycles = Cpu.Step(CpuVariant.CMOS65C02, cpuBuffer, bus);
+int cycles = Cpu.Step(CpuVariant.WDC65C02, cpuBuffer, bus);
 Console.WriteLine($"Instruction took {cycles} cycles");
 ```
 
@@ -245,7 +264,7 @@ Executes a specified number of cycles. Useful for running at a target frequency.
 // Run for approximately 1MHz (1,000,000 cycles per second)
 // At 60 FPS, that's ~16,667 cycles per frame
 int cyclesPerFrame = 16667;
-int actualCycles = Cpu.Run(CpuVariant.CMOS65C02, cpuBuffer, bus, cyclesPerFrame);
+int actualCycles = Cpu.Run(CpuVariant.WDC65C02, cpuBuffer, bus, cyclesPerFrame);
 ```
 
 ### Reset: `Cpu.Reset()`
@@ -666,7 +685,7 @@ public class EmulatorExample
         var cpuBuffer = new CpuStateBuffer();
 
         // Choose CPU variant
-        var variant = CpuVariant.CMOS65C02;
+        var variant = CpuVariant.WDC65C02;
 
         // Reset CPU
         Cpu.Reset(cpuBuffer, bus);

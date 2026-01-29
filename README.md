@@ -11,13 +11,35 @@ A cycle-accurate 6502/65C02 CPU emulator written in C# and F# for .NET 8.
 - **Interrupt Support** — IRQ, NMI, and Reset with proper priority handling
 - **Extensible Bus Interface** — Simple `IPandowdyCpuBus` interface for custom memory maps and I/O
 
+## Validation
+
+All CPU variants pass [Klaus Dormann's 6502/65C02 Functional Tests](https://github.com/Klaus2m5/6502_65C02_functional_tests), a standard test suite for 6502 emulator validation:
+
+| Test | NMOS6502 | NMOS6502_NO_ILLEGAL | WDC65C02 | ROCKWELL65C02 |
+|------|----------|---------------------|----------|---------------|
+| 6502 Functional Test | ✓ | ✓ | ✓ | ✓ |
+| 6502 Decimal Test | ✓ | ✓ | ✓ | ✓ |
+| 65C02 Extended Opcodes Test | — | — | ✓ | ✓ |
+
+### Cycle-Accurate Validation
+
+All CPU variants are **cycle-accurate** and pass the [Tom Harte SingleStepTests](https://github.com/SingleStepTests/65x02), which validate not only final register state but also cycle-by-cycle bus activity for every opcode:
+
+| Variant | Pass Rate |
+|---------|-----------|
+| NMOS6502 | 100% (256 opcodes × 10,000 tests each) |
+| WDC65C02 | 100% (256 opcodes × 10,000 tests each) |
+| ROCKWELL65C02 | 100% (256 opcodes × 10,000 tests each) |
+
+See [Pandowdy.Cpu.Harte-SST-Tests/README.md](Pandowdy.Cpu.Harte-SST-Tests/README.md) for instructions on running these tests.
+
 ## Supported CPU Variants
 
 | Variant | Description |
 |---------|-------------|
-| `NMOS6502` | Original NMOS 6502 with undocumented opcodes |
-| `NMOS6502_NO_UNDOC` | NMOS 6502 with undefined opcodes as NOPs |
-| `CMOS65C02` | WDC 65C02 with new instructions (STZ, PHX, BRA, etc.) |
+| `NMOS6502` | Original NMOS 6502 with illegal opcodes |
+| `NMOS6502_NO_ILLEGAL` | NMOS 6502 with undefined opcodes as NOPs |
+| `WDC65C02` | WDC 65C02 with new instructions (STZ, PHX, BRA, etc.) |
 | `ROCKWELL65C02` | Rockwell 65C02 with bit manipulation (RMB, SMB, BBR, BBS) |
 
 ## Quick Start
@@ -36,7 +58,7 @@ bus.SetResetVector(0x0400);
 
 // Reset and execute
 Cpu.Reset(cpuBuffer, bus);
-int cycles = Cpu.Step(CpuVariant.CMOS65C02, cpuBuffer, bus);
+int cycles = Cpu.Step(CpuVariant.WDC65C02, cpuBuffer, bus);
 
 Console.WriteLine($"A = ${cpuBuffer.Current.A:X2}"); // A = $42
 ```

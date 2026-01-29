@@ -18,6 +18,17 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     #region JMP Indirect Page Boundary Bug (NMOS specific)
 
     [Fact]
+    public void JMP_Indirect_Takes5Cycles()
+    {
+        // NMOS 6502 takes 5 cycles for indirect jump (unlike 65C02 which takes 6)
+        LoadAndReset(0x6C, 0x34, 0x12);
+        SetMemory(0x1234, 0x00);
+        SetMemory(0x1235, 0x80);
+        int cycles = StepInstruction();
+        Assert.Equal(5, cycles);
+    }
+
+    [Fact]
     public void JMP_Indirect_HasPageBoundaryBug()
     {
         // On NMOS, JMP ($12FF) reads high byte from $1200 instead of $1300

@@ -28,6 +28,15 @@ public class RamBus : IPandowdyCpuBus
     }
 
     /// <summary>
+    /// Peeks at a byte from the specified address without side effects.
+    /// For simple RAM, this is the same as CpuRead.
+    /// </summary>
+    public byte Peek(ushort address)
+    {
+        return _memory[address];
+    }
+
+    /// <summary>
     /// Writes a byte to the specified address.
     /// </summary>
     public void Write(ushort address, byte value)

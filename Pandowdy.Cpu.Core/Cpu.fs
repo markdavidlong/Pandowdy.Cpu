@@ -22,7 +22,9 @@ module Cpu =
             let prev = buffer.Prev
 
             if current.Pipeline.Length = 0 || current.PipelineIndex >= current.Pipeline.Length then
-                let opcode = bus.CpuRead(current.PC)
+                // Use Peek to determine the pipeline without recording a bus cycle.
+                // The actual opcode fetch (with cycle tracking) happens in fetchOpcode.
+                let opcode = bus.Peek(current.PC)
                 let pipelines = getPipelines variant
                 current.Pipeline <- pipelines.[int opcode]
                 current.PipelineIndex <- 0
@@ -41,7 +43,8 @@ module Cpu =
     let Step (variant: CpuVariant) (buffer: CpuStateBuffer) (bus: IPandowdyCpuBus) : int =
             let mutable cycles = 0
             let mutable complete = false
-            while not complete do
+            let maxCycles = 100 // Safety limit - no 6502 instruction should take this long
+            while not complete && cycles < maxCycles do
                 complete <- Clock variant buffer bus
                 cycles <- cycles + 1
             cycles
