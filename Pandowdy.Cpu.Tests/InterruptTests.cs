@@ -424,7 +424,7 @@ public class InterruptTests : CpuTestBase
     public void STP_SetsStoppedStatus()
     {
         // STP (0xDB) - 65C02 only
-        LoadAndReset(0xDB);
+        LoadAndReset([0xDB]);
 
         StepInstruction(CpuVariant.WDC65C02);
 
@@ -435,7 +435,7 @@ public class InterruptTests : CpuTestBase
     public void WAI_SetsWaitingStatus()
     {
         // WAI (0xCB) - 65C02 only
-        LoadAndReset(0xCB);
+        LoadAndReset([0xCB]);
 
         StepInstruction(CpuVariant.WDC65C02);
 
@@ -445,7 +445,7 @@ public class InterruptTests : CpuTestBase
     [Fact]
     public void STP_Takes3Cycles()
     {
-        LoadAndReset(0xDB);
+        LoadAndReset([0xDB]);
 
         int cycles = StepInstruction(CpuVariant.WDC65C02);
 
@@ -455,7 +455,7 @@ public class InterruptTests : CpuTestBase
     [Fact]
     public void WAI_Takes3Cycles()
     {
-        LoadAndReset(0xCB);
+        LoadAndReset([0xCB]);
 
         int cycles = StepInstruction(CpuVariant.WDC65C02);
 
@@ -469,7 +469,7 @@ public class InterruptTests : CpuTestBase
     [Fact]
     public void BRK_PushesBreakFlagSet()
     {
-        LoadAndReset(0x00, 0x00);
+        LoadAndReset([0x00, 0x00]);
         CpuBuffer.Current.SP = 0xFF;
         CpuBuffer.Prev.SP = 0xFF;
         CpuBuffer.Current.P = 0x00;

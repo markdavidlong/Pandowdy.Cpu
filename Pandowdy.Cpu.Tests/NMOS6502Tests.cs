@@ -20,7 +20,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void JMP_Indirect_Takes5Cycles()
     {
         // NMOS 6502 takes 5 cycles for indirect jump (unlike 65C02 which takes 6)
-        LoadAndReset(0x6C, 0x34, 0x12);
+        LoadAndReset([0x6C, 0x34, 0x12]);
         SetMemory(0x1234, 0x00);
         SetMemory(0x1235, 0x80);
         int cycles = StepInstruction();
@@ -31,7 +31,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void JMP_Indirect_HasPageBoundaryBug()
     {
         // On NMOS, JMP ($12FF) reads high byte from $1200 instead of $1300
-        LoadAndReset(0x6C, 0xFF, 0x12);
+        LoadAndReset([0x6C, 0xFF, 0x12]);
         SetMemory(0x12FF, 0x00);
         SetMemory(0x1200, 0x90);
         SetMemory(0x1300, 0x80);
@@ -49,7 +49,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void LAX_ZeroPage_LoadsAAndX()
     {
         // LAX $10 (0xA7)
-        LoadAndReset(0xA7, 0x10);
+        LoadAndReset([0xA7, 0x10]);
         SetZeroPage(0x10, 0x42);
 
         int cycles = StepInstruction();
@@ -63,7 +63,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void LAX_ZeroPageY_LoadsAAndX()
     {
         // LAX $10,Y (0xB7)
-        LoadAndReset(0xB7, 0x10);
+        LoadAndReset([0xB7, 0x10]);
         CpuBuffer.Current.Y = 0x05;
         CpuBuffer.Prev.Y = 0x05;
         SetZeroPage(0x15, 0x42);
@@ -79,7 +79,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void LAX_Absolute_LoadsAAndX()
     {
         // LAX $1234 (0xAF)
-        LoadAndReset(0xAF, 0x34, 0x12);
+        LoadAndReset([0xAF, 0x34, 0x12]);
         SetMemory(0x1234, 0x42);
 
         int cycles = StepInstruction();
@@ -93,7 +93,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void SAX_ZeroPage_StoresAAndX()
     {
         // SAX $10 (0x87) - Store A AND X
-        LoadAndReset(0x87, 0x10);
+        LoadAndReset([0x87, 0x10]);
         CpuBuffer.Current.A = 0xF0;
         CpuBuffer.Prev.A = 0xF0;
         CpuBuffer.Current.X = 0x0F;
@@ -109,7 +109,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void SAX_Absolute_StoresAAndX()
     {
         // SAX $1234 (0x8F)
-        LoadAndReset(0x8F, 0x34, 0x12);
+        LoadAndReset([0x8F, 0x34, 0x12]);
         CpuBuffer.Current.A = 0xFF;
         CpuBuffer.Prev.A = 0xFF;
         CpuBuffer.Current.X = 0x0F;
@@ -125,7 +125,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void DCP_ZeroPage_DecrementsAndCompares()
     {
         // DCP $10 (0xC7)
-        LoadAndReset(0xC7, 0x10);
+        LoadAndReset([0xC7, 0x10]);
         CpuBuffer.Current.A = 0x42;
         CpuBuffer.Prev.A = 0x42;
         SetZeroPage(0x10, 0x43);
@@ -142,7 +142,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void ISC_ZeroPage_IncrementsAndSubtracts()
     {
         // ISC/ISB $10 (0xE7)
-        LoadAndReset(0xE7, 0x10);
+        LoadAndReset([0xE7, 0x10]);
         CpuBuffer.Current.A = 0x50;
         CpuBuffer.Prev.A = 0x50;
         CpuBuffer.Current.CarryFlag = true;
@@ -160,7 +160,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void SLO_ZeroPage_ShiftsLeftAndOrs()
     {
         // SLO $10 (0x07)
-        LoadAndReset(0x07, 0x10);
+        LoadAndReset([0x07, 0x10]);
         CpuBuffer.Current.A = 0x00;
         CpuBuffer.Prev.A = 0x00;
         SetZeroPage(0x10, 0x40);
@@ -176,7 +176,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void RLA_ZeroPage_RotatesLeftAndAnds()
     {
         // RLA $10 (0x27)
-        LoadAndReset(0x27, 0x10);
+        LoadAndReset([0x27, 0x10]);
         CpuBuffer.Current.A = 0xFF;
         CpuBuffer.Prev.A = 0xFF;
         CpuBuffer.Current.CarryFlag = false;
@@ -194,7 +194,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void SRE_ZeroPage_ShiftsRightAndEors()
     {
         // SRE $10 (0x47)
-        LoadAndReset(0x47, 0x10);
+        LoadAndReset([0x47, 0x10]);
         CpuBuffer.Current.A = 0x00;
         CpuBuffer.Prev.A = 0x00;
         SetZeroPage(0x10, 0x02);
@@ -210,7 +210,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void RRA_ZeroPage_RotatesRightAndAdds()
     {
         // RRA $10 (0x67)
-        LoadAndReset(0x67, 0x10);
+        LoadAndReset([0x67, 0x10]);
         CpuBuffer.Current.A = 0x00;
         CpuBuffer.Prev.A = 0x00;
         CpuBuffer.Current.CarryFlag = true;
@@ -227,7 +227,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void ANC_Immediate_AndsAndSetsCarryFromN()
     {
         // ANC #$80 (0x0B)
-        LoadAndReset(0x0B, 0x80);
+        LoadAndReset([0x0B, 0x80]);
         CpuBuffer.Current.A = 0xFF;
         CpuBuffer.Prev.A = 0xFF;
 
@@ -243,7 +243,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void ALR_Immediate_AndsAndShiftsRight()
     {
         // ALR #$FF (0x4B)
-        LoadAndReset(0x4B, 0xFF);
+        LoadAndReset([0x4B, 0xFF]);
         CpuBuffer.Current.A = 0x02;
         CpuBuffer.Prev.A = 0x02;
 
@@ -258,7 +258,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void ARR_Immediate_AndsAndRotatesRight()
     {
         // ARR #$FF (0x6B)
-        LoadAndReset(0x6B, 0xFF);
+        LoadAndReset([0x6B, 0xFF]);
         CpuBuffer.Current.A = 0x02;
         CpuBuffer.Prev.A = 0x02;
         CpuBuffer.Current.CarryFlag = true;
@@ -274,7 +274,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void AXS_Immediate_SubtractsFromAAndX()
     {
         // AXS #$10 (0xCB)
-        LoadAndReset(0xCB, 0x10);
+        LoadAndReset([0xCB, 0x10]);
         CpuBuffer.Current.A = 0xFF;
         CpuBuffer.Prev.A = 0xFF;
         CpuBuffer.Current.X = 0x20;
@@ -378,7 +378,7 @@ public class NMOS6502Tests : CoreInstructionTests
     [Fact]
     public void ISC_Absolute_Takes6Cycles()
     {
-        LoadAndReset(0xEF, 0x34, 0x12);
+        LoadAndReset([0xEF, 0x34, 0x12]);
         CpuBuffer.Current.A = 0x50;
         CpuBuffer.Prev.A = 0x50;
         CpuBuffer.Current.CarryFlag = true;
@@ -393,7 +393,7 @@ public class NMOS6502Tests : CoreInstructionTests
     [Fact]
     public void SLO_Absolute_Takes6Cycles()
     {
-        LoadAndReset(0x0F, 0x34, 0x12);
+        LoadAndReset([0x0F, 0x34, 0x12]);
         SetMemory(0x1234, 0x40);
 
         int cycles = StepInstruction();
@@ -404,7 +404,7 @@ public class NMOS6502Tests : CoreInstructionTests
     [Fact]
     public void RLA_Absolute_Takes6Cycles()
     {
-        LoadAndReset(0x2F, 0x34, 0x12);
+        LoadAndReset([0x2F, 0x34, 0x12]);
         CpuBuffer.Current.A = 0xFF;
         CpuBuffer.Prev.A = 0xFF;
         SetMemory(0x1234, 0x40);
@@ -417,7 +417,7 @@ public class NMOS6502Tests : CoreInstructionTests
     [Fact]
     public void SRE_Absolute_Takes6Cycles()
     {
-        LoadAndReset(0x4F, 0x34, 0x12);
+        LoadAndReset([0x4F, 0x34, 0x12]);
         SetMemory(0x1234, 0x02);
 
         int cycles = StepInstruction();
@@ -428,7 +428,7 @@ public class NMOS6502Tests : CoreInstructionTests
     [Fact]
     public void RRA_Absolute_Takes6Cycles()
     {
-        LoadAndReset(0x6F, 0x34, 0x12);
+        LoadAndReset([0x6F, 0x34, 0x12]);
         CpuBuffer.Current.CarryFlag = true;
         CpuBuffer.Prev.CarryFlag = true;
         SetMemory(0x1234, 0x02);
@@ -446,7 +446,7 @@ public class NMOS6502Tests : CoreInstructionTests
     public void NOP_0x1A_IsNOP_OnNMOS()
     {
         // 0x1A is NOP on NMOS
-        LoadAndReset(0x1A);
+        LoadAndReset([0x1A]);
         CpuBuffer.Current.A = 0x42;
         CpuBuffer.Prev.A = 0x42;
 

@@ -21,7 +21,7 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void JMP_Indirect_Takes5Cycles()
     {
         // NMOS 6502 takes 5 cycles for indirect jump (unlike 65C02 which takes 6)
-        LoadAndReset(0x6C, 0x34, 0x12);
+        LoadAndReset([0x6C, 0x34, 0x12]);
         SetMemory(0x1234, 0x00);
         SetMemory(0x1235, 0x80);
         int cycles = StepInstruction();
@@ -32,7 +32,7 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void JMP_Indirect_HasPageBoundaryBug()
     {
         // On NMOS, JMP ($12FF) reads high byte from $1200 instead of $1300
-        LoadAndReset(0x6C, 0xFF, 0x12);
+        LoadAndReset([0x6C, 0xFF, 0x12]);
         SetMemory(0x12FF, 0x00);
         SetMemory(0x1200, 0x90);
         SetMemory(0x1300, 0x80);
@@ -127,7 +127,7 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void Opcode0x80_IsNOP_Immediate()
     {
         // 0x80 skips one byte (NOP immediate)
-        LoadAndReset(0x80, 0x10);
+        LoadAndReset([0x80, 0x10]);
 
         int cycles = StepInstruction();
 
@@ -139,7 +139,7 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void Opcode0x04_IsNOP_ZeroPage()
     {
         // 0x04 is 3-cycle NOP (reads zero page)
-        LoadAndReset(0x04, 0x10);
+        LoadAndReset([0x04, 0x10]);
 
         int cycles = StepInstruction();
 
@@ -150,7 +150,7 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void Opcode0x0C_IsNOP_Absolute()
     {
         // 0x0C is 4-cycle NOP (reads absolute)
-        LoadAndReset(0x0C, 0x34, 0x12);
+        LoadAndReset([0x0C, 0x34, 0x12]);
 
         int cycles = StepInstruction();
 
@@ -165,7 +165,7 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void Opcode0xA7_DoesNotExecuteLAX()
     {
         // On NO_ILLEGAL variant, 0xA7 should NOT load both A and X
-        LoadAndReset(0xA7, 0x10);
+        LoadAndReset([0xA7, 0x10]);
         CpuBuffer.Current.A = 0x00;
         CpuBuffer.Prev.A = 0x00;
         CpuBuffer.Current.X = 0x00;
@@ -183,7 +183,7 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
         public void Opcode0x87_DoesNotExecuteSAX()
         {
             // On NO_ILLEGAL variant, 0x87 should NOT store A AND X
-            LoadAndReset(0x87, 0x10);
+            LoadAndReset([0x87, 0x10]);
             CpuBuffer.Current.A = 0xF0;
             CpuBuffer.Prev.A = 0xF0;
             CpuBuffer.Current.X = 0x0F;

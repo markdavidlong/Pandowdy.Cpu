@@ -17,7 +17,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0xA9, 0x42);
+        LoadAndReset([0xA9, 0x42]);
         int cycles = StepInstruction();
         Assert.Equal(2, cycles);
         Assert.Equal(0x42, CurrentState.A);
@@ -26,7 +26,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_ZeroPage_Takes3Cycles()
     {
-        LoadAndReset(0xA5, 0x10);
+        LoadAndReset([0xA5, 0x10]);
         SetZeroPage(0x10, 0x42);
         int cycles = StepInstruction();
         Assert.Equal(3, cycles);
@@ -36,7 +36,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_ZeroPageX_Takes4Cycles()
     {
-        LoadAndReset(0xB5, 0x10);
+        LoadAndReset([0xB5, 0x10]);
         CpuBuffer.Current.X = 5;
         CpuBuffer.Prev.X = 5;
         SetZeroPage(0x15, 0x42);
@@ -48,7 +48,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_Absolute_Takes4Cycles()
     {
-        LoadAndReset(0xAD, 0x34, 0x12);
+        LoadAndReset([0xAD, 0x34, 0x12]);
         SetMemory(0x1234, 0x42);
         int cycles = StepInstruction();
         Assert.Equal(4, cycles);
@@ -58,7 +58,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_AbsoluteX_Takes4Cycles_NoPageCross()
     {
-        LoadAndReset(0xBD, 0x00, 0x12);
+        LoadAndReset([0xBD, 0x00, 0x12]);
         CpuBuffer.Current.X = 0x10;
         CpuBuffer.Prev.X = 0x10;
         SetMemory(0x1210, 0x42);
@@ -70,7 +70,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_AbsoluteX_Takes5Cycles_WithPageCross()
     {
-        LoadAndReset(0xBD, 0xF0, 0x12);
+        LoadAndReset([0xBD, 0xF0, 0x12]);
         CpuBuffer.Current.X = 0x20;
         CpuBuffer.Prev.X = 0x20;
         SetMemory(0x1310, 0x42);
@@ -82,7 +82,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_AbsoluteY_Takes4Cycles_NoPageCross()
     {
-        LoadAndReset(0xB9, 0x00, 0x12);
+        LoadAndReset([0xB9, 0x00, 0x12]);
         CpuBuffer.Current.Y = 0x10;
         CpuBuffer.Prev.Y = 0x10;
         SetMemory(0x1210, 0x42);
@@ -93,7 +93,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_AbsoluteY_Takes5Cycles_WithPageCross()
     {
-        LoadAndReset(0xB9, 0xF0, 0x12);
+        LoadAndReset([0xB9, 0xF0, 0x12]);
         CpuBuffer.Current.Y = 0x20;
         CpuBuffer.Prev.Y = 0x20;
         SetMemory(0x1310, 0x42);
@@ -104,7 +104,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_IndexedIndirectX_Takes6Cycles()
     {
-        LoadAndReset(0xA1, 0x10);
+        LoadAndReset([0xA1, 0x10]);
         CpuBuffer.Current.X = 0x05;
         CpuBuffer.Prev.X = 0x05;
         SetZeroPagePointer(0x15, 0x1234);
@@ -117,7 +117,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_IndirectIndexedY_Takes5Cycles_NoPageCross()
     {
-        LoadAndReset(0xB1, 0x10);
+        LoadAndReset([0xB1, 0x10]);
         CpuBuffer.Current.Y = 0x10;
         CpuBuffer.Prev.Y = 0x10;
         SetZeroPagePointer(0x10, 0x1200);
@@ -129,7 +129,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_IndirectIndexedY_Takes6Cycles_WithPageCross()
     {
-        LoadAndReset(0xB1, 0x10);
+        LoadAndReset([0xB1, 0x10]);
         CpuBuffer.Current.Y = 0x20;
         CpuBuffer.Prev.Y = 0x20;
         SetZeroPagePointer(0x10, 0x12F0);
@@ -141,7 +141,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_SetsZeroFlag()
     {
-        LoadAndReset(0xA9, 0x00);
+        LoadAndReset([0xA9, 0x00]);
         StepInstruction();
         Assert.True(CurrentState.ZeroFlag);
         Assert.False(CurrentState.NegativeFlag);
@@ -150,7 +150,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDA_SetsNegativeFlag()
     {
-        LoadAndReset(0xA9, 0x80);
+        LoadAndReset([0xA9, 0x80]);
         StepInstruction();
         Assert.False(CurrentState.ZeroFlag);
         Assert.True(CurrentState.NegativeFlag);
@@ -163,7 +163,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDX_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0xA2, 0x42);
+        LoadAndReset([0xA2, 0x42]);
         int cycles = StepInstruction();
         Assert.Equal(2, cycles);
         Assert.Equal(0x42, CurrentState.X);
@@ -172,7 +172,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDX_ZeroPage_Takes3Cycles()
     {
-        LoadAndReset(0xA6, 0x10);
+        LoadAndReset([0xA6, 0x10]);
         SetZeroPage(0x10, 0x42);
         int cycles = StepInstruction();
         Assert.Equal(3, cycles);
@@ -182,7 +182,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDX_Absolute_Takes4Cycles()
     {
-        LoadAndReset(0xAE, 0x34, 0x12);
+        LoadAndReset([0xAE, 0x34, 0x12]);
         SetMemory(0x1234, 0x42);
         int cycles = StepInstruction();
         Assert.Equal(4, cycles);
@@ -195,7 +195,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDY_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0xA0, 0x42);
+        LoadAndReset([0xA0, 0x42]);
         int cycles = StepInstruction();
         Assert.Equal(2, cycles);
         Assert.Equal(0x42, CurrentState.Y);
@@ -204,7 +204,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDY_ZeroPage_Takes3Cycles()
     {
-        LoadAndReset(0xA4, 0x10);
+        LoadAndReset([0xA4, 0x10]);
         SetZeroPage(0x10, 0x42);
         int cycles = StepInstruction();
         Assert.Equal(3, cycles);
@@ -213,7 +213,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void LDY_Absolute_Takes4Cycles()
     {
-        LoadAndReset(0xAC, 0x34, 0x12);
+        LoadAndReset([0xAC, 0x34, 0x12]);
         SetMemory(0x1234, 0x42);
         int cycles = StepInstruction();
         Assert.Equal(4, cycles);
@@ -226,7 +226,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void STA_ZeroPage_Takes3Cycles()
     {
-        LoadAndReset(0x85, 0x10);
+        LoadAndReset([0x85, 0x10]);
         CpuBuffer.Current.A = 0x42;
         CpuBuffer.Prev.A = 0x42;
         int cycles = StepInstruction();
@@ -237,7 +237,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void STA_Absolute_Takes4Cycles()
     {
-        LoadAndReset(0x8D, 0x34, 0x12);
+        LoadAndReset([0x8D, 0x34, 0x12]);
         CpuBuffer.Current.A = 0x42;
         CpuBuffer.Prev.A = 0x42;
         int cycles = StepInstruction();
@@ -248,7 +248,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void STA_AbsoluteX_Takes5Cycles_AlwaysNoPenalty()
     {
-        LoadAndReset(0x9D, 0xF0, 0x12);
+        LoadAndReset([0x9D, 0xF0, 0x12]);
         CpuBuffer.Current.A = 0x42;
         CpuBuffer.Prev.A = 0x42;
         CpuBuffer.Current.X = 0x20;
@@ -260,7 +260,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void STA_AbsoluteY_Takes5Cycles()
     {
-        LoadAndReset(0x99, 0x00, 0x12);
+        LoadAndReset([0x99, 0x00, 0x12]);
         CpuBuffer.Current.A = 0x42;
         CpuBuffer.Prev.A = 0x42;
         CpuBuffer.Current.Y = 0x10;
@@ -272,7 +272,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void STA_IndexedIndirectX_Takes6Cycles()
     {
-        LoadAndReset(0x81, 0x10);
+        LoadAndReset([0x81, 0x10]);
         CpuBuffer.Current.A = 0x42;
         CpuBuffer.Prev.A = 0x42;
         CpuBuffer.Current.X = 0x05;
@@ -285,7 +285,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void STA_IndirectIndexedY_Takes6Cycles()
     {
-        LoadAndReset(0x91, 0x10);
+        LoadAndReset([0x91, 0x10]);
         CpuBuffer.Current.A = 0x42;
         CpuBuffer.Prev.A = 0x42;
         CpuBuffer.Current.Y = 0x20;
@@ -302,7 +302,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void STX_ZeroPage_Takes3Cycles()
     {
-        LoadAndReset(0x86, 0x10);
+        LoadAndReset([0x86, 0x10]);
         CpuBuffer.Current.X = 0x42;
         CpuBuffer.Prev.X = 0x42;
         int cycles = StepInstruction();
@@ -312,7 +312,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void STY_ZeroPage_Takes3Cycles()
     {
-        LoadAndReset(0x84, 0x10);
+        LoadAndReset([0x84, 0x10]);
         CpuBuffer.Current.Y = 0x42;
         CpuBuffer.Prev.Y = 0x42;
         int cycles = StepInstruction();
@@ -326,7 +326,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void ADC_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0x69, 0x10);
+        LoadAndReset([0x69, 0x10]);
         CpuBuffer.Current.A = 0x05;
         CpuBuffer.Prev.A = 0x05;
         int cycles = StepInstruction();
@@ -337,7 +337,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void ADC_ZeroPage_Takes3Cycles()
     {
-        LoadAndReset(0x65, 0x10);
+        LoadAndReset([0x65, 0x10]);
         CpuBuffer.Current.A = 0x05;
         CpuBuffer.Prev.A = 0x05;
         SetZeroPage(0x10, 0x10);
@@ -348,7 +348,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void ADC_Absolute_Takes4Cycles()
     {
-        LoadAndReset(0x6D, 0x34, 0x12);
+        LoadAndReset([0x6D, 0x34, 0x12]);
         CpuBuffer.Current.A = 0x05;
         CpuBuffer.Prev.A = 0x05;
         SetMemory(0x1234, 0x10);
@@ -359,7 +359,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void ADC_SetsCarryOnOverflow()
     {
-        LoadAndReset(0x69, 0x02);
+        LoadAndReset([0x69, 0x02]);
         CpuBuffer.Current.A = 0xFF;
         CpuBuffer.Prev.A = 0xFF;
         StepInstruction();
@@ -370,7 +370,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void ADC_SetsOverflowOnSignedOverflow()
     {
-        LoadAndReset(0x69, 0x01);
+        LoadAndReset([0x69, 0x01]);
         CpuBuffer.Current.A = 0x7F;
         CpuBuffer.Prev.A = 0x7F;
         StepInstruction();
@@ -396,7 +396,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void SBC_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0xE9, 0x05);
+        LoadAndReset([0xE9, 0x05]);
         CpuBuffer.Current.A = 0x10;
         CpuBuffer.Prev.A = 0x10;
         CpuBuffer.Current.CarryFlag = true;
@@ -409,7 +409,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void SBC_ZeroPage_Takes3Cycles()
     {
-        LoadAndReset(0xE5, 0x10);
+        LoadAndReset([0xE5, 0x10]);
         CpuBuffer.Current.A = 0x15;
         CpuBuffer.Prev.A = 0x15;
         CpuBuffer.Current.CarryFlag = true;
@@ -422,7 +422,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void SBC_ClearsCarryOnBorrow()
     {
-        LoadAndReset(0xE9, 0x10);
+        LoadAndReset([0xE9, 0x10]);
         CpuBuffer.Current.A = 0x05;
         CpuBuffer.Prev.A = 0x05;
         CpuBuffer.Current.CarryFlag = true;
@@ -438,7 +438,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void AND_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0x29, 0x0F);
+        LoadAndReset([0x29, 0x0F]);
         CpuBuffer.Current.A = 0xFF;
         CpuBuffer.Prev.A = 0xFF;
         int cycles = StepInstruction();
@@ -449,7 +449,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void ORA_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0x09, 0xF0);
+        LoadAndReset([0x09, 0xF0]);
         CpuBuffer.Current.A = 0x0F;
         CpuBuffer.Prev.A = 0x0F;
         int cycles = StepInstruction();
@@ -460,7 +460,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void EOR_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0x49, 0xFF);
+        LoadAndReset([0x49, 0xFF]);
         CpuBuffer.Current.A = 0xAA;
         CpuBuffer.Prev.A = 0xAA;
         int cycles = StepInstruction();
@@ -475,7 +475,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void CMP_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0xC9, 0x10);
+        LoadAndReset([0xC9, 0x10]);
         CpuBuffer.Current.A = 0x20;
         CpuBuffer.Prev.A = 0x20;
         int cycles = StepInstruction();
@@ -486,7 +486,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void CMP_SetsZeroWhenEqual()
     {
-        LoadAndReset(0xC9, 0x20);
+        LoadAndReset([0xC9, 0x20]);
         CpuBuffer.Current.A = 0x20;
         CpuBuffer.Prev.A = 0x20;
         StepInstruction();
@@ -497,7 +497,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void CPX_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0xE0, 0x10);
+        LoadAndReset([0xE0, 0x10]);
         CpuBuffer.Current.X = 0x20;
         CpuBuffer.Prev.X = 0x20;
         int cycles = StepInstruction();
@@ -507,7 +507,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void CPY_Immediate_Takes2Cycles()
     {
-        LoadAndReset(0xC0, 0x10);
+        LoadAndReset([0xC0, 0x10]);
         CpuBuffer.Current.Y = 0x20;
         CpuBuffer.Prev.Y = 0x20;
         int cycles = StepInstruction();
@@ -521,7 +521,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BIT_ZeroPage_Takes3Cycles()
     {
-        LoadAndReset(0x24, 0x10);
+        LoadAndReset([0x24, 0x10]);
         CpuBuffer.Current.A = 0xFF;
         CpuBuffer.Prev.A = 0xFF;
         SetZeroPage(0x10, 0xC0);
@@ -532,7 +532,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BIT_SetsNVFromMemory()
     {
-        LoadAndReset(0x24, 0x10);
+        LoadAndReset([0x24, 0x10]);
         CpuBuffer.Current.A = 0x00;
         CpuBuffer.Prev.A = 0x00;
         SetZeroPage(0x10, 0xC0);
@@ -549,7 +549,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BEQ_NotTaken_Takes2Cycles()
     {
-        LoadAndReset(0xF0, 0x10);
+        LoadAndReset([0xF0, 0x10]);
         CpuBuffer.Current.ZeroFlag = false;
         CpuBuffer.Prev.ZeroFlag = false;
         int cycles = StepInstruction();
@@ -559,7 +559,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BEQ_Taken_NoPageCross_Takes3Cycles()
     {
-        LoadAndReset(0xF0, 0x10);
+        LoadAndReset([0xF0, 0x10]);
         CpuBuffer.Current.ZeroFlag = true;
         CpuBuffer.Prev.ZeroFlag = true;
         int cycles = StepInstruction();
@@ -569,7 +569,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BNE_NotTaken_Takes2Cycles()
     {
-        LoadAndReset(0xD0, 0x10);
+        LoadAndReset([0xD0, 0x10]);
         CpuBuffer.Current.ZeroFlag = true;
         CpuBuffer.Prev.ZeroFlag = true;
         int cycles = StepInstruction();
@@ -579,7 +579,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BCS_Taken_Takes3Cycles()
     {
-        LoadAndReset(0xB0, 0x10);
+        LoadAndReset([0xB0, 0x10]);
         CpuBuffer.Current.CarryFlag = true;
         CpuBuffer.Prev.CarryFlag = true;
         int cycles = StepInstruction();
@@ -589,7 +589,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BCC_Taken_Takes3Cycles()
     {
-        LoadAndReset(0x90, 0x10);
+        LoadAndReset([0x90, 0x10]);
         CpuBuffer.Current.CarryFlag = false;
         CpuBuffer.Prev.CarryFlag = false;
         int cycles = StepInstruction();
@@ -599,7 +599,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BMI_Taken_Takes3Cycles()
     {
-        LoadAndReset(0x30, 0x10);
+        LoadAndReset([0x30, 0x10]);
         CpuBuffer.Current.NegativeFlag = true;
         CpuBuffer.Prev.NegativeFlag = true;
         int cycles = StepInstruction();
@@ -609,7 +609,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BPL_Taken_Takes3Cycles()
     {
-        LoadAndReset(0x10, 0x10);
+        LoadAndReset([0x10, 0x10]);
         CpuBuffer.Current.NegativeFlag = false;
         CpuBuffer.Prev.NegativeFlag = false;
         int cycles = StepInstruction();
@@ -619,7 +619,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BVS_Taken_Takes3Cycles()
     {
-        LoadAndReset(0x70, 0x10);
+        LoadAndReset([0x70, 0x10]);
         CpuBuffer.Current.OverflowFlag = true;
         CpuBuffer.Prev.OverflowFlag = true;
         int cycles = StepInstruction();
@@ -629,7 +629,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BVC_Taken_Takes3Cycles()
     {
-        LoadAndReset(0x50, 0x10);
+        LoadAndReset([0x50, 0x10]);
         CpuBuffer.Current.OverflowFlag = false;
         CpuBuffer.Prev.OverflowFlag = false;
         int cycles = StepInstruction();
@@ -643,7 +643,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void JMP_Absolute_Takes3Cycles()
     {
-        LoadAndReset(0x4C, 0x34, 0x12);
+        LoadAndReset([0x4C, 0x34, 0x12]);
         int cycles = StepInstruction();
         Assert.Equal(3, cycles);
         Assert.Equal(0x1234, CurrentState.PC);
@@ -686,7 +686,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void PHP_Takes3Cycles()
     {
-        LoadAndReset(0x08);
+        LoadAndReset([0x08]);
         CpuBuffer.Current.SP = 0xFF;
         CpuBuffer.Prev.SP = 0xFF;
         int cycles = StepInstruction();
@@ -711,7 +711,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void JSR_Takes6Cycles()
     {
-        LoadAndReset(0x20, 0x34, 0x12);
+        LoadAndReset([0x20, 0x34, 0x12]);
         CpuBuffer.Current.SP = 0xFF;
         CpuBuffer.Prev.SP = 0xFF;
         int cycles = StepInstruction();
@@ -747,7 +747,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void BRK_Takes7Cycles()
     {
-        LoadAndReset(0x00, 0x00);
+        LoadAndReset([0x00, 0x00]);
         CpuBuffer.Current.SP = 0xFF;
         CpuBuffer.Prev.SP = 0xFF;
         Bus.SetIrqVector(0x8000);
@@ -762,7 +762,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void INC_ZeroPage_Takes5Cycles()
     {
-        LoadAndReset(0xE6, 0x10);
+        LoadAndReset([0xE6, 0x10]);
         SetZeroPage(0x10, 0x05);
         int cycles = StepInstruction();
         Assert.Equal(5, cycles);
@@ -772,7 +772,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void DEC_ZeroPage_Takes5Cycles()
     {
-        LoadAndReset(0xC6, 0x10);
+        LoadAndReset([0xC6, 0x10]);
         SetZeroPage(0x10, 0x05);
         int cycles = StepInstruction();
         Assert.Equal(5, cycles);
@@ -782,7 +782,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void INC_Absolute_Takes6Cycles()
     {
-        LoadAndReset(0xEE, 0x34, 0x12);
+        LoadAndReset([0xEE, 0x34, 0x12]);
         SetMemory(0x1234, 0x05);
         int cycles = StepInstruction();
         Assert.Equal(6, cycles);
@@ -791,7 +791,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void INC_AbsoluteX_Takes7Cycles()
     {
-        LoadAndReset(0xFE, 0x00, 0x12);
+        LoadAndReset([0xFE, 0x00, 0x12]);
         CpuBuffer.Current.X = 0x10;
         CpuBuffer.Prev.X = 0x10;
         SetMemory(0x1210, 0x05);
@@ -813,7 +813,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void ASL_ZeroPage_Takes5Cycles()
     {
-        LoadAndReset(0x06, 0x10);
+        LoadAndReset([0x06, 0x10]);
         SetZeroPage(0x10, 0x40);
         int cycles = StepInstruction();
         Assert.Equal(5, cycles);
@@ -863,7 +863,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void TAX_Takes2Cycles()
     {
-        LoadAndReset(0xAA);
+        LoadAndReset([0xAA]);
         CpuBuffer.Current.A = 0x42;
         CpuBuffer.Prev.A = 0x42;
         int cycles = StepInstruction();
@@ -874,7 +874,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void TXA_Takes2Cycles()
     {
-        LoadAndReset(0x8A);
+        LoadAndReset([0x8A]);
         CpuBuffer.Current.X = 0x42;
         CpuBuffer.Prev.X = 0x42;
         int cycles = StepInstruction();
@@ -885,7 +885,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void TAY_Takes2Cycles()
     {
-        LoadAndReset(0xA8);
+        LoadAndReset([0xA8]);
         CpuBuffer.Current.A = 0x42;
         CpuBuffer.Prev.A = 0x42;
         int cycles = StepInstruction();
@@ -896,7 +896,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void TYA_Takes2Cycles()
     {
-        LoadAndReset(0x98);
+        LoadAndReset([0x98]);
         CpuBuffer.Current.Y = 0x42;
         CpuBuffer.Prev.Y = 0x42;
         int cycles = StepInstruction();
@@ -907,7 +907,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void TSX_Takes2Cycles()
     {
-        LoadAndReset(0xBA);
+        LoadAndReset([0xBA]);
         CpuBuffer.Current.SP = 0x42;
         CpuBuffer.Prev.SP = 0x42;
         int cycles = StepInstruction();
@@ -918,7 +918,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void TXS_Takes2Cycles()
     {
-        LoadAndReset(0x9A);
+        LoadAndReset([0x9A]);
         CpuBuffer.Current.X = 0x42;
         CpuBuffer.Prev.X = 0x42;
         int cycles = StepInstruction();
@@ -929,7 +929,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void INX_Takes2Cycles()
     {
-        LoadAndReset(0xE8);
+        LoadAndReset([0xE8]);
         CpuBuffer.Current.X = 0x05;
         CpuBuffer.Prev.X = 0x05;
         int cycles = StepInstruction();
@@ -940,7 +940,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void INY_Takes2Cycles()
     {
-        LoadAndReset(0xC8);
+        LoadAndReset([0xC8]);
         CpuBuffer.Current.Y = 0x05;
         CpuBuffer.Prev.Y = 0x05;
         int cycles = StepInstruction();
@@ -951,7 +951,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void DEX_Takes2Cycles()
     {
-        LoadAndReset(0xCA);
+        LoadAndReset([0xCA]);
         CpuBuffer.Current.X = 0x05;
         CpuBuffer.Prev.X = 0x05;
         int cycles = StepInstruction();
@@ -962,7 +962,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void DEY_Takes2Cycles()
     {
-        LoadAndReset(0x88);
+        LoadAndReset([0x88]);
         CpuBuffer.Current.Y = 0x05;
         CpuBuffer.Prev.Y = 0x05;
         int cycles = StepInstruction();
@@ -977,7 +977,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void CLC_Takes2Cycles()
     {
-        LoadAndReset(0x18);
+        LoadAndReset([0x18]);
         CpuBuffer.Current.CarryFlag = true;
         CpuBuffer.Prev.CarryFlag = true;
         int cycles = StepInstruction();
@@ -997,7 +997,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void CLD_Takes2Cycles()
     {
-        LoadAndReset(0xD8);
+        LoadAndReset([0xD8]);
         CpuBuffer.Current.DecimalFlag = true;
         CpuBuffer.Prev.DecimalFlag = true;
         int cycles = StepInstruction();
@@ -1008,7 +1008,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void SED_Takes2Cycles()
     {
-        LoadAndReset(0xF8);
+        LoadAndReset([0xF8]);
         int cycles = StepInstruction();
         Assert.Equal(2, cycles);
         Assert.True(CurrentState.DecimalFlag);
@@ -1037,7 +1037,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void CLV_Takes2Cycles()
     {
-        LoadAndReset(0xB8);
+        LoadAndReset([0xB8]);
         CpuBuffer.Current.OverflowFlag = true;
         CpuBuffer.Prev.OverflowFlag = true;
         int cycles = StepInstruction();
@@ -1048,7 +1048,7 @@ public abstract class CoreInstructionTests : CpuTestBase
     [Fact]
     public void NOP_Takes2Cycles()
     {
-        LoadAndReset(0xEA);
+        LoadAndReset([0xEA]);
         int cycles = StepInstruction();
         Assert.Equal(2, cycles);
     }
