@@ -292,34 +292,34 @@ Checks for and handles any pending interrupt.
 
 ## CpuStateBuffer Class
 
-Provides double-buffered CPU state for clean instruction boundaries and debugging.
+Provides double-buffered CPU state for clean instruction boundaries, debugging, and state comparison.
 
 ### Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `Prev` | `CpuState` | Committed state at start of current instruction |
-| `Current` | `CpuState` | Working state being modified during execution |
+| `Prev` | `CpuState` | State before the current (or most recent) instruction |
+| `Current` | `CpuState` | State after the current (or most recent) instruction |
 
 ### Methods
 
-#### PrepareNextCycle
+#### SwapStateAndResetPipeline
 
 ```csharp
-void PrepareNextCycle()
+void SwapStateAndResetPipeline()
 ```
 
-Copies Prev state to Current, preparing for the next instruction.
+Called at the start of a new instruction cycle. If the previous instruction is complete (`Current.InstructionComplete` is true), copies Current to Prev (preserving the state at the start of the new instruction) and resets the pipeline state for the new instruction. Called internally by `Cpu.Clock()`.
 
 ---
 
-#### SwapIfComplete
+#### SaveStateBeforeInstruction
 
 ```csharp
-void SwapIfComplete()
+void SaveStateBeforeInstruction()
 ```
 
-If the current instruction is complete, atomically commits by swapping Prev and Current.
+Copies Current to Prev. This is a lower-level method; prefer using `SwapStateAndResetPipeline()` which handles the complete state transition.
 
 ---
 
@@ -342,6 +342,14 @@ void LoadResetVector(IPandowdyCpuBus bus)
 Reads the reset vector from $FFFC-$FFFD and sets PC in both states.
 
 ---
+
+### State Comparison
+
+After `Cpu.Step()` returns:
+- **`Prev`** contains the CPU state *before* the instruction executed
+- **`Current`** contains the CPU state *after* the instruction executed
+
+This allows you to compare Prev vs Current to see exactly what changed during the instruction.
 
 ### Debugger Helper Properties
 

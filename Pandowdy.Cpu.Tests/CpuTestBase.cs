@@ -83,9 +83,9 @@ public abstract class CpuTestBase
     }
 
     /// <summary>
-    /// Gets the current CPU state (after instruction completes, this is in Prev).
+    /// Gets the current CPU state (after instruction completes, this is in Current).
     /// </summary>
-    protected CpuState CurrentState => CpuBuffer.Prev;
+    protected CpuState CurrentState => CpuBuffer.Current;
 
     /// <summary>
     /// Helper to set a value in zero page.

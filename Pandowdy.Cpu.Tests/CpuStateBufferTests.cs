@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using Pandowdy.Cpu.Internals;
 using Xunit;
 
 namespace Pandowdy.Cpu.Tests;
@@ -36,38 +37,7 @@ public class CpuStateBufferTests
 
     #endregion
 
-    #region PrepareNextCycle Tests
-
-    [Fact]
-    public void PrepareNextCycle_CopiesPrevToCurrent()
-    {
-        var buffer = new CpuStateBuffer();
-        buffer.Prev.A = 0x42;
-        buffer.Prev.X = 0x10;
-        buffer.Current.A = 0x00;
-        buffer.Current.X = 0x00;
-
-        buffer.PrepareNextCycle();
-
-        Assert.Equal(0x42, buffer.Current.A);
-        Assert.Equal(0x10, buffer.Current.X);
-    }
-
-    [Fact]
-    public void PrepareNextCycle_PreservesCurrentAsSeparateObject()
-    {
-        var buffer = new CpuStateBuffer();
-        buffer.Prev.A = 0x42;
-
-        buffer.PrepareNextCycle();
-        buffer.Current.A = 0xFF;
-
-        Assert.Equal(0x42, buffer.Prev.A);
-    }
-
-    #endregion
-
-    #region SwapIfComplete Tests
+    #region SwapStateAndResetPipeline Tests
 
     [Fact]
     public void SwapIfComplete_WhenNotComplete_DoesNothing()
@@ -77,24 +47,27 @@ public class CpuStateBufferTests
         var originalCurrent = buffer.Current;
         buffer.Current.InstructionComplete = false;
 
-        buffer.SwapIfComplete();
+        buffer.SwapStateAndResetPipeline();
 
         Assert.Same(originalPrev, buffer.Prev);
         Assert.Same(originalCurrent, buffer.Current);
     }
 
     [Fact]
-    public void SwapIfComplete_WhenComplete_SwapsReferences()
+    public void SwapIfComplete_WhenComplete_CopiesCurrentToPrev()
     {
         var buffer = new CpuStateBuffer();
-        var originalPrev = buffer.Prev;
-        var originalCurrent = buffer.Current;
+        buffer.Current.A = 0x42;
+        buffer.Current.X = 0x10;
+        buffer.Current.PC = 0x1234;
         buffer.Current.InstructionComplete = true;
 
-        buffer.SwapIfComplete();
+        buffer.SwapStateAndResetPipeline();
 
-        Assert.Same(originalCurrent, buffer.Prev);
-        Assert.Same(originalPrev, buffer.Current);
+        // Prev should now have the same values as Current had
+        Assert.Equal(0x42, buffer.Prev.A);
+        Assert.Equal(0x10, buffer.Prev.X);
+        Assert.Equal(0x1234, buffer.Prev.PC);
     }
 
     [Fact]
@@ -106,7 +79,7 @@ public class CpuStateBufferTests
         buffer.Current.Pipeline = new MicroOp[10];
         buffer.Current.InstructionComplete = true;
 
-        buffer.SwapIfComplete();
+        buffer.SwapStateAndResetPipeline();
 
         Assert.False(buffer.Current.InstructionComplete);
         Assert.Equal(0, buffer.Current.PipelineIndex);
@@ -121,7 +94,7 @@ public class CpuStateBufferTests
         buffer.Current.PC = 0x1234;
         buffer.Current.InstructionComplete = true;
 
-        buffer.SwapIfComplete();
+        buffer.SwapStateAndResetPipeline();
 
         Assert.Equal(0x42, buffer.Prev.A);
         Assert.Equal(0x1234, buffer.Prev.PC);
@@ -135,8 +108,37 @@ public class CpuStateBufferTests
         buffer.Current.X = 0x10;
         buffer.Current.InstructionComplete = true;
 
-        buffer.SwapIfComplete();
+        buffer.SwapStateAndResetPipeline();
 
+        Assert.Equal(0x42, buffer.Current.A);
+        Assert.Equal(0x10, buffer.Current.X);
+    }
+
+    [Fact]
+    public void SaveStateBeforeInstruction_CopiesCurrentToPrev()
+    {
+        var buffer = new CpuStateBuffer();
+        buffer.Current.A = 0x42;
+        buffer.Current.X = 0x10;
+        buffer.Current.PC = 0x8000;
+
+        buffer.SaveStateBeforeInstruction();
+
+        Assert.Equal(0x42, buffer.Prev.A);
+        Assert.Equal(0x10, buffer.Prev.X);
+        Assert.Equal(0x8000, buffer.Prev.PC);
+    }
+
+    [Fact]
+    public void SaveStateBeforeInstruction_PreservesCurrentState()
+    {
+        var buffer = new CpuStateBuffer();
+        buffer.Current.A = 0x42;
+        buffer.Current.X = 0x10;
+
+        buffer.SaveStateBeforeInstruction();
+
+        // Current should still have the same values
         Assert.Equal(0x42, buffer.Current.A);
         Assert.Equal(0x10, buffer.Current.X);
     }

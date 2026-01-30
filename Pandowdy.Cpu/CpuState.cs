@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using Pandowdy.Cpu.Internals;
+
 namespace Pandowdy.Cpu;
 
 /// <summary>
@@ -250,12 +252,12 @@ public class CpuState
     /// where prev is the state at instruction start and current is the working state.
     /// </para>
     /// </remarks>
-    public MicroOp[] Pipeline { get; set; } = [];
+    internal MicroOp[] Pipeline { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the index of the next micro-operation to execute in the pipeline.
     /// </summary>
-    public int PipelineIndex { get; set; }
+    internal int PipelineIndex { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the current instruction has completed.

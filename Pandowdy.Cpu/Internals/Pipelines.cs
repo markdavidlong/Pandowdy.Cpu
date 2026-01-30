@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-namespace Pandowdy.Cpu;
+namespace Pandowdy.Cpu.Internals;
 
 /// <summary>
 /// Provides opcode pipeline definitions for 6502/65C02 CPU variants.
@@ -12,7 +12,7 @@ namespace Pandowdy.Cpu;
 /// micro-operations executed during each clock cycle of an instruction.
 /// The first micro-op is always <see cref="MicroOps.FetchOpcode"/>.
 /// </remarks>
-public static partial class Pipelines
+internal static partial class Pipelines
 {
     // ========================================
     // Constants

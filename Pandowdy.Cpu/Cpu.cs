@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using Pandowdy.Cpu.Internals;
+
 namespace Pandowdy.Cpu;
 
 /// <summary>
@@ -15,10 +17,11 @@ namespace Pandowdy.Cpu;
 /// <para>
 /// The execution model uses a double-buffered state pattern via <see cref="CpuStateBuffer"/>:
 /// <list type="bullet">
-///   <item><description><c>Prev</c>: The committed state at instruction start (read-only during execution).</description></item>
-///   <item><description><c>Current</c>: The working state being modified during execution.</description></item>
+///   <item><description><c>Prev</c>: The CPU state at the start of the instruction (before execution).</description></item>
+///   <item><description><c>Current</c>: The CPU state during and after execution.</description></item>
 /// </list>
-/// When an instruction completes, the states are swapped so <c>Current</c> becomes the new <c>Prev</c>.
+/// At the start of each new instruction cycle, <c>Current</c> is copied to <c>Prev</c>, preserving
+/// the "before" state. After <c>Step()</c> returns, <c>Prev</c> = before, <c>Current</c> = after.
 /// </para>
 /// </remarks>
 public static class Cpu
@@ -59,6 +62,9 @@ public static class Cpu
 
         if (current.Pipeline.Length == 0 || current.PipelineIndex >= current.Pipeline.Length)
         {
+            // Beginning of a new instruction - save current state to Prev
+            buffer.SwapStateAndResetPipeline();
+
             // Use Peek to determine the pipeline without recording a bus cycle.
             // The actual opcode fetch (with cycle tracking) happens in FetchOpcode.
             byte opcode = bus.Peek(current.PC);
@@ -74,7 +80,7 @@ public static class Cpu
 
         if (current.InstructionComplete)
         {
-            buffer.SwapIfComplete();
+
             return true;
         }
 
@@ -151,22 +157,36 @@ public static class Cpu
     }
 
     /// <summary>
-    /// Gets the opcode of the currently executing instruction.
+    /// Gets the opcode of the currently executing instruction, or the next instruction if complete.
     /// </summary>
     /// <param name="buffer">The CPU state buffer.</param>
     /// <param name="bus">The memory/IO bus.</param>
     /// <returns>The opcode byte.</returns>
     /// <remarks>
-    /// If an instruction is in progress (pipeline started), reads from <c>Prev.PC</c>.
-    /// Otherwise, reads from <c>Current.PC</c>.
+    /// <para>
+    /// If an instruction is in progress (pipeline started but not complete), reads from <c>Prev.PC</c>
+    /// to return the opcode of the instruction being executed.
+    /// </para>
+    /// <para>
+    /// If the instruction is complete or no instruction is in progress, reads from <c>Current.PC</c>
+    /// to return the opcode of the next instruction to be executed.
+    /// </para>
     /// </remarks>
     public static byte CurrentOpcode(CpuStateBuffer buffer, IPandowdyCpuBus bus)
     {
+        // If instruction is complete, return the next opcode (at Current.PC)
+        if (buffer.Current.InstructionComplete)
+        {
+            return bus.CpuRead(buffer.Current.PC);
+        }
+
+        // If an instruction is in progress, return the opcode being executed (at Prev.PC)
         if (buffer.Current.Pipeline.Length > 0 && buffer.Current.PipelineIndex > 0)
         {
             return bus.CpuRead(buffer.Prev.PC);
         }
 
+        // No instruction in progress, return opcode at Current.PC
         return bus.CpuRead(buffer.Current.PC);
     }
 

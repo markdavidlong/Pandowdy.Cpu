@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-namespace Pandowdy.Cpu;
+namespace Pandowdy.Cpu.Internals;
 
 /// <summary>
 /// Represents a single micro-operation in the CPU pipeline.
@@ -21,4 +21,4 @@ namespace Pandowdy.Cpu;
 /// clean instruction boundaries and debugging support.
 /// </para>
 /// </remarks>
-public delegate void MicroOp(CpuState prev, CpuState current, IPandowdyCpuBus bus);
+internal delegate void MicroOp(CpuState prev, CpuState current, IPandowdyCpuBus bus);

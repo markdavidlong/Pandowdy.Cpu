@@ -2,10 +2,12 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using Pandowdy.Cpu.Internals;
+
 namespace Pandowdy.Cpu;
 
 /// <summary>
-/// Provides double-buffered CPU state for clean instruction boundaries, debugging, and time-travel capabilities.
+/// Provides double-buffered CPU state for clean instruction boundaries, debugging, and state comparison.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -14,60 +16,52 @@ namespace Pandowdy.Cpu;
 /// <list type="bullet">
 ///   <item>
 ///     <term><see cref="Prev"/></term>
-///     <description>The committed state at the start of the current instruction. Read-only during execution.</description>
+///     <description>The state at the beginning of the current (or most recent) instruction.</description>
 ///   </item>
 ///   <item>
 ///     <term><see cref="Current"/></term>
-///     <description>The working state being modified during instruction execution.</description>
+///     <description>The state at the end of the current (or most recent) instruction.</description>
 ///   </item>
 /// </list>
 /// <para>
 /// This design provides several benefits:
 /// </para>
 /// <list type="bullet">
-///   <item><description><b>Clean instruction boundaries:</b> State changes are atomic at instruction completion.</description></item>
-///   <item><description><b>Debugging support:</b> Compare Prev vs Current to see what changed during an instruction.</description></item>
-///   <item><description><b>Rollback capability:</b> Discard Current changes by copying from Prev.</description></item>
-///   <item><description><b>Time-travel debugging:</b> Save/restore Prev state for reverse execution.</description></item>
+///   <item><description><b>State comparison:</b> Compare Prev vs Current to see what changed during an instruction.</description></item>
+///   <item><description><b>Debugging support:</b> Inspect the before/after state of each Step().</description></item>
+///   <item><description><b>Clean boundaries:</b> Prev always reflects the state before the last executed instruction.</description></item>
 /// </list>
 /// <para>
 /// <b>Execution flow:</b>
 /// </para>
 /// <list type="number">
-///   <item><description>At instruction start, Current is copied from Prev.</description></item>
-///   <item><description>Micro-ops modify Current while reading from Prev for original values.</description></item>
-///   <item><description>When instruction completes, <see cref="SwapIfComplete"/> promotes Current to Prev.</description></item>
+///   <item><description>At the start of a new instruction cycle, Current is copied to Prev (saving the "before" state).</description></item>
+///   <item><description>Micro-ops modify Current during execution.</description></item>
+///   <item><description>When Step() returns, Prev = before, Current = after.</description></item>
+///   <item><description>The pipeline state is preserved until the next instruction cycle begins.</description></item>
 /// </list>
 /// </remarks>
 /// <seealso cref="CpuState"/>
 public class CpuStateBuffer
 {
     /// <summary>
-    /// Gets the committed state from the previous instruction boundary.
+    /// Gets the state from before the current (or most recent) instruction.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// This state represents the CPU as it was at the start of the current instruction.
-    /// Micro-operations read from this state when they need the "before" value of a register.
-    /// </para>
-    /// <para>
-    /// Do not modify this state during instruction execution. It is updated automatically
-    /// when <see cref="SwapIfComplete"/> is called after an instruction completes.
+    /// After a <see cref="Cpu.Step"/> completes, this contains the CPU state as it was
+    /// before the instruction executed. Compare with <see cref="Current"/> to see what changed.
     /// </para>
     /// </remarks>
     public CpuState Prev { get; private set; }
 
     /// <summary>
-    /// Gets the working state for the current instruction execution.
+    /// Gets the state after the current (or most recent) instruction.
     /// </summary>
     /// <remarks>
     /// <para>
     /// This state is actively modified during instruction execution.
-    /// Micro-operations write their results here, building up the new CPU state.
-    /// </para>
-    /// <para>
-    /// When <see cref="CpuState.InstructionComplete"/> is set to true and
-    /// <see cref="SwapIfComplete"/> is called, this state becomes the new Prev.
+    /// After a <see cref="Cpu.Step"/> completes, this contains the resulting CPU state.
     /// </para>
     /// </remarks>
     public CpuState Current { get; private set; }
@@ -81,50 +75,61 @@ public class CpuStateBuffer
         Current = new CpuState();
     }
 
-    /// <summary>
-    /// Prepares for the next execution cycle by copying Prev state to Current.
-    /// </summary>
-    /// <remarks>
-    /// Called at the start of a new instruction to initialize Current with the
-    /// committed state from Prev. This ensures any partial changes from a previous
-    /// aborted instruction are discarded.
-    /// </remarks>
-    public void PrepareNextCycle()
-    {
-        Current.CopyFrom(Prev);
-    }
 
     /// <summary>
-    /// Atomically commits the current instruction by swapping buffers.
+    /// Atomically commits the current instruction by copying Current to Prev.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// When an instruction completes (Current.InstructionComplete is true), this method:
+    /// When an instruction begins being processed (Current.InstructionComplete from the previous cycle is true), this method:
     /// </para>
     /// <list type="number">
-    ///   <item><description>Swaps the Prev and Current references.</description></item>
-    ///   <item><description>Copies the new Prev to Current for the next instruction.</description></item>
+    ///   <item><description>Copies Current to Prev (Prev now holds the completed state).</description></item>
     ///   <item><description>Resets Current's pipeline state for the next instruction.</description></item>
     /// </list>
+    /// <para>
+    /// After this call, Prev and Current both contain the same state, ready for the next instruction.
+    /// </para>
     /// <para>
     /// If the instruction is not complete, this method does nothing.
     /// </para>
     /// </remarks>
-    public void SwapIfComplete()
+    public void SwapStateAndResetPipeline()
     {
         if (!Current.InstructionComplete)
         {
             return;
         }
 
-        // Swap the references
-        (Prev, Current) = (Current, Prev);
+        // Copy Current to Prev (Prev now has the completed instruction state)
+        Prev.CopyFrom(Current);
 
-        // Reset the new Current for the next instruction
-        Current.CopyFrom(Prev);
+        // Reset Current's pipeline state for the next instruction
         Current.InstructionComplete = false;
         Current.PipelineIndex = 0;
         Current.Pipeline = [];
+    }
+
+    /// <summary>
+    /// Saves the current state to Prev before beginning a new instruction.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Call this at the start of a new instruction (when PipelineIndex is 0 and Pipeline is empty).
+    /// After this call:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item><description>Prev contains the state before the instruction executes.</description></item>
+    ///   <item><description>Current will be modified during instruction execution.</description></item>
+    /// </list>
+    /// <para>
+    /// After the instruction completes and Step() returns, you can compare Prev (before) vs Current (after)
+    /// to see what changed during the instruction.
+    /// </para>
+    /// </remarks>
+    public void SaveStateBeforeInstruction()
+    {
+        Prev.CopyFrom(Current);
     }
 
     /// <summary>

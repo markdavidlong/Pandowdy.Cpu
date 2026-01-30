@@ -2,9 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-namespace Pandowdy.Cpu;
+namespace Pandowdy.Cpu.Internals;
 
-public static partial class Pipelines
+internal static partial class Pipelines
 {
     // ========================================
     // INX, INY, DEX, DEY Pipelines (Register)

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using Pandowdy.Cpu.Internals;
 using Xunit;
 
 namespace Pandowdy.Cpu.Tests;

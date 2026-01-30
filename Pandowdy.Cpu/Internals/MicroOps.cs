@@ -4,7 +4,7 @@
 
 using System.Runtime.CompilerServices;
 
-namespace Pandowdy.Cpu;
+namespace Pandowdy.Cpu.Internals;
 
 /// <summary>
 /// Provides micro-operation implementations for 6502/65C02 CPU emulation.
@@ -23,7 +23,7 @@ namespace Pandowdy.Cpu;
 /// </list>
 /// </para>
 /// </remarks>
-public static class MicroOps
+internal static class MicroOps
 {
     // ========================================
     // Helper Methods

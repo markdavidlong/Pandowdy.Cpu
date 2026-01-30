@@ -37,7 +37,7 @@ The CPU emulator uses a micro-op pipeline architecture for cycle-accurate emulat
 │                    CpuStateBuffer                      │
 │  ┌─────────────────┐    ┌─────────────────┐            │
 │  │      Prev       │    │     Current     │            │
-│  │   (committed)   │--->│   (working)     │            │
+│  │    (before)     │    │    (after)      │            │
 │  │                 │    │                 │            │
 │  │ A, X, Y, SP, PC │    │ A, X, Y, SP, PC │            │
 │  │ P (flags)       │    │ P (flags)       │            │
@@ -58,6 +58,12 @@ The CPU emulator uses a micro-op pipeline architecture for cycle-accurate emulat
                         │  (Memory I/O)   │
                         └─────────────────┘
 ```
+
+After `Cpu.Step()` returns:
+- **`Prev`** = CPU state *before* the instruction executed
+- **`Current`** = CPU state *after* the instruction executed
+
+This allows comparing Prev vs Current to see what changed during the instruction.
 
 ---
 
@@ -813,8 +819,8 @@ Value at $0200: $0A
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `Prev` | `CpuState` | Committed state |
-| `Current` | `CpuState` | Working state |
+| `Prev` | `CpuState` | State before the instruction |
+| `Current` | `CpuState` | State after the instruction |
 | `PcChanged` | `bool` | PC changed this instruction |
 | `JumpOccurred` | `bool` | Non-sequential PC change |
 | `BranchOccurred` | `bool` | Branch was taken |

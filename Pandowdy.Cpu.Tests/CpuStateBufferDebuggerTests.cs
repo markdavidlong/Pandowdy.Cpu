@@ -3,6 +3,7 @@
 // See LICENSE file for details
 
 using System.Linq;
+using Pandowdy.Cpu.Internals;
 using Xunit;
 
 namespace Pandowdy.Cpu.Tests;

@@ -2,6 +2,50 @@
 
 ---
 
+## v2.1.0
+
+**Release Date:** January 30, 2026
+
+### Critical Bug Fix
+
+- **CpuStateBuffer state comparison logic fixed**: The `Prev` and `Current` states in `CpuStateBuffer` were not being managed correctly for before/after instruction comparison.
+
+**Previous (incorrect) behavior in v2.0.0:**
+- At instruction completion, buffers were swapped and `Current` was overwritten
+- After `Step()` returned, `Prev` and `Current` contained the same values
+- Comparing `Prev` vs `Current` showed no differences
+
+**New (correct) behavior in v2.1.0:**
+- At the start of a new instruction cycle, `Current` is copied to `Prev` (saving the "before" state)
+- Micro-ops modify `Current` during execution
+- After `Step()` returns, `Prev` = before, `Current` = after
+- The pipeline is not reset until the next instruction cycle begins
+- Comparing `Prev` vs `Current` correctly shows what changed during the instruction
+
+### Namespace Reorganization
+
+- **Clean public API**: User-facing types remain in `Pandowdy.Cpu` namespace
+- **Internal implementation hidden**: `MicroOp`, `MicroOps`, and `Pipelines` moved to `Pandowdy.Cpu.Internals` namespace and marked `internal`
+- **CpuState cleanup**: `Pipeline` and `PipelineIndex` properties are now `internal`
+
+**Public API (`Pandowdy.Cpu`):**
+- `Cpu` - Static execution engine
+- `CpuState` - CPU registers and flags
+- `CpuStateBuffer` - Double-buffered state for debugging
+- `CpuVariant`, `CpuStatus` - Enums
+- `IPandowdyCpuBus` - Bus interface
+
+**Internals (`Pandowdy.Cpu.Internals`):**
+- `MicroOp` - Micro-operation delegate
+- `MicroOps` - Micro-operation implementations
+- `Pipelines` - Opcode pipeline tables
+
+### New API
+
+- Added `SaveStateBeforeInstruction()` method to `CpuStateBuffer` (called internally by `Cpu.Clock()`)
+
+---
+
 ## v2.0.0
 
 **Release Date:** January 30, 2026
@@ -11,10 +55,12 @@
 - **Pure C# Implementation**: The entire CPU emulator is now implemented in C#, simplifying the build process and reducing dependencies.
 - **Single Package**: All functionality is in the `Pandowdy.Cpu` package:
   - `Cpu` static class with `Clock`, `Step`, `Run`, `Reset`, `CurrentOpcode`, and `CyclesRemaining` methods
-  - `MicroOps` static class with all micro-operation implementations
-  - `Pipelines` static class with all opcode pipeline definitions
   - `CpuState`, `CpuStateBuffer`, `CpuVariant`, `CpuStatus` types
   - `IPandowdyCpuBus` interface
+
+### Bug
+
+- **Critical**: `CpuStateBuffer` did not correctly preserve before/after state for instruction comparison. Fixed in v2.1.0.
 
 ### Features
 

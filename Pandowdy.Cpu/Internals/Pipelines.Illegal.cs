@@ -2,12 +2,12 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-namespace Pandowdy.Cpu;
+namespace Pandowdy.Cpu.Internals;
 
 /// <summary>
 /// NMOS 6502 illegal/undocumented opcode pipelines.
 /// </summary>
-public static partial class Pipelines
+internal static partial class Pipelines
 {
     // ========================================
     // JAM - Halt CPU (Multiple opcodes)

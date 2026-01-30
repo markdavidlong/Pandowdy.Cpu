@@ -91,11 +91,14 @@ Pandowdy.Cpu/                  # Core library (C#)
 ├── Cpu.cs                    # Clock, Step, Run, Reset functions
 ├── CpuState.cs               # CPU state and registers
 ├── CpuStateBuffer.cs         # Double-buffered state
-├── CpuVariant.cs             # CPU variant enum
-├── MicroOps.cs               # Micro-operation implementations
-├── Pipelines.cs              # Opcode pipeline definitions
-├── Pipelines.*.cs            # Pipeline partial classes (Alu, Branch, etc.)
-└── IPandowdyCpuBus.cs        # Bus interface
+├── CpuVariant.cs             # CPU variant and status enums
+├── IPandowdyCpuBus.cs        # Bus interface
+│
+└── Internals/                # Internal implementation (not part of public API)
+    ├── MicroOp.cs            # Micro-operation delegate
+    ├── MicroOps.cs           # Micro-operation implementations
+    ├── Pipelines.cs          # Opcode pipeline definitions
+    └── Pipelines.*.cs        # Pipeline partial classes (Alu, Branch, etc.)
 
 Pandowdy.Cpu.Tests/            # Unit tests (xUnit)
 ├── *OpcodeTests.cs           # Opcode-specific tests
