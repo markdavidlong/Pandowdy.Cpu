@@ -3,7 +3,6 @@
 // See LICENSE file for details
 
 using System.Diagnostics;
-using Pandowdy.Cpu.Example;
 
 namespace Pandowdy.Cpu.Dormann_Tests;
 

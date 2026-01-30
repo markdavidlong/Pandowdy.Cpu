@@ -25,8 +25,8 @@ All CPU variants pass [Klaus Dormann's 6502/65C02 Functional Tests](https://gith
 
 All CPU variants are **cycle-accurate** and pass the [Tom Harte SingleStepTests](https://github.com/SingleStepTests/65x02), which validate not only final register state but also cycle-by-cycle bus activity for every opcode:
 
-| Variant | Pass Rate | Notes |
-|---------|-----------|
+| Variant | Pass Rate | Coverage |
+|---------|-----------|-------|
 | NMOS6502 | 100% (256 opcodes × 10,000 tests each) | All opcodes tested |
 | NMOS6502_NO_ILLEGAL | 100% (151 opcodes × 10,000 tests each) | Only documented opcodes tested | 
 | WDC65C02 | 100% (254 opcodes × 10,000 tests each) | All opcodes except WAI & STP tested |
@@ -64,15 +64,6 @@ int cycles = Cpu.Step(CpuVariant.WDC65C02, cpuBuffer, bus);
 Console.WriteLine($"A = ${cpuBuffer.Current.A:X2}"); // A = $42
 ```
 
-## API Overview
-
-| Function | Description |
-|----------|-------------|
-| `Cpu.Clock()` | Execute one CPU cycle |
-| `Cpu.Step()` | Execute one complete instruction |
-| `Cpu.Run()` | Execute for a specified number of cycles |
-| `Cpu.Reset()` | Reset CPU and load PC from reset vector |
-
 ## Project Structure
 
 ```
@@ -84,7 +75,8 @@ Pandowdy.Cpu.Example/  # Example usage application
 
 ## Documentation
 
-For detailed usage instructions, API reference, and examples, see the [CPU Usage Guide](docs/CpuUsageGuide.md).
+- [CPU Usage Guide](docs/CpuUsageGuide.md) — Detailed usage instructions and examples
+- [API Reference](docs/ApiReference.md) — Complete API documentation for Cpu, CpuState, and CpuStateBuffer
 
 ## Building
 
