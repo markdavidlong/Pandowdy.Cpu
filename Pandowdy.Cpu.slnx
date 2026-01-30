@@ -10,6 +10,7 @@
     <File Path="README.md" />
   </Folder>
   <Project Path="Pandowdy.Cpu.Core/Pandowdy.Cpu.Core.fsproj" />
+  <Project Path="Pandowdy.Cpu.Dormann-Tests/Pandowdy.Cpu.Dormann-Tests.csproj" Id="c0b5cc85-a905-47bd-8370-f4981aee7548" />
   <Project Path="Pandowdy.Cpu.Example/Pandowdy.Cpu.Example.csproj">
     <BuildDependency Project="Pandowdy.Cpu/Pandowdy.Cpu.csproj" />
   </Project>

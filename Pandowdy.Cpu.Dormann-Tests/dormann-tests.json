@@ -1,0 +1,28 @@
+{
+  "testDataPath": "./testdata",
+  "functionalTest": {
+    "hexFile": "6502_functional_test.hex",
+    "startAddress": "0400",
+    "successAddress": "3469"
+  },
+  "nmosDecimalTest": {
+    "hexFile": "6502_decimal_test.hex",
+    "startAddress": "0200",
+    "errorAddress": "000B"
+  },
+  "cmosDecimalTest": {
+    "hexFile": "65c02_decimal_test.hex",
+    "startAddress": "0200",
+    "errorAddress": "000B"
+  },
+  "wdcExtendedTest": {
+    "hexFile": "65c02_extended_opcodes_test.hex",
+    "startAddress": "0400",
+    "successAddress": "24F1"
+  },
+  "rockwellExtendedTest": {
+    "hexFile": "65c02_extended_opcodes_test.hex",
+    "startAddress": "0400",
+    "successAddress": "24F1"
+  }
+}

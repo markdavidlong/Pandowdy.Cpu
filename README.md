@@ -25,11 +25,12 @@ All CPU variants pass [Klaus Dormann's 6502/65C02 Functional Tests](https://gith
 
 All CPU variants are **cycle-accurate** and pass the [Tom Harte SingleStepTests](https://github.com/SingleStepTests/65x02), which validate not only final register state but also cycle-by-cycle bus activity for every opcode:
 
-| Variant | Pass Rate |
+| Variant | Pass Rate | Notes |
 |---------|-----------|
-| NMOS6502 | 100% (256 opcodes × 10,000 tests each) |
-| WDC65C02 | 100% (256 opcodes × 10,000 tests each) |
-| ROCKWELL65C02 | 100% (256 opcodes × 10,000 tests each) |
+| NMOS6502 | 100% (256 opcodes × 10,000 tests each) | All opcodes tested |
+| NMOS6502_NO_ILLEGAL | 100% (151 opcodes × 10,000 tests each) | Only documented opcodes tested | 
+| WDC65C02 | 100% (254 opcodes × 10,000 tests each) | All opcodes except WAI & STP tested |
+| ROCKWELL65C02 | 100% (256 opcodes × 10,000 tests each) | All opcodes tested |
 
 See [Pandowdy.Cpu.Harte-SST-Tests/README.md](Pandowdy.Cpu.Harte-SST-Tests/README.md) for instructions on running these tests.
 
