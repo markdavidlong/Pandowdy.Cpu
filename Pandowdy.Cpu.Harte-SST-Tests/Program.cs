@@ -31,7 +31,7 @@ public enum TestMode
 internal class Program
 {
     // Default path to Tom Harte's SingleStepTests repository
-    private const string DefaultTestPath = "./";
+    private const string DefaultTestPath =  "./";
 
     static void Main(string[] args)
     {

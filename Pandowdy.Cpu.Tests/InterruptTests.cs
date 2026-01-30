@@ -462,6 +462,120 @@ public class InterruptTests : CpuTestBase
         Assert.Equal(3, cycles);
     }
 
+    [Fact]
+    public void WAI_Integration_CpuStaysHalted_UntilIRQ_ThenResumes()
+    {
+        // WAI ($CB) followed by LDA #$42 at the next instruction
+        // ISR at $8000: LDA #$99, RTI
+        LoadAndReset([0xCB, 0xA9, 0x42]);
+        Bus.SetIrqVector(0x8000);
+        Bus.Memory[0x8000] = 0xA9; // LDA #$99
+        Bus.Memory[0x8001] = 0x99;
+        Bus.Memory[0x8002] = 0x40; // RTI
+        CpuBuffer.Current.SP = 0xFF;
+        CpuBuffer.Prev.SP = 0xFF;
+        CpuBuffer.Current.InterruptDisableFlag = false;
+        CpuBuffer.Prev.InterruptDisableFlag = false;
+
+        // Step 1: Execute WAI - CPU should enter Waiting state
+        Cpu.Step(CpuVariant.WDC65C02, CpuBuffer, Bus);
+        Assert.Equal(CpuStatus.Waiting, CpuBuffer.Current.Status);
+        ushort pcAfterWai = CpuBuffer.Current.PC;
+
+        // Step 2: Clock several times - CPU should stay halted, PC unchanged
+        for (int i = 0; i < 10; i++)
+        {
+            Cpu.Clock(CpuVariant.WDC65C02, CpuBuffer, Bus);
+        }
+        Assert.Equal(CpuStatus.Waiting, CpuBuffer.Current.Status);
+        Assert.Equal(pcAfterWai, CpuBuffer.Current.PC);
+
+        // Step 3: Signal IRQ and handle it (emulator host responsibility)
+        CpuBuffer.Current.SignalIrq();
+        bool handled = CpuBuffer.Current.HandlePendingInterrupt(Bus);
+        Assert.True(handled);
+
+        // CPU should now be running and PC should be at ISR
+        Assert.Equal(CpuStatus.Running, CpuBuffer.Current.Status);
+        Assert.Equal(0x8000, CpuBuffer.Current.PC);
+
+        // Execute ISR: LDA #$99
+        Cpu.Step(CpuVariant.WDC65C02, CpuBuffer, Bus);
+        Assert.Equal(0x99, CpuBuffer.Current.A);
+
+        // Execute RTI - should return to instruction after WAI
+        Cpu.Step(CpuVariant.WDC65C02, CpuBuffer, Bus);
+
+        // Now execute the LDA #$42 that was after WAI
+        Cpu.Step(CpuVariant.WDC65C02, CpuBuffer, Bus);
+        Assert.Equal(0x42, CpuBuffer.Current.A);
+    }
+
+    [Fact]
+    public void WAI_Integration_NMI_WakesCpu()
+    {
+        // WAI ($CB) followed by NOP
+        LoadAndReset([0xCB, 0xEA]);
+        Bus.SetNmiVector(0x9000);
+        Bus.Memory[0x9000] = 0xA9; // LDA #$77
+        Bus.Memory[0x9001] = 0x77;
+        Bus.Memory[0x9002] = 0x40; // RTI
+        CpuBuffer.Current.SP = 0xFF;
+        CpuBuffer.Prev.SP = 0xFF;
+
+        // Execute WAI
+        Cpu.Step(CpuVariant.WDC65C02, CpuBuffer, Bus);
+        Assert.Equal(CpuStatus.Waiting, CpuBuffer.Current.Status);
+
+        // Signal NMI and handle it (emulator host responsibility)
+        CpuBuffer.Current.SignalNmi();
+        bool handled = CpuBuffer.Current.HandlePendingInterrupt(Bus);
+        Assert.True(handled);
+
+        // CPU should be running and at NMI handler
+        Assert.Equal(CpuStatus.Running, CpuBuffer.Current.Status);
+        Assert.Equal(0x9000, CpuBuffer.Current.PC);
+
+        // Execute NMI handler: LDA #$77
+        Cpu.Step(CpuVariant.WDC65C02, CpuBuffer, Bus);
+        Assert.Equal(0x77, CpuBuffer.Current.A);
+    }
+
+    [Fact]
+    public void STP_Integration_CpuStaysHalted_Reset_Required()
+    {
+        // STP ($DB) followed by instructions that should never execute
+        LoadAndReset([0xDB, 0xA9, 0x42]);
+
+        // Execute STP
+        Cpu.Step(CpuVariant.WDC65C02, CpuBuffer, Bus);
+        Assert.Equal(CpuStatus.Stopped, CpuBuffer.Current.Status);
+        ushort pcAfterStp = CpuBuffer.Current.PC;
+
+        // Clock many times - CPU should stay stopped
+        for (int i = 0; i < 20; i++)
+        {
+            Cpu.Clock(CpuVariant.WDC65C02, CpuBuffer, Bus);
+        }
+        Assert.Equal(CpuStatus.Stopped, CpuBuffer.Current.Status);
+        Assert.Equal(pcAfterStp, CpuBuffer.Current.PC);
+
+        // IRQ should NOT wake from STP
+        CpuBuffer.Current.SignalIrq();
+        Cpu.Step(CpuVariant.WDC65C02, CpuBuffer, Bus);
+        Assert.Equal(CpuStatus.Stopped, CpuBuffer.Current.Status);
+
+        // NMI should NOT wake from STP
+        CpuBuffer.Current.SignalNmi();
+        Cpu.Step(CpuVariant.WDC65C02, CpuBuffer, Bus);
+        Assert.Equal(CpuStatus.Stopped, CpuBuffer.Current.Status);
+
+        // Only Reset can recover from STP
+        Bus.SetResetVector(0x0400);
+        Cpu.Reset(CpuBuffer, Bus);
+        Assert.Equal(CpuStatus.Running, CpuBuffer.Current.Status);
+    }
+
     #endregion
 
     #region BRK vs IRQ Difference
