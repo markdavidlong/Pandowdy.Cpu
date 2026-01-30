@@ -54,7 +54,7 @@ public enum CpuStatus
     /// instructions are encountered without actually stopping execution.
     /// </para>
     /// <para>
-    /// This status persists until <see cref="Cpu.reset"/> is called or it is
+    /// This status persists until <c>Cpu.Reset</c> is called or it is
     /// manually reset to <see cref="Running"/>.
     /// </para>
     /// </remarks>
