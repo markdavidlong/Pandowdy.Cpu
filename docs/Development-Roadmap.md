@@ -11,13 +11,15 @@
 | **Branch** | `develop` |
 | **Tests** | 1235 tests passing ✅ |
 | **Last Milestone** | Keyboard Reset Implementation (Task 6) |
-| **Next Focus** | GUI Disk Management Features (Task 5) |
+| **Next Focus** | CPU Migration to Pandowdy.Cpu (Task 18) |
 
 ---
 
 ## Table of Contents
 
 1. [Active Tasks](#active-tasks)
+   - [Task 18: Migrate to Pandowdy.Cpu](#task-18-migrate-to-pandowdycpu-critical-priority)
+   - [Task 19: Basic Debugger Implementation](#task-19-basic-debugger-implementation-high-priority)
    - [Task 5: GUI Disk Management Features](#task-5-gui-disk-management-features-high-priority)
    - [Task 10: SectorDiskImageProvider Debugging](#task-10-sectordiskimageprovider-debugging-high-priority)
    - [Task 13: Audio Emulation Implementation](#task-13-audio-emulation-implementation-medium-priority)
@@ -35,6 +37,7 @@
    - [Task 15: Authentic Apple II Keyboard Repeat](#task-15-authentic-apple-ii-keyboard-repeat-low-priority)
    - [Task 16: Research Cross-Platform Shader Rendering for Avalonia](#task-16-research-cross-platform-shader-rendering-for-avalonia-low-priority)
    - [Task 17: Research Compute-Shader Toolkits for Bitplane Processing](#task-17-research-compute-shader-toolkits-for-bitplane-processing-medium-priority)
+   - [Task 20: Advanced Debugger Features](#task-20-advanced-debugger-features-low-priority)
 3. [Completed Tasks](#completed-tasks)
    - [Task 3: Removed](#task-3-removed)
    - [Task 6: Clear Pending Keystrokes on Reset](#task-6-clear-pending-keystrokes-on-reset)
@@ -45,6 +48,281 @@
 ---
 
 ## Active Tasks
+
+### Task 18: Migrate to Pandowdy.Cpu (Critical Priority)
+
+**Goal:** Replace the legacy 6502.NET Emulator project with the new Pandowdy.Cpu library, eliminating the external dependency and improving CPU emulation architecture.
+
+**Status:** ⏳ NOT STARTED
+
+**Current State:**
+- `CPUAdapter.cs` wraps the legacy `Emulator.CPU` class from `legacy/6502.NET/Emulator`
+- Legacy CPU uses Connect-Execute-Disconnect pattern (performance overhead)
+- `ICpu` interface depends on `Emulator.ProcessorStatus` type
+- External dependency complicates builds and testing
+
+**New Pandowdy.Cpu Project:**
+- Located at: `E:\develop\Pandowdy.Cpu` (separate repository)
+- Provides: `Cpu6502.cs`, `Cpu65C02.cs`, `Cpu65C02Rockwell.cs` variants
+- Interface: `IPandowdyCpu` with `IPandowdyCpuBus` bus interface
+- Tested: Dormann tests, Harte SST tests for cycle-accuracy
+- Features: Direct bus access, no connection overhead, cycle-accurate
+
+**Migration Strategy:**
+
+**Phase 1: Add Pandowdy.Cpu to Solution**
+- Add `Pandowdy.Cpu` project to the solution (project reference or NuGet)
+- Keep legacy Emulator project temporarily for comparison
+
+**Phase 2: Create Bus Adapter**
+- Create `AppleIIBusToCpuBusAdapter` implementing `IPandowdyCpuBus`
+- Adapts `IAppleIIBus` methods (`CpuRead`, `CpuWrite`) to `IPandowdyCpuBus`
+- Follows DI guidelines: adapter is injected, not created internally
+
+**Phase 3: Update ICpu Interface**
+- Remove dependency on `Emulator.ProcessorStatus`
+- Define native `ProcessorStatus` struct/enum in `Pandowdy.EmuCore`
+- Keep `ICpu` API stable to minimize downstream changes
+
+**Phase 4: Replace CPUAdapter Implementation**
+- Create new `Cpu6502Adapter` (or replace `CPUAdapter`) using `Pandowdy.Cpu`
+- Remove Connect-Execute-Disconnect pattern overhead
+- Direct method calls: `_cpu.Clock()` with bus reference
+
+**Phase 5: Update DI Registration**
+- Update `Program.cs` to register new CPU implementation
+- Register bus adapter in DI container
+- Remove legacy Emulator project reference
+
+**Phase 6: Cleanup**
+- Remove `legacy/6502.NET/Emulator` from solution
+- Update documentation
+- Run full test suite
+
+**Files to Create/Modify:**
+
+*New Files:*
+- `Pandowdy.EmuCore\Adapters\AppleIIBusToCpuBusAdapter.cs` - Bus interface adapter
+- `Pandowdy.EmuCore\Types\ProcessorStatus.cs` - Native processor status (if needed)
+
+*Modified Files:*
+- `Pandowdy.EmuCore\Interfaces\ICpu.cs` - Remove `Emulator.ProcessorStatus` dependency
+- `Pandowdy.EmuCore\CPUAdapter.cs` - Replace with new Pandowdy.Cpu wrapper
+- `Pandowdy.EmuCore\Pandowdy.EmuCore.csproj` - Add Pandowdy.Cpu reference
+- `Pandowdy\Program.cs` - Update DI registration
+- `Pandowdy.EmuCore.Tests\CPUAdapterTests.cs` - Update tests for new CPU
+
+*Removed Files:*
+- `legacy\6502.NET\Emulator\Emulator.csproj` reference from solution
+
+**Technical Considerations:**
+- `IPandowdyCpuBus` has different method signatures than `IAppleIIBus`
+- Need to verify cycle-timing compatibility with Apple IIe requirements
+- Consider 65C02 vs 6502 - Apple IIe enhanced uses 65C02
+- ProcessorStatus type change may affect debugging tools
+
+**Testing Requirements:**
+- All existing CPU tests must pass
+- Run Dormann functional test suite through emulator
+- Verify timing-sensitive software (disk access, video sync)
+- Performance comparison: legacy vs new CPU
+
+**Benefits:**
+- ✅ Eliminates external legacy dependency
+- ✅ Removes Connect-Execute-Disconnect overhead
+- ✅ Cycle-accurate, well-tested implementation
+- ✅ Native .NET 8 implementation
+- ✅ Supports 6502, 65C02, 65C02 Rockwell variants
+- ✅ Better integration with Pandowdy architecture
+- ✅ Follows DI guidelines (injected dependencies)
+- ✅ **Enables future debugger implementation** - Pandowdy.Cpu provides better state introspection, breakpoint hooks, and single-step capabilities needed for a proper debugger
+
+**Priority:** Critical (blocks clean architecture, adds unnecessary complexity)
+
+**Enables Future Work:**
+- **Debugger Implementation:** Task 19 implements a basic debugger using Pandowdy.Cpu's state introspection capabilities
+- **Dependency Chain:** The debugger (Task 19) will significantly aid completion of:
+  - **Task 5** (GUI Disk Management) - Debug disk load/format issues
+  - **Task 10** (SectorDiskImageProvider) - Step through GCR encoding and sector synthesis
+  - **Task 13** (Audio Emulation) - Debug cycle-timing and audio sync issues
+
+---
+
+### Task 19: Basic Debugger Implementation (High Priority)
+
+**Goal:** Implement a rudimentary debugger for Pandowdy using Pandowdy.Cpu's introspection capabilities, enabling breakpoints, watches, and stepping through code.
+
+**Status:** ⏳ NOT STARTED
+
+**Prerequisites:**
+- Task 18 (Migrate to Pandowdy.Cpu) must be completed first
+- Pandowdy.Cpu provides the state introspection, breakpoint hooks, and single-step capabilities needed
+
+**Current State (Post-Task 18):**
+- Pandowdy.Cpu integrated with cycle-accurate execution
+- CPU state accessible (registers, flags, PC, SP)
+- Need debugging infrastructure to expose these capabilities
+
+**Scope: Basic Debugger (Not Full IDE)**
+This is a foundational debugger to aid development, not a full-featured IDE debugger. Focus on essential features.
+
+**Features to Implement:**
+
+1. **Breakpoints**
+   - Address breakpoints (break when PC reaches address)
+   - Conditional breakpoints (break when condition met, e.g., A == $FF)
+   - Enable/disable breakpoints without removing
+   - Breakpoint list management (add, remove, clear all)
+
+2. **Watches**
+   - Memory watches (monitor specific addresses)
+   - Register watches (A, X, Y, SP, PC, Status)
+   - Watch display in UI panel
+   - Optional: break on memory write to watched address
+
+3. **Stepping Modes**
+   - **Step Into** - Execute one instruction, follow JSR/JMP
+   - **Step Over** - Execute one instruction, treat JSR as single step (run until RTS)
+   - **Step Out** - Run until current subroutine returns (RTS/RTI)
+   - **Run Until** - Run until specific address reached
+   - **Note:** Favor instruction stepping over cycle stepping (even though Pandowdy.Cpu is cycle-accurate)
+
+4. **Execution Control**
+   - Pause/Resume execution
+   - Single instruction step (default)
+   - Single cycle step (optional, for advanced debugging)
+   - Run to cursor/address
+
+5. **CPU State Display**
+   - Registers: A, X, Y, SP, PC
+   - Status flags: N, V, B, D, I, Z, C (with visual indicators)
+   - Current instruction disassembly
+   - Stack contents (top N entries)
+
+**Technical Approach:**
+
+**Instruction vs Cycle Stepping:**
+```csharp
+// Prefer instruction stepping (cleaner UX)
+public void StepInstruction()
+{
+    do
+    {
+        _cpu.Clock(bus);
+    } while (!_cpu.IsInstructionComplete());
+}
+
+// Cycle stepping available for advanced use
+public void StepCycle()
+{
+    _cpu.Clock(bus);
+}
+```
+
+**Breakpoint Check Pattern:**
+```csharp
+public void RunWithBreakpoints()
+{
+    while (_running)
+    {
+        if (_breakpoints.Contains(_cpu.PC))
+        {
+            _running = false;
+            OnBreakpointHit?.Invoke(_cpu.PC);
+            break;
+        }
+
+        _cpu.Clock(bus);
+
+        if (_cpu.IsInstructionComplete())
+        {
+            CheckConditionalBreakpoints();
+            CheckWatchBreakpoints();
+        }
+    }
+}
+```
+
+**Step Over Implementation:**
+```csharp
+public void StepOver()
+{
+    ushort currentPC = _cpu.PC;
+    byte opcode = bus.CpuRead(currentPC);
+
+    if (IsJsrInstruction(opcode))
+    {
+        // Set temporary breakpoint at next instruction
+        ushort returnAddress = (ushort)(currentPC + 3); // JSR is 3 bytes
+        RunUntil(returnAddress);
+    }
+    else
+    {
+        StepInstruction();
+    }
+}
+```
+
+**Files to Create:**
+
+*Core Debugger:*
+- `Pandowdy.EmuCore\Debugging\IDebugger.cs` - Debugger interface
+- `Pandowdy.EmuCore\Debugging\Debugger.cs` - Main debugger implementation
+- `Pandowdy.EmuCore\Debugging\Breakpoint.cs` - Breakpoint model
+- `Pandowdy.EmuCore\Debugging\Watch.cs` - Watch model
+- `Pandowdy.EmuCore\Debugging\DebuggerState.cs` - Debugger state enum (Running, Paused, Stepping)
+
+*UI Components:*
+- `Pandowdy.UI\Controls\DebuggerPanel.axaml` - Main debugger UI panel
+- `Pandowdy.UI\ViewModels\DebuggerPanelViewModel.cs` - Debugger panel view model
+- `Pandowdy.UI\Controls\RegistersPanel.axaml` - CPU registers display
+- `Pandowdy.UI\Controls\BreakpointListPanel.axaml` - Breakpoint management
+- `Pandowdy.UI\Controls\WatchPanel.axaml` - Watch variables display
+
+*Tests:*
+- `Pandowdy.EmuCore.Tests\Debugging\DebuggerTests.cs` - Unit tests for debugger
+- `Pandowdy.EmuCore.Tests\Debugging\BreakpointTests.cs` - Breakpoint logic tests
+
+**Modified Files:**
+- `Pandowdy.EmuCore\VA2M.cs` - Integrate debugger into main emulation loop
+- `Pandowdy.UI\MainWindow.axaml` - Add debugger panel/menu
+- `Pandowdy.UI\ViewModels\MainWindowViewModel.cs` - Debugger commands
+- `Pandowdy\Program.cs` - Register debugger in DI
+
+**Architecture Notes:**
+- Debugger is injected via DI (follows project guidelines)
+- Debugger wraps or coordinates with CPU execution
+- UI binds to debugger state via ReactiveUI
+- Breakpoint checks happen at instruction boundaries (not every cycle)
+- Stepping defaults to instruction-level granularity
+
+**UI Integration:**
+- Debugger panel dockable (integrates with future Task 12)
+- Keyboard shortcuts: F5 (Run), F10 (Step Over), F11 (Step Into), Shift+F11 (Step Out)
+- Toolbar buttons for common operations
+- Status bar shows debugger state (Running/Paused/Stepping)
+
+**Testing Strategy:**
+- Unit tests for breakpoint matching
+- Unit tests for step over/into/out logic
+- Integration tests with simple 6502 programs
+- Verify stepping doesn't affect cycle timing
+
+**Benefits:**
+- ✅ Enables debugging of disk loading issues (Task 5)
+- ✅ Essential for GCR/sector debugging (Task 10)
+- ✅ Helps debug audio timing (Task 13)
+- ✅ General development productivity improvement
+- ✅ Foundation for future advanced debugging features
+
+**Priority:** High (unblocks Tasks 5, 10, 13)
+
+**Dependencies:**
+- **Requires:** Task 18 (Pandowdy.Cpu migration)
+- **Enables:** Tasks 5, 10, 13 (debugging support)
+- **Related:** Task 12 (docking system for debugger panels)
+
+---
 
 ### Task 5: GUI Disk Management Features (High Priority)
 
@@ -91,6 +369,9 @@
 - Hardcoded test images in `Program.cs` are intentional for development
 - Location on E:\ drive is intentional for development
 
+**Dependencies:**
+- Would benefit from debugger (Task 19) for troubleshooting disk load/format issues
+
 ---
 
 ### Task 10: SectorDiskImageProvider Debugging (High Priority)
@@ -121,6 +402,9 @@
 - `Pandowdy.EmuCore.Tests\DiskII\Providers\SectorDiskImageProviderTests.cs` (13 tests exist)
 
 **Priority:** High (blocks DSK/DO/PO format support)
+
+**Dependencies:**
+- Would greatly benefit from debugger (Task 19) for stepping through GCR encoding and sector synthesis
 
 ---
 
@@ -230,6 +514,9 @@
 - Architecture should allow easy addition of card-based audio
 
 **Priority:** Medium
+
+**Dependencies:**
+- May benefit from debugger (Task 19) for debugging cycle-timing and audio sync issues
 
 ---
 
@@ -1074,6 +1361,142 @@ fn merge_bitplanes(@builtin(global_invocation_id) id: vec3<u32>) {
 - Would offload work from emulator thread
 - May improve performance for complex video modes
 - Consider after core emulation stable
+
+---
+
+### Task 20: Advanced Debugger Features (Low Priority)
+
+**Goal:** Expand the basic debugger (Task 19) with advanced features for comprehensive debugging and development support.
+
+**Status:** ⏳ NOT STARTED
+
+**Prerequisites:**
+- Task 19 (Basic Debugger Implementation) must be completed first
+- This builds on the foundation established in Task 19
+
+**Current State (Post-Task 19):**
+- Basic breakpoints, watches, and stepping implemented
+- CPU state display working
+- Need additional features for advanced debugging scenarios
+
+**Scope: Advanced Features**
+This task adds features beyond the essential debugging capabilities, providing a more comprehensive development experience.
+
+**Features to Implement:**
+
+**1. Memory Viewer/Editor**
+- Hex dump view of memory ranges ($0000-$FFFF)
+- ASCII representation alongside hex
+- Edit memory values directly
+- Jump to address
+- Memory search (pattern, string, value)
+- Memory compare (find differences between snapshots)
+- Highlight recently changed bytes
+
+**2. Disassembly View**
+- Real-time disassembly of memory
+- Scrollable disassembly window
+- Show labels/symbols if available
+- Highlight current PC location
+- Click to set breakpoints on instructions
+- Show branch targets and jump destinations
+- Optional: cycle count per instruction
+
+**3. Enhanced Breakpoints**
+- Data breakpoints (break on memory read/write)
+- Range breakpoints (break when PC in range)
+- Hardware breakpoints (break on I/O access, e.g., $C0xx)
+- Breakpoint hit counts (break after N hits)
+- Breakpoint groups (enable/disable groups)
+- Breakpoint import/export (save/load breakpoint sets)
+- Log breakpoints (log message without stopping)
+
+**4. Execution History/Trace**
+- Instruction trace buffer (last N instructions executed)
+- Trace to file for offline analysis
+- Trace filtering (e.g., only JSR/RTS, only memory writes)
+- Reverse debugging (step backward through trace)
+- Trace visualization (call graph, execution flow)
+
+**5. Symbol Support**
+- Load symbol files (various formats)
+- Display symbols in disassembly
+- Symbol-aware breakpoints (break on function name)
+- Symbol browser panel
+- Auto-detect common ROM entry points
+
+**6. Stack Visualization**
+- Graphical stack view
+- Show return addresses
+- Stack frame boundaries
+- JSR/RTS matching
+- Stack depth indicator
+
+**7. I/O and Hardware Debugging**
+- Soft switch state panel (expanded view)
+- I/O access logging
+- Peripheral card state inspection
+- Disk II head position/motor state
+- Video mode state visualization
+- Memory bank switching visualization
+
+**8. Scripting/Automation**
+- Debugger scripting (simple command language or C# scripting)
+- Automated test scripts
+- Breakpoint actions (run script on break)
+- Memory validation scripts
+- Batch debugging operations
+
+**9. Performance Profiling**
+- Instruction execution counts
+- Hotspot detection (most executed addresses)
+- Time spent in routines
+- Call frequency analysis
+- Memory access patterns
+
+**10. State Snapshots**
+- Save/load complete emulator state
+- Quick save slots
+- State comparison (diff two states)
+- State annotations/notes
+- Auto-save on breakpoint hit
+
+**Files to Create:**
+
+*Core Components:*
+- `Pandowdy.EmuCore\Debugging\MemoryViewer.cs` - Memory view/edit logic
+- `Pandowdy.EmuCore\Debugging\Disassembler.cs` - Disassembly engine
+- `Pandowdy.EmuCore\Debugging\TraceBuffer.cs` - Execution trace buffer
+- `Pandowdy.EmuCore\Debugging\SymbolTable.cs` - Symbol management
+- `Pandowdy.EmuCore\Debugging\DataBreakpoint.cs` - Data breakpoint support
+- `Pandowdy.EmuCore\Debugging\Profiler.cs` - Execution profiler
+
+*UI Components:*
+- `Pandowdy.UI\Controls\MemoryViewerPanel.axaml` - Memory hex viewer
+- `Pandowdy.UI\Controls\DisassemblyPanel.axaml` - Disassembly view
+- `Pandowdy.UI\Controls\TracePanel.axaml` - Execution trace view
+- `Pandowdy.UI\Controls\StackPanel.axaml` - Stack visualization
+- `Pandowdy.UI\Controls\ProfilerPanel.axaml` - Profiling results
+
+**Technical Considerations:**
+- Memory viewer must be efficient for large address spaces
+- Trace buffer needs ring buffer for bounded memory usage
+- Disassembler should cache results for performance
+- Symbol loading should be lazy/async
+- Consider performance impact of data breakpoints (every memory access)
+- Profiling should be toggleable to avoid performance overhead
+
+**UI Integration:**
+- All panels dockable (integrates with Task 12)
+- Consistent keyboard shortcuts across panels
+- Context menus for common operations
+- Toolbar for panel visibility
+
+**Priority:** Low (nice-to-have after core debugger works)
+
+**Dependencies:**
+- **Requires:** Task 19 (Basic Debugger Implementation)
+- **Related:** Task 12 (Flexible Window Docking System)
 
 ---
 
