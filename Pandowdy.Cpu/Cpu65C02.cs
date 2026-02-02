@@ -7,8 +7,19 @@ namespace Pandowdy.Cpu;
 /// <summary>
 /// WDC 65C02 CPU with CMOS enhancements.
 /// </summary>
-public sealed class Cpu65C02(CpuStateBuffer buffer) : CpuBase(buffer)
+public sealed class Cpu65C02 : CpuBase
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Cpu65C02"/> class with a new state.
+    /// </summary>
+    public Cpu65C02() : base() { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Cpu65C02"/> class with an existing state.
+    /// </summary>
+    /// <param name="state">The CPU state to use.</param>
+    public Cpu65C02(CpuState state) : base(state) { }
+
     /// <inheritdoc />
     public override CpuVariant Variant => CpuVariant.Wdc65C02;
 

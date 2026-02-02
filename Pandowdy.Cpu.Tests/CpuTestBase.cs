@@ -20,7 +20,6 @@ public abstract class CpuTestBase
     protected abstract CpuVariant Variant { get; }
 
     protected TestRamBus Bus { get; private set; } = null!;
-    protected CpuStateBuffer CpuBuffer { get; private set; } = null!;
     protected IPandowdyCpu Cpu { get; private set; } = null!;
 
     protected void SetupCpu()
@@ -31,8 +30,7 @@ public abstract class CpuTestBase
     protected void SetupCpu(CpuVariant variant)
     {
         Bus = new TestRamBus();
-        CpuBuffer = new CpuStateBuffer();
-        Cpu = CpuFactory.Create(variant, CpuBuffer);
+        Cpu = CpuFactory.Create(variant);
         Bus.SetResetVector(ProgramStart);
         Bus.SetIrqVector(IrqHandler);
         Bus.SetNmiVector(NmiHandler);
@@ -65,7 +63,7 @@ public abstract class CpuTestBase
     {
         if (Cpu.Variant != variant)
         {
-            Cpu = CpuFactory.Create(variant, CpuBuffer);
+            Cpu = CpuFactory.Create(variant, Cpu.State);
         }
 
         return Cpu.Step(Bus);
@@ -86,7 +84,7 @@ public abstract class CpuTestBase
     {
         if (Cpu.Variant != variant)
         {
-            Cpu = CpuFactory.Create(variant, CpuBuffer);
+            Cpu = CpuFactory.Create(variant, Cpu.State);
         }
 
         int cycles = 0;
@@ -100,9 +98,9 @@ public abstract class CpuTestBase
     }
 
     /// <summary>
-    /// Gets the current CPU state (after instruction completes, this is in Current).
+    /// Gets the current CPU state.
     /// </summary>
-    protected CpuState CurrentState => CpuBuffer.Current;
+    protected CpuState CurrentState => Cpu.State;
 
     /// <summary>
     /// Helper to set a value in zero page.

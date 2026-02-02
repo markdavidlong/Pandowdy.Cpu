@@ -21,12 +21,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x15 + 0x27 = 0x42 in BCD
         LoadAndReset([0x69, 0x27]); // ADC #$27
-        CpuBuffer.Current.A = 0x15;
-        CpuBuffer.Prev.A = 0x15;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x15;
+        CurrentState.A = 0x15;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -39,12 +39,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x15 + 0x27 + 1 = 0x43 in BCD
         LoadAndReset([0x69, 0x27]); // ADC #$27
-        CpuBuffer.Current.A = 0x15;
-        CpuBuffer.Prev.A = 0x15;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x15;
+        CurrentState.A = 0x15;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
 
         StepInstruction();
 
@@ -57,12 +57,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x09 + 0x01 = 0x10 in BCD (low nibble wraps)
         LoadAndReset([0x69, 0x01]); // ADC #$01
-        CpuBuffer.Current.A = 0x09;
-        CpuBuffer.Prev.A = 0x09;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x09;
+        CurrentState.A = 0x09;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -75,12 +75,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x90 + 0x10 = 0x00 with carry in BCD
         LoadAndReset([0x69, 0x10]); // ADC #$10
-        CpuBuffer.Current.A = 0x90;
-        CpuBuffer.Prev.A = 0x90;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x90;
+        CurrentState.A = 0x90;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -93,12 +93,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x99 + 0x01 = 0x00 with carry in BCD
         LoadAndReset([0x69, 0x01]); // ADC #$01
-        CpuBuffer.Current.A = 0x99;
-        CpuBuffer.Prev.A = 0x99;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x99;
+        CurrentState.A = 0x99;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -111,12 +111,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x99 + 0x99 + 1 = 0x99 with carry in BCD (199 in decimal)
         LoadAndReset([0x69, 0x99]); // ADC #$99
-        CpuBuffer.Current.A = 0x99;
-        CpuBuffer.Prev.A = 0x99;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x99;
+        CurrentState.A = 0x99;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
 
         StepInstruction();
 
@@ -129,12 +129,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x00 + 0x00 = 0x00 in BCD
         LoadAndReset([0x69, 0x00]); // ADC #$00
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -152,12 +152,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x42 - 0x15 = 0x27 in BCD
         LoadAndReset([0xE9, 0x15]); // SBC #$15
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true; // No borrow
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true; // No borrow
+        CurrentState.CarryFlag = true;
 
         StepInstruction();
 
@@ -170,12 +170,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x42 - 0x15 - 1 = 0x26 in BCD (C=0 means borrow)
         LoadAndReset([0xE9, 0x15]); // SBC #$15
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false; // Borrow in
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false; // Borrow in
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -188,12 +188,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x10 - 0x01 = 0x09 in BCD
         LoadAndReset([0xE9, 0x01]); // SBC #$01
-        CpuBuffer.Current.A = 0x10;
-        CpuBuffer.Prev.A = 0x10;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x10;
+        CurrentState.A = 0x10;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
 
         StepInstruction();
 
@@ -206,12 +206,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x00 - 0x01 = 0x99 with borrow in BCD
         LoadAndReset([0xE9, 0x01]); // SBC #$01
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
 
         StepInstruction();
 
@@ -224,12 +224,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x00 - 0x00 = 0x00 in BCD
         LoadAndReset([0xE9, 0x00]); // SBC #$00
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
 
         StepInstruction();
 
@@ -242,12 +242,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x50 - 0x50 = 0x00 in BCD
         LoadAndReset([0xE9, 0x50]); // SBC #$50
-        CpuBuffer.Current.A = 0x50;
-        CpuBuffer.Prev.A = 0x50;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x50;
+        CurrentState.A = 0x50;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
 
         StepInstruction();
 
@@ -265,12 +265,12 @@ public class DecimalModeTests : CpuTestBase
         // NMOS 6502: Z flag is based on binary sum, not BCD result
         // 0x99 + 0x01 = 0x00 BCD, but binary 0x99 + 0x01 = 0x9A (not zero)
         LoadAndReset([0x69, 0x01]); // ADC #$01
-        CpuBuffer.Current.A = 0x99;
-        CpuBuffer.Prev.A = 0x99;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x99;
+        CurrentState.A = 0x99;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction(CpuVariant.Nmos6502);
 
@@ -284,12 +284,12 @@ public class DecimalModeTests : CpuTestBase
         // CMOS 65C02: Z flag is based on BCD result
         // 0x99 + 0x01 = 0x00 BCD, Z should be true
         LoadAndReset([0x69, 0x01]); // ADC #$01
-        CpuBuffer.Current.A = 0x99;
-        CpuBuffer.Prev.A = 0x99;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x99;
+        CurrentState.A = 0x99;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction(CpuVariant.Wdc65C02);
 
@@ -303,12 +303,12 @@ public class DecimalModeTests : CpuTestBase
         // NMOS: N flag based on intermediate result (after low nibble adjust)
         // 0x79 + 0x10 = 0x89 BCD
         LoadAndReset([0x69, 0x10]); // ADC #$10
-        CpuBuffer.Current.A = 0x79;
-        CpuBuffer.Prev.A = 0x79;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x79;
+        CurrentState.A = 0x79;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction(CpuVariant.Nmos6502);
 
@@ -322,12 +322,12 @@ public class DecimalModeTests : CpuTestBase
         // CMOS: N flag based on BCD result
         // 0x79 + 0x10 = 0x89 BCD (bit 7 set)
         LoadAndReset([0x69, 0x10]); // ADC #$10
-        CpuBuffer.Current.A = 0x79;
-        CpuBuffer.Prev.A = 0x79;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x79;
+        CurrentState.A = 0x79;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction(CpuVariant.Wdc65C02);
 
@@ -341,12 +341,12 @@ public class DecimalModeTests : CpuTestBase
         // NMOS: N and Z flags based on binary subtraction result
         // 0x01 - 0x01 = 0x00 (both BCD and binary are zero)
         LoadAndReset([0xE9, 0x01]); // SBC #$01
-        CpuBuffer.Current.A = 0x01;
-        CpuBuffer.Prev.A = 0x01;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x01;
+        CurrentState.A = 0x01;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
 
         StepInstruction(CpuVariant.Nmos6502);
 
@@ -360,12 +360,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // CMOS: N and Z flags based on BCD result
         LoadAndReset([0xE9, 0x01]); // SBC #$01
-        CpuBuffer.Current.A = 0x01;
-        CpuBuffer.Prev.A = 0x01;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x01;
+        CurrentState.A = 0x01;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
 
         StepInstruction(CpuVariant.Wdc65C02);
 
@@ -383,12 +383,12 @@ public class DecimalModeTests : CpuTestBase
         // In decimal mode, V flag is calculated on intermediate value
         // 0x79 + 0x10 = 0x89 (positive + positive = "negative" in signed interpretation)
         LoadAndReset([0x69, 0x10]); // ADC #$10
-        CpuBuffer.Current.A = 0x79;
-        CpuBuffer.Prev.A = 0x79;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x79;
+        CurrentState.A = 0x79;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -400,12 +400,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x15 + 0x27 = 0x42 (no sign change)
         LoadAndReset([0x69, 0x27]); // ADC #$27
-        CpuBuffer.Current.A = 0x15;
-        CpuBuffer.Prev.A = 0x15;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x15;
+        CurrentState.A = 0x15;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -418,12 +418,12 @@ public class DecimalModeTests : CpuTestBase
         // Subtracting negative from positive can cause overflow
         // 0x80 - 0x01 = 0x79 ("negative" - positive = positive)
         LoadAndReset([0xE9, 0x01]); // SBC #$01
-        CpuBuffer.Current.A = 0x80;
-        CpuBuffer.Prev.A = 0x80;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x80;
+        CurrentState.A = 0x80;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
 
         StepInstruction();
 
@@ -440,12 +440,12 @@ public class DecimalModeTests : CpuTestBase
         // Invalid BCD values (nibbles > 9) are corrected
         // 0x0A + 0x01 = 0x11 (0A is invalid, but CPU corrects it)
         LoadAndReset([0x69, 0x01]); // ADC #$01
-        CpuBuffer.Current.A = 0x0A;
-        CpuBuffer.Prev.A = 0x0A;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x0A;
+        CurrentState.A = 0x0A;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -458,12 +458,12 @@ public class DecimalModeTests : CpuTestBase
     {
         // 0x00 - 0x01 with borrow = 0x98 (100 - 1 - 1 = 98)
         LoadAndReset([0xE9, 0x01]); // SBC #$01
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false; // Borrow in
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false; // Borrow in
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -477,12 +477,12 @@ public class DecimalModeTests : CpuTestBase
         // Test chained BCD addition: 0x56 + 0x78 = 0x34 with carry
         // Then add carry to next byte
         LoadAndReset([0x69, 0x78, 0x69, 0x00]); // ADC #$78, ADC #$00
-        CpuBuffer.Current.A = 0x56;
-        CpuBuffer.Prev.A = 0x56;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x56;
+        CurrentState.A = 0x56;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction(); // First ADC
 
@@ -509,12 +509,12 @@ public class DecimalModeTests : CpuTestBase
         foreach (var variant in new[] { CpuVariant.Nmos6502, CpuVariant.Nmos6502Simple, CpuVariant.Wdc65C02, CpuVariant.Rockwell65C02 })
         {
             LoadAndReset([0x69, m]); // ADC #m
-            CpuBuffer.Current.A = a;
-            CpuBuffer.Prev.A = a;
-            CpuBuffer.Current.DecimalFlag = true;
-            CpuBuffer.Prev.DecimalFlag = true;
-            CpuBuffer.Current.CarryFlag = false;
-            CpuBuffer.Prev.CarryFlag = false;
+            CurrentState.A = a;
+            CurrentState.A = a;
+            CurrentState.DecimalFlag = true;
+            CurrentState.DecimalFlag = true;
+            CurrentState.CarryFlag = false;
+            CurrentState.CarryFlag = false;
 
             StepInstruction(variant);
 
@@ -533,12 +533,12 @@ public class DecimalModeTests : CpuTestBase
         foreach (var variant in new[] { CpuVariant.Nmos6502, CpuVariant.Nmos6502Simple, CpuVariant.Wdc65C02, CpuVariant.Rockwell65C02 })
         {
             LoadAndReset([0xE9, m]); // SBC #m
-            CpuBuffer.Current.A = a;
-            CpuBuffer.Prev.A = a;
-            CpuBuffer.Current.DecimalFlag = true;
-            CpuBuffer.Prev.DecimalFlag = true;
-            CpuBuffer.Current.CarryFlag = true; // No borrow
-            CpuBuffer.Prev.CarryFlag = true;
+            CurrentState.A = a;
+            CurrentState.A = a;
+            CurrentState.DecimalFlag = true;
+            CurrentState.DecimalFlag = true;
+            CurrentState.CarryFlag = true; // No borrow
+            CurrentState.CarryFlag = true;
 
             StepInstruction(variant);
 

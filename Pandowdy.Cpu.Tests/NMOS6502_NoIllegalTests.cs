@@ -50,8 +50,8 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void Opcode0x1A_IsNOP()
     {
         LoadAndReset([0x1A]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
 
         int cycles = StepInstruction();
 
@@ -63,8 +63,8 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void Opcode0x3A_IsNOP()
     {
         LoadAndReset([0x3A]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
 
         StepInstruction();
 
@@ -75,10 +75,10 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void Opcode0x5A_IsNOP()
     {
         LoadAndReset([0x5A]);
-        CpuBuffer.Current.Y = 0x42;
-        CpuBuffer.Prev.Y = 0x42;
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.Y = 0x42;
+        CurrentState.Y = 0x42;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
 
         StepInstruction();
 
@@ -89,8 +89,8 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void Opcode0x7A_IsNOP()
     {
         LoadAndReset([0x7A]);
-        CpuBuffer.Current.Y = 0x42;
-        CpuBuffer.Prev.Y = 0x42;
+        CurrentState.Y = 0x42;
+        CurrentState.Y = 0x42;
 
         StepInstruction();
 
@@ -101,10 +101,10 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void Opcode0xDA_IsNOP()
     {
         LoadAndReset([0xDA]);
-        CpuBuffer.Current.X = 0x42;
-        CpuBuffer.Prev.X = 0x42;
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.X = 0x42;
+        CurrentState.X = 0x42;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
 
         StepInstruction();
 
@@ -115,8 +115,8 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     public void Opcode0xFA_IsNOP()
     {
         LoadAndReset([0xFA]);
-        CpuBuffer.Current.X = 0x42;
-        CpuBuffer.Prev.X = 0x42;
+        CurrentState.X = 0x42;
+        CurrentState.X = 0x42;
 
         StepInstruction();
 
@@ -166,10 +166,10 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
     {
         // On NO_ILLEGAL variant, 0xA7 should NOT load both A and X
         LoadAndReset([0xA7, 0x10]);
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
-        CpuBuffer.Current.X = 0x00;
-        CpuBuffer.Prev.X = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.X = 0x00;
+        CurrentState.X = 0x00;
         SetZeroPage(0x10, 0x42);
 
         StepInstruction();
@@ -184,10 +184,10 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
         {
             // On NO_ILLEGAL variant, 0x87 should NOT store A AND X
             LoadAndReset([0x87, 0x10]);
-            CpuBuffer.Current.A = 0xF0;
-            CpuBuffer.Prev.A = 0xF0;
-            CpuBuffer.Current.X = 0x0F;
-            CpuBuffer.Prev.X = 0x0F;
+            CurrentState.A = 0xF0;
+            CurrentState.A = 0xF0;
+            CurrentState.X = 0x0F;
+            CurrentState.X = 0x0F;
             Bus.Memory[0x10] = 0xFF;
 
             StepInstruction();
@@ -215,14 +215,14 @@ public class NMOS6502_NoIllegalTests : CoreInstructionTests
                 // Provide 3 bytes of operand data to cover all addressing modes
                 LoadAndReset([opcode, 0x00, 0x04]);
                 // Set up registers to avoid edge cases
-                CpuBuffer.Current.A = 0x00;
-                CpuBuffer.Prev.A = 0x00;
-                CpuBuffer.Current.X = 0x00;
-                CpuBuffer.Prev.X = 0x00;
-                CpuBuffer.Current.Y = 0x00;
-                CpuBuffer.Prev.Y = 0x00;
-                CpuBuffer.Current.SP = 0xFF;
-                CpuBuffer.Prev.SP = 0xFF;
+                CurrentState.A = 0x00;
+                CurrentState.A = 0x00;
+                CurrentState.X = 0x00;
+                CurrentState.X = 0x00;
+                CurrentState.Y = 0x00;
+                CurrentState.Y = 0x00;
+                CurrentState.SP = 0xFF;
+                CurrentState.SP = 0xFF;
 
                 int cycles = StepInstruction();
 

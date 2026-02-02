@@ -64,8 +64,8 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // LAX $10,Y (0xB7)
         LoadAndReset([0xB7, 0x10]);
-        CpuBuffer.Current.Y = 0x05;
-        CpuBuffer.Prev.Y = 0x05;
+        CurrentState.Y = 0x05;
+        CurrentState.Y = 0x05;
         SetZeroPage(0x15, 0x42);
 
         int cycles = StepInstruction();
@@ -94,10 +94,10 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // SAX $10 (0x87) - Store A AND X
         LoadAndReset([0x87, 0x10]);
-        CpuBuffer.Current.A = 0xF0;
-        CpuBuffer.Prev.A = 0xF0;
-        CpuBuffer.Current.X = 0x0F;
-        CpuBuffer.Prev.X = 0x0F;
+        CurrentState.A = 0xF0;
+        CurrentState.A = 0xF0;
+        CurrentState.X = 0x0F;
+        CurrentState.X = 0x0F;
 
         int cycles = StepInstruction();
 
@@ -110,10 +110,10 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // SAX $1234 (0x8F)
         LoadAndReset([0x8F, 0x34, 0x12]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
-        CpuBuffer.Current.X = 0x0F;
-        CpuBuffer.Prev.X = 0x0F;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.X = 0x0F;
+        CurrentState.X = 0x0F;
 
         int cycles = StepInstruction();
 
@@ -126,8 +126,8 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // DCP $10 (0xC7)
         LoadAndReset([0xC7, 0x10]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
         SetZeroPage(0x10, 0x43);
 
         int cycles = StepInstruction();
@@ -143,10 +143,10 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // ISC/ISB $10 (0xE7)
         LoadAndReset([0xE7, 0x10]);
-        CpuBuffer.Current.A = 0x50;
-        CpuBuffer.Prev.A = 0x50;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x50;
+        CurrentState.A = 0x50;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
         SetZeroPage(0x10, 0x0F);
 
         int cycles = StepInstruction();
@@ -161,8 +161,8 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // SLO $10 (0x07)
         LoadAndReset([0x07, 0x10]);
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
         SetZeroPage(0x10, 0x40);
 
         int cycles = StepInstruction();
@@ -177,10 +177,10 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // RLA $10 (0x27)
         LoadAndReset([0x27, 0x10]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
         SetZeroPage(0x10, 0x40);
 
         int cycles = StepInstruction();
@@ -195,8 +195,8 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // SRE $10 (0x47)
         LoadAndReset([0x47, 0x10]);
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
         SetZeroPage(0x10, 0x02);
 
         int cycles = StepInstruction();
@@ -211,10 +211,10 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // RRA $10 (0x67)
         LoadAndReset([0x67, 0x10]);
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
         SetZeroPage(0x10, 0x02);
 
         int cycles = StepInstruction();
@@ -228,8 +228,8 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // ANC #$80 (0x0B)
         LoadAndReset([0x0B, 0x80]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
 
         int cycles = StepInstruction();
 
@@ -244,8 +244,8 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // ALR #$FF (0x4B)
         LoadAndReset([0x4B, 0xFF]);
-        CpuBuffer.Current.A = 0x02;
-        CpuBuffer.Prev.A = 0x02;
+        CurrentState.A = 0x02;
+        CurrentState.A = 0x02;
 
         int cycles = StepInstruction();
 
@@ -259,10 +259,10 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // ARR #$FF (0x6B)
         LoadAndReset([0x6B, 0xFF]);
-        CpuBuffer.Current.A = 0x02;
-        CpuBuffer.Prev.A = 0x02;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x02;
+        CurrentState.A = 0x02;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
 
         int cycles = StepInstruction();
 
@@ -275,10 +275,10 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // AXS #$10 (0xCB)
         LoadAndReset([0xCB, 0x10]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
-        CpuBuffer.Current.X = 0x20;
-        CpuBuffer.Prev.X = 0x20;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.X = 0x20;
+        CurrentState.X = 0x20;
 
         int cycles = StepInstruction();
 
@@ -330,8 +330,8 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // JAM (0x02) followed by LDA #$42
         LoadAndReset([0x02, 0xA9, 0x42]);
-        CpuBuffer.Current.IgnoreHaltStopWait = true;
-        CpuBuffer.Prev.IgnoreHaltStopWait = true;
+        CurrentState.IgnoreHaltStopWait = true;
+        CurrentState.IgnoreHaltStopWait = true;
 
         StepInstruction();
 
@@ -351,8 +351,8 @@ public class NMOS6502Tests : CoreInstructionTests
     public void DCP_Absolute_Takes6Cycles()
     {
         LoadAndReset([0xCF, 0x34, 0x12]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
         SetMemory(0x1234, 0x43);
 
         int cycles = StepInstruction();
@@ -364,10 +364,10 @@ public class NMOS6502Tests : CoreInstructionTests
     public void DCP_AbsoluteX_Takes7Cycles()
     {
         LoadAndReset([0xDF, 0x00, 0x12]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
-        CpuBuffer.Current.X = 0x10;
-        CpuBuffer.Prev.X = 0x10;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.X = 0x10;
+        CurrentState.X = 0x10;
         SetMemory(0x1210, 0x43);
 
         int cycles = StepInstruction();
@@ -379,10 +379,10 @@ public class NMOS6502Tests : CoreInstructionTests
     public void ISC_Absolute_Takes6Cycles()
     {
         LoadAndReset([0xEF, 0x34, 0x12]);
-        CpuBuffer.Current.A = 0x50;
-        CpuBuffer.Prev.A = 0x50;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x50;
+        CurrentState.A = 0x50;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
         SetMemory(0x1234, 0x0F);
 
         int cycles = StepInstruction();
@@ -405,8 +405,8 @@ public class NMOS6502Tests : CoreInstructionTests
     public void RLA_Absolute_Takes6Cycles()
     {
         LoadAndReset([0x2F, 0x34, 0x12]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
         SetMemory(0x1234, 0x40);
 
         int cycles = StepInstruction();
@@ -429,8 +429,8 @@ public class NMOS6502Tests : CoreInstructionTests
     public void RRA_Absolute_Takes6Cycles()
     {
         LoadAndReset([0x6F, 0x34, 0x12]);
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
         SetMemory(0x1234, 0x02);
 
         int cycles = StepInstruction();
@@ -447,8 +447,8 @@ public class NMOS6502Tests : CoreInstructionTests
     {
         // 0x1A is NOP on NMOS
         LoadAndReset([0x1A]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
 
         int cycles = StepInstruction();
 
@@ -461,8 +461,8 @@ public class NMOS6502Tests : CoreInstructionTests
         {
             // 0x3A is NOP on NMOS
                     LoadAndReset([0x3A]);
-                    CpuBuffer.Current.A = 0x42;
-                    CpuBuffer.Prev.A = 0x42;
+                    CurrentState.A = 0x42;
+                    CurrentState.A = 0x42;
 
                     StepInstruction();
 
@@ -480,12 +480,12 @@ public class NMOS6502Tests : CoreInstructionTests
                     // 0x79 + 0x10 = 0x89 (BCD), but binary sum is 0x89 which has bit 7 set
                     // So N should be set based on binary calculation
                     LoadAndReset([0x69, 0x10]);  // ADC #$10
-                    CpuBuffer.Current.A = 0x79;
-                    CpuBuffer.Prev.A = 0x79;
-                    CpuBuffer.Current.DecimalFlag = true;
-                    CpuBuffer.Prev.DecimalFlag = true;
-                    CpuBuffer.Current.CarryFlag = false;
-                    CpuBuffer.Prev.CarryFlag = false;
+                    CurrentState.A = 0x79;
+                    CurrentState.A = 0x79;
+                    CurrentState.DecimalFlag = true;
+                    CurrentState.DecimalFlag = true;
+                    CurrentState.CarryFlag = false;
+                    CurrentState.CarryFlag = false;
 
                     StepInstruction();
 
@@ -500,12 +500,12 @@ public class NMOS6502Tests : CoreInstructionTests
                     // NMOS 6502: Z flag is set based on the BINARY result, not the BCD result
                     // 0x99 + 0x01 = 0x00 (BCD with carry), binary sum is 0x9A (not zero)
                     LoadAndReset([0x69, 0x01]);  // ADC #$01
-                    CpuBuffer.Current.A = 0x99;
-                    CpuBuffer.Prev.A = 0x99;
-                    CpuBuffer.Current.DecimalFlag = true;
-                    CpuBuffer.Prev.DecimalFlag = true;
-                    CpuBuffer.Current.CarryFlag = false;
-                    CpuBuffer.Prev.CarryFlag = false;
+                    CurrentState.A = 0x99;
+                    CurrentState.A = 0x99;
+                    CurrentState.DecimalFlag = true;
+                    CurrentState.DecimalFlag = true;
+                    CurrentState.CarryFlag = false;
+                    CurrentState.CarryFlag = false;
 
                     StepInstruction();
 
@@ -521,12 +521,12 @@ public class NMOS6502Tests : CoreInstructionTests
                     // NMOS 6502: N flag is set based on the BINARY result, not the BCD result
                     // 0x00 - 0x01 = 0x99 (BCD with borrow), binary diff is 0xFF (bit 7 set)
                     LoadAndReset([0xE9, 0x01]);  // SBC #$01
-                    CpuBuffer.Current.A = 0x00;
-                    CpuBuffer.Prev.A = 0x00;
-                    CpuBuffer.Current.DecimalFlag = true;
-                    CpuBuffer.Prev.DecimalFlag = true;
-                    CpuBuffer.Current.CarryFlag = true;  // No borrow
-                    CpuBuffer.Prev.CarryFlag = true;
+                    CurrentState.A = 0x00;
+                    CurrentState.A = 0x00;
+                    CurrentState.DecimalFlag = true;
+                    CurrentState.DecimalFlag = true;
+                    CurrentState.CarryFlag = true;  // No borrow
+                    CurrentState.CarryFlag = true;
 
                     StepInstruction();
 
@@ -541,12 +541,12 @@ public class NMOS6502Tests : CoreInstructionTests
                     // NMOS 6502: Z flag is set based on the BINARY result
                     // 0x01 - 0x01 = 0x00 (both BCD and binary are zero, so Z = true)
                     LoadAndReset([0xE9, 0x01]);  // SBC #$01
-                    CpuBuffer.Current.A = 0x01;
-                    CpuBuffer.Prev.A = 0x01;
-                    CpuBuffer.Current.DecimalFlag = true;
-                    CpuBuffer.Prev.DecimalFlag = true;
-                    CpuBuffer.Current.CarryFlag = true;  // No borrow
-                    CpuBuffer.Prev.CarryFlag = true;
+                    CurrentState.A = 0x01;
+                    CurrentState.A = 0x01;
+                    CurrentState.DecimalFlag = true;
+                    CurrentState.DecimalFlag = true;
+                    CurrentState.CarryFlag = true;  // No borrow
+                    CurrentState.CarryFlag = true;
 
                     StepInstruction();
 
@@ -574,14 +574,14 @@ public class NMOS6502Tests : CoreInstructionTests
                     // Provide 3 bytes of operand data to cover all addressing modes
                     LoadAndReset([opcode, 0x00, 0x04]);
                     // Set up registers to avoid edge cases
-                    CpuBuffer.Current.A = 0x00;
-                    CpuBuffer.Prev.A = 0x00;
-                    CpuBuffer.Current.X = 0x00;
-                    CpuBuffer.Prev.X = 0x00;
-                    CpuBuffer.Current.Y = 0x00;
-                    CpuBuffer.Prev.Y = 0x00;
-                    CpuBuffer.Current.SP = 0xFF;
-                    CpuBuffer.Prev.SP = 0xFF;
+                    CurrentState.A = 0x00;
+                    CurrentState.A = 0x00;
+                    CurrentState.X = 0x00;
+                    CurrentState.X = 0x00;
+                    CurrentState.Y = 0x00;
+                    CurrentState.Y = 0x00;
+                    CurrentState.SP = 0xFF;
+                    CurrentState.SP = 0xFF;
 
                     int cycles = StepInstruction();
 

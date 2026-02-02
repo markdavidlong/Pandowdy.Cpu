@@ -22,8 +22,7 @@ public class CpuInstanceTests
     [InlineData(CpuVariant.Rockwell65C02, typeof(Cpu65C02Rockwell))]
     public void FactoryCreatesExpectedType(CpuVariant variant, Type expectedType)
     {
-        var buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, buffer);
+        var cpu = CpuFactory.Create(variant);
 
         Assert.IsType(expectedType, cpu);
     }
@@ -35,8 +34,7 @@ public class CpuInstanceTests
     [InlineData(CpuVariant.Rockwell65C02)]
     public void VariantPropertyMatchesFactory(CpuVariant variant)
     {
-        var buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, buffer);
+        var cpu = CpuFactory.Create(variant);
 
         Assert.Equal(variant, cpu.Variant);
     }
@@ -49,13 +47,11 @@ public class CpuInstanceTests
     public void ResetLoadsResetVector(CpuVariant variant)
     {
         var bus = CreateBus();
-        var buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, buffer);
+        var cpu = CpuFactory.Create(variant);
 
         cpu.Reset(bus);
 
-        Assert.Equal(ProgramStart, buffer.Current.PC);
-        Assert.Equal(ProgramStart, buffer.Prev.PC);
+        Assert.Equal(ProgramStart, cpu.State.PC);
     }
 
     [Theory]
@@ -66,15 +62,14 @@ public class CpuInstanceTests
     public void StepExecutesInstruction(CpuVariant variant)
     {
         var bus = CreateBus();
-        var buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, buffer);
+        var cpu = CpuFactory.Create(variant);
         bus.LoadProgram(ProgramStart, [0xA9, 0x42]);
 
         cpu.Reset(bus);
         int cycles = cpu.Step(bus);
 
         Assert.Equal(2, cycles);
-        Assert.Equal(0x42, buffer.Current.A);
+        Assert.Equal(0x42, cpu.State.A);
     }
 
     [Theory]
@@ -85,23 +80,21 @@ public class CpuInstanceTests
     public void StepPopulatesOpcodeTracking(CpuVariant variant)
     {
         var bus = CreateBus();
-        var buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, buffer);
+        var cpu = CpuFactory.Create(variant);
         bus.LoadProgram(ProgramStart, [0xA9, 0x42]);
 
         cpu.Reset(bus);
         cpu.Step(bus);
 
-        Assert.Equal(0xA9, buffer.Current.CurrentOpcode);
-        Assert.Equal(ProgramStart, buffer.Current.OpcodeAddress);
+        Assert.Equal(0xA9, cpu.State.CurrentOpcode);
+        Assert.Equal(ProgramStart, cpu.State.OpcodeAddress);
     }
 
     [Fact]
     public void ClockCompletesInstruction()
     {
         var bus = CreateBus();
-        var buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(CpuVariant.Nmos6502, buffer);
+        var cpu = CpuFactory.Create(CpuVariant.Nmos6502);
         bus.LoadProgram(ProgramStart, [0xEA]);
 
         cpu.Reset(bus);
@@ -118,34 +111,32 @@ public class CpuInstanceTests
     }
 
     [Fact]
-    public void BufferPropertyAllowsSwap()
+    public void StatePropertyAllowsSwap()
     {
-        var buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(CpuVariant.Nmos6502, buffer);
-        var newBuffer = new CpuStateBuffer();
+        var cpu = CpuFactory.Create(CpuVariant.Nmos6502);
+        var newState = new CpuState();
 
-        cpu.Buffer = newBuffer;
+        cpu.State = newState;
 
-        Assert.Same(newBuffer, cpu.Buffer);
+        Assert.Same(newState, cpu.State);
     }
 
     [Fact]
     public void InterruptSignalsUpdatePendingInterrupt()
     {
-        var buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(CpuVariant.Nmos6502, buffer);
+        var cpu = CpuFactory.Create(CpuVariant.Nmos6502);
 
         cpu.SignalIrq();
-        Assert.Equal(PendingInterrupt.Irq, buffer.Current.PendingInterrupt);
+        Assert.Equal(PendingInterrupt.Irq, cpu.State.PendingInterrupt);
 
         cpu.ClearIrq();
-        Assert.Equal(PendingInterrupt.None, buffer.Current.PendingInterrupt);
+        Assert.Equal(PendingInterrupt.None, cpu.State.PendingInterrupt);
 
         cpu.SignalNmi();
-        Assert.Equal(PendingInterrupt.Nmi, buffer.Current.PendingInterrupt);
+        Assert.Equal(PendingInterrupt.Nmi, cpu.State.PendingInterrupt);
 
         cpu.SignalReset();
-        Assert.Equal(PendingInterrupt.Reset, buffer.Current.PendingInterrupt);
+        Assert.Equal(PendingInterrupt.Reset, cpu.State.PendingInterrupt);
     }
 
     private static TestRamBus CreateBus()

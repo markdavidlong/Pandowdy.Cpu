@@ -23,17 +23,17 @@ public class CpuInterruptHandlingTests
     public void IrqClearsDecimalFlagForCmosVariants(CpuVariant variant, bool expectedDecimal)
     {
         var cpu = CreateCpu(variant, out var bus, out var buffer);
-        buffer.Current.PC = 0x2000;
-        buffer.Current.DecimalFlag = true;
-        buffer.Current.InterruptDisableFlag = false;
+        cpu.State.PC = 0x2000;
+        cpu.State.DecimalFlag = true;
+        cpu.State.InterruptDisableFlag = false;
 
         cpu.SignalIrq();
         bool handled = cpu.HandlePendingInterrupt(bus);
 
         Assert.True(handled);
-        Assert.Equal(expectedDecimal, buffer.Current.DecimalFlag);
-        Assert.Equal(IrqHandler, buffer.Current.PC);
-        Assert.Equal(PendingInterrupt.None, buffer.Current.PendingInterrupt);
+        Assert.Equal(expectedDecimal, cpu.State.DecimalFlag);
+        Assert.Equal(IrqHandler, cpu.State.PC);
+        Assert.Equal(PendingInterrupt.None, cpu.State.PendingInterrupt);
     }
 
     [Theory]
@@ -44,47 +44,47 @@ public class CpuInterruptHandlingTests
     public void NmiClearsDecimalFlagForCmosVariants(CpuVariant variant, bool expectedDecimal)
     {
         var cpu = CreateCpu(variant, out var bus, out var buffer);
-        buffer.Current.PC = 0x2000;
-        buffer.Current.DecimalFlag = true;
+        cpu.State.PC = 0x2000;
+        cpu.State.DecimalFlag = true;
 
         cpu.SignalNmi();
         bool handled = cpu.HandlePendingInterrupt(bus);
 
         Assert.True(handled);
-        Assert.Equal(expectedDecimal, buffer.Current.DecimalFlag);
-        Assert.Equal(NmiHandler, buffer.Current.PC);
-        Assert.Equal(PendingInterrupt.None, buffer.Current.PendingInterrupt);
+        Assert.Equal(expectedDecimal, cpu.State.DecimalFlag);
+        Assert.Equal(NmiHandler, cpu.State.PC);
+        Assert.Equal(PendingInterrupt.None, cpu.State.PendingInterrupt);
     }
 
     [Fact]
     public void IrqIsMaskedWhenInterruptDisableSet()
     {
         var cpu = CreateCpu(CpuVariant.Nmos6502, out var bus, out var buffer);
-        buffer.Current.PC = 0x2000;
-        buffer.Current.InterruptDisableFlag = true;
+        cpu.State.PC = 0x2000;
+        cpu.State.InterruptDisableFlag = true;
 
         cpu.SignalIrq();
         bool handled = cpu.HandlePendingInterrupt(bus);
 
         Assert.False(handled);
-        Assert.Equal(PendingInterrupt.Irq, buffer.Current.PendingInterrupt);
-        Assert.Equal(0x2000, buffer.Current.PC);
+        Assert.Equal(PendingInterrupt.Irq, cpu.State.PendingInterrupt);
+        Assert.Equal(0x2000, cpu.State.PC);
     }
 
     [Fact]
     public void IrqWakesCpuWhenWaiting()
     {
         var cpu = CreateCpu(CpuVariant.Wdc65C02, out var bus, out var buffer);
-        buffer.Current.PC = 0x2000;
-        buffer.Current.InterruptDisableFlag = true;
-        buffer.Current.Status = CpuStatus.Waiting;
+        cpu.State.PC = 0x2000;
+        cpu.State.InterruptDisableFlag = true;
+        cpu.State.Status = CpuStatus.Waiting;
 
         cpu.SignalIrq();
         bool handled = cpu.HandlePendingInterrupt(bus);
 
         Assert.True(handled);
-        Assert.Equal(CpuStatus.Running, buffer.Current.Status);
-        Assert.Equal(IrqHandler, buffer.Current.PC);
+        Assert.Equal(CpuStatus.Running, cpu.State.Status);
+        Assert.Equal(IrqHandler, cpu.State.PC);
     }
 
     [Fact]
@@ -92,25 +92,25 @@ public class CpuInterruptHandlingTests
     {
         var cpu = CreateCpu(CpuVariant.Nmos6502, out var bus, out var buffer);
         bus.SetResetVector(0x1234);
-        buffer.Current.A = 0x42;
-        buffer.Current.X = 0x24;
-        buffer.Current.Y = 0x18;
-        buffer.Current.PC = 0x2000;
+        cpu.State.A = 0x42;
+        cpu.State.X = 0x24;
+        cpu.State.Y = 0x18;
+        cpu.State.PC = 0x2000;
 
         cpu.SignalReset();
         bool handled = cpu.HandlePendingInterrupt(bus);
 
         Assert.True(handled);
-        Assert.Equal(0, buffer.Current.A);
-        Assert.Equal(0, buffer.Current.X);
-        Assert.Equal(0, buffer.Current.Y);
-        Assert.Equal(0xFD, buffer.Current.SP);
-        Assert.Equal(0x1234, buffer.Current.PC);
-        Assert.Equal(CpuState.FlagU | CpuState.FlagI, buffer.Current.P);
-        Assert.Equal(0, buffer.Current.CurrentOpcode);
-        Assert.Equal(0, buffer.Current.OpcodeAddress);
-        Assert.Equal(CpuStatus.Running, buffer.Current.Status);
-        Assert.Equal(PendingInterrupt.None, buffer.Current.PendingInterrupt);
+        Assert.Equal(0, cpu.State.A);
+        Assert.Equal(0, cpu.State.X);
+        Assert.Equal(0, cpu.State.Y);
+        Assert.Equal(0xFD, cpu.State.SP);
+        Assert.Equal(0x1234, cpu.State.PC);
+        Assert.Equal(CpuState.FlagU | CpuState.FlagI, cpu.State.P);
+        Assert.Equal(0, cpu.State.CurrentOpcode);
+        Assert.Equal(0, cpu.State.OpcodeAddress);
+        Assert.Equal(CpuStatus.Running, cpu.State.Status);
+        Assert.Equal(PendingInterrupt.None, cpu.State.PendingInterrupt);
     }
 
     private static IPandowdyCpu CreateCpu(CpuVariant variant, out TestRamBus bus, out CpuStateBuffer buffer)
@@ -120,7 +120,7 @@ public class CpuInterruptHandlingTests
         bus.SetIrqVector(IrqHandler);
         bus.SetNmiVector(NmiHandler);
         buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, buffer);
+        var cpu = CpuFactory.Create(variant);
         cpu.Reset(bus);
         return cpu;
     }

@@ -49,11 +49,10 @@ public class CpuModuleTests : CpuTestBase
     public void Clock_ReturnsTrue_WhenCpuIsStopped()
     {
         LoadAndReset([0xEA]);
-        CpuBuffer.Current.Status = CpuStatus.Stopped;
-        CpuBuffer.Prev.Status = CpuStatus.Stopped;
-        
+        CurrentState.Status = CpuStatus.Stopped;
+
         bool complete = Cpu.Clock(Bus);
-        
+
         Assert.True(complete);
     }
 
@@ -61,11 +60,10 @@ public class CpuModuleTests : CpuTestBase
     public void Clock_ReturnsTrue_WhenCpuIsJammed()
     {
         LoadAndReset([0xEA]);
-        CpuBuffer.Current.Status = CpuStatus.Jammed;
-        CpuBuffer.Prev.Status = CpuStatus.Jammed;
-        
+        CurrentState.Status = CpuStatus.Jammed;
+
         bool complete = Cpu.Clock(Bus);
-        
+
         Assert.True(complete);
     }
 
@@ -73,8 +71,7 @@ public class CpuModuleTests : CpuTestBase
     public void Clock_ReturnsTrue_WhenCpuIsWaiting()
     {
         LoadAndReset([0xEA]);
-        CpuBuffer.Current.Status = CpuStatus.Waiting;
-        CpuBuffer.Prev.Status = CpuStatus.Waiting;
+        CurrentState.Status = CpuStatus.Waiting;
         
         bool complete = Cpu.Clock(Bus);
         
@@ -86,12 +83,11 @@ public class CpuModuleTests : CpuTestBase
     {
         // Bypassed means the CPU continues running
         LoadAndReset([0xEA]); // NOP
-        CpuBuffer.Current.Status = CpuStatus.Bypassed;
-        CpuBuffer.Prev.Status = CpuStatus.Bypassed;
-        
+        CurrentState.Status = CpuStatus.Bypassed;
+
         bool complete1 = Cpu.Clock(Bus);
         bool complete2 = Cpu.Clock(Bus);
-        
+
         Assert.False(complete1);
         Assert.True(complete2);
     }
@@ -100,10 +96,10 @@ public class CpuModuleTests : CpuTestBase
     public void Clock_ContinuesExecution_WhenStatusIsRunning()
     {
         LoadAndReset([0xEA]); // NOP
-        
+
         bool complete1 = Cpu.Clock(Bus);
         bool complete2 = Cpu.Clock(Bus);
-        
+
         Assert.False(complete1);
         Assert.True(complete2);
     }
@@ -112,13 +108,12 @@ public class CpuModuleTests : CpuTestBase
     public void Clock_DoesNotAdvancePC_WhenHalted()
     {
         LoadAndReset([0xEA]);
-        CpuBuffer.Current.Status = CpuStatus.Stopped;
-        CpuBuffer.Prev.Status = CpuStatus.Stopped;
-        ushort originalPC = CpuBuffer.Current.PC;
+        CurrentState.Status = CpuStatus.Stopped;
+        ushort originalPC = CurrentState.PC;
         
         Cpu.Clock(Bus);
         
-        Assert.Equal(originalPC, CpuBuffer.Current.PC);
+        Assert.Equal(originalPC, CurrentState.PC);
     }
 
     #endregion
@@ -171,11 +166,10 @@ public class CpuModuleTests : CpuTestBase
     public void Step_Returns1Cycle_WhenCpuIsStopped()
     {
         LoadAndReset([0xEA]);
-        CpuBuffer.Current.Status = CpuStatus.Stopped;
-        CpuBuffer.Prev.Status = CpuStatus.Stopped;
-        
+        CurrentState.Status = CpuStatus.Stopped;
+
         int cycles = Cpu.Step(Bus);
-        
+
         Assert.Equal(1, cycles);
     }
 
@@ -183,11 +177,10 @@ public class CpuModuleTests : CpuTestBase
     public void Step_Returns1Cycle_WhenCpuIsJammed()
     {
         LoadAndReset([0xEA]);
-        CpuBuffer.Current.Status = CpuStatus.Jammed;
-        CpuBuffer.Prev.Status = CpuStatus.Jammed;
-        
+        CurrentState.Status = CpuStatus.Jammed;
+
         int cycles = Cpu.Step(Bus);
-        
+
         Assert.Equal(1, cycles);
     }
 
@@ -195,11 +188,10 @@ public class CpuModuleTests : CpuTestBase
     public void Step_Returns1Cycle_WhenCpuIsWaiting()
     {
         LoadAndReset([0xEA]);
-        CpuBuffer.Current.Status = CpuStatus.Waiting;
-        CpuBuffer.Prev.Status = CpuStatus.Waiting;
-        
+        CurrentState.Status = CpuStatus.Waiting;
+
         int cycles = Cpu.Step(Bus);
-        
+
         Assert.Equal(1, cycles);
     }
 
@@ -235,8 +227,8 @@ public class CpuModuleTests : CpuTestBase
         
         Cpu.Run(Bus, 4); // 2 cycles each
         
-        Assert.Equal(0x42, CpuBuffer.Current.A);
-        Assert.Equal(0x10, CpuBuffer.Current.X);
+        Assert.Equal(0x42, CurrentState.A);
+        Assert.Equal(0x10, CurrentState.X);
     }
 
     [Fact]
@@ -244,11 +236,10 @@ public class CpuModuleTests : CpuTestBase
     {
         // Run still consumes cycles even when stopped
         LoadAndReset([0xEA]);
-        CpuBuffer.Current.Status = CpuStatus.Stopped;
-        CpuBuffer.Prev.Status = CpuStatus.Stopped;
-        
+        CurrentState.Status = CpuStatus.Stopped;
+
         int cycles = Cpu.Run(Bus, 10);
-        
+
         Assert.Equal(10, cycles);
     }
 
@@ -261,48 +252,47 @@ public class CpuModuleTests : CpuTestBase
     {
         SetupCpu();
         Bus.SetResetVector(0xC000);
-        
+
         Cpu.Reset(Bus);
-        
-        Assert.Equal(0xC000, CpuBuffer.Current.PC);
-        Assert.Equal(0xC000, CpuBuffer.Prev.PC);
+
+        Assert.Equal(0xC000, CurrentState.PC);
     }
 
     [Fact]
     public void Reset_ClearsAllRegisters()
     {
         SetupCpu();
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Current.X = 0xFF;
-        CpuBuffer.Current.Y = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.X = 0xFF;
+        CurrentState.Y = 0xFF;
         
         Cpu.Reset(Bus);
         
-        Assert.Equal(0, CpuBuffer.Current.A);
-        Assert.Equal(0, CpuBuffer.Current.X);
-        Assert.Equal(0, CpuBuffer.Current.Y);
+        Assert.Equal(0, CurrentState.A);
+        Assert.Equal(0, CurrentState.X);
+        Assert.Equal(0, CurrentState.Y);
     }
 
     [Fact]
     public void Reset_SetsSPTo0xFD()
     {
         SetupCpu();
-        CpuBuffer.Current.SP = 0x00;
+        CurrentState.SP = 0x00;
         
         Cpu.Reset(Bus);
         
-        Assert.Equal(0xFD, CpuBuffer.Current.SP);
+        Assert.Equal(0xFD, CurrentState.SP);
     }
 
     [Fact]
     public void Reset_SetsStatusToRunning()
     {
         SetupCpu();
-        CpuBuffer.Current.Status = CpuStatus.Stopped;
+        CurrentState.Status = CpuStatus.Stopped;
         
         Cpu.Reset(Bus);
         
-        Assert.Equal(CpuStatus.Running, CpuBuffer.Current.Status);
+        Assert.Equal(CpuStatus.Running, CurrentState.Status);
     }
 
     [Fact]
@@ -313,7 +303,7 @@ public class CpuModuleTests : CpuTestBase
         
         Cpu.Reset(Bus);
         
-        Assert.Equal(PendingInterrupt.None, CpuBuffer.Current.PendingInterrupt);
+        Assert.Equal(PendingInterrupt.None, CurrentState.PendingInterrupt);
     }
 
     [Fact]
@@ -325,8 +315,8 @@ public class CpuModuleTests : CpuTestBase
         
         Cpu.Reset(Bus);
         
-        Assert.Empty(CpuBuffer.Current.Pipeline);
-        Assert.Equal(0, CpuBuffer.Current.PipelineIndex);
+        Assert.Empty(CurrentState.Pipeline);
+        Assert.Equal(0, CurrentState.PipelineIndex);
     }
 
     #endregion
@@ -340,8 +330,8 @@ public class CpuModuleTests : CpuTestBase
 
         Cpu.Clock(Bus);
 
-        Assert.Equal(0xA9, CpuBuffer.Current.CurrentOpcode);
-        Assert.Equal(ProgramStart, CpuBuffer.Current.OpcodeAddress);
+        Assert.Equal(0xA9, CurrentState.CurrentOpcode);
+        Assert.Equal(ProgramStart, CurrentState.OpcodeAddress);
     }
 
     [Fact]
@@ -353,8 +343,8 @@ public class CpuModuleTests : CpuTestBase
         Cpu.Clock(Bus);
 
         // Should return opcode of instruction being executed
-        Assert.Equal(0xA9, CpuBuffer.Current.CurrentOpcode);
-        Assert.Equal(ProgramStart, CpuBuffer.Current.OpcodeAddress);
+        Assert.Equal(0xA9, CurrentState.CurrentOpcode);
+        Assert.Equal(ProgramStart, CurrentState.OpcodeAddress);
     }
 
     [Fact]
@@ -367,8 +357,8 @@ public class CpuModuleTests : CpuTestBase
 
         Cpu.Clock(Bus);
 
-        Assert.Equal(0xA9, CpuBuffer.Current.CurrentOpcode);
-        Assert.Equal((ushort)(ProgramStart + 1), CpuBuffer.Current.OpcodeAddress);
+        Assert.Equal(0xA9, CurrentState.CurrentOpcode);
+        Assert.Equal((ushort)(ProgramStart + 1), CurrentState.OpcodeAddress);
     }
 
     #endregion
@@ -380,7 +370,7 @@ public class CpuModuleTests : CpuTestBase
     {
         LoadAndReset([0xEA]);
         
-        int remaining = CpuBuffer.Current.CyclesRemaining;
+        int remaining = CurrentState.CyclesRemaining;
 
         Assert.Equal(0, remaining);
     }
@@ -394,7 +384,7 @@ public class CpuModuleTests : CpuTestBase
         // Execute first cycle
         Cpu.Clock(Bus);
 
-        int remaining = CpuBuffer.Current.CyclesRemaining;
+        int remaining = CurrentState.CyclesRemaining;
 
         Assert.Equal(3, remaining); // 4 total - 1 executed = 3 remaining
     }
@@ -406,13 +396,13 @@ public class CpuModuleTests : CpuTestBase
         LoadAndReset([0xAD, 0x34, 0x12]);
         
         Cpu.Clock(Bus);
-        int after1 = CpuBuffer.Current.CyclesRemaining;
+        int after1 = CurrentState.CyclesRemaining;
 
         Cpu.Clock(Bus);
-        int after2 = CpuBuffer.Current.CyclesRemaining;
+        int after2 = CurrentState.CyclesRemaining;
 
         Cpu.Clock(Bus);
-        int after3 = CpuBuffer.Current.CyclesRemaining;
+        int after3 = CurrentState.CyclesRemaining;
         
         Assert.Equal(3, after1);
         Assert.Equal(2, after2);
@@ -427,7 +417,7 @@ public class CpuModuleTests : CpuTestBase
         // Complete first instruction
         Cpu.Step(Bus);
 
-        int remaining = CpuBuffer.Current.CyclesRemaining;
+        int remaining = CurrentState.CyclesRemaining;
 
         Assert.Equal(0, remaining);
     }
@@ -448,35 +438,31 @@ public class CpuModuleTests : CpuTestBase
     [MemberData(nameof(AllVariants))]
     public void Step_WorksWithAllVariants(CpuVariant variant)
     {
-        LoadAndReset([0xA9, 0x42]); // LDA #$42
-
         var bus = new TestRamBus();
         bus.SetResetVector(ProgramStart);
         bus.SetIrqVector(IrqHandler);
         bus.SetNmiVector(NmiHandler);
-        var buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, buffer);
+
+        var cpu = CpuFactory.Create(variant);
         bus.LoadProgram(ProgramStart, [0xA9, 0x42]);
 
         cpu.Reset(bus);
         int cycles = cpu.Step(bus);
 
         Assert.Equal(2, cycles);
-        Assert.Equal(0x42, buffer.Current.A);
+        Assert.Equal(0x42, cpu.State.A);
     }
 
     [Theory]
     [MemberData(nameof(AllVariants))]
     public void Run_WorksWithAllVariants(CpuVariant variant)
     {
-        LoadAndReset([0xEA, 0xEA]); // Two NOPs
-
         var bus = new TestRamBus();
         bus.SetResetVector(ProgramStart);
         bus.SetIrqVector(IrqHandler);
         bus.SetNmiVector(NmiHandler);
-        var buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, buffer);
+
+        var cpu = CpuFactory.Create(variant);
         bus.LoadProgram(ProgramStart, [0xEA, 0xEA]);
 
         cpu.Reset(bus);

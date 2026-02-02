@@ -104,6 +104,37 @@ internal static class MicroOps
     }
 
     /// <summary>
+    /// Appends a micro-op to the end of the working pipeline.
+    /// </summary>
+    /// <param name="state">The CPU state containing the pipeline.</param>
+    /// <param name="op">The micro-op to append.</param>
+    /// <remarks>
+    /// <para>
+    /// Unlike <see cref="InsertAfterCurrentOp"/> which inserts immediately after
+    /// the current operation, this method appends to the very end of the pipeline.
+    /// </para>
+    /// <para>
+    /// This is used when adding multiple penalty cycles where the first penalty
+    /// is inserted and the second should come after all existing operations.
+    /// </para>
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void AppendToWorkingPipeline(CpuState state, MicroOp op)
+    {
+        // If not already using working pipeline, copy from base pipeline
+        if (state.WorkingPipelineLength == 0)
+        {
+            int baseLen = state.Pipeline.Length;
+            Array.Copy(state.Pipeline, state.WorkingPipeline, baseLen);
+            state.WorkingPipelineLength = baseLen;
+        }
+
+        // Append at the end
+        state.WorkingPipeline[state.WorkingPipelineLength] = op;
+        state.WorkingPipelineLength++;
+    }
+
+    /// <summary>
     /// Adds a penalty cycle by inserting a dummy read after the current operation.
     /// </summary>
     /// <param name="state">The CPU state to modify.</param>

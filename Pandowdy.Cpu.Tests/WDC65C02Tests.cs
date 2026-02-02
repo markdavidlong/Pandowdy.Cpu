@@ -61,8 +61,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void STZ_ZeroPageX_Takes4Cycles()
     {
         LoadAndReset([0x74, 0x10]);
-        CpuBuffer.Current.X = 5;
-        CpuBuffer.Prev.X = 5;
+        CurrentState.X = 5;
+        CurrentState.X = 5;
         Bus.Memory[0x15] = 0xFF;
 
         int cycles = StepInstruction();
@@ -87,8 +87,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void STZ_AbsoluteX_Takes5Cycles()
     {
         LoadAndReset([0x9E, 0x00, 0x12]);
-        CpuBuffer.Current.X = 0x10;
-        CpuBuffer.Prev.X = 0x10;
+        CurrentState.X = 0x10;
+        CurrentState.X = 0x10;
         Bus.Memory[0x1210] = 0xFF;
 
         int cycles = StepInstruction();
@@ -105,10 +105,10 @@ public class WDC65C02Tests : CoreInstructionTests
     public void PHX_Takes3Cycles()
     {
         LoadAndReset([0xDA]);
-        CpuBuffer.Current.X = 0x42;
-        CpuBuffer.Prev.X = 0x42;
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.X = 0x42;
+        CurrentState.X = 0x42;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
 
         int cycles = StepInstruction();
 
@@ -122,8 +122,8 @@ public class WDC65C02Tests : CoreInstructionTests
     {
         LoadAndReset([0xFA]);
         Bus.Memory[0x01FF] = 0x42;
-        CpuBuffer.Current.SP = 0xFE;
-        CpuBuffer.Prev.SP = 0xFE;
+        CurrentState.SP = 0xFE;
+        CurrentState.SP = 0xFE;
 
         int cycles = StepInstruction();
 
@@ -136,10 +136,10 @@ public class WDC65C02Tests : CoreInstructionTests
     public void PHY_Takes3Cycles()
     {
         LoadAndReset([0x5A]);
-        CpuBuffer.Current.Y = 0x42;
-        CpuBuffer.Prev.Y = 0x42;
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.Y = 0x42;
+        CurrentState.Y = 0x42;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
 
         int cycles = StepInstruction();
 
@@ -152,8 +152,8 @@ public class WDC65C02Tests : CoreInstructionTests
     {
         LoadAndReset([0x7A]);
         Bus.Memory[0x01FF] = 0x42;
-        CpuBuffer.Current.SP = 0xFE;
-        CpuBuffer.Prev.SP = 0xFE;
+        CurrentState.SP = 0xFE;
+        CurrentState.SP = 0xFE;
 
         int cycles = StepInstruction();
 
@@ -169,8 +169,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void INC_Accumulator_Takes2Cycles()
     {
         LoadAndReset([0x1A]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
 
         int cycles = StepInstruction();
 
@@ -182,8 +182,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void INC_Accumulator_SetsFlags()
     {
         LoadAndReset([0x1A]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
 
         StepInstruction();
 
@@ -195,8 +195,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void DEC_Accumulator_Takes2Cycles()
     {
         LoadAndReset([0x3A]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
 
         int cycles = StepInstruction();
 
@@ -208,8 +208,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void DEC_Accumulator_SetsFlags()
     {
         LoadAndReset([0x3A]);
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
 
         StepInstruction();
 
@@ -266,8 +266,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void TRB_ZeroPage_Takes5Cycles()
     {
         LoadAndReset([0x14, 0x10]);
-        CpuBuffer.Current.A = 0x0F;
-        CpuBuffer.Prev.A = 0x0F;
+        CurrentState.A = 0x0F;
+        CurrentState.A = 0x0F;
         SetZeroPage(0x10, 0xFF);
 
         int cycles = StepInstruction();
@@ -280,8 +280,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void TRB_Absolute_Takes6Cycles()
     {
         LoadAndReset([0x1C, 0x34, 0x12]);
-        CpuBuffer.Current.A = 0x0F;
-        CpuBuffer.Prev.A = 0x0F;
+        CurrentState.A = 0x0F;
+        CurrentState.A = 0x0F;
         SetMemory(0x1234, 0xFF);
 
         int cycles = StepInstruction();
@@ -294,8 +294,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void TRB_SetsZeroIfNoCommonBits()
     {
         LoadAndReset([0x14, 0x10]);
-        CpuBuffer.Current.A = 0xF0;
-        CpuBuffer.Prev.A = 0xF0;
+        CurrentState.A = 0xF0;
+        CurrentState.A = 0xF0;
         SetZeroPage(0x10, 0x0F);
 
         StepInstruction();
@@ -307,8 +307,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void TSB_ZeroPage_Takes5Cycles()
     {
         LoadAndReset([0x04, 0x10]);
-        CpuBuffer.Current.A = 0x0F;
-        CpuBuffer.Prev.A = 0x0F;
+        CurrentState.A = 0x0F;
+        CurrentState.A = 0x0F;
         SetZeroPage(0x10, 0xF0);
 
         int cycles = StepInstruction();
@@ -321,8 +321,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void TSB_Absolute_Takes6Cycles()
     {
         LoadAndReset([0x0C, 0x34, 0x12]);
-        CpuBuffer.Current.A = 0x0F;
-        CpuBuffer.Prev.A = 0x0F;
+        CurrentState.A = 0x0F;
+        CurrentState.A = 0x0F;
         SetMemory(0x1234, 0xF0);
 
         int cycles = StepInstruction();
@@ -352,8 +352,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void STA_ZeroPageIndirect_Takes5Cycles()
     {
         LoadAndReset([0x92, 0x10]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
         SetZeroPagePointer(0x10, 0x1234);
 
         int cycles = StepInstruction();
@@ -366,8 +366,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void ADC_ZeroPageIndirect_Takes5Cycles()
     {
         LoadAndReset([0x72, 0x10]);
-        CpuBuffer.Current.A = 0x05;
-        CpuBuffer.Prev.A = 0x05;
+        CurrentState.A = 0x05;
+        CurrentState.A = 0x05;
         SetZeroPagePointer(0x10, 0x1234);
         SetMemory(0x1234, 0x10);
 
@@ -381,10 +381,10 @@ public class WDC65C02Tests : CoreInstructionTests
     public void SBC_ZeroPageIndirect_Takes5Cycles()
     {
         LoadAndReset([0xF2, 0x10]);
-        CpuBuffer.Current.A = 0x15;
-        CpuBuffer.Prev.A = 0x15;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x15;
+        CurrentState.A = 0x15;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
         SetZeroPagePointer(0x10, 0x1234);
         SetMemory(0x1234, 0x05);
 
@@ -398,8 +398,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void AND_ZeroPageIndirect_Takes5Cycles()
     {
         LoadAndReset([0x32, 0x10]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
         SetZeroPagePointer(0x10, 0x1234);
         SetMemory(0x1234, 0x0F);
 
@@ -413,8 +413,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void ORA_ZeroPageIndirect_Takes5Cycles()
     {
         LoadAndReset([0x12, 0x10]);
-        CpuBuffer.Current.A = 0x0F;
-        CpuBuffer.Prev.A = 0x0F;
+        CurrentState.A = 0x0F;
+        CurrentState.A = 0x0F;
         SetZeroPagePointer(0x10, 0x1234);
         SetMemory(0x1234, 0xF0);
 
@@ -428,8 +428,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void EOR_ZeroPageIndirect_Takes5Cycles()
     {
         LoadAndReset([0x52, 0x10]);
-        CpuBuffer.Current.A = 0xAA;
-        CpuBuffer.Prev.A = 0xAA;
+        CurrentState.A = 0xAA;
+        CurrentState.A = 0xAA;
         SetZeroPagePointer(0x10, 0x1234);
         SetMemory(0x1234, 0xFF);
 
@@ -443,8 +443,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void CMP_ZeroPageIndirect_Takes5Cycles()
     {
         LoadAndReset([0xD2, 0x10]);
-        CpuBuffer.Current.A = 0x20;
-        CpuBuffer.Prev.A = 0x20;
+        CurrentState.A = 0x20;
+        CurrentState.A = 0x20;
         SetZeroPagePointer(0x10, 0x1234);
         SetMemory(0x1234, 0x10);
 
@@ -462,8 +462,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void BIT_Immediate_Takes2Cycles()
     {
         LoadAndReset([0x89, 0x80]);
-        CpuBuffer.Current.A = 0x80;
-        CpuBuffer.Prev.A = 0x80;
+        CurrentState.A = 0x80;
+        CurrentState.A = 0x80;
 
         int cycles = StepInstruction();
 
@@ -474,12 +474,12 @@ public class WDC65C02Tests : CoreInstructionTests
     public void BIT_Immediate_OnlyAffectsZeroFlag()
     {
         LoadAndReset([0x89, 0xC0]);
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
-        CpuBuffer.Current.NegativeFlag = false;
-        CpuBuffer.Prev.NegativeFlag = false;
-        CpuBuffer.Current.OverflowFlag = false;
-        CpuBuffer.Prev.OverflowFlag = false;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.NegativeFlag = false;
+        CurrentState.NegativeFlag = false;
+        CurrentState.OverflowFlag = false;
+        CurrentState.OverflowFlag = false;
 
         StepInstruction();
 
@@ -492,10 +492,10 @@ public class WDC65C02Tests : CoreInstructionTests
     public void BIT_ZeroPageX_Takes4Cycles()
     {
         LoadAndReset([0x34, 0x10]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
-        CpuBuffer.Current.X = 5;
-        CpuBuffer.Prev.X = 5;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.X = 5;
+        CurrentState.X = 5;
         SetZeroPage(0x15, 0xC0);
 
         int cycles = StepInstruction();
@@ -507,10 +507,10 @@ public class WDC65C02Tests : CoreInstructionTests
     public void BIT_AbsoluteX_Takes4Cycles_NoPageCross()
     {
         LoadAndReset([0x3C, 0x00, 0x12]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
-        CpuBuffer.Current.X = 0x10;
-        CpuBuffer.Prev.X = 0x10;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.X = 0x10;
+        CurrentState.X = 0x10;
         SetMemory(0x1210, 0xC0);
 
         int cycles = StepInstruction();
@@ -522,10 +522,10 @@ public class WDC65C02Tests : CoreInstructionTests
     public void BIT_AbsoluteX_Takes5Cycles_WithPageCross()
     {
         LoadAndReset([0x3C, 0xF0, 0x12]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
-        CpuBuffer.Current.X = 0x20;
-        CpuBuffer.Prev.X = 0x20;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.X = 0x20;
+        CurrentState.X = 0x20;
         SetMemory(0x1310, 0xC0);
 
         int cycles = StepInstruction();
@@ -541,8 +541,8 @@ public class WDC65C02Tests : CoreInstructionTests
     public void JMP_AbsoluteIndexedIndirect_Takes6Cycles()
     {
         LoadAndReset([0x7C, 0x00, 0x12]);
-        CpuBuffer.Current.X = 0x10;
-        CpuBuffer.Prev.X = 0x10;
+        CurrentState.X = 0x10;
+        CurrentState.X = 0x10;
         SetMemory(0x1210, 0x00);
         SetMemory(0x1211, 0x80);
 
@@ -615,8 +615,8 @@ public class WDC65C02Tests : CoreInstructionTests
     {
         // WAI followed by LDA #$42
         LoadAndReset([0xCB, 0xA9, 0x42]);
-        CpuBuffer.Current.IgnoreHaltStopWait = true;
-        CpuBuffer.Prev.IgnoreHaltStopWait = true;
+        CurrentState.IgnoreHaltStopWait = true;
+        CurrentState.IgnoreHaltStopWait = true;
 
         StepInstruction();
 
@@ -633,8 +633,8 @@ public class WDC65C02Tests : CoreInstructionTests
     {
         // STP followed by LDA #$42
         LoadAndReset([0xDB, 0xA9, 0x42]);
-        CpuBuffer.Current.IgnoreHaltStopWait = true;
-        CpuBuffer.Prev.IgnoreHaltStopWait = true;
+        CurrentState.IgnoreHaltStopWait = true;
+        CurrentState.IgnoreHaltStopWait = true;
 
         StepInstruction();
 
@@ -656,12 +656,12 @@ public class WDC65C02Tests : CoreInstructionTests
         // CMOS 65C02: N flag is set based on the BCD result, not the binary result
         // 0x79 + 0x10 = 0x89 (BCD result has bit 7 set)
         LoadAndReset([0x69, 0x10]);  // ADC #$10
-        CpuBuffer.Current.A = 0x79;
-        CpuBuffer.Prev.A = 0x79;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x79;
+        CurrentState.A = 0x79;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -676,12 +676,12 @@ public class WDC65C02Tests : CoreInstructionTests
         // CMOS 65C02: Z flag is set based on the BCD result
         // 0x99 + 0x01 = 0x00 (BCD with carry), Z should be true for CMOS
         LoadAndReset([0x69, 0x01]);  // ADC #$01
-        CpuBuffer.Current.A = 0x99;
-        CpuBuffer.Prev.A = 0x99;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.A = 0x99;
+        CurrentState.A = 0x99;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
 
         StepInstruction();
 
@@ -697,12 +697,12 @@ public class WDC65C02Tests : CoreInstructionTests
         // CMOS 65C02: N flag is set based on the BCD result
         // 0x00 - 0x01 = 0x99 (BCD with borrow), BCD result 0x99 has bit 7 set
         LoadAndReset([0xE9, 0x01]);  // SBC #$01
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;  // No borrow
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;  // No borrow
+        CurrentState.CarryFlag = true;
 
         StepInstruction();
 
@@ -717,12 +717,12 @@ public class WDC65C02Tests : CoreInstructionTests
         // CMOS 65C02: Z flag is set based on the BCD result
         // 0x01 - 0x01 = 0x00 (both BCD and binary are zero)
         LoadAndReset([0xE9, 0x01]);  // SBC #$01
-        CpuBuffer.Current.A = 0x01;
-        CpuBuffer.Prev.A = 0x01;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
-        CpuBuffer.Current.CarryFlag = true;  // No borrow
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x01;
+        CurrentState.A = 0x01;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.CarryFlag = true;  // No borrow
+        CurrentState.CarryFlag = true;
 
         StepInstruction();
 
@@ -862,16 +862,16 @@ public class WDC65C02Tests : CoreInstructionTests
     public void NOP_DoesNotAffectRegistersOrFlags()
     {
         LoadAndReset([0x03]); // 1-cycle NOP
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
-        CpuBuffer.Current.X = 0x33;
-        CpuBuffer.Prev.X = 0x33;
-        CpuBuffer.Current.Y = 0x22;
-        CpuBuffer.Prev.Y = 0x22;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
-        CpuBuffer.Current.ZeroFlag = true;
-        CpuBuffer.Prev.ZeroFlag = true;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.X = 0x33;
+        CurrentState.X = 0x33;
+        CurrentState.Y = 0x22;
+        CurrentState.Y = 0x22;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.ZeroFlag = true;
+        CurrentState.ZeroFlag = true;
 
         StepInstruction();
 
@@ -901,14 +901,14 @@ public class WDC65C02Tests : CoreInstructionTests
             // Provide 3 bytes of operand data to cover all addressing modes
             LoadAndReset([opcode, 0x00, 0x04]);
             // Set up registers to avoid edge cases
-            CpuBuffer.Current.A = 0x00;
-            CpuBuffer.Prev.A = 0x00;
-            CpuBuffer.Current.X = 0x00;
-            CpuBuffer.Prev.X = 0x00;
-            CpuBuffer.Current.Y = 0x00;
-            CpuBuffer.Prev.Y = 0x00;
-            CpuBuffer.Current.SP = 0xFF;
-            CpuBuffer.Prev.SP = 0xFF;
+            CurrentState.A = 0x00;
+            CurrentState.A = 0x00;
+            CurrentState.X = 0x00;
+            CurrentState.X = 0x00;
+            CurrentState.Y = 0x00;
+            CurrentState.Y = 0x00;
+            CurrentState.SP = 0xFF;
+            CurrentState.SP = 0xFF;
 
             int cycles = StepInstruction();
 
