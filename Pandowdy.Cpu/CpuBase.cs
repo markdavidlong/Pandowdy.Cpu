@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using System.Runtime.CompilerServices;
 using Pandowdy.Cpu.Internals;
 
 namespace Pandowdy.Cpu;
@@ -70,26 +71,32 @@ public abstract class CpuBase : IPandowdyCpu
     /// </summary>
     /// <param name="bus">The memory/IO bus.</param>
     /// <returns><c>true</c> if an instruction completed this cycle; otherwise, <c>false</c>.</returns>
-    public virtual bool Clock(IPandowdyCpuBus bus)
+    /// <remarks>
+    /// This method is not virtual to allow JIT inlining. All CPU variants share the same
+    /// execution logic; only the pipeline tables differ (selected at construction time).
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Clock(IPandowdyCpuBus bus)
     {
         var current = _buffer.Current;
 
-        // Check if CPU is halted (Stopped, Jammed, or Waiting)
-        // If halted, return true (instruction complete) but don't advance PC
-        // Note: Bypassed status means the CPU is still running (halt was bypassed)
-        if (current.Status == CpuStatus.Stopped ||
-            current.Status == CpuStatus.Jammed ||
-            current.Status == CpuStatus.Waiting)
+        // Check if CPU is halted (Stopped=1, Jammed=2, or Waiting=3)
+        // This single range check replaces three separate comparisons.
+        // Running=0 and Bypassed=4 are the non-halted states.
+        var status = current.Status;
+        if ((uint)(status - CpuStatus.Stopped) <= (uint)(CpuStatus.Waiting - CpuStatus.Stopped))
         {
             return true;
         }
 
         // Running or Bypassed - continue execution
-        var prev = _buffer.Prev;
+        // When Prev is null (performance mode), pass current as prev - micro-ops will still work
+        var prev = _buffer.Prev ?? current;
 
-        if (current.Pipeline.Length == 0 || current.PipelineIndex >= current.Pipeline.Length)
+        int effectiveLength = current.EffectivePipelineLength;
+        if (effectiveLength == 0 || current.PipelineIndex >= effectiveLength)
         {
-            // Beginning of a new instruction - save current state to Prev
+            // Beginning of a new instruction - save current state to Prev (if enabled)
             _buffer.SwapStateAndResetPipeline();
 
             // Use Peek to determine the pipeline without recording a bus cycle.
@@ -97,19 +104,15 @@ public abstract class CpuBase : IPandowdyCpu
             byte opcode = bus.Peek(current.PC);
             current.Pipeline = _pipelines[opcode];
             current.PipelineIndex = 0;
+            current.WorkingPipelineLength = 0;  // Reset working pipeline for new instruction
             current.InstructionComplete = false;
         }
 
-        var microOp = current.Pipeline[current.PipelineIndex];
+        var microOp = current.GetPipelineOp(current.PipelineIndex);
         microOp(prev, current, bus);
         current.PipelineIndex++;
 
-        if (current.InstructionComplete)
-        {
-            return true;
-        }
-
-        return false;
+        return current.InstructionComplete;
     }
 
     /// <summary>
