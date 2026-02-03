@@ -1,7 +1,4 @@
 using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
-using Emulator;
-using System.Drawing;
 
 namespace Pandowdy.EmuCore.Tests.Helpers;
 

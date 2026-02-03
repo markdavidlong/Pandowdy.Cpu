@@ -1,6 +1,3 @@
-using System;
-using Xunit;
-using Emulator;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
@@ -33,7 +30,7 @@ public class LanguageCardTests
     private class MockSystemRomProvider(int size) : ISystemRomProvider
     {
 #pragma warning disable CA1859 // Use concrete types for improved performance
-        private readonly IMemory _memory = new MemoryBlock(size);
+        private readonly IPandowdyMemory _memory = new MemoryBlock(size);
 #pragma warning restore CA1859
 
         public int Size => _memory.Size;

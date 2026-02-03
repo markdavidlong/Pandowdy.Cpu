@@ -1,4 +1,3 @@
-using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore.DataTypes
@@ -47,7 +46,7 @@ namespace Pandowdy.EmuCore.DataTypes
     /// <para>
     /// <strong>Design Philosophy:</strong>
     /// This class prioritizes simplicity and performance over features. It provides the bare
-    /// minimum needed to implement the <see cref="IMemory"/> interface, making it ideal for:
+    /// minimum needed to implement the <see cref="IPandowdyMemory"/> interface, making it ideal for:
     /// <list type="bullet">
     /// <item>Unit testing CPU instructions in isolation</item>
     /// <item>Simple emulators that don't need memory mapping</item>

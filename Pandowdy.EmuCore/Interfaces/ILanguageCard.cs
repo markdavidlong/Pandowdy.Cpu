@@ -1,7 +1,5 @@
-using Emulator;
-
 namespace Pandowdy.EmuCore.Interfaces;
 
-public interface ILanguageCard : IMemory
+public interface ILanguageCard : IPandowdyMemory
 {
 }

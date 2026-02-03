@@ -1,6 +1,3 @@
-using System;
-using Xunit;
-using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.DataTypes;
 
@@ -11,10 +8,10 @@ namespace Pandowdy.EmuCore.Tests;
 /// </summary>
 public class UtilityTests
 {
-    #region ValidateIMemorySize Tests
+    #region ValidateIPandowdyMemorySize Tests
 
     [Fact]
-    public void ValidateIMemorySize_WithCorrectSize_ReturnsMemory()
+    public void ValidateIPandowdyMemorySize_WithCorrectSize_ReturnsMemory()
     {
         // Arrange
         var memory = new MemoryBlock(0x4000); // 16KB
@@ -23,7 +20,7 @@ public class UtilityTests
         // Act
         // Use ISystemRam to test the generic constraint works with derived interfaces
 #pragma warning disable CA1859 // Use concrete types when possible for improved performance
-        ISystemRam result = Utility.ValidateIMemorySize(memory, "testMemory", expectedSize);
+        ISystemRam result = Utility.ValidateIPandowdyMemorySize(memory, "testMemory", expectedSize);
 #pragma warning restore CA1859
 
         // Assert
@@ -33,7 +30,7 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_WithNullMemory_ThrowsArgumentNullException()
+    public void ValidateIPandowdyMemorySize_WithNullMemory_ThrowsArgumentNullException()
     {
         // Arrange
         MemoryBlock? memory = null;
@@ -41,12 +38,12 @@ public class UtilityTests
 
         // Act & Assert
         var ex = Assert.Throws<ArgumentNullException>(
-            () => Utility.ValidateIMemorySize(memory!, "testMemory", expectedSize));
+            () => Utility.ValidateIPandowdyMemorySize(memory!, "testMemory", expectedSize));
         Assert.Equal("testMemory", ex.ParamName);
     }
 
     [Fact]
-    public void ValidateIMemorySize_WithWrongSize_ThrowsArgumentException()
+    public void ValidateIPandowdyMemorySize_WithWrongSize_ThrowsArgumentException()
     {
         // Arrange
         var memory = new MemoryBlock(0x1000); // 4KB
@@ -54,7 +51,7 @@ public class UtilityTests
 
         // Act & Assert
         var ex = Assert.Throws<ArgumentException>(
-            () => Utility.ValidateIMemorySize(memory, "testMemory", expectedSize));
+            () => Utility.ValidateIPandowdyMemorySize(memory, "testMemory", expectedSize));
         Assert.Equal("testMemory", ex.ParamName);
         Assert.Contains("16384", ex.Message); // Expected size in decimal
         Assert.Contains("0x4000", ex.Message); // Expected size in hex
@@ -68,7 +65,7 @@ public class UtilityTests
     [InlineData(0x2000, 0x4000)]  // Too small: 8KB vs 16KB
     [InlineData(0x8000, 0x4000)]  // Too large: 32KB vs 16KB
     [InlineData(0x4001, 0x4000)]  // Too large: 16KB+1 vs 16KB
-    public void ValidateIMemorySize_WithVariousWrongSizes_ThrowsArgumentException(
+    public void ValidateIPandowdyMemorySize_WithVariousWrongSizes_ThrowsArgumentException(
         ushort actualSize, ushort expectedSize)
     {
         // Arrange
@@ -76,7 +73,7 @@ public class UtilityTests
 
         // Act & Assert
         var ex = Assert.Throws<ArgumentException>(
-            () => Utility.ValidateIMemorySize(memory, "testParam", expectedSize));
+            () => Utility.ValidateIPandowdyMemorySize(memory, "testParam", expectedSize));
         Assert.Contains(expectedSize.ToString(), ex.Message);
         Assert.Contains(actualSize.ToString(), ex.Message);
     }
@@ -89,7 +86,7 @@ public class UtilityTests
     [InlineData(0x4000)]  // 16KB
     [InlineData(0x8000)]  // 32KB
     [InlineData(0xFFFF)]  // 64KB-1
-    public void ValidateIMemorySize_WithMatchingSizes_Succeeds(ushort size)
+    public void ValidateIPandowdyMemorySize_WithMatchingSizes_Succeeds(ushort size)
     {
         // Arrange
         var memory = new MemoryBlock(size);
@@ -97,7 +94,7 @@ public class UtilityTests
         // Act
         // Use ISystemRam to verify generic constraint works with derived interfaces
 #pragma warning disable CA1859 // Use concrete types when possible for improved performance
-        ISystemRam result = Utility.ValidateIMemorySize(memory, "testMemory", size);
+        ISystemRam result = Utility.ValidateIPandowdyMemorySize(memory, "testMemory", size);
 #pragma warning restore CA1859
 
         // Assert
@@ -106,7 +103,7 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_PreservesMemoryReference()
+    public void ValidateIPandowdyMemorySize_PreservesMemoryReference()
     {
         // Arrange
         var memory = new MemoryBlock(0x1000);
@@ -115,7 +112,7 @@ public class UtilityTests
         // Act
         // Use ISystemRam to verify reference preservation works with interface types
 #pragma warning disable CA1859 // Use concrete types when possible for improved performance
-        ISystemRam result = Utility.ValidateIMemorySize(memory, "testMemory", 0x1000);
+        ISystemRam result = Utility.ValidateIPandowdyMemorySize(memory, "testMemory", 0x1000);
 #pragma warning restore CA1859
 
         // Assert - Should be same instance
@@ -124,7 +121,7 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_UsesCorrectParameterNameInException()
+    public void ValidateIPandowdyMemorySize_UsesCorrectParameterNameInException()
     {
         // Arrange
         var memory = new MemoryBlock(0x1000);
@@ -132,12 +129,12 @@ public class UtilityTests
 
         // Act & Assert
         var ex = Assert.Throws<ArgumentException>(
-            () => Utility.ValidateIMemorySize(memory, paramName, 0x4000));
+            () => Utility.ValidateIPandowdyMemorySize(memory, paramName, 0x4000));
         Assert.Equal(paramName, ex.ParamName);
     }
 
     [Fact]
-    public void ValidateIMemorySize_ErrorMessageIncludesBothFormats()
+    public void ValidateIPandowdyMemorySize_ErrorMessageIncludesBothFormats()
     {
         // Arrange
         var memory = new MemoryBlock(0x1234); // 4660 bytes
@@ -145,7 +142,7 @@ public class UtilityTests
 
         // Act & Assert
         var ex = Assert.Throws<ArgumentException>(
-            () => Utility.ValidateIMemorySize(memory, "test", expectedSize));
+            () => Utility.ValidateIPandowdyMemorySize(memory, "test", expectedSize));
         
         // Verify both decimal and hex formats are present
         Assert.Contains("16384", ex.Message);  // Expected in decimal
@@ -159,7 +156,7 @@ public class UtilityTests
     #region Real-World Usage Tests
 
     [Fact]
-    public void ValidateIMemorySize_LanguageCardMainRam_16KB()
+    public void ValidateIPandowdyMemorySize_LanguageCardMainRam_16KB()
     {
         // Arrange - Simulate LanguageCard validation
         var mainRam = new MemoryBlock(0x4000);
@@ -167,7 +164,7 @@ public class UtilityTests
         // Act
         // Use ISystemRam to match LanguageCard's actual usage
 #pragma warning disable CA1859 // Use concrete types when possible for improved performance
-        ISystemRam result = Utility.ValidateIMemorySize(mainRam, nameof(mainRam), 0x4000);
+        ISystemRam result = Utility.ValidateIPandowdyMemorySize(mainRam, nameof(mainRam), 0x4000);
 #pragma warning restore CA1859
 
         // Assert
@@ -176,7 +173,7 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_LanguageCardAuxRam_16KB()
+    public void ValidateIPandowdyMemorySize_LanguageCardAuxRam_16KB()
     {
         // Arrange - Simulate LanguageCard validation
         var auxRam = new MemoryBlock(0x4000);
@@ -184,7 +181,7 @@ public class UtilityTests
         // Act
         // Use ISystemRam to match LanguageCard's actual usage
 #pragma warning disable CA1859 // Use concrete types when possible for improved performance
-        ISystemRam result = Utility.ValidateIMemorySize(auxRam, nameof(auxRam), 0x4000);
+        ISystemRam result = Utility.ValidateIPandowdyMemorySize(auxRam, nameof(auxRam), 0x4000);
 #pragma warning restore CA1859
 
         // Assert
@@ -193,15 +190,15 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_SystemRom_16KB()
+    public void ValidateIPandowdyMemorySize_SystemRom_16KB()
     {
         // Arrange - Simulate SystemRomProvider validation (now 16KB, not 12KB)
         var systemRom = new MemoryBlock(0x4000);
 
         // Act
-        // Use IMemory to test base interface compatibility
+        // Use IPandowdyMemory to test base interface compatibility
 #pragma warning disable CA1859 // Use concrete types when possible for improved performance
-        IMemory result = Utility.ValidateIMemorySize(systemRom, nameof(systemRom), 0x4000);
+        IPandowdyMemory result = Utility.ValidateIPandowdyMemorySize(systemRom, nameof(systemRom), 0x4000);
 #pragma warning restore CA1859
 
         // Assert
@@ -210,7 +207,7 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_FullMemoryPool_64KB()
+    public void ValidateIPandowdyMemorySize_FullMemoryPool_64KB()
     {
         // Arrange - Note: MemoryBlock.MaxSize is 0x10000 (64KB), but ushort max is 0xFFFF
         // So we test with the largest valid ushort value
@@ -219,7 +216,7 @@ public class UtilityTests
         // Act
         // Use ISystemRam to test with derived interface
 #pragma warning disable CA1859 // Use concrete types when possible for improved performance
-        ISystemRam result = Utility.ValidateIMemorySize(memoryPool, nameof(memoryPool), 0xFFFF);
+        ISystemRam result = Utility.ValidateIPandowdyMemorySize(memoryPool, nameof(memoryPool), 0xFFFF);
 #pragma warning restore CA1859
 
         // Assert
@@ -228,14 +225,14 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_ChainedValidation()
+    public void ValidateIPandowdyMemorySize_ChainedValidation()
     {
         // Arrange - Test that validation can be chained
         var memory = new MemoryBlock(0x2000);
 
         // Act - Chain validation result directly
-        var validated = Utility.ValidateIMemorySize(
-            Utility.ValidateIMemorySize(memory, "param1", 0x2000),
+        var validated = Utility.ValidateIPandowdyMemorySize(
+            Utility.ValidateIPandowdyMemorySize(memory, "param1", 0x2000),
             "param2",
             0x2000);
 
@@ -248,14 +245,14 @@ public class UtilityTests
     #region Edge Case Tests
 
     [Fact]
-    public void ValidateIMemorySize_WithMinimumSize_Succeeds()
+    public void ValidateIPandowdyMemorySize_WithMinimumSize_Succeeds()
     {
         // Arrange
         var memory = new MemoryBlock(1); // Minimum size
         ushort expectedSize = 1;
 
         // Act
-        var result = Utility.ValidateIMemorySize(memory, "testMemory", expectedSize);
+        var result = Utility.ValidateIPandowdyMemorySize(memory, "testMemory", expectedSize);
 
         // Assert
         Assert.NotNull(result);
@@ -263,14 +260,14 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_WithNearMaximumSize_Succeeds()
+    public void ValidateIPandowdyMemorySize_WithNearMaximumSize_Succeeds()
     {
         // Arrange - Test with maximum ushort value
         var memory = new MemoryBlock(0xFFFF); // 64KB-1
         ushort expectedSize = 0xFFFF;
 
         // Act
-        var result = Utility.ValidateIMemorySize(memory, "testMemory", expectedSize);
+        var result = Utility.ValidateIPandowdyMemorySize(memory, "testMemory", expectedSize);
 
         // Assert
         Assert.NotNull(result);
@@ -278,7 +275,7 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_OffByOne_Upper_Fails()
+    public void ValidateIPandowdyMemorySize_OffByOne_Upper_Fails()
     {
         // Arrange
         var memory = new MemoryBlock(0x4001); // 16KB + 1
@@ -286,11 +283,11 @@ public class UtilityTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(
-            () => Utility.ValidateIMemorySize(memory, "testMemory", expectedSize));
+            () => Utility.ValidateIPandowdyMemorySize(memory, "testMemory", expectedSize));
     }
 
     [Fact]
-    public void ValidateIMemorySize_OffByOne_Lower_Fails()
+    public void ValidateIPandowdyMemorySize_OffByOne_Lower_Fails()
     {
         // Arrange
         var memory = new MemoryBlock(0x3FFF); // 16KB - 1
@@ -298,7 +295,7 @@ public class UtilityTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(
-            () => Utility.ValidateIMemorySize(memory, "testMemory", expectedSize));
+            () => Utility.ValidateIPandowdyMemorySize(memory, "testMemory", expectedSize));
     }
 
     #endregion
@@ -306,9 +303,9 @@ public class UtilityTests
     #region Documentation Tests
 
     [Fact]
-    public void ValidateIMemorySize_DocumentsLanguageCardUsage()
+    public void ValidateIPandowdyMemorySize_DocumentsLanguageCardUsage()
     {
-        // This test documents how LanguageCard uses ValidateIMemorySize
+        // This test documents how LanguageCard uses ValidateIPandowdyMemorySize
         
         // Arrange - Simulating LanguageCard constructor
         var mainRam = new MemoryBlock(0x4000);
@@ -317,9 +314,9 @@ public class UtilityTests
 
         // Act - Validation as done in LanguageCard (using interface types)
 #pragma warning disable CA1859 // Use concrete types when possible for improved performance
-        ISystemRam validatedMain = Utility.ValidateIMemorySize(mainRam, "mainRam", 0x4000);
-        ISystemRam validatedAux = Utility.ValidateIMemorySize(auxRam, "auxRam", 0x4000);
-        IMemory validatedRom = Utility.ValidateIMemorySize(systemRom, "systemRom", 0x4000);
+        ISystemRam validatedMain = Utility.ValidateIPandowdyMemorySize(mainRam, "mainRam", 0x4000);
+        ISystemRam validatedAux = Utility.ValidateIPandowdyMemorySize(auxRam, "auxRam", 0x4000);
+        IPandowdyMemory validatedRom = Utility.ValidateIPandowdyMemorySize(systemRom, "systemRom", 0x4000);
 #pragma warning restore CA1859
 
         // Assert
@@ -329,7 +326,7 @@ public class UtilityTests
     }
 
     [Fact]
-    public void ValidateIMemorySize_DocumentsErrorMessage()
+    public void ValidateIPandowdyMemorySize_DocumentsErrorMessage()
     {
         // This test documents the error message format
         
@@ -340,7 +337,7 @@ public class UtilityTests
         // Act
         try
         {
-            Utility.ValidateIMemorySize(memory, "exampleParameter", expectedSize);
+            Utility.ValidateIPandowdyMemorySize(memory, "exampleParameter", expectedSize);
             Assert.Fail("Should have thrown ArgumentException");
         }
         catch (ArgumentException ex)

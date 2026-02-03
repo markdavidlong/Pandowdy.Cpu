@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore;
@@ -68,9 +67,9 @@ public class LanguageCard(
     /// </summary>
     private const int RequiredRomSize = 0x4000; // 16KB
 
-    private readonly ISystemRam _mainRam = Utility.ValidateIMemorySize(mainRam, nameof(mainRam), RequiredRamSize);
-    private readonly ISystemRam? _auxRam = auxRam != null ? Utility.ValidateIMemorySize(auxRam, nameof(auxRam), RequiredRamSize) : null;
-    private readonly ISystemRomProvider _systemRom = Utility.ValidateIMemorySize(systemRom, nameof(systemRom), RequiredRomSize);
+    private readonly ISystemRam _mainRam = Utility.ValidateIPandowdyMemorySize(mainRam, nameof(mainRam), RequiredRamSize);
+    private readonly ISystemRam? _auxRam = auxRam != null ? Utility.ValidateIPandowdyMemorySize(auxRam, nameof(auxRam), RequiredRamSize) : null;
+    private readonly ISystemRomProvider _systemRom = Utility.ValidateIPandowdyMemorySize(systemRom, nameof(systemRom), RequiredRomSize);
     private readonly IFloatingBusProvider _floatingBus = floatingBus ?? throw new ArgumentNullException(nameof(floatingBus));
     private readonly ISystemStatusProvider _status = status ?? throw new ArgumentNullException(nameof(status));
 
@@ -202,7 +201,7 @@ public class LanguageCard(
     {
         if (_status.StateHighRead)
         {
-            IMemory? targetMemory =  _status.StateAltZp ? _auxRam : _mainRam;
+            IPandowdyMemory? targetMemory =  _status.StateAltZp ? _auxRam : _mainRam;
             
             return targetMemory != null 
                 ? targetMemory[DetermineMappedRamAddress(address)]
@@ -260,7 +259,7 @@ public class LanguageCard(
             return;
         }
         
-        IMemory? targetMemory = _status.StateAltZp ? _auxRam : _mainRam;
+        IPandowdyMemory? targetMemory = _status.StateAltZp ? _auxRam : _mainRam;
         
         if (targetMemory != null)
         {

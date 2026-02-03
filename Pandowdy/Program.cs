@@ -2,6 +2,7 @@ using Avalonia;
 using ReactiveUI.Avalonia;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Pandowdy.Cpu;
 using Pandowdy.UI;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.EmuCore;
@@ -44,7 +45,15 @@ namespace Pandowdy
             return Host.CreateDefaultBuilder(args)
                 .ConfigureServices((context, services) =>
                 {
-                    services.AddSingleton<Emulator.CPU>();
+                    // Pandowdy.Cpu - CPU state (injected into CPU)
+                    services.AddSingleton<CpuState>();
+
+                    // Pandowdy.Cpu - CPU emulation
+                    services.AddSingleton<IPandowdyCpu>(sp =>
+                    {
+                        var state = sp.GetRequiredService<CpuState>();
+                        return CpuFactory.Create(CpuVariant.Wdc65C02, state);
+                    });
 
                     // EmuCore - Input Subsystems
                     //services.AddSingleton<SingularKeyHandler>();  // Keyboard handler (both IKeyboardReader and IKeyboardSetter)
@@ -70,7 +79,6 @@ namespace Pandowdy
 
                     services.AddSingleton<IDirectMemoryPoolReader>(sp => sp.GetRequiredService<AddressSpaceController>());
 
-                    services.AddSingleton<ICpu, CPUAdapter>();
                     services.AddSingleton<IFrameProvider, FrameProvider>();
                     services.AddSingleton<IEmulatorState, EmulatorStateProvider>();
                     services.AddSingleton<ICharacterRomProvider, CharacterRomProvider>();

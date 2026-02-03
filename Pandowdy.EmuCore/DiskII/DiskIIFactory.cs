@@ -1,4 +1,3 @@
-using Pandowdy.EmuCore.DiskII.Providers;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 

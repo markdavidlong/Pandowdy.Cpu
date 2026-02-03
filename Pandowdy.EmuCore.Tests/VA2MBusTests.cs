@@ -1,4 +1,4 @@
-using Emulator;
+using Pandowdy.Cpu;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
@@ -33,7 +33,8 @@ public class VA2MBusTests
     {
         public AddressSpaceController AddressSpace { get; }
         public SystemStatusProvider StatusProvider { get; }
-        public ICpu Cpu { get; }
+        public IPandowdyCpu Cpu { get; }
+        public CpuState CpuState { get; }
         public VA2MBus Bus { get; }
         public SoftSwitches Switches { get; }
         public IKeyboardReader KeyboardReader { get; }
@@ -46,30 +47,31 @@ public class VA2MBusTests
             // Create game controller first (required by StatusProvider)
             GameController = new SimpleGameController();
             StatusProvider = new SystemStatusProvider(GameController);
-            
+
             // Create keyboard handler
             var keyboard = new SingularKeyHandler();
             KeyboardReader = keyboard;
-            
+
             // Create soft switches
             Switches = new SoftSwitches(StatusProvider);
-            
+
             // Create VBlank status handler
             VBlank = new CpuClockingCounters();
-            
+
             // Create I/O handler (coordinates keyboard, controller, switches, VBlank)
             IoHandler = new SystemIoHandler(Switches, keyboard, GameController, VBlank);
-            
+
             // Create memory subsystem (AddressSpaceController needs IoHandler for routing!)
             AddressSpace = new AddressSpaceController(
                 new TestLanguageCard(), 
                 new Test64KSystemRamSelector(),
                 IoHandler,
                 new TestSlots(StatusProvider));
-            
-            // Create CPU
-            Cpu = new CPUAdapter(new CPU());
-            
+
+            // Create CPU using Pandowdy.Cpu factory
+            CpuState = new CpuState();
+            Cpu = CpuFactory.Create(CpuVariant.Wdc65C02, CpuState);
+
             // Create bus (new architecture: AddressSpace + CPU + VBlank)
             Bus = new VA2MBus(AddressSpace, Cpu, VBlank);
         }
@@ -94,7 +96,9 @@ public class VA2MBusTests
             new Test64KSystemRamSelector(),
             ioHandler,
             new TestSlots(status));
-        var cpu = new CPUAdapter(new CPU());
+
+        var cpuState = new CpuState();
+        var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, cpuState);
 
         // Act
         var bus = new VA2MBus(addressSpace, cpu, vblank);
@@ -111,7 +115,9 @@ public class VA2MBusTests
         // Arrange
         var gameController = new SimpleGameController();
         var status = new SystemStatusProvider(gameController);
-        var cpu = new CPUAdapter(new CPU());
+
+        var cpuState = new CpuState();
+        var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, cpuState);
         var keyboard = new SingularKeyHandler();
         var switches = new SoftSwitches(status);
         var vblank = new CpuClockingCounters();
@@ -1316,7 +1322,7 @@ public class VA2MBusTests
 
     #endregion
 
-    #region Edge Cases and Disposal (2 tests)
+    #region Edge Cases and Disposal (1 test)
 
     [Fact]
     public void Dispose_CanBeCalledMultipleTimes()
@@ -1330,16 +1336,6 @@ public class VA2MBusTests
         fixture.Bus.Dispose();
     }
 
-    [Fact]
-    public void Connect_ThrowsNotSupportedException()
-    {
-        // Arrange
-        var fixture = new VA2MBusFixture();
-        var cpu = new CPU();
-
-        // Act & Assert
-        Assert.Throws<NotSupportedException>(() => fixture.Bus.Connect(cpu));
-    }
 
     #endregion
 }

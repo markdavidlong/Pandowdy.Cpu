@@ -1,6 +1,5 @@
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Tests.Helpers;
 
 namespace Pandowdy.EmuCore.Tests;
 

@@ -1,6 +1,3 @@
-using Xunit;
-using Pandowdy.EmuCore;
-using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Tests;

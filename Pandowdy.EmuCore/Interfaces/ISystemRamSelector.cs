@@ -1,5 +1,3 @@
-using Emulator;
-
 namespace Pandowdy.EmuCore.Interfaces;
 
 /// <summary>
@@ -26,7 +24,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// <para>
 /// <strong>Interfaces Implemented:</strong>
 /// <list type="bullet">
-/// <item><see cref="IMemory"/>: Standard Read/Write for CPU access with soft switch routing</item>
+/// <item><see cref="IPandowdyMemory"/>: Standard Read/Write for CPU access with soft switch routing</item>
 /// <item><see cref="IDirectMemoryPoolReader"/>: Raw access bypassing soft switches for rendering</item>
 /// </list>
 /// </para>
@@ -37,8 +35,8 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// </remarks>
 /// <seealso cref="ISystemRam"/>
 /// <seealso cref="IDirectMemoryPoolReader"/>
-/// <seealso cref="IMemory"/>
-public interface ISystemRamSelector : IMemory, IDirectMemoryPoolReader
+/// <seealso cref="IPandowdyMemory"/>
+public interface ISystemRamSelector : IPandowdyMemory, IDirectMemoryPoolReader
 {
     /// <summary>
     /// Copies the entire main RAM bank (48KB) into the provided destination span.

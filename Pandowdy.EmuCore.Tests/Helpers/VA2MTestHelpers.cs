@@ -1,6 +1,6 @@
+using Pandowdy.Cpu;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
-using Emulator;
 using Pandowdy.EmuCore.DataTypes;
 
 namespace Pandowdy.EmuCore.Tests.Helpers;
@@ -194,7 +194,7 @@ public class TestFrameProvider : IFrameProvider
 /// </summary>
 public class TestAppleIIBus : IAppleIIBus
 {
-    private readonly TestCpu _cpu = new();
+    private readonly IPandowdyCpu _cpu;
     private readonly AddressSpaceController _memory;
     private ulong _clockCounter = 0;
     private byte _keyValue = 0;
@@ -210,23 +210,26 @@ public class TestAppleIIBus : IAppleIIBus
         var keyboard = new SingularKeyHandler();
         var vblank = new CpuClockingCounters();
         var ioHandler = new SystemIoHandler(softSwitches, keyboard, gameController, vblank);
-        
+
         _memory = new AddressSpaceController(
             new TestLanguageCard(), 
             new Test64KSystemRamSelector(),
             ioHandler,
             new TestSlots(statusProvider));
+
+        // Create CPU using factory with DI-style pattern
+        var cpuState = new CpuState();
+        _cpu = CpuFactory.Create(CpuVariant.Wdc65C02, cpuState);
+
+        // Reset CPU so it's at an instruction boundary (InstructionComplete = true)
+        _cpu.Reset(this);
     }
 
     // IAppleIIBus implementation
-    public IMemory RAM => _memory;
-    public ICpu Cpu => _cpu;
+    public IPandowdyMemory RAM => _memory;
+    public IPandowdyCpu Cpu => _cpu;
     public ulong SystemClockCounter => _clockCounter;
 
-    public void Connect(CPU cpu)
-    {
-        // Not needed for test
-    }
 
     public void EnqueueKey(byte key)
     {
@@ -269,42 +272,6 @@ public class TestAppleIIBus : IAppleIIBus
     public List<byte> GetEnqueuedKeyHistory() => [.. _enqueuedKeyHistory];
     public bool GetPushButton(int num) => num >= 0 && num < 3 && _pushButtons[num];
     public int ResetCount => _resetCount;
-}
-
-/// <summary>
-/// Test implementation of ICpu that provides minimal CPU simulation.
-/// </summary>
-public class TestCpu : ICpu
-{
-    public ushort PC { get; set; } = 0;
-    public byte A { get; set; } = 0;
-    public byte X { get; set; } = 0;
-    public byte Y { get; set; } = 0;
-    public byte SP { get; set; } = 0xFF;
-    public ProcessorStatus Status { get; set; } = new ProcessorStatus();
-
-    public void Clock(IAppleIIBus bus) { }
-    
-    public void Reset(IAppleIIBus bus) 
-    { 
-        PC = 0;
-        A = 0;
-        X = 0;
-        Y = 0;
-        SP = 0xFF;
-        Status = new ProcessorStatus();
-    }
-    
-    public void InterruptRequest(IAppleIIBus bus) { }
-    public void NonMaskableInterrupt(IAppleIIBus bus) { }
-    public bool IsInstructionComplete() => true;
-    public byte Read(ushort address) => 0;
-    public void Write(ushort address, byte data) { }
-
-    public override string ToString()
-    {
-        return $"PC:{PC:X4} A:{A:X2} X:{X:X2} Y:{Y:X2} SP:{SP:X2}";
-    }
 }
 
 /// <summary>

@@ -4,9 +4,6 @@
 [submodule "legacy/CiderPress2"]
 	path = legacy/CiderPress2
 	url = https://github.com/markdavidlong/CiderPress2.git
-[submodule "legacy/6502.NET"]
-	path = legacy/6502.NET
-	url = https://github.com/markdavidlong/6502.NET.git
 [submodule "Pandowdy.Cpu"]
 	path = Pandowdy.Cpu
 	url = https://github.com/LydianScaleSoftware/Pandowdy.Cpu.git

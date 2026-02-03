@@ -1,4 +1,3 @@
-using System;
 using Pandowdy.EmuCore.DataTypes;
 
 namespace Pandowdy.EmuCore.Interfaces;

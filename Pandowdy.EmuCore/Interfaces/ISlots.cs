@@ -1,5 +1,3 @@
-using Emulator;
-
 namespace Pandowdy.EmuCore.Interfaces;
 
 /// <summary>
@@ -34,11 +32,11 @@ public enum SlotNumber
 /// <summary>
 /// Manages Apple IIe expansion slots and coordinates peripheral card I/O and ROM access.
 /// </summary>
-/// <seealso cref="IMemory"/>
+/// <seealso cref="IPandowdyMemory"/>
 /// <seealso cref="IConfigurable"/>
 /// <seealso cref="ICard"/>
 /// <seealso cref="ICardFactory"/>
-public interface ISlots : IMemory, IConfigurable
+public interface ISlots : IPandowdyMemory, IConfigurable
 {
    
     /// <summary>
@@ -121,7 +119,7 @@ public interface ISlots : IMemory, IConfigurable
     /// <para>
     /// This method provides direct access to the card instance for inspection, debugging,
     /// or advanced operations. Normal emulator operation doesn't require calling this method
-    /// since <see cref="IMemory.Read"/> and <see cref="IMemory.Write"/> automatically route
+    /// since <see cref="IPandowdyMemory.Read"/> and <see cref="IPandowdyMemory.Write"/> automatically route
     /// to the appropriate card based on address.
     /// </para>
     /// <para>
@@ -186,9 +184,9 @@ public interface ISlots : IMemory, IConfigurable
     /// <seealso cref="RemoveCard"/>
     public bool IsEmpty(SlotNumber slot);
 
-    //** Inherited from IMemory **
+    //** Inherited from IPandowdyMemory **
     //
-    // The following members are inherited from IMemory and handle the $C090-$CFFF address range:
+    // The following members are inherited from IPandowdyMemory and handle the $C090-$CFFF address range:
     //
     // byte Read(ushort address)
     //   Reads a byte from the slots address space ($C090-$CFFF, offset by $C000).

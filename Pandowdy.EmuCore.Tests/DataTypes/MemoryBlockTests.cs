@@ -1,5 +1,5 @@
-using Xunit;
 using Pandowdy.EmuCore.DataTypes;
+using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -9,7 +9,7 @@ namespace Pandowdy.EmuCore.Tests;
 /// <remarks>
 /// MemoryBlock is a straightforward, flat memory space without bank switching or
 /// soft switches. These tests verify basic read/write functionality, boundary behavior,
-/// and IMemory interface compliance.
+/// and IPandowdyMemory interface compliance.
 /// </remarks>
 public class MemoryBlockTests
 {
@@ -395,13 +395,13 @@ public class MemoryBlockTests
 
     #endregion
 
-    #region IMemory Interface Compliance Tests
+    #region IPandowdyMemory Interface Compliance Tests
 
     [Fact]
-    public void IMemory_Read_WorksThroughInterface()
+    public void IPandowdyMemory_Read_WorksThroughInterface()
     {
         // Arrange
-        Emulator.IMemory memory = new MemoryBlock(256);
+        IPandowdyMemory memory = new MemoryBlock(256);
         ((MemoryBlock)memory).Write(0x70, 0xBB);
 
         // Act
@@ -412,10 +412,10 @@ public class MemoryBlockTests
     }
 
     [Fact]
-    public void IMemory_Write_WorksThroughInterface()
+    public void IPandowdyMemory_Write_WorksThroughInterface()
     {
         // Arrange
-        Emulator.IMemory memory = new MemoryBlock(256);
+        IPandowdyMemory memory = new MemoryBlock(256);
 
         // Act
         memory.Write(0x80, 0xCC);
@@ -425,10 +425,10 @@ public class MemoryBlockTests
     }
 
     [Fact]
-    public void IMemory_Indexer_WorksThroughInterface()
+    public void IPandowdyMemory_Indexer_WorksThroughInterface()
     {
         // Arrange
-        Emulator.IMemory memory = new MemoryBlock(256);
+        IPandowdyMemory memory = new MemoryBlock(256);
 
         // Act
         memory[0x90] = 0xDD;
@@ -439,10 +439,10 @@ public class MemoryBlockTests
     }
 
     [Fact]
-    public void IMemory_Size_WorksThroughInterface()
+    public void IPandowdyMemory_Size_WorksThroughInterface()
     {
         // Arrange
-        Emulator.IMemory memory = new MemoryBlock(1024);
+        IPandowdyMemory memory = new MemoryBlock(1024);
 
         // Assert
         Assert.Equal(1024, memory.Size);
@@ -797,10 +797,10 @@ public class MemoryBlockTests
     }
 
     [Fact]
-    public void MemoryBlock64k_Implements_IMemory()
+    public void MemoryBlock64k_Implements_IPandowdyMemory()
     {
         // Arrange & Act
-        Emulator.IMemory memory = new MemoryBlock64k();
+        IPandowdyMemory memory = new MemoryBlock64k();
 
         // Assert
         Assert.Equal(0x10000, memory.Size);

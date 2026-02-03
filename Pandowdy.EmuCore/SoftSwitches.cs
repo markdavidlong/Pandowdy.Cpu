@@ -33,9 +33,7 @@
 // appropriate events (Changed, MemoryMappingChanged) to notify subscribers.
 //------------------------------------------------------------------------------
 
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore;

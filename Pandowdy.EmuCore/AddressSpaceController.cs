@@ -1,6 +1,4 @@
-using Emulator;
 using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore;
 
@@ -64,7 +62,7 @@ public sealed class MemoryAccessEventArgs : EventArgs
 /// the emulator worker thread. Cross-thread access should be coordinated by the bus (VA2MBus).
 /// </para>
 /// </remarks>
-public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDirectMemoryPoolReader, IDisposable
+public sealed class AddressSpaceController : IPandowdyMemory, IMemoryAccessNotifier, IDirectMemoryPoolReader, IDisposable
 {
     /// <summary>
     /// Gets the size of the addressable memory space (always 64KB for 6502).
@@ -207,7 +205,7 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
     /// <para>
     /// <strong>Size Validation:</strong> The system RAM must be at least 48KB ($C000 bytes)
     /// to cover the $0000-$BFFF address range. Validation is performed via
-    /// <see cref="Utility.ValidateIMemorySize"/>.
+    /// <see cref="Utility.ValidateIPandowdyMemorySize"/>.
     /// </para>
     /// </remarks>
     public AddressSpaceController(
@@ -223,7 +221,7 @@ public sealed class AddressSpaceController : IMemory, IMemoryAccessNotifier, IDi
 
         _io = ioHandler;
         _langCard = langCard;
-        _systemRam = Utility.ValidateIMemorySize(systemRam, nameof(systemRam), RequiredRamSize);
+        _systemRam = Utility.ValidateIPandowdyMemorySize(systemRam, nameof(systemRam), RequiredRamSize);
         _slots = slots;
     }
 

@@ -1,8 +1,6 @@
-using Emulator;
-
 namespace Pandowdy.EmuCore.Interfaces;
 
-public interface ISystemRomProvider : IMemory
+public interface ISystemRomProvider : IPandowdyMemory
 {
     public void LoadRomFile(string filename);
 }

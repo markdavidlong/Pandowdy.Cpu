@@ -1,5 +1,3 @@
-using Emulator;
-
 namespace Pandowdy.EmuCore.Interfaces;
 
 /// <summary>
@@ -27,13 +25,13 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// <see cref="ISlots"/> implementation for peripheral card I/O.
 /// </para>
 /// <para>
-/// <strong>Decorator Pattern:</strong> This interface extends <see cref="IMemory"/> allowing
+/// <strong>Decorator Pattern:</strong> This interface extends <see cref="IPandowdyMemory"/> allowing
 /// implementations to be composed (e.g., wrapping with No-Slot Clock interceptor).
 /// </para>
 /// </remarks>
 /// <seealso cref="ISlots"/>
-/// <seealso cref="IMemory"/>
-public interface ISystemIoHandler : IMemory
+/// <seealso cref="IPandowdyMemory"/>
+public interface ISystemIoHandler : IPandowdyMemory
 {
     /// <summary>
     /// Resets all soft switches and I/O state to power-on defaults.

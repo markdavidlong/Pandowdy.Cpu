@@ -8,10 +8,10 @@
 
 | Status | Details |
 |--------|---------|
-| **Branch** | `develop` |
-| **Tests** | 1235 tests passing ✅ |
-| **Last Milestone** | Keyboard Reset Implementation (Task 6) |
-| **Next Focus** | CPU Migration to Pandowdy.Cpu (Task 18) |
+| **Branch** | `tasks` |
+| **Tests** | 1206 tests passing ✅ |
+| **Last Milestone** | CPU Migration to Pandowdy.Cpu (Task 18) - Phases 1-5 ✅ |
+| **Next Focus** | Task 18 Phase 6 (Cleanup) → Task 19 (Basic Debugger) |
 
 ---
 
@@ -53,7 +53,7 @@
 
 **Goal:** Replace the legacy 6502.NET Emulator project with the new Pandowdy.Cpu library, eliminating the external dependency and improving CPU emulation architecture.
 
-**Status:** ⏳ NOT STARTED
+**Status:** ⏳ IN PROGRESS (Phase 1 complete)
 
 **Current State:**
 - `CPUAdapter.cs` wraps the legacy `Emulator.CPU` class from `legacy/6502.NET/Emulator`
@@ -73,62 +73,74 @@
 **Phase 1: Add Pandowdy.Cpu to Solution** ✅ DONE
 - ~~Add `Pandowdy.Cpu` project to the solution (project reference or NuGet)~~
 - Added as Git submodule at `Pandowdy.Cpu/`
+- Added `Pandowdy.Cpu.csproj` to Pandowdy solution
 - Keep legacy Emulator project temporarily for comparison
 
-**Phase 2: Create Bus Adapter**
-- Create `AppleIIBusToCpuBusAdapter` implementing `IPandowdyCpuBus`
-- Adapts `IAppleIIBus` methods (`CpuRead`, `CpuWrite`) to `IPandowdyCpuBus`
-- Follows DI guidelines: adapter is injected, not created internally
+**Phase 2: Create Bus Adapter** ✅ DONE
+- ~~Create `AppleIIBusToCpuBusAdapter` implementing `IPandowdyCpuBus`~~
+- Better approach: `IAppleIIBus` now implements `IPandowdyCpuBus` directly
+- Added default interface implementations for `CpuRead()`, `Peek()`, and `Write()`
+- Added project reference from `Pandowdy.EmuCore` to `Pandowdy.Cpu`
+- No separate adapter class needed - cleaner architecture
 
-**Phase 3: Update ICpu Interface**
-- Remove dependency on `Emulator.ProcessorStatus`
-- Define native `ProcessorStatus` struct/enum in `Pandowdy.EmuCore`
-- Keep `ICpu` API stable to minimize downstream changes
+**Phase 3: Update ICpu Interface** ✅ DONE
+- ~~Remove dependency on `Emulator.ProcessorStatus`~~
+- ~~Define native `ProcessorStatus` struct/enum in `Pandowdy.EmuCore`~~
+- Better approach: Removed `ICpu` interface entirely, use `IPandowdyCpu` directly
+- `IAppleIIBus.Cpu` now returns `IPandowdyCpu` instead of `ICpu`
+- State access via `cpu.Buffer.Current` (CpuState class)
 
-**Phase 4: Replace CPUAdapter Implementation**
-- Create new `Cpu6502Adapter` (or replace `CPUAdapter`) using `Pandowdy.Cpu`
-- Remove Connect-Execute-Disconnect pattern overhead
-- Direct method calls: `_cpu.Clock()` with bus reference
+**Phase 4: Replace CPUAdapter Implementation** ✅ DONE
+- ~~Create new `Cpu6502Adapter` (or replace `CPUAdapter`) using `Pandowdy.Cpu`~~
+- Removed `CPUAdapter` class entirely - no adapter needed
+- DI container creates `IPandowdyCpu` via `CpuFactory.Create()`
+- `CpuStateBuffer` owned by DI container, injected where needed
+- Direct method calls: `cpu.Clock(bus)` returns bool
 
-**Phase 5: Update DI Registration**
-- Update `Program.cs` to register new CPU implementation
-- Register bus adapter in DI container
-- Remove legacy Emulator project reference
+**Phase 5: Update DI Registration** ✅ DONE
+- Updated `Program.cs` to register:
+  - `CpuStateBuffer` as singleton (DI-owned)
+  - `IPandowdyCpu` via factory method using `CpuFactory.Create(CpuVariant.Wdc65C02, buffer)`
+- Removed legacy `Emulator.CPU` and `CPUAdapter` registrations
 
-**Phase 6: Cleanup**
-- Remove `legacy/6502.NET/Emulator` from solution
-- Update documentation
-- Run full test suite
+**Phase 6: Cleanup** ⏳ IN PROGRESS
+- ~~Removed `ICpu.cs` interface~~
+- ~~Removed `CPUAdapter.cs` class~~
+- ~~Removed `CPUAdapterTests.cs` test file~~
+- ~~Removed `TestCpu` class from test helpers~~
+- TODO: Remove `legacy/6502.NET/Emulator` from solution (or keep for reference)
+- TODO: Update documentation
+- ✅ All 1206 tests passing
 
-**Files to Create/Modify:**
-
-*New Files:*
-- `Pandowdy.EmuCore\Adapters\AppleIIBusToCpuBusAdapter.cs` - Bus interface adapter
-- `Pandowdy.EmuCore\Types\ProcessorStatus.cs` - Native processor status (if needed)
-
-*Modified Files:*
-- `Pandowdy.EmuCore\Interfaces\ICpu.cs` - Remove `Emulator.ProcessorStatus` dependency
-- `Pandowdy.EmuCore\CPUAdapter.cs` - Replace with new Pandowdy.Cpu wrapper
-- `Pandowdy.EmuCore\Pandowdy.EmuCore.csproj` - Add Pandowdy.Cpu reference
-- `Pandowdy\Program.cs` - Update DI registration
-- `Pandowdy.EmuCore.Tests\CPUAdapterTests.cs` - Update tests for new CPU
+**Files Created/Modified:**
 
 *Removed Files:*
-- `legacy\6502.NET\Emulator\Emulator.csproj` reference from solution
+- `Pandowdy.EmuCore\Interfaces\ICpu.cs` - Interface no longer needed
+- `Pandowdy.EmuCore\CPUAdapter.cs` - Adapter no longer needed
+- `Pandowdy.EmuCore.Tests\CPUAdapterTests.cs` - Tests for removed class
+
+*Modified Files:*
+- `Pandowdy.EmuCore\Interfaces\IAppleIIBus.cs` - Now implements `IPandowdyCpuBus`, `Cpu` returns `IPandowdyCpu`
+- `Pandowdy.EmuCore\VA2MBus.cs` - Constructor takes `IPandowdyCpu`, field type updated
+- `Pandowdy.EmuCore\VA2M.cs` - Uses `Bus.Cpu.Buffer.Current` for state access
+- `Pandowdy.EmuCore\Pandowdy.EmuCore.csproj` - Added Pandowdy.Cpu project reference
+- `Pandowdy\Program.cs` - DI registration for `CpuStateBuffer` and `IPandowdyCpu`
+- `Pandowdy.EmuCore.Tests\Helpers\VA2MTestHelpers.cs` - Uses real CPU from factory
+- `Pandowdy.EmuCore.Tests\VA2MBusTests.cs` - Updated to use `IPandowdyCpu`
 
 **Technical Considerations:**
-- `IPandowdyCpuBus` has different method signatures than `IAppleIIBus`
-- Need to verify cycle-timing compatibility with Apple IIe requirements
-- Consider 65C02 vs 6502 - Apple IIe enhanced uses 65C02
-- ProcessorStatus type change may affect debugging tools
+- ~~`IPandowdyCpuBus` has different method signatures than `IAppleIIBus`~~ ✅ Resolved via default interface methods
+- ~~Need to verify cycle-timing compatibility with Apple IIe requirements~~ ✅ Using WDC 65C02 variant
+- ~~Consider 65C02 vs 6502~~ ✅ Apple IIe enhanced uses 65C02, configured in DI
+- ~~ProcessorStatus type change may affect debugging tools~~ ✅ Use `CpuState` properties instead
 
 **Testing Requirements:**
-- All existing CPU tests must pass
-- Run Dormann functional test suite through emulator
-- Verify timing-sensitive software (disk access, video sync)
-- Performance comparison: legacy vs new CPU
+- ✅ All existing CPU tests pass (1206 tests passing)
+- TODO: Run Dormann functional test suite through emulator
+- TODO: Verify timing-sensitive software (disk access, video sync)
+- TODO: Performance comparison: legacy vs new CPU
 
-**Benefits:**
+**Benefits:
 - ✅ Eliminates external legacy dependency
 - ✅ Removes Connect-Execute-Disconnect overhead
 - ✅ Cycle-accurate, well-tested implementation

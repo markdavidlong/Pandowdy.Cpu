@@ -1,5 +1,4 @@
 using Pandowdy.EmuCore.DiskII;
-using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore.Tests.DiskII;
 

@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Emulator;
 using Pandowdy.EmuCore.Interfaces;
 
 
@@ -68,8 +67,8 @@ public class SystemRamSelector(
     private const int RequiredRamSize = 0xC000; // 48KB
 
 
-    private readonly ISystemRam _mainRam = Utility.ValidateIMemorySize(mainRam, nameof(mainRam), RequiredRamSize);
-    private readonly ISystemRam? _auxRam = auxRam != null ? Utility.ValidateIMemorySize(auxRam, nameof(auxRam), RequiredRamSize) : null;
+    private readonly ISystemRam _mainRam = Utility.ValidateIPandowdyMemorySize(mainRam, nameof(mainRam), RequiredRamSize);
+    private readonly ISystemRam? _auxRam = auxRam != null ? Utility.ValidateIPandowdyMemorySize(auxRam, nameof(auxRam), RequiredRamSize) : null;
     private readonly IFloatingBusProvider _floatingBus = floatingBus ?? throw new ArgumentNullException(nameof(floatingBus));
     private readonly ISystemStatusProvider _status = status ?? throw new ArgumentNullException(nameof(status));
 
@@ -269,7 +268,7 @@ public class SystemRamSelector(
             }
         }
 
-        IMemory? targetMemory = readAux ? _auxRam : _mainRam;
+        IPandowdyMemory? targetMemory = readAux ? _auxRam : _mainRam;
         return targetMemory != null ? targetMemory[address] : _floatingBus.Read();
     }
 
@@ -341,7 +340,7 @@ public class SystemRamSelector(
             }
         }
 
-        IMemory? targetMemory = writeAux ? _auxRam : _mainRam;
+        IPandowdyMemory? targetMemory = writeAux ? _auxRam : _mainRam;
         if (targetMemory != null)
         {
             targetMemory[address] = data;

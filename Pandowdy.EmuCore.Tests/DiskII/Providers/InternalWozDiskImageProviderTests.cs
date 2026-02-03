@@ -1,4 +1,3 @@
-using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.DiskII.Providers;
 
 namespace Pandowdy.EmuCore.Tests.DiskII.Providers;

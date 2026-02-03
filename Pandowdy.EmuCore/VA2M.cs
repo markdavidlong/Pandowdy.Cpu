@@ -59,7 +59,6 @@
 // Achieves ~1.023 MHz within 0.05% error (~500 PPM).
 //------------------------------------------------------------------------------
 
-using System.Reflection;
 using System.Diagnostics;
 using System.Collections.Concurrent;
 using Pandowdy.EmuCore.Interfaces;
@@ -592,9 +591,9 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// <para>
     /// <strong>Instruction Atomicity:</strong> On the 6502, instruction execution is guaranteed
     /// to be atomic - no interrupts or external events can occur in the middle of an instruction.
-    /// This method respects this guarantee by checking <see cref="ICpu.IsInstructionComplete"/>
-    /// before processing pending actions. If an instruction is in progress, pending actions are
-    /// deferred until the instruction completes.
+    /// This method respects this guarantee by checking <c>Bus.Cpu.Buffer.Current.CyclesRemaining</c>
+    /// before processing pending actions. If an instruction is in progress (CyclesRemaining > 0),
+    /// pending actions are deferred until the instruction completes.
     /// </para>
     /// <para>
     /// <strong>Why This Matters:</strong> Without this check, a reset or interrupt command
@@ -612,16 +611,21 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
         // Only process pending commands at instruction boundaries to maintain 6502 atomicity.
         // Without this check, a Reset() or InterruptRequest() from another thread could
         // execute mid-instruction, violating the 6502's atomic instruction guarantee.
-            if (Bus.Cpu != null && !Bus.Cpu.IsInstructionComplete())
-            {
-                return;
-            }
-
-            while (_pending.TryDequeue(out var act))
-            {
-                try { act(); } catch { Debug.WriteLine($"Exception during ProcessPending()"); }
-            }
+        // 
+        // We check CyclesRemaining == 0 rather than InstructionComplete because:
+        // - After Reset(), InstructionComplete is false (no instruction has completed yet)
+        // - But CyclesRemaining == 0 indicates the CPU is ready to fetch the next instruction
+        // - This correctly handles both post-reset and mid-execution states
+        if (Bus.Cpu != null && Bus.Cpu.State.CyclesRemaining > 0)
+        {
+            return;
         }
+
+        while (_pending.TryDequeue(out var act))
+        {
+            try { act(); } catch { Debug.WriteLine($"Exception during ProcessPending()"); }
+        }
+    }
 
     /// <summary>
     /// Handles VBlank event from the bus, triggering frame rendering and flash toggle.
@@ -1180,7 +1184,8 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     {
         int lineNum = (int)(Bus.CpuRead(0x75) + (Bus.CpuRead(0x76) << 8));
         int? basicLine = lineNum < 0xFA00 ? lineNum : null;
-        var snapshot = new StateSnapshot((ushort) Bus.Cpu.PC, (byte)Bus.Cpu.SP, Bus.SystemClockCounter, basicLine, true, false);
+        var state = Bus.Cpu.State;
+        var snapshot = new StateSnapshot(state.PC, state.SP, Bus.SystemClockCounter, basicLine, true, false);
         _stateSink.Update(snapshot);
 
 

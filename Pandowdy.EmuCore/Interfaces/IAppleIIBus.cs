@@ -1,4 +1,4 @@
-using Emulator;
+using Pandowdy.Cpu;
 
 namespace Pandowdy.EmuCore.Interfaces;
 
@@ -7,12 +7,13 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// keyboard input and pushbutton (game controller) functionality.
 /// </summary>
 /// <remarks>
+/// <para>
 /// This interface represents the Apple IIe system bus, coordinating communication
 /// between the CPU, memory, and I/O devices. It handles keyboard input, game controller
 /// buttons, and provides access to the system clock counter for timing-sensitive operations.
+/// </para>
 /// </remarks>
-#pragma warning disable CS0108 // Member hides inherited member; IBus will be removed soon
-public interface IAppleIIBus : IBus
+public interface IAppleIIBus :  IPandowdyCpuBus
 {
     /// <summary>
     /// Gets the memory pool representing the Apple IIe's 64k addressable memory space.
@@ -21,16 +22,16 @@ public interface IAppleIIBus : IBus
     /// The memory instance that provides read/write access to main RAM, auxiliary RAM,
     /// ROM, and language card memory banks.
     /// </value>
-    IMemory RAM { get; }
+    IPandowdyMemory RAM { get; }
 
     /// <summary>
-    /// Gets the 6502 CPU instance connected to this bus.
+    /// Gets the 65C02 CPU instance connected to this bus.
     /// </summary>
     /// <value>
     /// The CPU that executes instructions and communicates with memory and I/O
     /// devices through this bus interface.
     /// </value>
-    ICpu Cpu { get; }
+    IPandowdyCpu Cpu { get; }
 
     /// <summary>
     /// Gets the system clock counter tracking elapsed cycles since reset.
@@ -50,13 +51,42 @@ public interface IAppleIIBus : IBus
     /// If false, may trigger side effects like clearing soft switches or strobing addresses.</param>
     /// <returns>The byte value at the specified address</returns>
     /// <remarks>
+    /// <para>
     /// This method handles I/O address decoding for the $C000-$CFFF range, routing
     /// reads to appropriate handlers for keyboard, soft switches, and peripheral cards.
     /// Regular memory reads ($0000-$BFFF, $D000-$FFFF) are routed to the memory pool
     /// with bank switching and auxiliary memory selection applied.
+    /// </para>
+    /// <para>
+    /// <strong>IPandowdyCpuBus:</strong> When called with <paramref name="readOnly"/> = false,
+    /// this satisfies <see cref="IPandowdyCpuBus.CpuRead"/>. When called with 
+    /// <paramref name="readOnly"/> = true, this satisfies <see cref="IPandowdyCpuBus.Peek"/>.
+    /// </para>
     /// </remarks>
     byte CpuRead(ushort address, bool readOnly = false);
-    
+
+    /// <summary>
+    /// Reads a byte from the specified memory address as the CPU would (with side effects).
+    /// </summary>
+    /// <param name="address">The 16-bit memory address to read from ($0000-$FFFF)</param>
+    /// <returns>The byte value at the specified address</returns>
+    /// <remarks>
+    /// This is the <see cref="IPandowdyCpuBus.CpuRead"/> implementation.
+    /// Equivalent to calling <see cref="CpuRead(ushort, bool)"/> with readOnly = false.
+    /// </remarks>
+    byte IPandowdyCpuBus.CpuRead(ushort address) => CpuRead(address, readOnly: false);
+
+    /// <summary>
+    /// Peeks at a byte from the specified address without triggering side effects.
+    /// </summary>
+    /// <param name="address">The 16-bit address to peek at.</param>
+    /// <returns>The byte value at the specified address.</returns>
+    /// <remarks>
+    /// This is the <see cref="IPandowdyCpuBus.Peek"/> implementation.
+    /// Equivalent to calling <see cref="CpuRead(ushort, bool)"/> with readOnly = true.
+    /// </remarks>
+    byte IPandowdyCpuBus.Peek(ushort address) => CpuRead(address, readOnly: true);
+
     /// <summary>
     /// Writes a byte to the specified memory address as the CPU would.
     /// </summary>
@@ -71,7 +101,18 @@ public interface IAppleIIBus : IBus
     /// on the write address rather than the data value.
     /// </remarks>
     void CpuWrite(ushort address, byte data);
-    
+
+    /// <summary>
+    /// Writes a byte to the specified memory address as the CPU would.
+    /// </summary>
+    /// <param name="address">The 16-bit memory address to write to ($0000-$FFFF)</param>
+    /// <param name="value">The byte value to write</param>
+    /// <remarks>
+    /// This is the <see cref="IPandowdyCpuBus.Write"/> implementation.
+    /// Equivalent to calling <see cref="CpuWrite"/>.
+    /// </remarks>
+    void IPandowdyCpuBus.Write(ushort address, byte value) => CpuWrite(address, value);
+
     /// <summary>
     /// Advances the system clock by one cycle.
     /// </summary>

@@ -1,5 +1,4 @@
-using System.Diagnostics;
-using Emulator;
+using Pandowdy.Cpu;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
 
@@ -51,16 +50,16 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// Handles all memory operations including RAM, ROM, memory banking, and I/O routing.
     /// </remarks>
     private readonly AddressSpaceController _addressSpace;
-    
+
     /// <summary>
-    /// CPU instance (6502 emulator) connected to this bus.
+    /// CPU instance (65C02 emulator) connected to this bus.
     /// </summary>
-    private readonly ICpu _cpu;
-    
+    private readonly IPandowdyCpu _cpu;
+
     /// <summary>
     /// Gets the CPU instance connected to this bus.
     /// </summary>
-    public ICpu Cpu { get => _cpu; }
+    public IPandowdyCpu Cpu { get => _cpu; }
 
     /// <summary>
     /// CPU clocking and VBlank timing counters.
@@ -98,10 +97,10 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// <para>
     /// <strong>Note:</strong> This exposes the full address space controller, not just
     /// RAM. It includes memory banking, ROM mapping, and I/O routing.
-    /// The IMemory interface is used for compatibility with existing code.
+    /// The IPandowdyMemory interface is used for compatibility with existing code.
     /// </para>
     /// </remarks>
-    public IMemory RAM => _addressSpace;
+    public IPandowdyMemory RAM => _addressSpace;
 
     /// <summary>
     /// Gets the total number of CPU cycles executed since last reset.
@@ -164,7 +163,7 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
     /// AddressSpaceController, which delegates to appropriate handlers (RAM, ROM, I/O cards).
     /// </para>
     /// </remarks>
-    public VA2MBus(AddressSpaceController addressSpace, ICpu cpu, CpuClockingCounters clockCounters)
+    public VA2MBus(AddressSpaceController addressSpace, IPandowdyCpu cpu, CpuClockingCounters clockCounters)
     {
         ArgumentNullException.ThrowIfNull(addressSpace);
         ArgumentNullException.ThrowIfNull(cpu);
@@ -174,20 +173,6 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         _clockCounters = clockCounters;
     }
 
-    /// <summary>
-    /// Legacy CPU connection method. Not supported in VA2MBus.
-    /// </summary>
-    /// <param name="_">CPU instance (ignored).</param>
-    /// <exception cref="NotSupportedException">Always thrown. VA2MBus requires CPU in constructor.</exception>
-    /// <remarks>
-    /// VA2MBus uses constructor injection for the CPU connection. The Connect method is
-    /// deprecated and should not be called. This method exists only for IAppleIIBus interface
-    /// compatibility.
-    /// </remarks>
-    public void Connect(Emulator.CPU _)
-    {
-        throw new NotSupportedException("This should not be called. Connect is deprecated.");
-    }
 
     /// <summary>
     /// Reads a byte from memory or I/O space.

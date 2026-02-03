@@ -9,9 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\legacy\6502.NET\Emulator\Emulator.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\CommonUtil\CommonUtil.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\DiskArc\DiskArc.csproj" />
+    <ProjectReference Include="..\Pandowdy.Cpu\Pandowdy.Cpu\Pandowdy.Cpu.csproj" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
   </ItemGroup>
 

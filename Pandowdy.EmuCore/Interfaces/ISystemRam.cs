@@ -1,5 +1,3 @@
-using Emulator;
-
 namespace Pandowdy.EmuCore.Interfaces;
 
 /// <summary>
@@ -7,7 +5,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>Purpose:</strong> Extends the base <see cref="IMemory"/> interface with a bulk copy
+/// <strong>Purpose:</strong> Extends the base <see cref="IPandowdyMemory"/> interface with a bulk copy
 /// operation that enables efficient memory snapshots for video rendering. The Apple IIe emulator
 /// captures video memory at VBlank (~60 Hz), requiring fast memory copies to minimize emulator
 /// thread blocking.
@@ -28,8 +26,8 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// </para>
 /// </remarks>
 /// <seealso cref="ISystemRamSelector"/>
-/// <seealso cref="IMemory"/>
-public interface ISystemRam : IMemory
+/// <seealso cref="IPandowdyMemory"/>
+public interface ISystemRam : IPandowdyMemory
 {
     /// <summary>
     /// Copies the entire contents of this RAM bank into the provided destination span.

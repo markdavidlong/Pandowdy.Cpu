@@ -1,5 +1,3 @@
-using Xunit;
-using Emulator;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Services;
 using Pandowdy.EmuCore.Interfaces;
@@ -180,7 +178,7 @@ public class NullFloatingBusProviderTests
         var fb = new NullFloatingBusProvider();
         
         // Simulate Language Card trying to read non-existent aux memory
-        IMemory? auxRam = null;
+        IPandowdyMemory? auxRam = null;
         byte value = auxRam is not null ? auxRam[0x1000] : fb.Read();
 
         // Assert - Should get zero from floating bus

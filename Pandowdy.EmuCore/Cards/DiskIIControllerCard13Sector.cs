@@ -1,5 +1,4 @@
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 
