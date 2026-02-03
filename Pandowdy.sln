@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.3.11218.70
@@ -58,8 +58,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommonUtil", "legacy\CiderPress2\CommonUtil\CommonUtil.csproj", "{26CBF272-F5E7-C706-D3FA-314632D55CEE}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AppleSAWS", "legacy\AppleSAWS\build\AppleSAWS.vcxproj", "{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utilities", "legacy\6502.NET\Utilities\Utilities.csproj", "{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy.EmuCore.Tests", "Pandowdy.EmuCore.Tests\Pandowdy.EmuCore.Tests.csproj", "{3D1BE63F-08F2-876B-D0D6-C1FDB558CD4F}"
 EndProject
@@ -230,30 +228,6 @@ Global
 		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.RelWithDebInfo|x64.Build.0 = RelWithDebInfo|x64
 		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.RelWithDebInfo|x86.ActiveCfg = RelWithDebInfo|Win32
 		{808BC2E4-B22D-3B60-AAEF-63F7109CA8B3}.RelWithDebInfo|x86.Build.0 = RelWithDebInfo|Win32
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Debug|x64.Build.0 = Debug|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Debug|x86.Build.0 = Debug|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.MinSizeRel|Any CPU.ActiveCfg = Release|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.MinSizeRel|Any CPU.Build.0 = Release|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.MinSizeRel|x64.ActiveCfg = Release|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.MinSizeRel|x64.Build.0 = Release|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.MinSizeRel|x86.ActiveCfg = MinSizeRel|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.MinSizeRel|x86.Build.0 = MinSizeRel|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Release|x64.ActiveCfg = Release|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Release|x64.Build.0 = Release|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Release|x86.ActiveCfg = Release|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.Release|x86.Build.0 = Release|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.RelWithDebInfo|Any CPU.ActiveCfg = Debug|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.RelWithDebInfo|Any CPU.Build.0 = Debug|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.RelWithDebInfo|x64.ActiveCfg = Debug|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.RelWithDebInfo|x64.Build.0 = Debug|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.RelWithDebInfo|x86.ActiveCfg = RelWithDebInfo|Any CPU
-		{D86ED6DC-C706-7482-BC57-60EB0C8DBFE3}.RelWithDebInfo|x86.Build.0 = RelWithDebInfo|Any CPU
 		{3D1BE63F-08F2-876B-D0D6-C1FDB558CD4F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3D1BE63F-08F2-876B-D0D6-C1FDB558CD4F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3D1BE63F-08F2-876B-D0D6-C1FDB558CD4F}.Debug|x64.ActiveCfg = Debug|Any CPU
