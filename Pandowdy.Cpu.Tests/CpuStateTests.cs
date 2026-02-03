@@ -350,7 +350,7 @@ public class CpuStateTests
     [Fact]
     public void SignalIrq_SetsPendingInterrupt()
     {
-        var cpu = CreateCpu(out _, out var buffer);
+        var cpu = CreateCpu(out _);
 
         cpu.SignalIrq();
 
@@ -360,7 +360,7 @@ public class CpuStateTests
     [Fact]
     public void SignalIrq_DoesNotOverrideNmi()
     {
-        var cpu = CreateCpu(out _, out var buffer);
+        var cpu = CreateCpu(out _);
         cpu.SignalNmi();
 
         cpu.SignalIrq();
@@ -371,7 +371,7 @@ public class CpuStateTests
     [Fact]
     public void SignalNmi_SetsPendingInterrupt()
     {
-        var cpu = CreateCpu(out _, out var buffer);
+        var cpu = CreateCpu(out _);
 
         cpu.SignalNmi();
 
@@ -381,7 +381,7 @@ public class CpuStateTests
     [Fact]
     public void SignalNmi_OverridesIrq()
     {
-        var cpu = CreateCpu(out _, out var buffer);
+        var cpu = CreateCpu(out _);
         cpu.SignalIrq();
 
         cpu.SignalNmi();
@@ -392,7 +392,7 @@ public class CpuStateTests
     [Fact]
     public void SignalNmi_OverridesReset()
     {
-        var cpu = CreateCpu(out _, out var buffer);
+        var cpu = CreateCpu(out _);
         cpu.SignalReset();
 
         cpu.SignalNmi();
@@ -403,7 +403,7 @@ public class CpuStateTests
     [Fact]
     public void SignalReset_SetsPendingInterrupt()
     {
-        var cpu = CreateCpu(out _, out var buffer);
+        var cpu = CreateCpu(out _);
 
         cpu.SignalReset();
 
@@ -413,7 +413,7 @@ public class CpuStateTests
     [Fact]
     public void SignalReset_OverridesAll()
     {
-        var cpu = CreateCpu(out _, out var buffer);
+        var cpu = CreateCpu(out _);
         cpu.SignalNmi();
 
         cpu.SignalReset();
@@ -424,7 +424,7 @@ public class CpuStateTests
     [Fact]
     public void ClearIrq_ClearsPendingIrq()
     {
-        var cpu = CreateCpu(out _, out var buffer);
+        var cpu = CreateCpu(out _);
         cpu.SignalIrq();
 
         cpu.ClearIrq();
@@ -435,7 +435,7 @@ public class CpuStateTests
     [Fact]
     public void ClearIrq_DoesNotClearNmi()
     {
-        var cpu = CreateCpu(out _, out var buffer);
+        var cpu = CreateCpu(out _);
         cpu.SignalNmi();
 
         cpu.ClearIrq();
@@ -450,7 +450,7 @@ public class CpuStateTests
     [Fact]
     public void HandlePendingInterrupt_Reset_LoadsResetVector()
     {
-        var cpu = CreateCpu(out var bus, out var buffer);
+        var cpu = CreateCpu(out var bus);
         bus.SetResetVector(0x8000);
         cpu.SignalReset();
 
@@ -464,7 +464,7 @@ public class CpuStateTests
     [Fact]
     public void HandlePendingInterrupt_Reset_ResetsRegisters()
     {
-        var cpu = CreateCpu(out var bus, out var buffer);
+        var cpu = CreateCpu(out var bus);
         cpu.State.A = 0xFF;
         cpu.State.X = 0xFF;
         cpu.State.Y = 0xFF;
@@ -481,7 +481,7 @@ public class CpuStateTests
     [Fact]
     public void HandlePendingInterrupt_Nmi_LoadsNmiVector()
     {
-        var cpu = CreateCpu(out var bus, out var buffer);
+        var cpu = CreateCpu(out var bus);
         bus.SetNmiVector(0x9000);
         cpu.State.PC = 0x1234;
         cpu.State.SP = 0xFF;
@@ -496,7 +496,7 @@ public class CpuStateTests
     [Fact]
     public void HandlePendingInterrupt_Nmi_PushesStateToStack()
     {
-        var cpu = CreateCpu(out var bus, out var buffer);
+        var cpu = CreateCpu(out var bus);
         bus.SetNmiVector(0x9000);
         cpu.State.PC = 0x1234;
         cpu.State.SP = 0xFF;
@@ -513,7 +513,7 @@ public class CpuStateTests
     [Fact]
     public void HandlePendingInterrupt_Nmi_SetsInterruptDisable()
     {
-        var cpu = CreateCpu(out var bus, out var buffer);
+        var cpu = CreateCpu(out var bus);
         cpu.State.SP = 0xFF;
         cpu.State.InterruptDisableFlag = false;
         cpu.SignalNmi();
@@ -526,7 +526,7 @@ public class CpuStateTests
     [Fact]
     public void HandlePendingInterrupt_Irq_LoadsIrqVector()
     {
-        var cpu = CreateCpu(out var bus, out var buffer);
+        var cpu = CreateCpu(out var bus);
         bus.SetIrqVector(0xA000);
         cpu.State.PC = 0x1234;
         cpu.State.SP = 0xFF;
@@ -542,7 +542,7 @@ public class CpuStateTests
     [Fact]
     public void HandlePendingInterrupt_Irq_IgnoredWhenInterruptDisabled()
     {
-        var cpu = CreateCpu(out var bus, out var buffer);
+        var cpu = CreateCpu(out var bus);
         bus.SetIrqVector(0xA000);
         cpu.State.PC = 0x1234;
         cpu.State.SP = 0xFF;
@@ -558,7 +558,7 @@ public class CpuStateTests
     [Fact]
     public void HandlePendingInterrupt_Irq_HandledWhenWaitingEvenIfDisabled()
     {
-        var cpu = CreateCpu(out var bus, out var buffer);
+        var cpu = CreateCpu(out var bus);
         bus.SetIrqVector(0xA000);
         cpu.State.PC = 0x1234;
         cpu.State.SP = 0xFF;
@@ -575,7 +575,7 @@ public class CpuStateTests
     [Fact]
     public void HandlePendingInterrupt_Nmi_ResumesFromWaiting()
     {
-        var cpu = CreateCpu(out var bus, out var buffer);
+        var cpu = CreateCpu(out var bus);
         cpu.State.SP = 0xFF;
         cpu.State.Status = CpuStatus.Waiting;
         cpu.SignalNmi();
@@ -588,7 +588,7 @@ public class CpuStateTests
     [Fact]
     public void HandlePendingInterrupt_None_ReturnsFalse()
     {
-        var cpu = CreateCpu(out var bus, out var buffer);
+        var cpu = CreateCpu(out var bus);
         cpu.State.PendingInterrupt = PendingInterrupt.None;
 
         bool handled = cpu.HandlePendingInterrupt(bus);
@@ -598,14 +598,14 @@ public class CpuStateTests
 
     #endregion
 
-    private static IPandowdyCpu CreateCpu(out TestRamBus bus, out CpuStateBuffer buffer)
+    private static IPandowdyCpu CreateCpu(out TestRamBus bus)
     {
         bus = new TestRamBus();
         bus.SetResetVector(0x8000);
         bus.SetIrqVector(0xA000);
         bus.SetNmiVector(0x9000);
-        buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(CpuVariant.Nmos6502);
+        var state = new CpuState();
+        var cpu = CpuFactory.Create(CpuVariant.Nmos6502, state);
         cpu.Reset(bus);
         return cpu;
     }

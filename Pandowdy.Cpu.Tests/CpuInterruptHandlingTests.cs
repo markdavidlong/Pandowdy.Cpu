@@ -22,7 +22,7 @@ public class CpuInterruptHandlingTests
     [InlineData(CpuVariant.Rockwell65C02, false)]
     public void IrqClearsDecimalFlagForCmosVariants(CpuVariant variant, bool expectedDecimal)
     {
-        var cpu = CreateCpu(variant, out var bus, out var buffer);
+        var cpu = CreateCpu(variant, out var bus);
         cpu.State.PC = 0x2000;
         cpu.State.DecimalFlag = true;
         cpu.State.InterruptDisableFlag = false;
@@ -43,7 +43,7 @@ public class CpuInterruptHandlingTests
     [InlineData(CpuVariant.Rockwell65C02, false)]
     public void NmiClearsDecimalFlagForCmosVariants(CpuVariant variant, bool expectedDecimal)
     {
-        var cpu = CreateCpu(variant, out var bus, out var buffer);
+        var cpu = CreateCpu(variant, out var bus);
         cpu.State.PC = 0x2000;
         cpu.State.DecimalFlag = true;
 
@@ -59,7 +59,7 @@ public class CpuInterruptHandlingTests
     [Fact]
     public void IrqIsMaskedWhenInterruptDisableSet()
     {
-        var cpu = CreateCpu(CpuVariant.Nmos6502, out var bus, out var buffer);
+        var cpu = CreateCpu(CpuVariant.Nmos6502, out var bus);
         cpu.State.PC = 0x2000;
         cpu.State.InterruptDisableFlag = true;
 
@@ -74,7 +74,7 @@ public class CpuInterruptHandlingTests
     [Fact]
     public void IrqWakesCpuWhenWaiting()
     {
-        var cpu = CreateCpu(CpuVariant.Wdc65C02, out var bus, out var buffer);
+        var cpu = CreateCpu(CpuVariant.Wdc65C02, out var bus);
         cpu.State.PC = 0x2000;
         cpu.State.InterruptDisableFlag = true;
         cpu.State.Status = CpuStatus.Waiting;
@@ -90,7 +90,7 @@ public class CpuInterruptHandlingTests
     [Fact]
     public void ResetInterruptResetsRegistersAndLoadsVector()
     {
-        var cpu = CreateCpu(CpuVariant.Nmos6502, out var bus, out var buffer);
+        var cpu = CreateCpu(CpuVariant.Nmos6502, out var bus);
         bus.SetResetVector(0x1234);
         cpu.State.A = 0x42;
         cpu.State.X = 0x24;
@@ -113,14 +113,14 @@ public class CpuInterruptHandlingTests
         Assert.Equal(PendingInterrupt.None, cpu.State.PendingInterrupt);
     }
 
-    private static IPandowdyCpu CreateCpu(CpuVariant variant, out TestRamBus bus, out CpuStateBuffer buffer)
+    private static IPandowdyCpu CreateCpu(CpuVariant variant, out TestRamBus bus)
     {
         bus = new TestRamBus();
         bus.SetResetVector(ProgramStart);
         bus.SetIrqVector(IrqHandler);
         bus.SetNmiVector(NmiHandler);
-        buffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant);
+        var state = new CpuState();
+        var cpu = CpuFactory.Create(variant, state);
         cpu.Reset(bus);
         return cpu;
     }

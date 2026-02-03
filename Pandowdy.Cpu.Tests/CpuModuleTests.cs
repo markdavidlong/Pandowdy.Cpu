@@ -443,7 +443,8 @@ public class CpuModuleTests : CpuTestBase
         bus.SetIrqVector(IrqHandler);
         bus.SetNmiVector(NmiHandler);
 
-        var cpu = CpuFactory.Create(variant);
+        var state = new CpuState();
+        var cpu = CpuFactory.Create(variant, state);
         bus.LoadProgram(ProgramStart, [0xA9, 0x42]);
 
         cpu.Reset(bus);
@@ -462,7 +463,8 @@ public class CpuModuleTests : CpuTestBase
         bus.SetIrqVector(IrqHandler);
         bus.SetNmiVector(NmiHandler);
 
-        var cpu = CpuFactory.Create(variant);
+        var state = new CpuState();
+        var cpu = CpuFactory.Create(variant, state);
         bus.LoadProgram(ProgramStart, [0xEA, 0xEA]);
 
         cpu.Reset(bus);

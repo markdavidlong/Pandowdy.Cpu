@@ -21,6 +21,7 @@ public abstract class CpuTestBase
 
     protected TestRamBus Bus { get; private set; } = null!;
     protected IPandowdyCpu Cpu { get; private set; } = null!;
+    protected CpuState State { get; private set; } = null!;
 
     protected void SetupCpu()
     {
@@ -30,7 +31,8 @@ public abstract class CpuTestBase
     protected void SetupCpu(CpuVariant variant)
     {
         Bus = new TestRamBus();
-        Cpu = CpuFactory.Create(variant);
+        State = new CpuState();
+        Cpu = CpuFactory.Create(variant, State);
         Bus.SetResetVector(ProgramStart);
         Bus.SetIrqVector(IrqHandler);
         Bus.SetNmiVector(NmiHandler);
