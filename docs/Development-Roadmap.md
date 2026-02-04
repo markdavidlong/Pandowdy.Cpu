@@ -9,7 +9,7 @@
 | Status | Details |
 |--------|---------|
 | **Branch** | `tasks` |
-| **Tests** | 3388 tests (Including Pandowdy.Cpu.Tests) passing ✅ |
+| **Tests** | 1195 tests passing ✅ |
 | **Last Milestone** | CPU Migration to Pandowdy.Cpu (Task 18) ✅ COMPLETE |
 | **Next Focus** | Task 19 (Basic Debugger Implementation) |
 
