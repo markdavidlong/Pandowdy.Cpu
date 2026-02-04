@@ -23,6 +23,7 @@ namespace Pandowdy.UI.ViewModels;
 /// <list type="bullet">
 /// <item><see cref="EmulatorState"/>: Displays CPU state (PC, cycles, BASIC line)</item>
 /// <item><see cref="SystemStatus"/>: Displays soft switches and system status</item>
+/// <item><see cref="CpuStatus"/>: Displays CPU registers and flags (60Hz update)</item>
 /// </list>
 /// </para>
 /// <para>
@@ -44,10 +45,10 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     /// <value>View model showing PC, cycles, and BASIC line number.</value>
     public EmulatorStateViewModel EmulatorState { get; }
-    
+
     //public ErrorLogViewModel ErrorLog { get; }
     //public DisassemblyViewModel Disassembly { get; }
-    
+
     /// <summary>
     /// Gets the view model for displaying system status (soft switches, buttons).
     /// </summary>
@@ -59,6 +60,12 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     /// <value>View model showing disk drive states (motor, track, disk images).</value>
     public DiskStatusPanelViewModel DiskStatus { get; }
+
+    /// <summary>
+    /// Gets the view model for displaying CPU register and flag status.
+    /// </summary>
+    /// <value>View model showing CPU registers (PC, A, X, Y, SP) and processor flags.</value>
+    public CpuStatusPanelViewModel CpuStatus { get; }
 
     #endregion
 
@@ -423,6 +430,7 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <param name="emuState">Emulator state provider for control commands.</param>
     /// <param name="systemStatus">View model for displaying system status.</param>
     /// <param name="diskStatus">View model for displaying disk drive status.</param>
+    /// <param name="cpuStatus">View model for displaying CPU register and flag status.</param>
     /// <remarks>
     /// <para>
     /// <strong>Dependency Injection:</strong> All dependencies are injected via constructor,
@@ -449,7 +457,8 @@ public sealed class MainWindowViewModel : ReactiveObject
                                //DisassemblyViewModel disassembly,
                                IEmulatorState emuState,
                                SystemStatusViewModel systemStatus,
-                               DiskStatusPanelViewModel diskStatus)
+                               DiskStatusPanelViewModel diskStatus,
+                               CpuStatusPanelViewModel cpuStatus)
     {
         EmulatorState = emulatorState;
         //ErrorLog = errorLog;
@@ -457,6 +466,7 @@ public sealed class MainWindowViewModel : ReactiveObject
         _emuState = emuState;
         SystemStatus = systemStatus;
         DiskStatus = diskStatus;
+        CpuStatus = cpuStatus;
 
         // Initialize emulator control commands
         PauseCommand = ReactiveCommand.Create(() => _emuState.RequestPause());

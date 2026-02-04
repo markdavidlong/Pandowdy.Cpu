@@ -158,6 +158,9 @@ namespace Pandowdy
 
                     services.AddSingleton<IAppleIIBus,VA2MBus>();
 
+                    // Memory Inspector - provides read-only access to all memory regions for debugging
+                    services.AddSingleton<IMemoryInspector, MemoryInspector>();
+
                     // UI services
                     services.AddSingleton<IRefreshTicker, AvaloniaRefreshTicker>();
 
@@ -165,6 +168,7 @@ namespace Pandowdy
                     services.AddTransient<EmulatorStateViewModel>();
                     services.AddTransient<SystemStatusViewModel>();
                     services.AddTransient<DiskStatusPanelViewModel>();
+                    services.AddTransient<CpuStatusPanelViewModel>();
                     services.AddTransient<MainWindowViewModel>();
 
                     services.AddSingleton<VA2M>();

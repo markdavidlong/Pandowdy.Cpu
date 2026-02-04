@@ -2,8 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.ViewModels;
 using System.Reactive.Subjects;
 
@@ -45,6 +47,51 @@ public class MainWindowViewModelTests
     }
 
     /// <summary>
+    /// Test stub for IRefreshTicker.
+    /// </summary>
+    private class TestRefreshTicker : IRefreshTicker
+    {
+        private readonly Subject<DateTime> _subject = new();
+        public IObservable<DateTime> Stream => _subject;
+        public void Start() { }
+        public void Stop() { }
+        public void Tick() => _subject.OnNext(DateTime.Now);
+    }
+
+    /// <summary>
+    /// Test stub for IEmulatorCoreInterface.
+    /// </summary>
+    private class TestEmulatorCoreInterface : IEmulatorCoreInterface
+    {
+        public CpuStateSnapshot CpuState => new()
+        {
+            PC = 0x0800,
+            A = 0x00,
+            X = 0x00,
+            Y = 0x00,
+            SP = 0xFF,
+            P = 0x00,
+            Status = CpuExecutionStatus.Running,
+            CyclesRemaining = 0
+        };
+
+        public IMemoryInspector MemoryInspector => throw new NotImplementedException();
+        public ulong TotalCycles => 0;
+        public bool ThrottleEnabled { get; set; }
+        public IEmulatorState EmulatorState => throw new NotImplementedException();
+        public IFrameProvider FrameProvider => throw new NotImplementedException();
+        public ISystemStatusProvider SystemStatus => throw new NotImplementedException();
+        public IDiskStatusProvider DiskStatus => throw new NotImplementedException();
+
+        public Task RunAsync(CancellationToken token, double targetMhz = 1.023) => Task.CompletedTask;
+        public void Clock() { }
+        public void UserReset() { }
+        public void SetPushButton(byte button, bool pressed) { }
+        public void EnqueueKey(byte key) { }
+        public void Reset() { }
+    }
+
+    /// <summary>
     /// Helper fixture to create MainWindowViewModel with dependencies.
     /// </summary>
     private class MainWindowViewModelFixture
@@ -53,6 +100,7 @@ public class MainWindowViewModelTests
         public EmulatorStateViewModel EmulatorStateViewModel { get; }
         public SystemStatusViewModel SystemStatusViewModel { get; }
         public DiskStatusPanelViewModel DiskStatusViewModel { get; }
+        public CpuStatusPanelViewModel CpuStatusViewModel { get; }
         public MainWindowViewModel ViewModel { get; }
 
         public MainWindowViewModelFixture()
@@ -60,11 +108,14 @@ public class MainWindowViewModelTests
             EmulatorState = new TestEmulatorState();
             var statusProvider = new SystemStatusProvider();
             var diskStatusProvider = new DiskStatusProvider();
+            var emulatorCoreInterface = new TestEmulatorCoreInterface();
+            var refreshTicker = new TestRefreshTicker();
 
             EmulatorStateViewModel = new EmulatorStateViewModel(EmulatorState);
             SystemStatusViewModel = new SystemStatusViewModel(statusProvider);
             DiskStatusViewModel = new DiskStatusPanelViewModel(diskStatusProvider);
-            ViewModel = new MainWindowViewModel(EmulatorStateViewModel, EmulatorState, SystemStatusViewModel, DiskStatusViewModel);
+            CpuStatusViewModel = new CpuStatusPanelViewModel(emulatorCoreInterface, refreshTicker);
+            ViewModel = new MainWindowViewModel(EmulatorStateViewModel, EmulatorState, SystemStatusViewModel, DiskStatusViewModel, CpuStatusViewModel);
         }
     }
 

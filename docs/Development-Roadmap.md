@@ -9,20 +9,21 @@
 | Status | Details |
 |--------|---------|
 | **Branch** | `tasks` |
-| **Tests** | 3388 tests (Including Pandowdy.Cpu.Tests) passing ✅ |
+| **Tests** | 3378 tests (Including Pandowdy.Cpu.Tests) passing ✅ |
 | **Last Milestone** | CPU Migration to Pandowdy.Cpu (Task 18) ✅ COMPLETE |
-| **Next Focus** | Task 19 (Basic Debugger Implementation) |
+| **Current Focus** | Task 19 (Basic Debugger Implementation) ⏳ IN PROGRESS |
 
 ---
 
 ## Table of Contents
 
-1. [Active Tasks](#active-tasks)
+1. [In Progress Tasks](#in-progress-tasks)
    - [Task 19: Basic Debugger Implementation](#task-19-basic-debugger-implementation-high-priority)
+2. [Active Tasks](#active-tasks)
    - [Task 5: GUI Disk Management Features](#task-5-gui-disk-management-features-high-priority)
    - [Task 10: SectorDiskImageProvider Debugging](#task-10-sectordiskimageprovider-debugging-high-priority)
    - [Task 13: Audio Emulation Implementation](#task-13-audio-emulation-implementation-medium-priority)
-2. [Backlog](#backlog)
+3. [Backlog](#backlog)
    - [Task 4: HGR Flicker Investigation](#task-4-hgr-flicker-investigation-medium-priority)
    - [Task 7: Handle BRK Loops in Interrupt Handler](#task-7-handle-brk-loops-in-interrupt-handler-low-priority)
    - [Task 8: Check for Race Conditions at High Speeds](#task-8-check-for-race-conditions-at-high-speeds-medium-priority)
@@ -34,34 +35,95 @@
    - [Task 16: Research Cross-Platform Shader Rendering for Avalonia](#task-16-research-cross-platform-shader-rendering-for-avalonia-low-priority)
    - [Task 17: Research Compute-Shader Toolkits for Bitplane Processing](#task-17-research-compute-shader-toolkits-for-bitplane-processing-medium-priority)
    - [Task 20: Advanced Debugger Features](#task-20-advanced-debugger-features-low-priority)
-3. [Completed Tasks](#completed-tasks)
+4. [Completed Tasks](#completed-tasks)
    - [Task 1: Migrate VA2M to CpuClockingCounters.VBlankOccurred](#task-1-migrate-va2m-to-cpuclockingcountersvblankoccurred)
    - [Task 2: Remove VA2MBus.VBlank Event](#task-2-remove-va2mbusvblank-event)
    - [Task 3: Removed](#task-3-removed)
    - [Task 6: Clear Pending Keystrokes on Reset](#task-6-clear-pending-keystrokes-on-reset)
    - [Task 18: Migrate to Pandowdy.Cpu](#task-18-migrate-to-pandowdycpu-critical-priority)
-4. [Code Style Guidelines](#code-style-guidelines)
-5. [Git Best Practices](#git-best-practices)
-6. [Testing Guidelines](#testing-guidelines)
+5. [Code Style Guidelines](#code-style-guidelines)
+6. [Git Best Practices](#git-best-practices)
+7. [Testing Guidelines](#testing-guidelines)
 
 ---
 
-## Active Tasks
+## In Progress Tasks
 
 ### Task 19: Basic Debugger Implementation (High Priority)
 
 **Goal:** Implement a rudimentary debugger for Pandowdy using Pandowdy.Cpu's introspection capabilities, enabling breakpoints, watches, and stepping through code.
 
-**Status:** ⏳ NOT STARTED (Ready to begin - Task 18 complete)
+**Status:** ⏳ IN PROGRESS
+
+**Progress:**
+- ✅ `CpuStateSnapshot` wrapper struct created (encapsulates CPU state without exposing Pandowdy.Cpu types)
+- ✅ `CpuExecutionStatus` enum created (Running, Stopped, Jammed, Waiting, Bypassed)
+- ✅ `IMemoryInspector` interface created (extends IDirectMemoryPoolReader with ROM access)
+- ✅ `MemoryInspector` implementation created (side-effect-free reads from RAM, ROM, slot cards)
+- ✅ `IEmulatorCoreInterface.CpuState` property returns `CpuStateSnapshot`
+- ✅ `IEmulatorCoreInterface.MemoryInspector` property returns `IMemoryInspector`
+- ✅ `CpuStatusPanel` UI control created (displays PC, A, X, Y, SP, flags, execution status)
+- ✅ `CpuStatusPanelViewModel` created (60Hz updates via IRefreshTicker)
+- ✅ Panel integrated into MainWindow below Apple II display
+- ⏳ Debugger core (breakpoints, stepping) - NOT STARTED
+- ⏳ Debugger UI panels (disassembly, watches) - NOT STARTED
 
 **Prerequisites:**
 - ✅ Task 18 (Migrate to Pandowdy.Cpu) - COMPLETED
+- ✅ Read-only state inspection via `IEmulatorCoreInterface` - COMPLETED
 - Pandowdy.Cpu provides the state introspection, breakpoint hooks, and single-step capabilities needed
 
 **Current State:**
 - Pandowdy.Cpu integrated with cycle-accurate execution ✅
-- CPU state accessible (registers, flags, PC, SP) ✅
+- CPU state accessible via `IEmulatorCoreInterface.CpuState` (A, X, Y, SP, PC, P, flags, status) ✅
+- Memory accessible via `IEmulatorCoreInterface.MemoryInspector` (main/aux RAM, system ROM, slot ROM, active mapping) ✅
+- Cycle count accessible via `IEmulatorCoreInterface.TotalCycles` ✅
+- CPU status panel displays real-time state at 60Hz ✅
 - Ready to implement debugging infrastructure
+
+**Infrastructure Available:
+```csharp
+// CPU state snapshot (thread-safe, readonly struct)
+var cpu = emulator.CpuState;
+Console.WriteLine($"PC=${cpu.PC:X4} A=${cpu.A:X2} X=${cpu.X:X2} Y=${cpu.Y:X2}");
+Console.WriteLine($"Flags: {cpu.FlagsString}"); // e.g., "Nv-bdiZc"
+Console.WriteLine($"Status: {cpu.Status}"); // Running, Stopped, Jammed, Waiting
+
+// Individual flag access
+if (cpu.FlagC) Console.WriteLine("Carry is set");
+if (cpu.AtInstructionBoundary) Console.WriteLine("Safe to inspect state");
+
+// Memory inspection (thread-safe reads)
+var mem = emulator.MemoryInspector;
+byte mainValue = mem.ReadRawMain(0x0400);      // TEXT page 1 (main)
+byte auxValue = mem.ReadRawAux(0x0400);        // TEXT page 1 (aux)
+byte romValue = mem.ReadSystemRom(0xFFFE);     // Reset vector (always ROM)
+byte activeValue = mem.ReadActiveHighMemory(0xD000); // ROM or LC RAM based on soft switches
+byte slotRom = mem.ReadSlotRom(6, 0x00);       // First byte of slot 6 ROM
+byte[] block = mem.ReadMainBlock(0x2000, 0x2000); // Bulk read HGR page 1
+
+// Timing info
+ulong totalCycles = emulator.TotalCycles;
+```
+
+**Future Consideration: Nullable Returns for IMemoryInspector**
+
+The current `IMemoryInspector` methods return `byte` (with 0 for unavailable addresses). A future enhancement could change ROM methods to return `byte?` to distinguish between:
+- `null` = address not available/not readable (e.g., $C000-$C0FF I/O space)
+- `0` = address is readable and contains the value zero
+
+This would match the pattern already used in `ICard.ReadRom()`, `ICard.ReadIO()`, and `ICard.ReadExtendedRom()` which all return `byte?`. The change would be:
+```csharp
+// Current
+byte ReadSystemRom(int address);        // Returns 0 for unavailable
+byte ReadActiveHighMemory(int address); // Returns 0 for unavailable
+byte ReadSlotRom(int slot, int offset); // Returns 0 for empty slot
+
+// Future (more semantically correct)
+byte? ReadSystemRom(int address);        // Returns null for unavailable
+byte? ReadActiveHighMemory(int address); // Returns null for unavailable  
+byte? ReadSlotRom(int slot, int offset); // Returns null for empty slot
+```
 
 **Scope: Basic Debugger (Not Full IDE)**
 This is a foundational debugger to aid development, not a full-featured IDE debugger. Focus on essential features.
@@ -223,6 +285,8 @@ public void StepOver()
 - **Related:** Task 12 (docking system for debugger panels)
 
 ---
+
+## Active Tasks
 
 ### Task 5: GUI Disk Management Features (High Priority)
 

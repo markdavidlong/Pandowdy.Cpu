@@ -61,6 +61,11 @@
 									DockPanel.Dock="Right"
 									DataContext="{Binding DiskStatus}" />
 
+		<!-- CPU status panel (bottom, below display) -->
+		<controls:CpuStatusPanel x:Name="CpuStatusPanel"
+								 DockPanel.Dock="Bottom"
+								 DataContext="{Binding CpuStatus}" />
+
 		<!-- Apple2Display centered with black background, padding, margin, and rounded corners -->
 <Border Background="#D4C5A9" 
         Padding="16"

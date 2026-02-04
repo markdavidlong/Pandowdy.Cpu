@@ -264,4 +264,77 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
         Services.IDiskStatusProvider DiskStatus { get; }
 
         #endregion
+
+        #region Direct State Inspection (Read-Only, Thread-Safe)
+
+        /// <summary>
+        /// Gets comprehensive read-only access to all memory regions for display and debugging.
+        /// </summary>
+        /// <value>Access to main RAM, auxiliary RAM, system ROM, slot ROM, and active memory mapping.</value>
+        /// <remarks>
+        /// <para>
+        /// <strong>Thread Safety:</strong> Thread-safe for reads. Byte reads from fixed-size arrays
+        /// are atomic. May show mid-instruction memory state (acceptable for display purposes).
+        /// </para>
+        /// <para>
+        /// <strong>Memory Regions:</strong>
+        /// <list type="bullet">
+        /// <item><strong>Main/Aux RAM:</strong> <see cref="IDirectMemoryPoolReader.ReadRawMain"/> and <see cref="IDirectMemoryPoolReader.ReadRawAux"/></item>
+        /// <item><strong>System ROM:</strong> <see cref="IMemoryInspector.ReadSystemRom"/> for $C000-$FFFF ROM</item>
+        /// <item><strong>Slot ROM:</strong> <see cref="IMemoryInspector.ReadSlotRom"/> for specific slot's ROM</item>
+        /// <item><strong>Active Mapping:</strong> <see cref="IMemoryInspector.ReadActiveHighMemory"/> for current $C100-$FFFF mapping</item>
+        /// </list>
+        /// </para>
+        /// <para>
+        /// <strong>Use Cases:</strong> Memory viewer/hex dump panel, debugger memory inspection,
+        /// watch expressions, memory search, ROM disassembly, video memory debugging.
+        /// </para>
+        /// <para>
+        /// <strong>No Secondary Loop Required:</strong> Since memory arrays are fixed-size and byte
+        /// reads are atomic, GUI can safely read at any time without requiring a timer-based service loop.
+        /// </para>
+        /// </remarks>
+        IMemoryInspector MemoryInspector { get; }
+
+        /// <summary>
+        /// Gets a snapshot of the current CPU state for display and debugging.
+        /// </summary>
+        /// <value>Immutable snapshot of CPU registers, flags, and execution status.</value>
+        /// <remarks>
+        /// <para>
+        /// <strong>Thread Safety:</strong> Thread-safe. Returns a readonly struct copy, so the caller
+        /// receives a consistent snapshot. Changes to the returned struct do not affect CPU state.
+        /// </para>
+        /// <para>
+        /// <strong>Contents:</strong> Includes all programmer-visible registers (A, X, Y, SP, PC, P),
+        /// individual flag accessors (N, V, B, D, I, Z, C), execution status, and cycles remaining.
+        /// </para>
+        /// <para>
+        /// <strong>Mid-Instruction State:</strong> May show intermediate register values during
+        /// multi-cycle instruction execution. For display purposes this is acceptable; use
+        /// <see cref="DataTypes.CpuStateSnapshot.AtInstructionBoundary"/> to check if at a safe point.
+        /// </para>
+        /// <para>
+        /// <strong>Use Cases:</strong> CPU register panel in debugger, watch expressions for A/X/Y/SP,
+        /// disassembly view showing PC, status flag indicators (N/V/B/D/I/Z/C).
+        /// </para>
+        /// </remarks>
+        DataTypes.CpuStateSnapshot CpuState { get; }
+
+        /// <summary>
+        /// Gets the total number of CPU cycles executed since the last reset.
+        /// </summary>
+        /// <value>Total cycle count (64-bit, sufficient for years of continuous execution).</value>
+        /// <remarks>
+        /// <para>
+        /// <strong>Thread Safety:</strong> Thread-safe read of a 64-bit counter.
+        /// </para>
+        /// <para>
+        /// <strong>Use Cases:</strong> Cycle counter display in debugger, performance timing,
+        /// profiling instruction execution, timing-based breakpoints.
+        /// </para>
+        /// </remarks>
+        ulong TotalCycles { get; }
+
+        #endregion
     }

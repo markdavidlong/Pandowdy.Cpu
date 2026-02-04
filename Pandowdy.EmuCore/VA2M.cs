@@ -324,10 +324,54 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
 
     #endregion
 
+    #region IEmulatorCoreInterface Direct State Inspection
+
+    /// <summary>
+    /// Gets comprehensive read-only access to all memory regions for display and debugging.
+    /// </summary>
+    /// <value>Access to main/aux RAM, system ROM, slot ROM, and active memory mapping.</value>
+    /// <remarks>
+    /// Thread-safe for reads (atomic byte access). Provides RAM, ROM, and current mapping inspection.
+    /// </remarks>
+    public IMemoryInspector MemoryInspector => _memoryInspector;
+
+    /// <summary>
+    /// Gets a snapshot of the current CPU state for display and debugging.
+    /// </summary>
+    /// <value>Immutable snapshot of CPU registers, flags, and execution status.</value>
+    /// <remarks>
+    /// Thread-safe. Returns readonly struct copy for consistent snapshot.
+    /// </remarks>
+    public DataTypes.CpuStateSnapshot CpuState
+    {
+        get
+        {
+            var state = Bus.Cpu.State;
+            return new DataTypes.CpuStateSnapshot
+            {
+                A = state.A,
+                X = state.X,
+                Y = state.Y,
+                P = state.P,
+                SP = state.SP,
+                PC = state.PC,
+                Status = (DataTypes.CpuExecutionStatus)state.Status,
+                CyclesRemaining = state.CyclesRemaining
+            };
+        }
+    }
+
+    /// <summary>
+    /// Gets total CPU cycles executed since last reset.
+    /// </summary>
+    public ulong TotalCycles => Bus.SystemClockCounter;
+
+    #endregion
+
     /// <summary>
     /// Emulator state sink for publishing CPU state snapshots.
     /// </summary>
-    private readonly IEmulatorState _stateSink; 
+    private readonly IEmulatorState _stateSink;
 
     /// <summary>
     /// Frame provider for publishing rendered video frames.
@@ -433,6 +477,10 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </summary>
     private long _minVBlankTicks = 0;
 
+    /// <summary>
+    /// Memory inspector for comprehensive read-only access to all memory regions.
+    /// </summary>
+    private readonly IMemoryInspector _memoryInspector;
 
     private IGameControllerStatus _gameController;
 
@@ -497,7 +545,8 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
             IKeyboardSetter keyboardSetter,
             IGameControllerStatus gameController,
             Services.IDiskStatusProvider diskStatusProvider,
-            CpuClockingCounters clockCounters)
+            CpuClockingCounters clockCounters,
+            IMemoryInspector memoryInspector)
         {
             ArgumentNullException.ThrowIfNull(stateSink);
             ArgumentNullException.ThrowIfNull(frameSink);
@@ -511,6 +560,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
             ArgumentNullException.ThrowIfNull(gameController);
             ArgumentNullException.ThrowIfNull(diskStatusProvider);
             ArgumentNullException.ThrowIfNull(clockCounters);
+            ArgumentNullException.ThrowIfNull(memoryInspector);
 
 
             _stateSink = stateSink;
@@ -523,6 +573,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
         _keyboardSetter = keyboardSetter;
         _gameController = gameController;
         _clockCounters = clockCounters;
+        _memoryInspector = memoryInspector;
         Bus = bus;
         MemoryPool = memoryPool;
 
@@ -532,7 +583,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
 
         // Subscribe to VBlank for frame rendering
         _clockCounters.VBlankOccurred += OnVBlank;
-        
+
         // Start flash timer
         _flashTimer = new Timer(_ =>
         {

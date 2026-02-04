@@ -29,6 +29,7 @@ public static class VA2MTestHelpers
         private IGameControllerStatus? _gameController;
         private IDiskStatusProvider? _diskStatusProvider;
         private CpuClockingCounters? _clockCounters;
+        private IMemoryInspector? _memoryInspector;
 
         public VA2MBuilder()
         {
@@ -49,12 +50,16 @@ public static class VA2MTestHelpers
             var ioHandler = new SystemIoHandler(softSwitches, _keyboardSetter as IKeyboardReader 
                 ?? new SingularKeyHandler(), _gameController, vblank);
 
+            var testSlots = new TestSlots(_systemStatusProvider);
             _memoryPool = new AddressSpaceController(
                 new TestLanguageCard(), 
                 new TestSystemRamSelector(),
                 ioHandler,
-                new TestSlots(_systemStatusProvider));
+                testSlots);
             _frameGenerator = new TestFrameGenerator();
+
+            // Create test memory inspector
+            _memoryInspector = new TestMemoryInspector();
         }
 
         public VA2MBuilder WithEmulatorState(IEmulatorState state)
@@ -135,7 +140,8 @@ public static class VA2MTestHelpers
                 _keyboardSetter!,
                 _gameController!,
                 _diskStatusProvider!,
-                _clockCounters!
+                _clockCounters!,
+                _memoryInspector!
             );
         }
     }
@@ -331,4 +337,73 @@ public class TestFrameGenerator : IFrameGenerator
     // Test helpers
     public int RenderCallCount => _renderCallCount;
     public RenderContext? LastContext => _lastContext;
+}
+
+/// <summary>
+/// Test implementation of IMemoryInspector for unit testing.
+/// </summary>
+public class TestMemoryInspector : IMemoryInspector
+{
+    private readonly byte[] _mainRam = new byte[65536];
+    private readonly byte[] _auxRam = new byte[65536];
+    private readonly byte[] _systemRom = new byte[16384]; // 16KB ROM
+
+    public byte ReadRawMain(int address) => _mainRam[address & 0xFFFF];
+    public byte ReadRawAux(int address) => _auxRam[address & 0xFFFF];
+
+    public byte ReadSystemRom(int address)
+    {
+        // $C000-$C0FF is I/O space, not readable
+        if (address < 0xC100 || address > 0xFFFF)
+        {
+            return 0;
+        }
+        return _systemRom[(address - 0xC000) & 0x3FFF];
+    }
+
+    public byte ReadActiveHighMemory(int address)
+    {
+        // $C000-$C0FF is I/O space, not readable
+        if (address < 0xC100 || address > 0xFFFF)
+        {
+            return 0;
+        }
+        // Test implementation returns system ROM for simplicity
+        return ReadSystemRom(address);
+    }
+
+    public byte ReadSlotRom(int slot, int offset) => 0;
+
+    public byte ReadSlotExtendedRom(int slot, int offset) => 0;
+
+    public byte[] ReadMainBlock(int startAddress, int length)
+    {
+        var result = new byte[length];
+        for (int i = 0; i < length; i++)
+        {
+            result[i] = _mainRam[(startAddress + i) & 0xFFFF];
+        }
+        return result;
+    }
+
+    public byte[] ReadAuxBlock(int startAddress, int length)
+    {
+        var result = new byte[length];
+        for (int i = 0; i < length; i++)
+        {
+            result[i] = _auxRam[(startAddress + i) & 0xFFFF];
+        }
+        return result;
+    }
+
+    // Test helpers
+    public void SetMainRam(int address, byte value) => _mainRam[address & 0xFFFF] = value;
+    public void SetAuxRam(int address, byte value) => _auxRam[address & 0xFFFF] = value;
+    public void SetSystemRom(int address, byte value)
+    {
+        if (address >= 0xC000 && address <= 0xFFFF)
+        {
+            _systemRom[(address - 0xC000) & 0x3FFF] = value;
+        }
+    }
 }
