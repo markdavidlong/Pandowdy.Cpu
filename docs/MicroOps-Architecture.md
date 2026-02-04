@@ -24,14 +24,11 @@ Each micro-op receives three parameters:
 
 | Parameter | Purpose |
 |-----------|---------|
-| `prev` | The committed CPU state from the start of the instruction (read-only reference) |
-| `current` | The working CPU state being modified during execution |
+| `prev` | A reference to the CPU state (same instance as `current` - historical artifact) |
+| `current` | The CPU state being modified during execution |
 | `bus` | The memory/IO bus interface for read/write operations |
 
-The **double-buffer architecture** (`prev`/`current`) enables:
-- Clean instruction boundaries for debugging
-- Consistent behavior when reading register values that may be modified
-- Support for features like disassembly that need the original state
+> **Note:** The `prev` parameter exists for historical reasons. Both `prev` and `current` now reference the same `CpuState` instance owned directly by the CPU. For debugging scenarios where you need to compare state before and after an instruction, use `DebugCpu` which takes its own snapshot before each instruction.
 
 ### The Pipeline
 
@@ -62,21 +59,20 @@ The `Clock()` method executes exactly one micro-op (one clock cycle):
 public virtual bool Clock(IPandowdyCpuBus bus)
 {
     // If pipeline is empty, start a new instruction
-    if (current.Pipeline.Length == 0 || current.PipelineIndex >= current.Pipeline.Length)
+    if (_state.Pipeline.Length == 0 || _state.PipelineIndex >= _state.Pipeline.Length)
     {
-        _buffer.SwapStateAndResetPipeline();
-        byte opcode = bus.Peek(current.PC);
-        current.Pipeline = _pipelines[opcode];  // Look up pipeline for this opcode
-        current.PipelineIndex = 0;
-        current.InstructionComplete = false;
+        byte opcode = bus.Peek(_state.PC);
+        _state.Pipeline = _pipelines[opcode];  // Look up pipeline for this opcode
+        _state.PipelineIndex = 0;
+        _state.InstructionComplete = false;
     }
 
     // Execute the current micro-op
-    var microOp = current.Pipeline[current.PipelineIndex];
-    microOp(prev, current, bus);
-    current.PipelineIndex++;
+    var microOp = _state.Pipeline[_state.PipelineIndex];
+    microOp(_state, _state, bus);
+    _state.PipelineIndex++;
 
-    return current.InstructionComplete;
+    return _state.InstructionComplete;
 }
 ```
 
@@ -342,9 +338,9 @@ private static readonly MicroOp[] Xyz_Abs =
 
 ## Debugging Tips
 
-1. **Inspect the pipeline**: `current.Pipeline` shows remaining micro-ops
+1. **Inspect the pipeline**: `cpu.State.Pipeline` shows remaining micro-ops
 2. **Check PipelineIndex**: Shows which micro-op is executing
-3. **Use prev state**: Compare `prev` and `current` to see what changed
+3. **Use DebugCpu**: Wrap the CPU with `DebugCpu` to compare `PrevState` and `State` after each instruction
 4. **Watch TempAddress/TempValue**: These show intermediate calculations
 5. **Monitor bus activity**: Each micro-op typically performs 0 or 1 bus operations
 

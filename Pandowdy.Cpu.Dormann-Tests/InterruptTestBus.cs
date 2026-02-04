@@ -32,9 +32,51 @@ public class InterruptTestBus : IPandowdyCpuBus
     public byte[] Memory => _memory;
 
     /// <summary>
-    /// Gets or sets the feedback register value.
+    /// Gets the feedback register value.
     /// </summary>
     public byte FeedbackRegister => _feedbackRegister;
+
+    /// <summary>
+    /// Sets interrupt bits in the feedback register for WAI test automation.
+    /// </summary>
+    /// <param name="irq">If true, sets IRQ bit (bit 0).</param>
+    /// <param name="nmi">If true, sets NMI bit (bit 1).</param>
+    public void SetInterruptBits(bool irq, bool nmi)
+    {
+        byte value = _feedbackRegister;
+        if (irq)
+        {
+            value |= (byte)(1 << IrqBit);
+        }
+
+        if (nmi)
+        {
+            value |= (byte)(1 << NmiBit);
+        }
+
+        _feedbackRegister = (byte)(value & Filter);
+    }
+
+    /// <summary>
+    /// Clears interrupt bits in the feedback register for WAI test automation.
+    /// </summary>
+    /// <param name="irq">If true, clears IRQ bit (bit 0).</param>
+    /// <param name="nmi">If true, clears NMI bit (bit 1).</param>
+    public void ClearInterruptBits(bool irq, bool nmi)
+    {
+        byte value = _feedbackRegister;
+        if (irq)
+        {
+            value = (byte)(value & ~(1 << IrqBit));
+        }
+
+        if (nmi)
+        {
+            value = (byte)(value & ~(1 << NmiBit));
+        }
+
+        _feedbackRegister = value;
+    }
 
     /// <summary>
     /// Gets whether IRQ should be asserted (bit 0 is HIGH in open collector mode without DDR).

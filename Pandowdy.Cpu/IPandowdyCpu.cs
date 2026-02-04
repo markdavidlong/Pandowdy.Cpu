@@ -70,7 +70,7 @@ public interface IPandowdyCpu
     CpuVariant Variant { get; }
 
     /// <summary>
-    /// Gets or sets the state buffer used by this CPU instance.
+    /// Gets or sets the CPU state.
     /// </summary>
-    CpuStateBuffer Buffer { get; set; }
+    CpuState State { get; set; }
 }

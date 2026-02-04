@@ -16,7 +16,7 @@ public class HarteTestRunner(string testBasePath)
 {
     private readonly string _testBasePath = testBasePath;
     private readonly RamBus _bus = new RamBus();
-    private readonly CpuStateBuffer _cpuBuffer = new CpuStateBuffer();
+    // CPU is created per-test file run, state accessed via cpu.State
 
     /// <summary>
     /// Maps menu variant names to (CpuVariant, TestFolder) tuples.
@@ -263,7 +263,8 @@ public class HarteTestRunner(string testBasePath)
             var testCases = LoadTestCases(testFilePath);
             summary.TotalTests = testCases.Count;
 
-            var cpu = CpuFactory.Create(variant, _cpuBuffer);
+            var state = new CpuState();
+            var cpu = CpuFactory.Create(variant, state);
 
             for (int testIndex = 0; testIndex < testCases.Count; testIndex++)
             {
@@ -352,7 +353,7 @@ public class HarteTestRunner(string testBasePath)
             }
 
             // Initialize CPU state
-            InitializeCpuState(testCase.Initial);
+            InitializeCpuState(cpu, testCase.Initial);
 
             // Capture initial state for diagnostics
             result.InitialPC = (ushort)testCase.Initial.PC;
@@ -422,7 +423,7 @@ public class HarteTestRunner(string testBasePath)
             }
 
             // Verify final state
-            var verificationResult = VerifyFinalState(testCase.Final);
+            var verificationResult = VerifyFinalState(cpu, testCase.Final);
             if (verificationResult != null)
             {
                 result.Passed = false;
@@ -551,31 +552,28 @@ public class HarteTestRunner(string testBasePath)
     /// <summary>
     /// Initializes CPU state from a HarteState.
     /// </summary>
-    private void InitializeCpuState(HarteState state)
+    private static void InitializeCpuState(IPandowdyCpu cpu, HarteState state)
     {
-        // Reset CPU buffer to clear any previous state
-        _cpuBuffer.Reset();
+        // Reset CPU state to clear any previous state
+        cpu.State.Reset();
 
-        // Set registers on Current state (which will be used for execution)
-        var cpuState = _cpuBuffer.Current;
+        // Set registers on CPU state
+        var cpuState = cpu.State;
         cpuState.PC = (ushort)state.PC;
         cpuState.SP = (byte)state.S;
         cpuState.A = (byte)state.A;
         cpuState.X = (byte)state.X;
         cpuState.Y = (byte)state.Y;
         cpuState.P = (byte)state.P;
-
-        // Also set Prev to match (for proper instruction execution)
-        _cpuBuffer.Prev.CopyFrom(cpuState);
     }
 
     /// <summary>
     /// Verifies the final CPU and memory state matches expected.
     /// Returns null if verification passes, or an error message if it fails.
     /// </summary>
-    private string? VerifyFinalState(HarteState expected)
+    private string? VerifyFinalState(IPandowdyCpu cpu, HarteState expected)
     {
-        var actual = _cpuBuffer.Current; // After Step, the result state is in Current
+        var actual = cpu.State; // After Step, the result state is in cpu.State
 
         // Check registers
         if (actual.PC != (ushort)expected.PC)

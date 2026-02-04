@@ -8,7 +8,7 @@ This document provides a comprehensive reference for the Pandowdy.Cpu library AP
 - [CpuFactory Class](#cpufactory-class)
 - [CPU Classes](#cpu-classes)
 - [CpuState Class](#cpustate-class)
-- [CpuStateBuffer Class](#cpustatebuffer-class)
+- [DebugCpu Class](#debugcpu-class)
 - [IPandowdyCpuBus Interface](#ipandowdycpubus-interface)
 - [Enumerations](#enumerations)
 
@@ -194,17 +194,18 @@ Gets the CPU variant this instance emulates.
 
 ---
 
-#### Buffer
+#### State
 
 ```csharp
-CpuStateBuffer Buffer { get; set; }
+CpuState State { get; set; }
 ```
 
-Gets or sets the CPU state buffer.
+Gets or sets the CPU state.
 
 **Remarks:**
-- The buffer is settable to allow swapping state buffers at runtime without constructing a new CPU instance.
-- Useful for scenarios like switching between multiple emulated machines, save/restore, or testing.
+- The state is provided to the CPU via dependency injection through `CpuFactory.Create(variant, state)`.
+- The state is settable to allow replacing the entire state at runtime.
+- Useful for scenarios like save/restore, testing, state sharing between components, or debugging.
 
 ---
 
@@ -215,22 +216,64 @@ Factory for creating CPU instances by variant.
 ### Create
 
 ```csharp
-static IPandowdyCpu Create(CpuVariant variant, CpuStateBuffer buffer)
+static IPandowdyCpu Create(CpuVariant variant, CpuState state)
 ```
 
-Creates a CPU instance for the specified variant.
+Creates a CPU instance for the specified variant with the provided state.
 
 **Parameters:**
 - `variant` — The CPU variant to emulate
-- `buffer` — The state buffer to use
+- `state` — The CPU state to inject into the CPU
 
 **Returns:** An `IPandowdyCpu` instance for the specified variant.
 
+**Remarks:**
+- The `state` parameter is required; the caller must provide a `CpuState` instance.
+- The provided state is injected into the CPU via dependency injection.
+- The state may be shared with other components or pre-configured before injection.
+
 **Example:**
 ```csharp
-var buffer = new CpuStateBuffer();
-var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, buffer);
+var state = new CpuState();
+var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, state);
 cpu.Reset(bus);
+Console.WriteLine($"A = ${cpu.State.A:X2}");
+
+// Pre-configure state before injection:
+state.A = 0x42;
+var cpu2 = CpuFactory.Create(CpuVariant.Wdc65C02, state);
+```
+
+---
+
+### CreateDebug
+
+```csharp
+static DebugCpu CreateDebug(CpuVariant variant, CpuState state)
+```
+
+Creates a debugging CPU wrapper for the specified variant with the provided state.
+
+**Parameters:**
+- `variant` — The CPU variant to emulate
+- `state` — The CPU state to inject into the CPU
+
+**Returns:** A `DebugCpu` wrapping a CPU instance for the specified variant.
+
+```csharp
+static DebugCpu CreateDebug(IPandowdyCpu cpu)
+```
+
+Wraps an existing CPU instance in a debugging wrapper.
+
+**Example:**
+```csharp
+var state = new CpuState();
+var debugCpu = CpuFactory.CreateDebug(CpuVariant.Wdc65C02, state);
+debugCpu.Reset(bus);
+debugCpu.Step(bus);
+if (debugCpu.BranchOccurred)
+    Console.WriteLine("Branch was taken!");
 ```
 
 ---
@@ -370,82 +413,84 @@ Low-level methods to get/set individual status flags using bit masks.
 
 ---
 
-## CpuStateBuffer Class
+## DebugCpu Class
 
-Provides double-buffered CPU state for clean instruction boundaries, debugging, and state comparison.
+A debugging wrapper around a CPU that tracks state changes between instructions.
+
+### Overview
+
+`DebugCpu` decorates any `IPandowdyCpu` implementation to provide debugging capabilities without impacting the performance of production code. It implements `IPandowdyCpu` and can be used anywhere a regular CPU instance is used.
+
+**Key Features:**
+- Automatically snapshots state before each instruction
+- Provides comparison helpers (PcChanged, BranchOccurred, etc.)
+- Tracks which registers changed during each instruction
+
+### Constructor
+
+```csharp
+public DebugCpu(IPandowdyCpu cpu)
+```
+
+Creates a debugging wrapper around the specified CPU.
+
+**Parameters:**
+- `cpu` — The underlying CPU to wrap
 
 ### Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `Prev` | `CpuState` | State before the current (or most recent) instruction |
-| `Current` | `CpuState` | State after the current (or most recent) instruction |
-
-### Methods
-
-#### SwapStateAndResetPipeline
-
-```csharp
-void SwapStateAndResetPipeline()
-```
-
-Called at the start of a new instruction cycle. If the previous instruction is complete (`Current.InstructionComplete` is true), copies Current to Prev (preserving the state at the start of the new instruction) and resets the pipeline state for the new instruction. Called internally by `Cpu.Clock()`.
-
----
-
-#### SaveStateBeforeInstruction
-
-```csharp
-void SaveStateBeforeInstruction()
-```
-
-Copies Current to Prev. This is a lower-level method; prefer using `SwapStateAndResetPipeline()` which handles the complete state transition.
-
----
-
-#### Reset
-
-```csharp
-void Reset()
-```
-
-Resets both Prev and Current to power-on defaults.
-
----
-
-#### LoadResetVector
-
-```csharp
-void LoadResetVector(IPandowdyCpuBus bus)
-```
-
-Reads the reset vector from $FFFC-$FFFD and sets PC in both states.
-
----
-
-### State Comparison
-
-After `Cpu.Step()` returns:
-- **`Prev`** contains the CPU state *before* the instruction executed
-- **`Current`** contains the CPU state *after* the instruction executed
-
-This allows you to compare Prev vs Current to see exactly what changed during the instruction.
+| `UnderlyingCpu` | `IPandowdyCpu` | The wrapped CPU instance |
+| `State` | `CpuState` | Current CPU state (delegates to underlying CPU) |
+| `PrevState` | `CpuState?` | State snapshot before the last completed instruction |
+| `Variant` | `CpuVariant` | The CPU variant (delegates to underlying CPU) |
 
 ### Debugger Helper Properties
 
-These properties help detect what happened during an instruction by comparing Prev vs Current:
+These properties compare `PrevState` vs `State` to detect what happened during the last instruction:
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `PcChanged` | `bool` | True if PC changed during the instruction |
 | `JumpOccurred` | `bool` | True if a JMP-style instruction executed |
-| `BranchOccurred` | `bool` | True if a branch was taken |
+| `BranchOccurred` | `bool` | True if a branch instruction was taken |
 | `ReturnOccurred` | `bool` | True if RTS/RTI executed |
 | `InterruptOccurred` | `bool` | True if an interrupt was triggered |
 | `PageCrossed` | `bool` | True if addressing crossed a page boundary |
 | `StackActivityOccurred` | `bool` | True if SP changed |
 | `StackDelta` | `int` | Change in SP (negative=push, positive=pull) |
 | `ChangedRegisters` | `IEnumerable<string>` | Names of registers that changed |
+
+### Methods
+
+All execution and interrupt methods delegate to the underlying CPU:
+
+- `Clock(IPandowdyCpuBus bus)` — Execute one cycle, with state tracking
+- `Step(IPandowdyCpuBus bus)` — Execute one instruction, snapshots state first
+- `Run(IPandowdyCpuBus bus, int maxCycles)` — Execute cycles (delegates directly)
+- `Reset(IPandowdyCpuBus bus)` — Reset CPU, clears PrevState
+- `SignalIrq()` / `SignalNmi()` / `SignalReset()` — Signal interrupts
+- `ClearIrq()` — Clear pending IRQ
+- `HandlePendingInterrupt(IPandowdyCpuBus bus)` — Handle pending interrupt
+
+### Usage Example
+
+```csharp
+var debugCpu = CpuFactory.CreateDebug(CpuVariant.Wdc65C02);
+debugCpu.Reset(bus);
+
+while (debugCpu.State.Status == CpuStatus.Running)
+{
+    debugCpu.Step(bus);
+    
+    if (debugCpu.BranchOccurred)
+        Console.WriteLine("Branch was taken!");
+    
+    foreach (var reg in debugCpu.ChangedRegisters)
+        Console.WriteLine($"  {reg} changed");
+}
+```
 
 ---
 
@@ -522,8 +567,7 @@ Writes a byte to the specified address.
 ```csharp
 // Setup
 var bus = new MyBusImplementation();
-var buffer = new CpuStateBuffer();
-var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, buffer);
+var cpu = CpuFactory.Create(CpuVariant.Wdc65C02);
 cpu.Reset(bus);
 
 // Main loop
@@ -546,7 +590,7 @@ while (running)
 
 ```csharp
 // Create CPU
-var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, buffer);
+var cpu = CpuFactory.Create(CpuVariant.Wdc65C02);
 
 // Signal an IRQ from hardware
 cpu.SignalIrq();
@@ -558,7 +602,7 @@ if (cpu.HandlePendingInterrupt(bus))
 }
 
 // For WAI instruction, CPU halts until interrupt
-if (buffer.Current.Status == CpuStatus.Waiting)
+if (cpu.State.Status == CpuStatus.Waiting)
 {
     // CPU is waiting - signal interrupt to wake it
     cpu.SignalIrq();

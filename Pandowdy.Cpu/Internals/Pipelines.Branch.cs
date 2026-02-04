@@ -155,7 +155,7 @@ internal static partial class Pipelines
                             n.InstructionComplete = true;
                         };
                         MicroOps.InsertAfterCurrentOp(current, penaltyT5);
-                        current.Pipeline = [..current.Pipeline, penaltyT6];
+                        MicroOps.AppendToWorkingPipeline(current, penaltyT6);
                     }
                     else
                     {
@@ -218,7 +218,7 @@ internal static partial class Pipelines
                             n.InstructionComplete = true;
                         };
                         MicroOps.InsertAfterCurrentOp(current, penaltyT5);
-                        current.Pipeline = [..current.Pipeline, penaltyT6];
+                        MicroOps.AppendToWorkingPipeline(current, penaltyT6);
                     }
                     else
                     {

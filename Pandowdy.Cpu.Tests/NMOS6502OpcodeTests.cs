@@ -46,8 +46,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // When ZP + X > 0xFF, it wraps within zero page
         LoadAndReset([0xB5, 0xF0]);
-        CpuBuffer.Current.X = 0x20; // 0xF0 + 0x20 = 0x110 -> wraps to 0x10
-        CpuBuffer.Prev.X = 0x20;
+        CurrentState.X = 0x20; // 0xF0 + 0x20 = 0x110 -> wraps to 0x10
+        CurrentState.X = 0x20;
         SetZeroPage(0x10, 0xCD);
         StepInstruction();
         Assert.Equal(0xCD, CurrentState.A);
@@ -66,8 +66,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void LDA_AbsoluteX_NoPageCross()
     {
         LoadAndReset([0xBD, 0x00, 0x12]); // LDA $1200,X
-        CpuBuffer.Current.X = 0x34;
-        CpuBuffer.Prev.X = 0x34;
+        CurrentState.X = 0x34;
+        CurrentState.X = 0x34;
         SetMemory(0x1234, 0x77);
         int cycles = StepInstruction();
         Assert.Equal(4, cycles);
@@ -78,8 +78,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void LDA_AbsoluteX_WithPageCross()
     {
         LoadAndReset([0xBD, 0xFF, 0x12]); // LDA $12FF,X
-        CpuBuffer.Current.X = 0x01; // Crosses to 0x1300
-        CpuBuffer.Prev.X = 0x01;
+        CurrentState.X = 0x01; // Crosses to 0x1300
+        CurrentState.X = 0x01;
         SetMemory(0x1300, 0x88);
         int cycles = StepInstruction();
         Assert.Equal(5, cycles);
@@ -90,8 +90,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void LDA_AbsoluteY_NoPageCross()
     {
         LoadAndReset([0xB9, 0x00, 0x20]); // LDA $2000,Y
-        CpuBuffer.Current.Y = 0x10;
-        CpuBuffer.Prev.Y = 0x10;
+        CurrentState.Y = 0x10;
+        CurrentState.Y = 0x10;
         SetMemory(0x2010, 0x99);
         int cycles = StepInstruction();
         Assert.Equal(4, cycles);
@@ -102,8 +102,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void LDA_AbsoluteY_WithPageCross()
     {
         LoadAndReset([0xB9, 0xF0, 0x20]); // LDA $20F0,Y
-        CpuBuffer.Current.Y = 0x20; // Crosses to 0x2110
-        CpuBuffer.Prev.Y = 0x20;
+        CurrentState.Y = 0x20; // Crosses to 0x2110
+        CurrentState.Y = 0x20;
         SetMemory(0x2110, 0xAA);
         int cycles = StepInstruction();
         Assert.Equal(5, cycles);
@@ -115,8 +115,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // LDA ($10,X) where X=5, so pointer at $15
         LoadAndReset([0xA1, 0x10]);
-        CpuBuffer.Current.X = 0x05;
-        CpuBuffer.Prev.X = 0x05;
+        CurrentState.X = 0x05;
+        CurrentState.X = 0x05;
         SetZeroPagePointer(0x15, 0x3000); // Pointer at $15 -> $3000
         SetMemory(0x3000, 0xBB);
         int cycles = StepInstruction();
@@ -129,8 +129,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // LDA ($FF,X) where X=2 -> pointer at $01 (wraps)
         LoadAndReset([0xA1, 0xFF]);
-        CpuBuffer.Current.X = 0x02;
-        CpuBuffer.Prev.X = 0x02;
+        CurrentState.X = 0x02;
+        CurrentState.X = 0x02;
         SetZeroPagePointer(0x01, 0x4000);
         SetMemory(0x4000, 0xCC);
         StepInstruction();
@@ -142,8 +142,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // LDA ($20),Y - pointer at $20, add Y
         LoadAndReset([0xB1, 0x20]);
-        CpuBuffer.Current.Y = 0x10;
-        CpuBuffer.Prev.Y = 0x10;
+        CurrentState.Y = 0x10;
+        CurrentState.Y = 0x10;
         SetZeroPagePointer(0x20, 0x5000);
         SetMemory(0x5010, 0xDD);
         int cycles = StepInstruction();
@@ -156,8 +156,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // LDA ($30),Y with page cross
         LoadAndReset([0xB1, 0x30]);
-        CpuBuffer.Current.Y = 0x80;
-        CpuBuffer.Prev.Y = 0x80;
+        CurrentState.Y = 0x80;
+        CurrentState.Y = 0x80;
         SetZeroPagePointer(0x30, 0x50F0); // 0x50F0 + 0x80 = 0x5170 (page cross)
         SetMemory(0x5170, 0xEE);
         int cycles = StepInstruction();
@@ -196,8 +196,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void LDX_ZeroPageY_WrapsWithinZeroPage()
     {
         LoadAndReset([0xB6, 0xF0]);
-        CpuBuffer.Current.Y = 0x20; // Wraps to 0x10
-        CpuBuffer.Prev.Y = 0x20;
+        CurrentState.Y = 0x20; // Wraps to 0x10
+        CurrentState.Y = 0x20;
         SetZeroPage(0x10, 0x34);
         StepInstruction();
         Assert.Equal(0x34, CurrentState.X);
@@ -216,8 +216,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void LDX_AbsoluteY_WithPageCross()
     {
         LoadAndReset([0xBE, 0xFF, 0x30]); // LDX $30FF,Y
-        CpuBuffer.Current.Y = 0x02;
-        CpuBuffer.Prev.Y = 0x02;
+        CurrentState.Y = 0x02;
+        CurrentState.Y = 0x02;
         SetMemory(0x3101, 0x78);
         int cycles = StepInstruction();
         Assert.Equal(5, cycles);
@@ -245,8 +245,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void LDY_ZeroPageX_WrapsWithinZeroPage()
     {
         LoadAndReset([0xB4, 0xFE]);
-        CpuBuffer.Current.X = 0x10; // Wraps to 0x0E
-        CpuBuffer.Prev.X = 0x10;
+        CurrentState.X = 0x10; // Wraps to 0x0E
+        CurrentState.X = 0x10;
         SetZeroPage(0x0E, 0x9A);
         StepInstruction();
         Assert.Equal(0x9A, CurrentState.Y);
@@ -256,8 +256,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void LDY_AbsoluteX_WithPageCross()
     {
         LoadAndReset([0xBC, 0xF0, 0x40]); // LDY $40F0,X
-        CpuBuffer.Current.X = 0x20;
-        CpuBuffer.Prev.X = 0x20;
+        CurrentState.X = 0x20;
+        CurrentState.X = 0x20;
         SetMemory(0x4110, 0xBC);
         int cycles = StepInstruction();
         Assert.Equal(5, cycles);
@@ -272,8 +272,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STA_ZeroPage_StoresValue()
     {
         LoadAndReset([0x85, 0x40]);
-        CpuBuffer.Current.A = 0xAB;
-        CpuBuffer.Prev.A = 0xAB;
+        CurrentState.A = 0xAB;
+        CurrentState.A = 0xAB;
         StepInstruction();
         Assert.Equal(0xAB, Bus.Memory[0x40]);
     }
@@ -282,10 +282,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STA_ZeroPageX_WrapsWithinZeroPage()
     {
         LoadAndReset([0x95, 0xF0]);
-        CpuBuffer.Current.A = 0xCD;
-        CpuBuffer.Prev.A = 0xCD;
-        CpuBuffer.Current.X = 0x20; // Wraps to 0x10
-        CpuBuffer.Prev.X = 0x20;
+        CurrentState.A = 0xCD;
+        CurrentState.A = 0xCD;
+        CurrentState.X = 0x20; // Wraps to 0x10
+        CurrentState.X = 0x20;
         StepInstruction();
         Assert.Equal(0xCD, Bus.Memory[0x10]);
     }
@@ -294,8 +294,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STA_Absolute_StoresAtAddress()
     {
         LoadAndReset([0x8D, 0x00, 0x80]); // STA $8000
-        CpuBuffer.Current.A = 0xEF;
-        CpuBuffer.Prev.A = 0xEF;
+        CurrentState.A = 0xEF;
+        CurrentState.A = 0xEF;
         StepInstruction();
         Assert.Equal(0xEF, Bus.Memory[0x8000]);
     }
@@ -305,10 +305,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // Store instructions don't have page-cross penalty optimization
         LoadAndReset([0x9D, 0x00, 0x70]);
-        CpuBuffer.Current.A = 0x11;
-        CpuBuffer.Prev.A = 0x11;
-        CpuBuffer.Current.X = 0x10;
-        CpuBuffer.Prev.X = 0x10;
+        CurrentState.A = 0x11;
+        CurrentState.A = 0x11;
+        CurrentState.X = 0x10;
+        CurrentState.X = 0x10;
         int cycles = StepInstruction();
         Assert.Equal(5, cycles);
         Assert.Equal(0x11, Bus.Memory[0x7010]);
@@ -318,10 +318,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STA_AbsoluteY_AlwaysTakes5Cycles()
     {
         LoadAndReset([0x99, 0x00, 0x60]);
-        CpuBuffer.Current.A = 0x22;
-        CpuBuffer.Prev.A = 0x22;
-        CpuBuffer.Current.Y = 0x05;
-        CpuBuffer.Prev.Y = 0x05;
+        CurrentState.A = 0x22;
+        CurrentState.A = 0x22;
+        CurrentState.Y = 0x05;
+        CurrentState.Y = 0x05;
         int cycles = StepInstruction();
         Assert.Equal(5, cycles);
         Assert.Equal(0x22, Bus.Memory[0x6005]);
@@ -331,10 +331,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STA_IndexedIndirectX_StoresViaPointer()
     {
         LoadAndReset([0x81, 0x20]);
-        CpuBuffer.Current.A = 0x33;
-        CpuBuffer.Prev.A = 0x33;
-        CpuBuffer.Current.X = 0x05;
-        CpuBuffer.Prev.X = 0x05;
+        CurrentState.A = 0x33;
+        CurrentState.A = 0x33;
+        CurrentState.X = 0x05;
+        CurrentState.X = 0x05;
         SetZeroPagePointer(0x25, 0x9000);
         StepInstruction();
         Assert.Equal(0x33, Bus.Memory[0x9000]);
@@ -344,10 +344,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STA_IndirectIndexedY_AlwaysTakes6Cycles()
     {
         LoadAndReset([0x91, 0x40]);
-        CpuBuffer.Current.A = 0x44;
-        CpuBuffer.Prev.A = 0x44;
-        CpuBuffer.Current.Y = 0x10;
-        CpuBuffer.Prev.Y = 0x10;
+        CurrentState.A = 0x44;
+        CurrentState.A = 0x44;
+        CurrentState.Y = 0x10;
+        CurrentState.Y = 0x10;
         SetZeroPagePointer(0x40, 0xA000);
         int cycles = StepInstruction();
         Assert.Equal(6, cycles);
@@ -362,8 +362,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STX_ZeroPage_StoresValue()
     {
         LoadAndReset([0x86, 0x50]);
-        CpuBuffer.Current.X = 0x55;
-        CpuBuffer.Prev.X = 0x55;
+        CurrentState.X = 0x55;
+        CurrentState.X = 0x55;
         StepInstruction();
         Assert.Equal(0x55, Bus.Memory[0x50]);
     }
@@ -372,10 +372,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STX_ZeroPageY_WrapsWithinZeroPage()
     {
         LoadAndReset([0x96, 0xF5]);
-        CpuBuffer.Current.X = 0x66;
-        CpuBuffer.Prev.X = 0x66;
-        CpuBuffer.Current.Y = 0x15; // Wraps to 0x0A
-        CpuBuffer.Prev.Y = 0x15;
+        CurrentState.X = 0x66;
+        CurrentState.X = 0x66;
+        CurrentState.Y = 0x15; // Wraps to 0x0A
+        CurrentState.Y = 0x15;
         StepInstruction();
         Assert.Equal(0x66, Bus.Memory[0x0A]);
     }
@@ -384,8 +384,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STX_Absolute_StoresAtAddress()
     {
         LoadAndReset([0x8E, 0x00, 0xB0]); // STX $B000
-        CpuBuffer.Current.X = 0x77;
-        CpuBuffer.Prev.X = 0x77;
+        CurrentState.X = 0x77;
+        CurrentState.X = 0x77;
         StepInstruction();
         Assert.Equal(0x77, Bus.Memory[0xB000]);
     }
@@ -398,8 +398,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STY_ZeroPage_StoresValue()
     {
         LoadAndReset([0x84, 0x60]);
-        CpuBuffer.Current.Y = 0x88;
-        CpuBuffer.Prev.Y = 0x88;
+        CurrentState.Y = 0x88;
+        CurrentState.Y = 0x88;
         StepInstruction();
         Assert.Equal(0x88, Bus.Memory[0x60]);
     }
@@ -408,10 +408,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STY_ZeroPageX_WrapsWithinZeroPage()
     {
         LoadAndReset([0x94, 0xFA]);
-        CpuBuffer.Current.Y = 0x99;
-        CpuBuffer.Prev.Y = 0x99;
-        CpuBuffer.Current.X = 0x10; // Wraps to 0x0A
-        CpuBuffer.Prev.X = 0x10;
+        CurrentState.Y = 0x99;
+        CurrentState.Y = 0x99;
+        CurrentState.X = 0x10; // Wraps to 0x0A
+        CurrentState.X = 0x10;
         StepInstruction();
         Assert.Equal(0x99, Bus.Memory[0x0A]);
     }
@@ -420,8 +420,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void STY_Absolute_StoresAtAddress()
     {
         LoadAndReset([0x8C, 0x00, 0xC0]); // STY $C000
-        CpuBuffer.Current.Y = 0xAA;
-        CpuBuffer.Prev.Y = 0xAA;
+        CurrentState.Y = 0xAA;
+        CurrentState.Y = 0xAA;
         StepInstruction();
         Assert.Equal(0xAA, Bus.Memory[0xC000]);
     }
@@ -443,10 +443,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
         byte expectedA, bool expectedC, bool expectedZ, bool expectedV)
     {
         LoadAndReset(0x69, operand);
-        CpuBuffer.Current.A = a;
-        CpuBuffer.Prev.A = a;
-        CpuBuffer.Current.CarryFlag = carryIn;
-        CpuBuffer.Prev.CarryFlag = carryIn;
+        CurrentState.A = a;
+        CurrentState.A = a;
+        CurrentState.CarryFlag = carryIn;
+        CurrentState.CarryFlag = carryIn;
         StepInstruction();
         Assert.Equal(expectedA, CurrentState.A);
         Assert.Equal(expectedC, CurrentState.CarryFlag);
@@ -458,8 +458,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void ADC_ZeroPage_AddsFromMemory()
     {
         LoadAndReset([0x65, 0x30]);
-        CpuBuffer.Current.A = 0x10;
-        CpuBuffer.Prev.A = 0x10;
+        CurrentState.A = 0x10;
+        CurrentState.A = 0x10;
         SetZeroPage(0x30, 0x20);
         StepInstruction();
         Assert.Equal(0x30, CurrentState.A);
@@ -469,8 +469,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void ADC_Absolute_Takes4Cycles()
     {
         LoadAndReset([0x6D, 0x00, 0x50]);
-        CpuBuffer.Current.A = 0x05;
-        CpuBuffer.Prev.A = 0x05;
+        CurrentState.A = 0x05;
+        CurrentState.A = 0x05;
         SetMemory(0x5000, 0x03);
         int cycles = StepInstruction();
         Assert.Equal(4, cycles);
@@ -481,10 +481,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void ADC_IndexedIndirectX_Takes6Cycles()
     {
         LoadAndReset([0x61, 0x10]);
-        CpuBuffer.Current.A = 0x01;
-        CpuBuffer.Prev.A = 0x01;
-        CpuBuffer.Current.X = 0x05;
-        CpuBuffer.Prev.X = 0x05;
+        CurrentState.A = 0x01;
+        CurrentState.A = 0x01;
+        CurrentState.X = 0x05;
+        CurrentState.X = 0x05;
         SetZeroPagePointer(0x15, 0x6000);
         SetMemory(0x6000, 0x02);
         int cycles = StepInstruction();
@@ -507,10 +507,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
         byte expectedA, bool expectedC, bool expectedZ, bool expectedV)
     {
         LoadAndReset(0xE9, operand);
-        CpuBuffer.Current.A = a;
-        CpuBuffer.Prev.A = a;
-        CpuBuffer.Current.CarryFlag = carryIn;
-        CpuBuffer.Prev.CarryFlag = carryIn;
+        CurrentState.A = a;
+        CurrentState.A = a;
+        CurrentState.CarryFlag = carryIn;
+        CurrentState.CarryFlag = carryIn;
         StepInstruction();
         Assert.Equal(expectedA, CurrentState.A);
         Assert.Equal(expectedC, CurrentState.CarryFlag);
@@ -522,10 +522,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void SBC_ZeroPage_SubtractsFromMemory()
     {
         LoadAndReset([0xE5, 0x40]);
-        CpuBuffer.Current.A = 0x30;
-        CpuBuffer.Prev.A = 0x30;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.A = 0x30;
+        CurrentState.A = 0x30;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
         SetZeroPage(0x40, 0x10);
         StepInstruction();
         Assert.Equal(0x20, CurrentState.A);
@@ -544,8 +544,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void AND_Immediate_ComputesCorrectly(byte a, byte operand, byte expected)
     {
         LoadAndReset(0x29, operand);
-        CpuBuffer.Current.A = a;
-        CpuBuffer.Prev.A = a;
+        CurrentState.A = a;
+        CurrentState.A = a;
         StepInstruction();
         Assert.Equal(expected, CurrentState.A);
         Assert.Equal(expected == 0, CurrentState.ZeroFlag);
@@ -556,8 +556,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void AND_ZeroPage_Takes3Cycles()
     {
         LoadAndReset([0x25, 0x50]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
         SetZeroPage(0x50, 0xF0);
         int cycles = StepInstruction();
         Assert.Equal(3, cycles);
@@ -568,10 +568,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void AND_AbsoluteX_WithPageCross()
     {
         LoadAndReset([0x3D, 0xFF, 0x10]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
-        CpuBuffer.Current.X = 0x01;
-        CpuBuffer.Prev.X = 0x01;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.X = 0x01;
+        CurrentState.X = 0x01;
         SetMemory(0x1100, 0x55);
         int cycles = StepInstruction();
         Assert.Equal(5, cycles);
@@ -590,8 +590,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void ORA_Immediate_ComputesCorrectly(byte a, byte operand, byte expected)
     {
         LoadAndReset(0x09, operand);
-        CpuBuffer.Current.A = a;
-        CpuBuffer.Prev.A = a;
+        CurrentState.A = a;
+        CurrentState.A = a;
         StepInstruction();
         Assert.Equal(expected, CurrentState.A);
         Assert.Equal(expected == 0, CurrentState.ZeroFlag);
@@ -602,10 +602,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void ORA_IndirectIndexedY_WithPageCross()
     {
         LoadAndReset([0x11, 0x60]);
-        CpuBuffer.Current.A = 0x0F;
-        CpuBuffer.Prev.A = 0x0F;
-        CpuBuffer.Current.Y = 0x80;
-        CpuBuffer.Prev.Y = 0x80;
+        CurrentState.A = 0x0F;
+        CurrentState.A = 0x0F;
+        CurrentState.Y = 0x80;
+        CurrentState.Y = 0x80;
         SetZeroPagePointer(0x60, 0x70F0);
         SetMemory(0x7170, 0xF0);
         int cycles = StepInstruction();
@@ -626,8 +626,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void EOR_Immediate_ComputesCorrectly(byte a, byte operand, byte expected)
     {
         LoadAndReset(0x49, operand);
-        CpuBuffer.Current.A = a;
-        CpuBuffer.Prev.A = a;
+        CurrentState.A = a;
+        CurrentState.A = a;
         StepInstruction();
         Assert.Equal(expected, CurrentState.A);
     }
@@ -645,8 +645,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void CMP_Immediate_SetsFlags(byte a, byte operand, bool expectC, bool expectZ, bool expectN)
     {
         LoadAndReset(0xC9, operand);
-        CpuBuffer.Current.A = a;
-        CpuBuffer.Prev.A = a;
+        CurrentState.A = a;
+        CurrentState.A = a;
         StepInstruction();
         Assert.Equal(expectC, CurrentState.CarryFlag);
         Assert.Equal(expectZ, CurrentState.ZeroFlag);
@@ -659,8 +659,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // Zero page
         LoadAndReset([0xC5, 0x10]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
         SetZeroPage(0x10, 0x00);
         StepInstruction();
         Assert.Equal(0x42, CurrentState.A);
@@ -677,8 +677,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void CPX_Immediate_SetsFlags(byte x, byte operand, bool expectC, bool expectZ, bool expectN)
     {
         LoadAndReset(0xE0, operand);
-        CpuBuffer.Current.X = x;
-        CpuBuffer.Prev.X = x;
+        CurrentState.X = x;
+        CurrentState.X = x;
         StepInstruction();
         Assert.Equal(expectC, CurrentState.CarryFlag);
         Assert.Equal(expectZ, CurrentState.ZeroFlag);
@@ -697,8 +697,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void CPY_Immediate_SetsFlags(byte y, byte operand, bool expectC, bool expectZ, bool expectN)
     {
         LoadAndReset(0xC0, operand);
-        CpuBuffer.Current.Y = y;
-        CpuBuffer.Prev.Y = y;
+        CurrentState.Y = y;
+        CurrentState.Y = y;
         StepInstruction();
         Assert.Equal(expectC, CurrentState.CarryFlag);
         Assert.Equal(expectZ, CurrentState.ZeroFlag);
@@ -719,8 +719,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void BIT_ZeroPage_SetsFlags(byte a, byte memory, bool expectZ, bool expectN, bool expectV)
     {
         LoadAndReset([0x24, 0x20]);
-        CpuBuffer.Current.A = a;
-        CpuBuffer.Prev.A = a;
+        CurrentState.A = a;
+        CurrentState.A = a;
         SetZeroPage(0x20, memory);
         StepInstruction();
         Assert.Equal(expectZ, CurrentState.ZeroFlag);
@@ -733,8 +733,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void BIT_Absolute_Takes4Cycles()
     {
         LoadAndReset([0x2C, 0x00, 0x80]);
-        CpuBuffer.Current.A = 0xFF;
-        CpuBuffer.Prev.A = 0xFF;
+        CurrentState.A = 0xFF;
+        CurrentState.A = 0xFF;
         SetMemory(0x8000, 0xC0);
         int cycles = StepInstruction();
         Assert.Equal(4, cycles);
@@ -752,8 +752,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void ASL_Accumulator_ShiftsCorrectly(byte input, byte expected, bool expectC, bool expectZ, bool expectN)
     {
         LoadAndReset([0x0A]);
-        CpuBuffer.Current.A = input;
-        CpuBuffer.Prev.A = input;
+        CurrentState.A = input;
+        CurrentState.A = input;
         StepInstruction();
         Assert.Equal(expected, CurrentState.A);
         Assert.Equal(expectC, CurrentState.CarryFlag);
@@ -784,8 +784,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void ASL_AbsoluteX_Takes7Cycles()
     {
         LoadAndReset([0x1E, 0x00, 0x90]);
-        CpuBuffer.Current.X = 0x10;
-        CpuBuffer.Prev.X = 0x10;
+        CurrentState.X = 0x10;
+        CurrentState.X = 0x10;
         SetMemory(0x9010, 0x20);
         int cycles = StepInstruction();
         Assert.Equal(7, cycles);
@@ -803,8 +803,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void LSR_Accumulator_ShiftsCorrectly(byte input, byte expected, bool expectC, bool expectZ)
     {
         LoadAndReset([0x4A]);
-        CpuBuffer.Current.A = input;
-        CpuBuffer.Prev.A = input;
+        CurrentState.A = input;
+        CurrentState.A = input;
         StepInstruction();
         Assert.Equal(expected, CurrentState.A);
         Assert.Equal(expectC, CurrentState.CarryFlag);
@@ -836,10 +836,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void ROL_Accumulator_RotatesCorrectly(byte input, bool carryIn, byte expected, bool carryOut)
     {
         LoadAndReset([0x2A]);
-        CpuBuffer.Current.A = input;
-        CpuBuffer.Prev.A = input;
-        CpuBuffer.Current.CarryFlag = carryIn;
-        CpuBuffer.Prev.CarryFlag = carryIn;
+        CurrentState.A = input;
+        CurrentState.A = input;
+        CurrentState.CarryFlag = carryIn;
+        CurrentState.CarryFlag = carryIn;
         StepInstruction();
         Assert.Equal(expected, CurrentState.A);
         Assert.Equal(carryOut, CurrentState.CarryFlag);
@@ -849,8 +849,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void ROL_ZeroPage_RotatesMemory()
     {
         LoadAndReset([0x26, 0x50]);
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
         SetZeroPage(0x50, 0x40);
         StepInstruction();
         Assert.Equal(0x81, Bus.Memory[0x50]);
@@ -871,10 +871,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void ROR_Accumulator_RotatesCorrectly(byte input, bool carryIn, byte expected, bool carryOut)
     {
         LoadAndReset([0x6A]);
-        CpuBuffer.Current.A = input;
-        CpuBuffer.Prev.A = input;
-        CpuBuffer.Current.CarryFlag = carryIn;
-        CpuBuffer.Prev.CarryFlag = carryIn;
+        CurrentState.A = input;
+        CurrentState.A = input;
+        CurrentState.CarryFlag = carryIn;
+        CurrentState.CarryFlag = carryIn;
         StepInstruction();
         Assert.Equal(expected, CurrentState.A);
         Assert.Equal(carryOut, CurrentState.CarryFlag);
@@ -918,8 +918,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void INC_ZeroPageX_Takes6Cycles()
     {
         LoadAndReset([0xF6, 0x10]);
-        CpuBuffer.Current.X = 0x05;
-        CpuBuffer.Prev.X = 0x05;
+        CurrentState.X = 0x05;
+        CurrentState.X = 0x05;
         SetZeroPage(0x15, 0x00);
         int cycles = StepInstruction();
         Assert.Equal(6, cycles);
@@ -930,8 +930,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void DEC_AbsoluteX_Takes7Cycles()
     {
         LoadAndReset([0xDE, 0x00, 0xA0]);
-        CpuBuffer.Current.X = 0x20;
-        CpuBuffer.Prev.X = 0x20;
+        CurrentState.X = 0x20;
+        CurrentState.X = 0x20;
         SetMemory(0xA020, 0x10);
         int cycles = StepInstruction();
         Assert.Equal(7, cycles);
@@ -949,8 +949,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void INX_IncrementsX(byte input, byte expected)
     {
         LoadAndReset([0xE8]);
-        CpuBuffer.Current.X = input;
-        CpuBuffer.Prev.X = input;
+        CurrentState.X = input;
+        CurrentState.X = input;
         StepInstruction();
         Assert.Equal(expected, CurrentState.X);
     }
@@ -961,8 +961,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void INY_IncrementsY(byte input, byte expected)
     {
         LoadAndReset([0xC8]);
-        CpuBuffer.Current.Y = input;
-        CpuBuffer.Prev.Y = input;
+        CurrentState.Y = input;
+        CurrentState.Y = input;
         StepInstruction();
         Assert.Equal(expected, CurrentState.Y);
     }
@@ -973,8 +973,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void DEX_DecrementsX(byte input, byte expected)
     {
         LoadAndReset([0xCA]);
-        CpuBuffer.Current.X = input;
-        CpuBuffer.Prev.X = input;
+        CurrentState.X = input;
+        CurrentState.X = input;
         StepInstruction();
         Assert.Equal(expected, CurrentState.X);
     }
@@ -985,8 +985,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void DEY_DecrementsY(byte input, byte expected)
     {
         LoadAndReset([0x88]);
-        CpuBuffer.Current.Y = input;
-        CpuBuffer.Prev.Y = input;
+        CurrentState.Y = input;
+        CurrentState.Y = input;
         StepInstruction();
         Assert.Equal(expected, CurrentState.Y);
     }
@@ -1004,8 +1004,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
         Bus.Memory[0x04F0] = 0xF0; // BEQ
         Bus.Memory[0x04F1] = 0x20; // +32 -> crosses to 0x0512
         Cpu.Reset(Bus);
-        CpuBuffer.Current.ZeroFlag = true;
-        CpuBuffer.Prev.ZeroFlag = true;
+        CurrentState.ZeroFlag = true;
+        CurrentState.ZeroFlag = true;
         int cycles = StepInstruction();
         Assert.Equal(4, cycles);
         Assert.Equal(0x0512, CurrentState.PC);
@@ -1019,8 +1019,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
         Bus.Memory[0x0500] = 0xD0; // BNE
         Bus.Memory[0x0501] = 0xFE; // -2 (but signed, goes back)
         Cpu.Reset(Bus);
-        CpuBuffer.Current.ZeroFlag = false;
-        CpuBuffer.Prev.ZeroFlag = false;
+        CurrentState.ZeroFlag = false;
+        CurrentState.ZeroFlag = false;
 
         // -2 signed from 0x0502 = 0x0500, same page
         int cycles = StepInstruction();
@@ -1035,8 +1035,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
         Bus.Memory[0x0500] = 0xD0; // BNE
         Bus.Memory[0x0501] = 0x80; // -128 signed
         Cpu.Reset(Bus);
-        CpuBuffer.Current.ZeroFlag = false;
-        CpuBuffer.Prev.ZeroFlag = false;
+        CurrentState.ZeroFlag = false;
+        CurrentState.ZeroFlag = false;
 
         // -128 signed from 0x0502 = 0x0482, crosses page
         int cycles = StepInstruction();
@@ -1050,8 +1050,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void BCC_BCS_ConditionChecking(byte opcode, bool carryForBranch)
     {
         LoadAndReset(opcode, 0x10);
-        CpuBuffer.Current.CarryFlag = carryForBranch;
-        CpuBuffer.Prev.CarryFlag = carryForBranch;
+        CurrentState.CarryFlag = carryForBranch;
+        CurrentState.CarryFlag = carryForBranch;
         int cycles = StepInstruction();
         Assert.Equal(3, cycles); // Taken, no page cross
     }
@@ -1062,8 +1062,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void BPL_BMI_ConditionChecking(byte opcode, bool negativeForBranch)
     {
         LoadAndReset(opcode, 0x10);
-        CpuBuffer.Current.NegativeFlag = negativeForBranch;
-        CpuBuffer.Prev.NegativeFlag = negativeForBranch;
+        CurrentState.NegativeFlag = negativeForBranch;
+        CurrentState.NegativeFlag = negativeForBranch;
         int cycles = StepInstruction();
         Assert.Equal(3, cycles);
     }
@@ -1074,8 +1074,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void BVC_BVS_ConditionChecking(byte opcode, bool overflowForBranch)
     {
         LoadAndReset(opcode, 0x10);
-        CpuBuffer.Current.OverflowFlag = overflowForBranch;
-        CpuBuffer.Prev.OverflowFlag = overflowForBranch;
+        CurrentState.OverflowFlag = overflowForBranch;
+        CurrentState.OverflowFlag = overflowForBranch;
         int cycles = StepInstruction();
         Assert.Equal(3, cycles);
     }
@@ -1122,10 +1122,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void PHA_PushesA_DecrementsSP()
     {
         LoadAndReset([0x48]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
         StepInstruction();
         Assert.Equal(0xFE, CurrentState.SP);
         Assert.Equal(0x42, Bus.Memory[0x01FF]);
@@ -1136,8 +1136,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         LoadAndReset([0x68]);
         Bus.Memory[0x01FF] = 0xAB;
-        CpuBuffer.Current.SP = 0xFE;
-        CpuBuffer.Prev.SP = 0xFE;
+        CurrentState.SP = 0xFE;
+        CurrentState.SP = 0xFE;
         StepInstruction();
         Assert.Equal(0xFF, CurrentState.SP);
         Assert.Equal(0xAB, CurrentState.A);
@@ -1148,8 +1148,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         LoadAndReset([0x68]);
         Bus.Memory[0x01FF] = 0x80; // Negative value
-        CpuBuffer.Current.SP = 0xFE;
-        CpuBuffer.Prev.SP = 0xFE;
+        CurrentState.SP = 0xFE;
+        CurrentState.SP = 0xFE;
         StepInstruction();
         Assert.True(CurrentState.NegativeFlag);
         Assert.False(CurrentState.ZeroFlag);
@@ -1159,12 +1159,12 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void PHP_PushesStatusWithBAndUnused()
     {
         LoadAndReset([0x08]);
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
-        CpuBuffer.Current.ZeroFlag = true;
-        CpuBuffer.Prev.ZeroFlag = true;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.ZeroFlag = true;
+        CurrentState.ZeroFlag = true;
         StepInstruction();
         // PHP always sets B flag (bit 4) and unused (bit 5)
         byte pushed = Bus.Memory[0x01FF];
@@ -1179,8 +1179,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         LoadAndReset([0x28]);
         Bus.Memory[0x01FF] = 0xFF; // All flags set
-        CpuBuffer.Current.SP = 0xFE;
-        CpuBuffer.Prev.SP = 0xFE;
+        CurrentState.SP = 0xFE;
+        CurrentState.SP = 0xFE;
         StepInstruction();
         Assert.True(CurrentState.CarryFlag);
         Assert.True(CurrentState.ZeroFlag);
@@ -1195,10 +1195,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // Stack wraps within page 1
         LoadAndReset([0x48]);
-        CpuBuffer.Current.A = 0x55;
-        CpuBuffer.Prev.A = 0x55;
-        CpuBuffer.Current.SP = 0x00;
-        CpuBuffer.Prev.SP = 0x00;
+        CurrentState.A = 0x55;
+        CurrentState.A = 0x55;
+        CurrentState.SP = 0x00;
+        CurrentState.SP = 0x00;
         StepInstruction();
         Assert.Equal(0xFF, CurrentState.SP); // Wraps to FF
         Assert.Equal(0x55, Bus.Memory[0x0100]); // Written to $0100
@@ -1212,8 +1212,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void JSR_PushesReturnAddressMinus1()
     {
         LoadAndReset([0x20, 0x00, 0x80]); // JSR $8000
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
         StepInstruction();
         Assert.Equal(0x8000, CurrentState.PC);
         Assert.Equal(0xFD, CurrentState.SP);
@@ -1226,8 +1226,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void RTS_ReturnsToAddressPlus1()
     {
         LoadAndReset([0x60]);
-        CpuBuffer.Current.SP = 0xFD;
-        CpuBuffer.Prev.SP = 0xFD;
+        CurrentState.SP = 0xFD;
+        CurrentState.SP = 0xFD;
         Bus.Memory[0x01FE] = 0x02; // Low byte of return - 1
         Bus.Memory[0x01FF] = 0x04; // High byte
         StepInstruction();
@@ -1247,8 +1247,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
         Bus.Memory[0x0403] = 0xEA; // NOP (next instruction)
         Bus.Memory[0x8000] = 0x60; // RTS
         Cpu.Reset(Bus);
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
 
         StepInstruction(); // Execute JSR
         Assert.Equal(0x8000, CurrentState.PC);
@@ -1265,8 +1265,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void RTI_RestoresStatusAndPC()
     {
         LoadAndReset([0x40]);
-        CpuBuffer.Current.SP = 0xFC;
-        CpuBuffer.Prev.SP = 0xFC;
+        CurrentState.SP = 0xFC;
+        CurrentState.SP = 0xFC;
         Bus.Memory[0x01FD] = 0xFF; // Status
         Bus.Memory[0x01FE] = 0x00; // PC low
         Bus.Memory[0x01FF] = 0x90; // PC high
@@ -1282,8 +1282,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // Unlike RTS, RTI returns to exact address
         LoadAndReset([0x40]);
-        CpuBuffer.Current.SP = 0xFC;
-        CpuBuffer.Prev.SP = 0xFC;
+        CurrentState.SP = 0xFC;
+        CurrentState.SP = 0xFC;
         Bus.Memory[0x01FD] = 0x00; // Status
         Bus.Memory[0x01FE] = 0x50; // PC low
         Bus.Memory[0x01FF] = 0x70; // PC high
@@ -1299,8 +1299,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void BRK_PushesStatusWithBFlag()
     {
         LoadAndReset([0x00, 0x00]);
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
         Bus.SetIrqVector(0x8000);
         StepInstruction();
         // Check B flag is set in pushed status
@@ -1312,10 +1312,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void BRK_SetsInterruptDisable()
     {
         LoadAndReset([0x00, 0x00]);
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
-        CpuBuffer.Current.InterruptDisableFlag = false;
-        CpuBuffer.Prev.InterruptDisableFlag = false;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
+        CurrentState.InterruptDisableFlag = false;
+        CurrentState.InterruptDisableFlag = false;
         Bus.SetIrqVector(0x8000);
         StepInstruction();
         Assert.True(CurrentState.InterruptDisableFlag);
@@ -1326,10 +1326,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // NMOS 6502 does NOT clear D flag on BRK (unlike 65C02)
         LoadAndReset([0x00, 0x00]);
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
         Bus.SetIrqVector(0x8000);
         StepInstruction();
         Assert.True(CurrentState.DecimalFlag, "NMOS: D flag should remain set after BRK");
@@ -1340,8 +1340,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     {
         // BRK pushes PC+2 (skipping the signature byte)
         LoadAndReset([0x00, 0xAB]); // BRK with signature byte
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
         Bus.SetIrqVector(0x8000);
         StepInstruction();
         // PC was 0x0400, so pushed should be 0x0402
@@ -1357,8 +1357,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void TAX_TransfersAToX_SetsFlags()
     {
         LoadAndReset([0xAA]);
-        CpuBuffer.Current.A = 0x80;
-        CpuBuffer.Prev.A = 0x80;
+        CurrentState.A = 0x80;
+        CurrentState.A = 0x80;
         StepInstruction();
         Assert.Equal(0x80, CurrentState.X);
         Assert.True(CurrentState.NegativeFlag);
@@ -1369,8 +1369,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void TXA_TransfersXToA_SetsFlags()
     {
         LoadAndReset([0x8A]);
-        CpuBuffer.Current.X = 0x00;
-        CpuBuffer.Prev.X = 0x00;
+        CurrentState.X = 0x00;
+        CurrentState.X = 0x00;
         StepInstruction();
         Assert.Equal(0x00, CurrentState.A);
         Assert.True(CurrentState.ZeroFlag);
@@ -1380,8 +1380,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void TAY_TransfersAToY_SetsFlags()
     {
         LoadAndReset([0xA8]);
-        CpuBuffer.Current.A = 0x7F;
-        CpuBuffer.Prev.A = 0x7F;
+        CurrentState.A = 0x7F;
+        CurrentState.A = 0x7F;
         StepInstruction();
         Assert.Equal(0x7F, CurrentState.Y);
         Assert.False(CurrentState.NegativeFlag);
@@ -1392,8 +1392,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void TYA_TransfersYToA_SetsFlags()
     {
         LoadAndReset([0x98]);
-        CpuBuffer.Current.Y = 0xFF;
-        CpuBuffer.Prev.Y = 0xFF;
+        CurrentState.Y = 0xFF;
+        CurrentState.Y = 0xFF;
         StepInstruction();
         Assert.Equal(0xFF, CurrentState.A);
         Assert.True(CurrentState.NegativeFlag);
@@ -1403,8 +1403,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void TSX_TransfersSPToX_SetsFlags()
     {
         LoadAndReset([0xBA]);
-        CpuBuffer.Current.SP = 0x80;
-        CpuBuffer.Prev.SP = 0x80;
+        CurrentState.SP = 0x80;
+        CurrentState.SP = 0x80;
         StepInstruction();
         Assert.Equal(0x80, CurrentState.X);
         Assert.True(CurrentState.NegativeFlag);
@@ -1414,10 +1414,10 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void TXS_TransfersXToSP_NoFlags()
     {
         LoadAndReset([0x9A]);
-        CpuBuffer.Current.X = 0x00;
-        CpuBuffer.Prev.X = 0x00;
-        CpuBuffer.Current.ZeroFlag = false;
-        CpuBuffer.Prev.ZeroFlag = false;
+        CurrentState.X = 0x00;
+        CurrentState.X = 0x00;
+        CurrentState.ZeroFlag = false;
+        CurrentState.ZeroFlag = false;
         StepInstruction();
         Assert.Equal(0x00, CurrentState.SP);
         Assert.False(CurrentState.ZeroFlag); // TXS doesn't affect flags
@@ -1431,8 +1431,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void CLC_ClearsCarry()
     {
         LoadAndReset([0x18]);
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
         StepInstruction();
         Assert.False(CurrentState.CarryFlag);
     }
@@ -1441,8 +1441,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void SEC_SetsCarry()
     {
         LoadAndReset([0x38]);
-        CpuBuffer.Current.CarryFlag = false;
-        CpuBuffer.Prev.CarryFlag = false;
+        CurrentState.CarryFlag = false;
+        CurrentState.CarryFlag = false;
         StepInstruction();
         Assert.True(CurrentState.CarryFlag);
     }
@@ -1451,8 +1451,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void CLD_ClearsDecimal()
     {
         LoadAndReset([0xD8]);
-        CpuBuffer.Current.DecimalFlag = true;
-        CpuBuffer.Prev.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
+        CurrentState.DecimalFlag = true;
         StepInstruction();
         Assert.False(CurrentState.DecimalFlag);
     }
@@ -1461,8 +1461,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void SED_SetsDecimal()
     {
         LoadAndReset([0xF8]);
-        CpuBuffer.Current.DecimalFlag = false;
-        CpuBuffer.Prev.DecimalFlag = false;
+        CurrentState.DecimalFlag = false;
+        CurrentState.DecimalFlag = false;
         StepInstruction();
         Assert.True(CurrentState.DecimalFlag);
     }
@@ -1471,8 +1471,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void CLI_ClearsInterruptDisable()
     {
         LoadAndReset([0x58]);
-        CpuBuffer.Current.InterruptDisableFlag = true;
-        CpuBuffer.Prev.InterruptDisableFlag = true;
+        CurrentState.InterruptDisableFlag = true;
+        CurrentState.InterruptDisableFlag = true;
         StepInstruction();
         Assert.False(CurrentState.InterruptDisableFlag);
     }
@@ -1481,8 +1481,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void SEI_SetsInterruptDisable()
     {
         LoadAndReset([0x78]);
-        CpuBuffer.Current.InterruptDisableFlag = false;
-        CpuBuffer.Prev.InterruptDisableFlag = false;
+        CurrentState.InterruptDisableFlag = false;
+        CurrentState.InterruptDisableFlag = false;
         StepInstruction();
         Assert.True(CurrentState.InterruptDisableFlag);
     }
@@ -1491,8 +1491,8 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void CLV_ClearsOverflow()
     {
         LoadAndReset([0xB8]);
-        CpuBuffer.Current.OverflowFlag = true;
-        CpuBuffer.Prev.OverflowFlag = true;
+        CurrentState.OverflowFlag = true;
+        CurrentState.OverflowFlag = true;
         StepInstruction();
         Assert.False(CurrentState.OverflowFlag);
     }
@@ -1505,13 +1505,13 @@ public class NMOS6502OpcodeTests : CpuTestBase
     public void NOP_DoesNothing()
     {
         LoadAndReset([0xEA]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
-        CpuBuffer.Current.X = 0x33;
-        CpuBuffer.Prev.X = 0x33;
-        CpuBuffer.Current.Y = 0x22;
-        CpuBuffer.Prev.Y = 0x22;
-        ushort pcBefore = (ushort)(CpuBuffer.Current.PC + 1); // After fetch
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.X = 0x33;
+        CurrentState.X = 0x33;
+        CurrentState.Y = 0x22;
+        CurrentState.Y = 0x22;
+        ushort pcBefore = (ushort)(CurrentState.PC + 1); // After fetch
 
         StepInstruction();
 

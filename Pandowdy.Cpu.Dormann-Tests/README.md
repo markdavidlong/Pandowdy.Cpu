@@ -173,25 +173,28 @@ as65 -l -m -s2 -w -h0 6502_interrupt_test.a65
 ```
 
 **Success addresses for 65C02:**
-- `$0719` - Automated interrupt tests complete
-- `$0750` - WAI tests complete (handled automatically by test runner)
+- `$0719` - Automated interrupt tests complete (Rockwell 65C02)
+- `$0750` - WAI tests complete (WDC 65C02 only)
 
 The Dormann 65C02 interrupt test includes "manual" WAI tests at `$071F`-`$0750` that are
-documented as requiring single-stepping and manual IRQ control. These tests are unreachable
-from normal execution (the automated tests end with `jmp *` at `$0719`). The test runner
-automatically handles this by:
-1. Detecting success at `$0719` (automated tests passed)
-2. Jumping PC to `$071F` to start WAI tests
-3. Signaling IRQ when the CPU enters Waiting status
-4. Verifying WAI tests complete at `$0750`
+documented as requiring single-stepping and manual IRQ control. The test runner automates
+these manual steps for WDC 65C02 by:
+
+1. Detecting when automated tests complete at `$0719`
+2. Jumping PC to `$071F` to start WAI tests (otherwise unreachable)
+3. For first WAI test (I flag set): Signaling NMI to wake, then clearing pending interrupt
+4. For second WAI test (I flag clear): Signaling IRQ and letting handler run
+
+**Note:** Rockwell 65C02 doesn't have the WAI instruction (treats `$CB` as NOP), so
+WAI tests are skipped for that variant.
 
 **Key differences between NMOS and CMOS interrupt handling:**
 
-| Behavior | NMOS 6502 | 65C02 |
-|----------|-----------|-------|
-| D flag on BRK/IRQ/NMI | Unchanged | Cleared |
-| WAI instruction | Not available | Tested (automated) |
-| Test endpoint | `$06F5` | `$0719` (then `$0750` for WAI) |
+| Behavior | NMOS 6502 | WDC 65C02 | Rockwell 65C02 |
+|----------|-----------|-----------|----------------|
+| D flag on BRK/IRQ/NMI | Unchanged | Cleared | Cleared |
+| WAI instruction | N/A | Yes ($0750) | No (NOP) |
+| Test endpoint | `$06F5` | `$0750` | `$0719` |
 
 **Note:** The interrupt test uses a feedback register at `$BFFC` to control interrupt
 signals. The test runner implements this register to trigger IRQ (bit 0) and NMI (bit 1).
@@ -274,9 +277,10 @@ Pandowdy.Cpu.Dormann-Tests --create-config
 }
 ```
 
-**Note on cmosInterruptTest successAddress:** The value `0719` is the automated test success
-point. The test runner automatically continues to WAI tests at `$071F` and verifies completion
-at `$0750`. This is handled internally and doesn't require configuration.
+**Note on cmosInterruptTest successAddress:** The value `0719` is the end of automated
+interrupt tests. For WDC 65C02, the test runner automatically continues to WAI tests and
+verifies completion at `$0750`. For Rockwell 65C02 (which doesn't have WAI), the test
+ends at `$0719`.
 
 ### Using a Custom Configuration
 

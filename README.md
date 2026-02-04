@@ -5,9 +5,10 @@ A cycle-accurate 6502/65C02 CPU emulator written in C# for .NET 8.
 ## Features
 
 - **Cycle-Accurate Emulation** — Micro-op pipeline architecture provides true cycle-level timing
-- **Instance-Based API** — Create CPU instances via `CpuFactory.Create()` with injected state buffers
+- **Instance-Based API** — Create CPU instances via `CpuFactory.Create()` with direct state access
 - **Multiple CPU Variants** — NMOS 6502, 65C02, and Rockwell 65C02 with bit manipulation instructions
-- **Double-Buffered State** — Clean instruction boundaries for debugging, single-stepping, and state comparison
+- **Direct State Access** — Simple `cpu.State` property for register access and debugging
+- **Debugging Wrapper** — `DebugCpu` wrapper tracks state changes between instructions
 - **Interrupt Support** — IRQ, NMI, and Reset with proper priority handling and variant-specific D-flag behavior
 - **Extensible Bus Interface** — Simple `IPandowdyCpuBus` interface for custom memory maps and I/O
 - **Pure C#** — No external dependencies beyond .NET 8
@@ -51,12 +52,12 @@ See [Pandowdy.Cpu.Harte-SST-Tests/README.md](Pandowdy.Cpu.Harte-SST-Tests/README
 ```csharp
 using Pandowdy.Cpu;
 
-// Create memory bus and CPU state buffer
+// Create memory bus
 var bus = new RamBus();
-var cpuBuffer = new CpuStateBuffer();
 
-// Create CPU instance
-var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, cpuBuffer);
+// Create CPU state and instance
+var state = new CpuState();
+var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, state);
 
 // Load program and set reset vector
 byte[] program = { 0xA9, 0x42, 0x8D, 0x00, 0x02 }; // LDA #$42, STA $0200
@@ -67,14 +68,34 @@ bus.SetResetVector(0x0400);
 cpu.Reset(bus);
 int cycles = cpu.Step(bus);
 
-Console.WriteLine($"A = ${cpuBuffer.Current.A:X2}"); // A = $42
+Console.WriteLine($"A = ${cpu.State.A:X2}"); // A = $42
+```
+
+### Debugging with DebugCpu
+
+For debugging, use `DebugCpu` which tracks state changes between instructions:
+
+```csharp
+// Create a debugging wrapper
+var state = new CpuState();
+var debugCpu = CpuFactory.CreateDebug(CpuVariant.Wdc65C02, state);
+
+debugCpu.Reset(bus);
+debugCpu.Step(bus);
+
+// Check what changed
+if (debugCpu.BranchOccurred)
+    Console.WriteLine("Branch was taken!");
+
+foreach (var reg in debugCpu.ChangedRegisters)
+    Console.WriteLine($"  {reg} changed");
 ```
 
 ## Project Structure
 
 ```
-Pandowdy.Cpu/              # Core library (CPU classes, MicroOps, Pipelines, CpuState, CpuStateBuffer)
-Pandowdy.Cpu.Tests/        # xUnit test suite (2,185 tests)
+Pandowdy.Cpu/              # Core library (CPU classes, MicroOps, Pipelines, CpuState, DebugCpu)
+Pandowdy.Cpu.Tests/        # xUnit test suite (2,183 tests)
 Pandowdy.Cpu.Dormann-Tests/ # Klaus Dormann functional test runner
 Pandowdy.Cpu.Harte-SST-Tests/ # Tom Harte SingleStepTests runner
 ```
@@ -82,7 +103,7 @@ Pandowdy.Cpu.Harte-SST-Tests/ # Tom Harte SingleStepTests runner
 ## Documentation
 
 - [CPU Usage Guide](docs/CpuUsageGuide.md) — Detailed usage instructions and examples
-- [API Reference](docs/ApiReference.md) — Complete API documentation for IPandowdyCpu, CpuFactory, CpuState, and CpuStateBuffer
+- [API Reference](docs/ApiReference.md) — Complete API documentation for IPandowdyCpu, CpuFactory, CpuState, and DebugCpu
 - [Micro-Ops Architecture](docs/MicroOps-Architecture.md) — How the cycle-accurate micro-op pipeline works
 - [Building](BUILDING.md) — Build instructions, running tests, and project structure
 

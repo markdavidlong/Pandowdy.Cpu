@@ -3,12 +3,14 @@
 // See LICENSE file for details
 
 using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Pandowdy.Cpu.Internals;
 
 namespace Pandowdy.Cpu;
 
 /// <summary>
-/// Represents the execution status of the CPU.
+/// Represents the execution status of the CPU as a byte-backed enum for efficient packing.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -21,30 +23,33 @@ namespace Pandowdy.Cpu;
 ///   <item><description><see cref="Waiting"/>: Suspended by WAI instruction, waiting for interrupt.</description></item>
 ///   <item><description><see cref="Bypassed"/>: A halt instruction was bypassed, CPU continues running.</description></item>
 /// </list>
+/// <para>
+/// This enum is byte-backed to allow packing into <see cref="CpuRegisters"/> for efficient copying.
+/// </para>
 /// </remarks>
-public enum CpuStatus
+public enum CpuStatus : byte
 {
     /// <summary>Normal execution mode - CPU is actively processing instructions.</summary>
-    Running,
+    Running = 0,
 
     /// <summary>
     /// CPU halted by STP instruction. Only a hardware reset can resume execution.
     /// Available on 65C02 and later variants.
     /// </summary>
-    Stopped,
+    Stopped = 1,
 
     /// <summary>
     /// CPU frozen by executing an illegal JAM/KIL opcode.
     /// Only available on NMOS 6502. Requires hardware reset to recover.
     /// </summary>
-    Jammed,
+    Jammed = 2,
 
     /// <summary>
     /// CPU suspended by WAI instruction, waiting for an interrupt (IRQ, NMI, or Reset).
     /// When an interrupt occurs, the CPU resumes execution at the interrupt handler.
     /// Available on 65C02 and later variants.
     /// </summary>
-    Waiting,
+    Waiting = 3,
 
     /// <summary>
     /// Indicates that a halt instruction (JAM, STP, or WAI) was encountered but bypassed
@@ -61,7 +66,66 @@ public enum CpuStatus
     /// manually reset to <see cref="Running"/>.
     /// </para>
     /// </remarks>
-    Bypassed
+    Bypassed = 4
+}
+
+/// <summary>
+/// Packed CPU registers using explicit memory layout for efficient single-copy operations.
+/// </summary>
+/// <remarks>
+/// <para>
+/// This struct packs the essential CPU registers into exactly 8 bytes (one ulong) using
+/// explicit field offsets. This allows copying all registers with a single 8-byte assignment
+/// instead of multiple individual field copies.
+/// </para>
+/// <para>Memory layout:</para>
+/// <list type="table">
+///   <listheader><term>Offset</term><description>Field</description></listheader>
+///   <item><term>0</term><description>A (1 byte) - Accumulator</description></item>
+///   <item><term>1</term><description>X (1 byte) - X Index Register</description></item>
+///   <item><term>2</term><description>Y (1 byte) - Y Index Register</description></item>
+///   <item><term>3</term><description>P (1 byte) - Processor Status</description></item>
+///   <item><term>4</term><description>SP (1 byte) - Stack Pointer</description></item>
+///   <item><term>5-6</term><description>PC (2 bytes) - Program Counter</description></item>
+///   <item><term>7</term><description>Status (1 byte) - CPU execution status</description></item>
+/// </list>
+/// </remarks>
+[StructLayout(LayoutKind.Explicit, Size = 8)]
+public struct CpuRegisters
+{
+    /// <summary>
+    /// All registers packed into a single 64-bit value for efficient copying.
+    /// </summary>
+    [FieldOffset(0)]
+    public ulong Packed;
+
+    /// <summary>Accumulator register (A).</summary>
+    [FieldOffset(0)]
+    public byte A;
+
+    /// <summary>X Index register.</summary>
+    [FieldOffset(1)]
+    public byte X;
+
+    /// <summary>Y Index register.</summary>
+    [FieldOffset(2)]
+    public byte Y;
+
+    /// <summary>Processor Status register (P).</summary>
+    [FieldOffset(3)]
+    public byte P;
+
+    /// <summary>Stack Pointer register (SP).</summary>
+    [FieldOffset(4)]
+    public byte SP;
+
+    /// <summary>Program Counter (PC).</summary>
+    [FieldOffset(5)]
+    public ushort PC;
+
+    /// <summary>CPU execution status.</summary>
+    [FieldOffset(7)]
+    public CpuStatus Status;
 }
 
 /// <summary>
@@ -122,17 +186,31 @@ public enum PendingInterrupt
 /// and <see cref="PipelineIndex"/> tracks the current execution position.
 /// </para>
 /// <para>
-/// For debugging and time-travel debugging, use <see cref="CpuStateBuffer"/> which maintains
-/// both the previous and current state, allowing comparison of state changes per instruction.
+/// For debugging and state comparison, use <see cref="DebugCpu"/> which wraps any CPU
+/// and tracks the previous state, allowing comparison of state changes per instruction.
 /// </para>
 /// </remarks>
-/// <seealso cref="CpuStateBuffer"/>
+/// <seealso cref="DebugCpu"/>
 /// <seealso cref="CpuStatus"/>
 /// <seealso cref="PendingInterrupt"/>
 public class CpuState
 {
     // ========================================
-    // Programmer-Visible Registers
+    // Packed Registers (for efficient copying)
+    // ========================================
+
+    /// <summary>
+    /// Packed CPU registers for efficient single-copy operations at instruction boundaries.
+    /// </summary>
+    /// <remarks>
+    /// This struct contains A, X, Y, P, SP, PC, and Status in a single 8-byte block
+    /// that can be copied with a single 64-bit assignment.
+    /// </remarks>
+    internal CpuRegisters Registers;
+
+    // ========================================
+    // Programmer-Visible Register Properties
+    // (delegate to packed Registers struct)
     // ========================================
 
     /// <summary>
@@ -142,7 +220,13 @@ public class CpuState
     /// The accumulator is the primary register for arithmetic and logic operations.
     /// Most ALU operations use the accumulator as both source and destination.
     /// </remarks>
-    public byte A { get; set; }
+    public byte A
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Registers.A;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => Registers.A = value;
+    }
 
     /// <summary>
     /// Gets or sets the X Index register.
@@ -151,7 +235,13 @@ public class CpuState
     /// Used for indexed addressing modes (e.g., LDA $1234,X) and as a general-purpose counter.
     /// Some instructions like TAX, TXA, TXS, TSX, INX, DEX operate directly on X.
     /// </remarks>
-    public byte X { get; set; }
+    public byte X
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Registers.X;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => Registers.X = value;
+    }
 
     /// <summary>
     /// Gets or sets the Y Index register.
@@ -160,7 +250,13 @@ public class CpuState
     /// Used for indexed addressing modes (e.g., LDA $1234,Y) and as a general-purpose counter.
     /// Some instructions like TAY, TYA, INY, DEY operate directly on Y.
     /// </remarks>
-    public byte Y { get; set; }
+    public byte Y
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Registers.Y;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => Registers.Y = value;
+    }
 
     /// <summary>
     /// Gets or sets the Processor Status register (P).
@@ -180,7 +276,13 @@ public class CpuState
     /// </list>
     /// <para>Use the convenience properties (e.g., <see cref="CarryFlag"/>, <see cref="ZeroFlag"/>) for easier access.</para>
     /// </remarks>
-    public byte P { get; set; }
+    public byte P
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Registers.P;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => Registers.P = value;
+    }
 
     /// <summary>
     /// Gets or sets the Stack Pointer register (SP).
@@ -195,7 +297,13 @@ public class CpuState
     /// Pull operations increment SP then read from $0100+SP.
     /// </para>
     /// </remarks>
-    public byte SP { get; set; }
+    public byte SP
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Registers.SP;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => Registers.SP = value;
+    }
 
     /// <summary>
     /// Gets or sets the Program Counter (PC).
@@ -210,7 +318,13 @@ public class CpuState
     /// After reset, PC is loaded from the reset vector at $FFFC-$FFFD.
     /// </para>
     /// </remarks>
-    public ushort PC { get; set; }
+    public ushort PC
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Registers.PC;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => Registers.PC = value;
+    }
 
     // ========================================
     // Temporary Execution State
@@ -254,12 +368,60 @@ public class CpuState
     /// </remarks>
     public ushort OpcodeAddress { get; set; }
 
+    /// <summary>
+    /// Gets or sets the address to use for penalty cycle reads.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When a page-crossing penalty cycle is needed, this field stores the "wrong" address
+    /// (the incomplete/uncorrected address) that the 6502 reads before it has the correct
+    /// high byte. This avoids allocating a closure to capture the address.
+    /// </para>
+    /// <para>
+    /// Set by AddXCheckPage/AddYCheckPage before inserting a penalty cycle.
+    /// Read by DummyReadPenaltyAddress during the penalty cycle.
+    /// </para>
+    /// </remarks>
+    internal ushort PenaltyAddress { get; set; }
+
+    /// <summary>
+    /// Gets or sets the old PC for branch penalty cycles.
+    /// </summary>
+    /// <remarks>
+    /// When a branch is taken, this stores the PC value before the branch offset was applied.
+    /// Used by the branch penalty cycle micro-ops to avoid closure allocations.
+    /// </remarks>
+    internal ushort BranchOldPC { get; set; }
+
     // ========================================
     // Pipeline Execution State
     // ========================================
 
     /// <summary>
-    /// Gets or sets the array of micro-operations for the current instruction.
+    /// Maximum capacity for the working pipeline buffer.
+    /// </summary>
+    /// <remarks>
+    /// The longest 6502 instruction is 7 cycles (RMW absolute,X). With up to 2 penalty cycles
+    /// for page crossing, we need at most 9 slots. 16 provides ample headroom.
+    /// </remarks>
+    internal const int WorkingPipelineCapacity = 16;
+
+    /// <summary>
+    /// Gets the working pipeline buffer for in-place modification.
+    /// </summary>
+    /// <remarks>
+    /// This buffer is used when penalty cycles need to be inserted. The pipeline is copied
+    /// here once, then subsequent insertions modify this buffer in-place without allocation.
+    /// </remarks>
+    internal MicroOp[] WorkingPipeline { get; } = new MicroOp[WorkingPipelineCapacity];
+
+    /// <summary>
+    /// Gets or sets the actual length of the working pipeline (0 if not using working pipeline).
+    /// </summary>
+    internal int WorkingPipelineLength { get; set; }
+
+    /// <summary>
+    /// Gets or sets the base pipeline array for the current instruction.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -271,6 +433,11 @@ public class CpuState
     /// Each micro-op is a delegate that receives (prev, current, bus) parameters,
     /// where prev is the state at instruction start and current is the working state.
     /// </para>
+    /// <para>
+    /// When <see cref="WorkingPipelineLength"/> is 0, this array is used directly.
+    /// When penalty cycles are inserted, the pipeline is copied to <see cref="WorkingPipeline"/>
+    /// and <see cref="WorkingPipelineLength"/> is set to the new length.
+    /// </para>
     /// </remarks>
     internal MicroOp[] Pipeline { get; set; } = [];
 
@@ -278,6 +445,22 @@ public class CpuState
     /// Gets or sets the index of the next micro-operation to execute in the pipeline.
     /// </summary>
     internal int PipelineIndex { get; set; }
+
+    /// <summary>
+    /// Gets the effective length of the current pipeline (working or base).
+    /// </summary>
+    internal int EffectivePipelineLength
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => WorkingPipelineLength > 0 ? WorkingPipelineLength : Pipeline.Length;
+    }
+
+    /// <summary>
+    /// Gets the micro-op at the specified index from the effective pipeline.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal MicroOp GetPipelineOp(int index) =>
+        WorkingPipelineLength > 0 ? WorkingPipeline[index] : Pipeline[index];
 
     /// <summary>
     /// Gets or sets a value indicating whether the current instruction has completed.
@@ -294,7 +477,7 @@ public class CpuState
     /// <remarks>
     /// Returns 0 when no instruction is in progress.
     /// </remarks>
-    public int CyclesRemaining => Pipeline.Length - PipelineIndex;
+    public int CyclesRemaining => EffectivePipelineLength - PipelineIndex;
 
     /// <summary>
     /// Gets or sets the current execution status of the CPU.
@@ -310,7 +493,13 @@ public class CpuState
     ///   <item><description><see cref="CpuStatus.Waiting"/>: Suspended by WAI instruction.</description></item>
     /// </list>
     /// </remarks>
-    public CpuStatus Status { get; set; }
+    public CpuStatus Status
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Registers.Status;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => Registers.Status = value;
+    }
 
     /// <summary>
     /// Gets or sets the pending interrupt signal awaiting service.
@@ -404,9 +593,12 @@ public class CpuState
         TempValue = 0;
         CurrentOpcode = 0;
         OpcodeAddress = 0;
+        PenaltyAddress = 0;
+        BranchOldPC = 0;
 
         Pipeline = [];
         PipelineIndex = 0;
+        WorkingPipelineLength = 0;
         InstructionComplete = false;
         Status = CpuStatus.Running;
         PendingInterrupt = PendingInterrupt.None;
@@ -425,95 +617,103 @@ public class CpuState
     /// Note: <see cref="IgnoreHaltStopWait"/> is not copied as it is a configuration
     /// setting rather than execution state.
     /// </para>
+    /// <para>
+    /// Note: <see cref="WorkingPipeline"/> contents are not copied since the working
+    /// pipeline is only valid during instruction execution. At instruction boundaries
+    /// (when this method is called), the working pipeline is reset anyway.
+    /// </para>
     /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void CopyFrom(CpuState other)
     {
-        A = other.A;
-        X = other.X;
-        Y = other.Y;
-            P = other.P;
-            SP = other.SP;
-            PC = other.PC;
+        // Single 8-byte copy for all packed registers (A, X, Y, P, SP, PC, Status)
+        Registers.Packed = other.Registers.Packed;
 
-            TempAddress = other.TempAddress;
-            TempValue = other.TempValue;
-            CurrentOpcode = other.CurrentOpcode;
-            OpcodeAddress = other.OpcodeAddress;
+        TempAddress = other.TempAddress;
+        TempValue = other.TempValue;
+        CurrentOpcode = other.CurrentOpcode;
+        OpcodeAddress = other.OpcodeAddress;
+        PenaltyAddress = other.PenaltyAddress;
+        BranchOldPC = other.BranchOldPC;
 
-            // Share the pipeline array reference (immutable during execution)
-            Pipeline = other.Pipeline;
-            PipelineIndex = other.PipelineIndex;
-            InstructionComplete = other.InstructionComplete;
-            Status = other.Status;
-            PendingInterrupt = other.PendingInterrupt;
-        }
+        // Share the pipeline array reference (immutable during execution)
+        Pipeline = other.Pipeline;
+        PipelineIndex = other.PipelineIndex;
 
-        /// <summary>
-        /// Creates a deep copy of this CPU state.
-        /// </summary>
-        /// <returns>A new <see cref="CpuState"/> instance with all values copied.</returns>
-        /// <remarks>
-        /// Use this for save states or when you need an independent copy.
-        /// For hot-path updates where you want to avoid allocation, use
-        /// <see cref="CopyFrom"/> on an existing instance instead.
-        /// </remarks>
-        public CpuState Clone()
+        // Only copy WorkingPipelineLength, not the array contents.
+        // At instruction boundaries, working pipeline is reset, so contents don't need copying.
+        WorkingPipelineLength = other.WorkingPipelineLength;
+
+        InstructionComplete = other.InstructionComplete;
+        PendingInterrupt = other.PendingInterrupt;
+    }
+
+    /// <summary>
+    /// Creates a deep copy of this CPU state.
+    /// </summary>
+    /// <returns>A new <see cref="CpuState"/> instance with all values copied.</returns>
+    /// <remarks>
+    /// Use this for save states or when you need an independent copy.
+    /// For hot-path updates where you want to avoid allocation, use
+    /// <see cref="CopyFrom"/> on an existing instance instead.
+    /// </remarks>
+    public CpuState Clone()
+    {
+        var clone = new CpuState();
+        clone.CopyFrom(this);
+        return clone;
+    }
+
+    // ========================================
+    // Status Flag Helpers
+    // ========================================
+
+    /// <summary>
+    /// Gets the value of a specific status flag.
+    /// </summary>
+    /// <param name="flag">The flag bit mask (e.g., <see cref="FlagC"/>, <see cref="FlagZ"/>).</param>
+    /// <returns><c>true</c> if the flag is set; otherwise, <c>false</c>.</returns>
+    public bool GetFlag(byte flag) => (P & flag) != 0;
+
+    /// <summary>
+    /// Sets or clears a specific status flag.
+    /// </summary>
+    /// <param name="flag">The flag bit mask (e.g., <see cref="FlagC"/>, <see cref="FlagZ"/>).</param>
+    /// <param name="value"><c>true</c> to set the flag; <c>false</c> to clear it.</param>
+    public void SetFlag(byte flag, bool value)
+    {
+        if (value)
         {
-            var clone = new CpuState();
-            clone.CopyFrom(this);
-            return clone;
+            P |= flag;
         }
-
-        // ========================================
-        // Status Flag Helpers
-        // ========================================
-
-        /// <summary>
-        /// Gets the value of a specific status flag.
-        /// </summary>
-        /// <param name="flag">The flag bit mask (e.g., <see cref="FlagC"/>, <see cref="FlagZ"/>).</param>
-        /// <returns><c>true</c> if the flag is set; otherwise, <c>false</c>.</returns>
-        public bool GetFlag(byte flag) => (P & flag) != 0;
-
-        /// <summary>
-        /// Sets or clears a specific status flag.
-        /// </summary>
-        /// <param name="flag">The flag bit mask (e.g., <see cref="FlagC"/>, <see cref="FlagZ"/>).</param>
-        /// <param name="value"><c>true</c> to set the flag; <c>false</c> to clear it.</param>
-        public void SetFlag(byte flag, bool value)
+        else
         {
-            if (value)
-            {
-                P |= flag;
-            }
-            else
-            {
-                P = (byte) (P & ~flag);
-            }
+            P = (byte) (P & ~flag);
         }
+    }
 
-        // ========================================
-        // Convenience Flag Properties
-        // ========================================
+    // ========================================
+    // Convenience Flag Properties
+    // ========================================
 
-        /// <summary>Gets or sets the Carry flag. Set when an arithmetic operation produces a carry or borrow.</summary>
-        public bool CarryFlag { get => GetFlag(FlagC); set => SetFlag(FlagC, value); }
+    /// <summary>Gets or sets the Carry flag. Set when an arithmetic operation produces a carry or borrow.</summary>
+    public bool CarryFlag { get => GetFlag(FlagC); set => SetFlag(FlagC, value); }
 
-        /// <summary>Gets or sets the Zero flag. Set when an operation produces a zero result.</summary>
-        public bool ZeroFlag { get => GetFlag(FlagZ); set => SetFlag(FlagZ, value); }
+    /// <summary>Gets or sets the Zero flag. Set when an operation produces a zero result.</summary>
+    public bool ZeroFlag { get => GetFlag(FlagZ); set => SetFlag(FlagZ, value); }
 
-        /// <summary>Gets or sets the Interrupt Disable flag. When set, IRQ interrupts are ignored.</summary>
-        public bool InterruptDisableFlag { get => GetFlag(FlagI); set => SetFlag(FlagI, value); }
+    /// <summary>Gets or sets the Interrupt Disable flag. When set, IRQ interrupts are ignored.</summary>
+    public bool InterruptDisableFlag { get => GetFlag(FlagI); set => SetFlag(FlagI, value); }
 
-        /// <summary>Gets or sets the Decimal Mode flag. When set, ADC and SBC use BCD arithmetic.</summary>
-        public bool DecimalFlag { get => GetFlag(FlagD); set => SetFlag(FlagD, value); }
+    /// <summary>Gets or sets the Decimal Mode flag. When set, ADC and SBC use BCD arithmetic.</summary>
+    public bool DecimalFlag { get => GetFlag(FlagD); set => SetFlag(FlagD, value); }
 
-        /// <summary>Gets or sets the Break flag. Only meaningful when P is pushed to stack by BRK instruction.</summary>
-        public bool BreakFlag { get => GetFlag(FlagB); set => SetFlag(FlagB, value); }
+    /// <summary>Gets or sets the Break flag. Only meaningful when P is pushed to stack by BRK instruction.</summary>
+    public bool BreakFlag { get => GetFlag(FlagB); set => SetFlag(FlagB, value); }
 
-        /// <summary>Gets or sets the Overflow flag. Set when a signed arithmetic operation overflows.</summary>
-        public bool OverflowFlag { get => GetFlag(FlagV); set => SetFlag(FlagV, value); }
+    /// <summary>Gets or sets the Overflow flag. Set when a signed arithmetic operation overflows.</summary>
+    public bool OverflowFlag { get => GetFlag(FlagV); set => SetFlag(FlagV, value); }
 
-        /// <summary>Gets or sets the Negative flag. Set when the result has bit 7 set (negative in signed arithmetic).</summary>
-        public bool NegativeFlag { get => GetFlag(FlagN); set => SetFlag(FlagN, value); }
+    /// <summary>Gets or sets the Negative flag. Set when the result has bit 7 set (negative in signed arithmetic).</summary>
+    public bool NegativeFlag { get => GetFlag(FlagN); set => SetFlag(FlagN, value); }
 }

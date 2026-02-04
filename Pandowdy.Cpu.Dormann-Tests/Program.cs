@@ -241,6 +241,7 @@ internal class Program
     /// </summary>
     private static string GetTestDataPath(string[] args, TestConfig config)
     {
+
         // First priority: command line argument (skip --config and its value)
         for (int i = 0; i < args.Length; i++)
         {
@@ -345,8 +346,8 @@ internal class Program
         }
 
         var bus = new RamBus();
-        var cpuBuffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, cpuBuffer);
+        var state = new CpuState();
+        var cpu = CpuFactory.Create(variant, state);
 
         // Load test program
         Console.Write($"  Loading {hexFile}... ");
@@ -362,7 +363,7 @@ internal class Program
         Console.WriteLine("  Running test...");
         var sw = Stopwatch.StartNew();
 
-        ushort previousPC = cpuBuffer.Current.PC;
+        ushort previousPC = cpu.State.PC;
         int sameAddressCount = 0;
         const int LoopThreshold = 3;
         long totalCycles = 0;
@@ -375,7 +376,7 @@ internal class Program
             totalCycles++;
             instructionCount++;
 
-            ushort currentPC = cpuBuffer.Prev.PC;
+            ushort currentPC = cpu.State.PC;
 
             // Check for infinite loop
             if (currentPC == previousPC)
@@ -401,7 +402,7 @@ internal class Program
         }
 
         sw.Stop();
-        ushort finalPC = cpuBuffer.Prev.PC;
+        ushort finalPC = cpu.State.PC;
 
         Console.WriteLine();
         Console.WriteLine($"  Execution stopped at PC = ${finalPC:X4}");
@@ -462,8 +463,8 @@ internal class Program
         }
 
         var bus = new RamBus();
-        var cpuBuffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, cpuBuffer);
+        var state = new CpuState();
+        var cpu = CpuFactory.Create(variant, state);
 
         // Load test program
         Console.Write($"  Loading {hexFile}... ");
@@ -492,14 +493,14 @@ internal class Program
             instructionCount++;
 
             // Check for STP/WAI/Jam which indicates test end
-            var status = cpuBuffer.Prev.Status;
+            var status = cpu.State.Status;
             if (status == CpuStatus.Stopped || status == CpuStatus.Jammed || status == CpuStatus.Waiting)
             {
                 break;
             }
 
             // Check for reaching the test endpoint (handles NMOS 6502 which doesn't have STP)
-            ushort pc = cpuBuffer.Prev.PC;
+            ushort pc = cpu.State.PC;
             if (hasStpEndpoint && pc == TestEndAddress)
             {
                 break;
@@ -611,8 +612,8 @@ internal class Program
         }
 
         var bus = new RamBus();
-        var cpuBuffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, cpuBuffer);
+        var state = new CpuState();
+        var cpu = CpuFactory.Create(variant, state);
 
         // Load test program
         Console.Write($"  Loading {hexFile}... ");
@@ -626,7 +627,7 @@ internal class Program
         Console.WriteLine("  Running test...");
         var sw = Stopwatch.StartNew();
 
-        ushort previousPC = cpuBuffer.Current.PC;
+        ushort previousPC = cpu.State.PC;
         int sameAddressCount = 0;
         const int LoopThreshold = 3;
         long totalCycles = 0;
@@ -639,7 +640,7 @@ internal class Program
             totalCycles++;
             instructionCount++;
 
-            ushort currentPC = cpuBuffer.Prev.PC;
+            ushort currentPC = cpu.State.PC;
 
             // Check for infinite loop
             if (currentPC == previousPC)
@@ -664,7 +665,7 @@ internal class Program
         }
 
         sw.Stop();
-        ushort finalPC = cpuBuffer.Prev.PC;
+        ushort finalPC = cpu.State.PC;
 
         Console.WriteLine();
         Console.WriteLine($"  Execution stopped at PC = ${finalPC:X4}");
@@ -696,36 +697,41 @@ internal class Program
     /// The test writes to this register to trigger IRQ (bit 0) and NMI (bit 1).
     /// </para>
     /// <para>
-    /// For NMOS 6502, the test completes at $06F5 before WAI tests (which require 65C02).
+    /// For NMOS 6502, the test completes at $06F5.
     /// </para>
     /// <para>
-    /// For 65C02 variants, the test includes WAI instruction testing ($071F-$0750).
-    /// The Dormann WAI tests are documented as "manual tests" requiring single-stepping
-    /// and manual IRQ control. This test runner automates those manual steps by:
+    /// For 65C02 variants, the automated tests complete at $0719. The WAI tests at
+    /// $071F-$0750 are documented as "manual tests" requiring single-stepping and
+    /// manual IRQ control. This test runner automates those manual steps by:
     /// <list type="number">
     /// <item><description>Detecting when automated tests complete at $0719</description></item>
-    /// <item><description>Manually jumping PC to $071F to start WAI tests (otherwise unreachable)</description></item>
-    /// <item><description>Signaling IRQ when CPU enters Waiting status to wake it up</description></item>
+    /// <item><description>Manually jumping PC to $071F to start WAI tests</description></item>
+    /// <item><description>Signaling interrupt when CPU enters Waiting state to wake it</description></item>
+    /// <item><description>Clearing the pending interrupt before it's serviced (per manual procedure)</description></item>
     /// </list>
+    /// The manual procedure states: "tie IRQ low, step until PC advances, then remove IRQ".
+    /// This means the interrupt wakes WAI but is removed before the handler runs.
     /// </para>
     /// </remarks>
     static TestResult RunInterruptTest(string testDataPath, CpuVariant variant, TestConfig config)
     {
         // Select appropriate test config based on variant (NMOS vs CMOS have different endpoints)
-        // NMOS 6502 doesn't have WAI instruction, so test ends earlier
         bool isCmos = variant == CpuVariant.Wdc65C02 || variant == CpuVariant.Rockwell65C02;
+        bool hasWaiInstruction = variant == CpuVariant.Wdc65C02;  // Only WDC has WAI
         var testConfig = isCmos ? config.CmosInterruptTest : config.NmosInterruptTest;
 
-        string testName = isCmos ? "6502 Interrupt Test (with WAI)" : "6502 Interrupt Test";
+        string testName = hasWaiInstruction ? "6502 Interrupt Test (with WAI)" : "6502 Interrupt Test";
         string hexFile = testConfig.HexFile;
         ushort startAddress = testConfig.StartAddressValue;
-        // For NMOS, use config success address. For CMOS, we'll check WAI success internally.
-        ushort successAddress = testConfig.SuccessAddressValue ?? (isCmos ? (ushort)0x0719 : (ushort)0x06F5);
+        // For WDC 65C02, we run WAI tests to $0750. For others, use config or defaults.
+        // Rockwell 65C02 treats WAI opcode as NOP, so it ends at $0719 (automated test endpoint)
+        ushort successAddress = testConfig.SuccessAddressValue ?? 
+            (hasWaiInstruction ? (ushort)0x0750 : (isCmos ? (ushort)0x0719 : (ushort)0x06F5));
 
         Console.WriteLine($"\n=== {testName} ===");
         Console.WriteLine($"  Variant: {variant}");
         Console.WriteLine($"  Start:   ${startAddress:X4}");
-        if (isCmos)
+        if (hasWaiInstruction)
         {
             Console.WriteLine($"  Success: PC = $0719 (automated) then $0750 (WAI tests)");
         }
@@ -734,9 +740,9 @@ internal class Program
             Console.WriteLine($"  Success: PC = ${successAddress:X4}");
         }
         Console.WriteLine($"  Feedback register: $BFFC (IRQ=bit0, NMI=bit1)");
-        if (!isCmos)
+        if (isCmos && !hasWaiInstruction)
         {
-            Console.WriteLine($"  Note: WAI tests skipped (NMOS 6502 doesn't have WAI instruction)");
+            Console.WriteLine($"  Note: WAI tests skipped ({variant} doesn't have WAI instruction)");
         }
         Console.WriteLine();
 
@@ -748,26 +754,26 @@ internal class Program
             return TestResult.Error;
         }
 
-        var bus = new InterruptTestBus();
-        var cpuBuffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(variant, cpuBuffer);
+                var bus = new InterruptTestBus();
+                var state = new CpuState();
+                var cpu = CpuFactory.Create(variant, state);
 
-        // Load test program
-        Console.Write($"  Loading {hexFile}... ");
-        LoadIntelHex(hexPath, bus.Memory);
-        Console.WriteLine("OK");
+                // Load test program
+                Console.Write($"  Loading {hexFile}... ");
+                LoadIntelHex(hexPath, bus.Memory);
+                Console.WriteLine("OK");
 
-        // Initialize the feedback register to no interrupts
-        bus.InitializeFeedback();
+                // Initialize the feedback register to no interrupts
+                bus.InitializeFeedback();
 
-        bus.SetResetVector(startAddress);
-        cpu.Reset(bus);
+                bus.SetResetVector(startAddress);
+                cpu.Reset(bus);
 
         // Run until we detect an infinite loop (PC stops changing)
         Console.WriteLine("  Running test...");
         var sw = Stopwatch.StartNew();
 
-        ushort previousPC = cpuBuffer.Current.PC;
+        ushort previousPC = cpu.State.PC;
         int sameAddressCount = 0;
         const int LoopThreshold = 3;
         long totalCycles = 0;
@@ -778,12 +784,12 @@ internal class Program
         byte prevFeedback = bus.FeedbackRegister;
 
         // WAI test addresses (for 65C02 only)
-        // The automated tests end at $0719 (jmp *), but WAI tests at $071F are unreachable
-        // from normal execution. We manually jump to $071F after automated tests pass.
         const ushort AutomatedTestSuccessAddress = 0x0719;
         const ushort WaiTestStartAddress = 0x071F;
-        const ushort WaiTestSuccessAddress = 0x0750;
+        const ushort FirstWaiSuccessAddress = 0x0733;  // Success point after first WAI test
+        const ushort SecondWaiStartAddress = 0x0736;   // Start of second WAI test
         bool waiTestsStarted = false;
+        bool firstWaiPassed = false;
 
         while (totalCycles < MaxCycles)
         {
@@ -809,42 +815,98 @@ internal class Program
 
             prevFeedback = currentFeedback;
 
-            // Handle any pending interrupts at instruction boundary
+            // Handle any pending interrupts at instruction boundary (for normal test execution)
+            // We always call this except when we're about to handle WAI specially below
             cpu.HandlePendingInterrupt(bus);
 
-            // Check if CPU is waiting (WAI instruction executed)
-            // This simulates the manual step of tying IRQ low when WAI is hit
-            if (cpuBuffer.Current.Status == CpuStatus.Waiting)
+            // If CPU is in Waiting state (from WAI instruction), wake it with appropriate interrupt
+            // The WAI tests have two different scenarios:
+            //   - First WAI (I=1): Wake with NMI, but DON'T run handler (per manual procedure "remove IRQ")
+            //   - Second WAI (I=0): Wake with IRQ, and DO run the handler (it clears I_src)
+            if (cpu.State.Status == CpuStatus.Waiting && waiTestsStarted)
             {
-                // Signal IRQ to wake up the CPU from WAI
-                cpu.SignalIrq();
-                cpu.HandlePendingInterrupt(bus);
+                ushort waitingPC = cpu.State.PC;
+
+                // First WAI test: I flag is SET, so only NMI can wake
+                // Second WAI test: I flag is CLEAR, so IRQ can wake
+                bool isFlagSet = (cpu.State.P & CpuState.FlagI) != 0;
+
+                Console.WriteLine($"    WAI at PC=${waitingPC:X4}, I={isFlagSet}, Y=${cpu.State.Y:X2}");
+
+                if (isFlagSet)
+                {
+                    // First WAI test (I=1): Use NMI but DON'T run handler
+                    // Per manual procedure: "tie IRQ low, step until PC advances, then remove IRQ"
+                    cpu.SignalNmi();
+
+                    // WAI wakes when an interrupt is pending - set status to Running
+                    cpu.State.Status = CpuStatus.Running;
+
+                    // Clear the pending interrupt so the handler doesn't run
+                    cpu.State.PendingInterrupt = PendingInterrupt.None;
+                    bus.ClearInterruptBits(irq: true, nmi: true);
+                    prevFeedback = bus.FeedbackRegister;
+
+                    Console.WriteLine($"    WAI woke (NMI cleared), PC=${cpu.State.PC:X4}");
+                }
+                else
+                {
+                    // Second WAI test (I=0): Use IRQ and let the handler run
+                    // The handler is expected to check and clear I_src bit 1 before returning
+                    // I_src bit meanings: bit 0 = BRK, bit 1 = IRQ, bit 2 = NMI
+                    // The test already set I_src = $02 (bit 1) at $073D
+                    bus.SetInterruptBits(irq: true, nmi: false);
+                    cpu.SignalIrq();
+
+                    // Wake WAI and let HandlePendingInterrupt service the IRQ
+                    cpu.State.Status = CpuStatus.Running;
+                    prevFeedback = bus.FeedbackRegister;
+
+                    // Service the interrupt now
+                    cpu.HandlePendingInterrupt(bus);
+
+                    Console.WriteLine($"    WAI woke (IRQ serviced), PC=${cpu.State.PC:X4}");
+                }
             }
 
             cpu.Step(bus);
             totalCycles++;
             instructionCount++;
 
-            ushort currentPC = cpuBuffer.Current.PC;
+            ushort currentPC = cpu.State.PC;
 
-            // For 65C02: Check if we've reached the automated test success point
+            // For WDC 65C02 only: Check if we've reached the automated test success point
             // If so, manually jump to WAI tests (which are otherwise unreachable)
-            if (isCmos && !waiTestsStarted && currentPC == AutomatedTestSuccessAddress)
+            // Note: Rockwell 65C02 doesn't have WAI instruction (treats $CB as NOP), so skip WAI tests
+            bool hasWai = variant == CpuVariant.Wdc65C02;
+            if (hasWai && !waiTestsStarted && currentPC == AutomatedTestSuccessAddress)
             {
-                Console.WriteLine($"    Automated tests passed at ${AutomatedTestSuccessAddress:X4}, jumping to WAI tests at ${WaiTestStartAddress:X4}...");
-                cpuBuffer.Current.PC = WaiTestStartAddress;
+                Console.WriteLine($"    Automated tests passed at ${AutomatedTestSuccessAddress:X4}, starting WAI tests at ${WaiTestStartAddress:X4}...");
+                cpu.State.PC = WaiTestStartAddress;
                 waiTestsStarted = true;
                 sameAddressCount = 0;
                 previousPC = WaiTestStartAddress;
                 continue;
             }
 
+            // Check if first WAI test passed (reached $0733) - if so, jump to second WAI test
+            if (waiTestsStarted && !firstWaiPassed && currentPC == FirstWaiSuccessAddress)
+            {
+                Console.WriteLine($"    First WAI test passed at ${FirstWaiSuccessAddress:X4}, starting second WAI test at ${SecondWaiStartAddress:X4}...");
+                cpu.State.PC = SecondWaiStartAddress;
+                firstWaiPassed = true;
+                sameAddressCount = 0;
+                previousPC = SecondWaiStartAddress;
+                continue;
+            }
+
             // Check for infinite loop (but not when CPU is waiting - that's expected for WAI)
-            if (cpuBuffer.Current.Status != CpuStatus.Waiting)
+            if (cpu.State.Status != CpuStatus.Waiting)
             {
                 if (currentPC == previousPC)
                 {
                     sameAddressCount++;
+
                     if (sameAddressCount >= LoopThreshold)
                     {
                         // Detected infinite loop
@@ -871,7 +933,7 @@ internal class Program
         }
 
         sw.Stop();
-        ushort finalPC = cpuBuffer.Current.PC;
+        ushort finalPC = cpu.State.PC;
 
         Console.WriteLine();
         Console.WriteLine($"  Execution stopped at PC = ${finalPC:X4}");
@@ -879,15 +941,15 @@ internal class Program
         Console.WriteLine($"  Time: {sw.Elapsed.TotalSeconds:F2} seconds");
         Console.WriteLine($"  Speed: {instructionCount / sw.Elapsed.TotalSeconds:N0} instructions/sec");
 
-        // For 65C02, check if we reached the WAI test success address
-        // For NMOS, check the config success address
-        ushort expectedSuccess = isCmos && waiTestsStarted ? WaiTestSuccessAddress : successAddress;
+        // When WAI tests ran, we use the WAI test success address ($0750), not the config value
+        const ushort WaiTestSuccessFinal = 0x0750;
+        ushort expectedSuccess = waiTestsStarted ? WaiTestSuccessFinal : successAddress;
 
         if (finalPC == expectedSuccess)
         {
             if (waiTestsStarted)
             {
-                Console.WriteLine($"  Result: PASSED (automated tests + WAI tests completed at ${expectedSuccess:X4})");
+                Console.WriteLine($"  Result: PASSED (automated + WAI tests completed at ${expectedSuccess:X4})");
             }
             else
             {
@@ -897,7 +959,7 @@ internal class Program
         }
         else
         {
-            // Derive the .lst filename from the hex file (e.g., "65C02_interrupt_test.hex" -> "65C02_interrupt_test.lst")
+            // Derive the .lst filename from the hex file
             string lstFile = Path.ChangeExtension(hexFile, ".lst");
             Console.WriteLine($"  Result: FAILED (expected ${expectedSuccess:X4}, got ${finalPC:X4})");
             Console.WriteLine($"  Tip: Look up ${finalPC:X4} in {lstFile} to find the failing test");

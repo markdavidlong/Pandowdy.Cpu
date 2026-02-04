@@ -1,6 +1,6 @@
 # Pandowdy 6502/65C02 CPU Emulator Usage Guide
 
-This guide demonstrates how to use the `IPandowdyCpu`, `CpuFactory`, `CpuState`, and `CpuStateBuffer` classes to emulate 6502-family processors.
+This guide demonstrates how to use the `IPandowdyCpu`, `CpuFactory`, `CpuState`, and `DebugCpu` classes to emulate 6502-family processors.
 
 ## Table of Contents
 
@@ -11,7 +11,7 @@ This guide demonstrates how to use the `IPandowdyCpu`, `CpuFactory`, `CpuState`,
 - [Setting Up the Bus](#setting-up-the-bus)
 - [CPU Execution](#cpu-execution)
 - [Working with CPU State](#working-with-cpu-state)
-- [Using CpuStateBuffer for Debugging](#using-cpustatebuffer-for-debugging)
+- [Using DebugCpu for Debugging](#using-debugcpu-for-debugging)
 - [Interrupt Handling](#interrupt-handling)
 - [Halt Instructions and IgnoreHaltStopWait](#halt-instructions-and-ignorehaltstopwait)
 - [Complete Example](#complete-example)
@@ -27,44 +27,54 @@ The CPU emulator uses a micro-op pipeline architecture for cycle-accurate emulat
 | `IPandowdyCpu` | Interface for CPU instances with `Clock`, `Step`, `Run`, and `Reset` methods |
 | `CpuFactory` | Factory for creating CPU instances by variant |
 | `CpuState` | Complete CPU state including registers, flags, and execution status |
-| `CpuStateBuffer` | Double-buffered state for clean instruction boundaries and debugging |
+| `DebugCpu` | Debugging wrapper that tracks state changes between instructions |
 | `IPandowdyCpuBus` | Interface for memory read/write operations |
 | `CpuVariant` | Enum specifying which CPU variant to emulate |
 
 ### Architecture Diagram
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                    CpuStateBuffer                      │
-│  ┌─────────────────┐    ┌─────────────────┐            │
-│  │      Prev       │    │     Current     │            │
-│  │    (before)     │    │    (after)      │            │
-│  │                 │    │                 │            │
-│  │ A, X, Y, SP, PC │    │ A, X, Y, SP, PC │            │
-│  │ P (flags)       │    │ P (flags)       │            │
-│  │ Status          │    │ Status          │            │
-│  └─────────────────┘    └─────────────────┘            │
-└────────────────────────────────────────────────────────┘
-         │                        │
-         │                        ▼
-         │              ┌─────────────────┐
-         │              │   cpu.Clock()   │
-         │              │   cpu.Step()    │
-         │              │   cpu.Run()     │
-         │              └────────┬────────┘
-         │                       │
-         │                       ▼
-         │              ┌─────────────────┐
-         └─────────────>│ IPandowdyCpuBus │
-                        │  (Memory I/O)   │
-                        └─────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                      CpuFactory                         │
+│  - Receives CpuState and injects it into the CPU        │
+│  - Create(variant) / Create(variant, state)             │
+│  - CreateDebug(variant) for debugging scenarios         │
+└───────────────────────────┬─────────────────────────────┘
+                            │ injects
+                            ▼
+┌─────────────────────────────────────────────────────────┐
+│                    IPandowdyCpu                         │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │            CpuState (injected)                  │    │
+│  │                                                 │    │
+│  │   A, X, Y, SP, PC, P (flags), Status            │    │
+│  │   CurrentOpcode, OpcodeAddress, Pipeline        │    │
+│  │                                                 │    │
+│  └─────────────────────────────────────────────────┘    │
+│                                                         │
+│  cpu.Clock(), cpu.Step(), cpu.Run(), cpu.Reset()        │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+                            ▼
+                  ┌─────────────────┐
+                  │ IPandowdyCpuBus │
+                  │  (Memory I/O)   │
+                  └─────────────────┘
+
+
+┌─────────────────────────────────────────────────────────┐
+│                    DebugCpu (optional)                  │
+│                                                         │
+│  Wraps IPandowdyCpu to provide debugging features:      │
+│  - PrevState: Owned snapshot before each instruction    │
+│  - State: Delegates to wrapped CPU's injected state     │
+│  - BranchOccurred, JumpOccurred, ReturnOccurred         │
+│  - ChangedRegisters, StackDelta, etc.                   │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
 ```
 
-After `cpu.Step()` returns:
-- **`Prev`** = CPU state *before* the instruction executed
-- **`Current`** = CPU state *after* the instruction executed
-
-This allows comparing Prev vs Current to see what changed during the instruction.
+The `CpuState` must be provided to `CpuFactory.Create()` and is injected into the CPU. Access the state via `cpu.State`. For debugging scenarios where you need to compare state before and after an instruction, use `DebugCpu` which maintains its own `PrevState` snapshot while delegating `State` to the wrapped CPU.
 
 ---
 
@@ -81,9 +91,9 @@ byte[] program = { 0xA9, 0x42, 0x8D, 0x00, 0x02 }; // LDA #$42, STA $0200
 bus.LoadProgram(0x0400, program);
 bus.SetResetVector(0x0400);
 
-// 3. Create the CPU state buffer and CPU instance
-var cpuBuffer = new CpuStateBuffer();
-var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, cpuBuffer);
+// 3. Create the CPU state and instance
+var state = new CpuState();
+var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, state);
 
 // 4. Reset the CPU (loads PC from reset vector)
 cpu.Reset(bus);
@@ -91,7 +101,7 @@ cpu.Reset(bus);
 // 5. Execute instructions
 int cycles = cpu.Step(bus);
 Console.WriteLine($"Instruction took {cycles} cycles");
-Console.WriteLine($"A = ${cpuBuffer.Current.A:X2}");
+Console.WriteLine($"A = ${cpu.State.A:X2}");
 ```
 
 ---
@@ -254,7 +264,7 @@ public class SystemBus : IPandowdyCpuBus
 Executes one CPU clock cycle. Returns `true` when an instruction completes.
 
 ```csharp
-var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, cpuBuffer);
+var cpu = CpuFactory.Create(CpuVariant.Wdc65C02);
 
 bool instructionComplete = cpu.Clock(bus);
 
@@ -297,13 +307,13 @@ cpu.Reset(bus);
 
 ```csharp
 // Get the opcode of the current instruction (set during fetch)
-byte opcode = cpuBuffer.Current.CurrentOpcode;
+byte opcode = cpu.State.CurrentOpcode;
 
 // Get the address where the opcode was fetched from
-ushort opcodeAddress = cpuBuffer.Current.OpcodeAddress;
+ushort opcodeAddress = cpu.State.OpcodeAddress;
 
 // Get remaining cycles in current instruction pipeline
-int remaining = cpuBuffer.Current.CyclesRemaining;
+int remaining = cpu.State.CyclesRemaining;
 ```
 
 ---
@@ -313,7 +323,7 @@ int remaining = cpuBuffer.Current.CyclesRemaining;
 ### Accessing Registers
 
 ```csharp
-CpuState state = cpuBuffer.Current;
+CpuState state = cpu.State;
 
 // Read registers
 byte accumulator = state.A;
@@ -388,147 +398,157 @@ switch (status)
 
     ---
 
-    ## Using CpuStateBuffer for Debugging
+    ## Using DebugCpu for Debugging
 
-The double-buffer architecture enables powerful debugging capabilities.
+    The `DebugCpu` wrapper provides powerful debugging capabilities by automatically tracking state changes between instructions.
 
-### Comparing State Changes
+    ### Creating a Debug CPU
 
-```csharp
-// Execute one instruction
-cpu.Step(bus);
+        ```csharp
+        // Create a debug CPU with state
+        var state = new CpuState();
+        var debugCpu = CpuFactory.CreateDebug(CpuVariant.Wdc65C02, state);
 
-// Compare before and after
-CpuState before = cpuBuffer.Prev;
-CpuState after = cpuBuffer.Current;
+        // Or wrap an existing CPU
+        var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, state);
+        var debugCpu = CpuFactory.CreateDebug(cpu);
+        ```
 
-if (before.A != after.A)
-{
-    Console.WriteLine($"A changed: ${before.A:X2} -> ${after.A:X2}");
-}
+        ### Comparing State Changes
 
-// Use the built-in helper
-foreach (string reg in cpuBuffer.ChangedRegisters)
-{
-    Console.WriteLine($"Register {reg} was modified");
-}
-```
+        ```csharp
+        // Execute one instruction
+        debugCpu.Step(bus);
 
-### Detecting Instruction Types
+        // Compare before and after
+        CpuState before = debugCpu.PrevState!;
+        CpuState after = debugCpu.State;
 
-```csharp
-cpu.Step(bus);
-
-if (cpuBuffer.JumpOccurred)
-{
-    Console.WriteLine($"Jump to ${cpuBuffer.Current.PC:X4}");
-}
-
-if (cpuBuffer.BranchOccurred)
-{
-    Console.WriteLine("Branch was taken");
-}
-
-if (cpuBuffer.ReturnOccurred)
-{
-    Console.WriteLine("Returned from subroutine");
-}
-
-if (cpuBuffer.InterruptOccurred)
-{
-    Console.WriteLine("Interrupt was serviced");
-}
-
-if (cpuBuffer.PageCrossed)
-{
-    Console.WriteLine("Page boundary crossed (possible extra cycle)");
-}
-```
-
-### Stack Monitoring
-
-```csharp
-if (cpuBuffer.StackActivityOccurred)
-{
-    int delta = cpuBuffer.StackDelta;
-    if (delta < 0)
-    {
-        Console.WriteLine($"Pushed {-delta} byte(s) to stack");
-    }
-    else
-    {
-        Console.WriteLine($"Pulled {delta} byte(s) from stack");
-    }
-}
-```
-
-### Building a Simple Debugger
-
-```csharp
-public class SimpleDebugger
-{
-    private readonly IPandowdyCpu _cpu;
-    private readonly CpuStateBuffer _buffer;
-    private readonly IPandowdyCpuBus _bus;
-    private readonly HashSet<ushort> _breakpoints = new();
-
-    public SimpleDebugger(CpuVariant variant, CpuStateBuffer buffer, IPandowdyCpuBus bus)
-    {
-        _buffer = buffer;
-        _bus = bus;
-        _cpu = CpuFactory.Create(variant, buffer);
-    }
-
-    public void AddBreakpoint(ushort address) => _breakpoints.Add(address);
-    public void RemoveBreakpoint(ushort address) => _breakpoints.Remove(address);
-
-    public void Step()
-    {
-        int cycles = _cpu.Step(_bus);
-        PrintState(cycles);
-    }
-
-    public void RunUntilBreakpoint()
-    {
-        do
+        if (before.A != after.A)
         {
-            _cpu.Step(_bus);
-        } while (!_breakpoints.Contains(_buffer.Current.PC) &&
-                 _buffer.Current.Status == CpuStatus.Running);
-    }
+            Console.WriteLine($"A changed: ${before.A:X2} -> ${after.A:X2}");
+        }
 
-    private void PrintState(int cycles)
+    // Use the built-in helper
+    foreach (string reg in debugCpu.ChangedRegisters)
     {
-        var s = _buffer.Current;
-        Console.WriteLine($"PC:${s.PC:X4} A:${s.A:X2} X:${s.X:X2} Y:${s.Y:X2} " +
-                         $"SP:${s.SP:X2} P:{FlagsToString(s.P)} Cycles:{cycles}");
+        Console.WriteLine($"Register {reg} was modified");
     }
+    ```
 
-    private static string FlagsToString(byte p)
+    ### Detecting Instruction Types
+
+    ```csharp
+    debugCpu.Step(bus);
+
+    if (debugCpu.JumpOccurred)
     {
-        return string.Concat(
-            (p & 0x80) != 0 ? 'N' : '-',
-            (p & 0x40) != 0 ? 'V' : '-',
-            '-',  // Unused
-            (p & 0x10) != 0 ? 'B' : '-',
-            (p & 0x08) != 0 ? 'D' : '-',
-            (p & 0x04) != 0 ? 'I' : '-',
-            (p & 0x02) != 0 ? 'Z' : '-',
-            (p & 0x01) != 0 ? 'C' : '-'
-        );
+        Console.WriteLine($"Jump to ${debugCpu.State.PC:X4}");
     }
-}
-```
 
----
+    if (debugCpu.BranchOccurred)
+    {
+        Console.WriteLine("Branch was taken");
+    }
 
-## Interrupt Handling
+    if (debugCpu.ReturnOccurred)
+    {
+        Console.WriteLine("Returned from subroutine");
+    }
 
-### Signaling Interrupts
+    if (debugCpu.InterruptOccurred)
+    {
+        Console.WriteLine("Interrupt was serviced");
+    }
 
-```csharp
-// Create CPU instance
-var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, cpuBuffer);
+    if (debugCpu.PageCrossed)
+    {
+        Console.WriteLine("Page boundary crossed (possible extra cycle)");
+    }
+    ```
+
+    ### Stack Monitoring
+
+    ```csharp
+    if (debugCpu.StackActivityOccurred)
+    {
+        int delta = debugCpu.StackDelta;
+        if (delta < 0)
+        {
+            Console.WriteLine($"Pushed {-delta} byte(s) to stack");
+        }
+        else
+        {
+            Console.WriteLine($"Pulled {delta} byte(s) from stack");
+        }
+    }
+    ```
+
+    ### Building a Simple Debugger
+
+    ```csharp
+    public class SimpleDebugger
+    {
+        private readonly DebugCpu _debugCpu;
+        private readonly IPandowdyCpuBus _bus;
+        private readonly HashSet<ushort> _breakpoints = new();
+
+        public SimpleDebugger(CpuVariant variant, IPandowdyCpuBus bus)
+        {
+            _bus = bus;
+            _debugCpu = CpuFactory.CreateDebug(variant);
+        }
+
+        public void AddBreakpoint(ushort address) => _breakpoints.Add(address);
+        public void RemoveBreakpoint(ushort address) => _breakpoints.Remove(address);
+
+        public void Step()
+        {
+            int cycles = _debugCpu.Step(_bus);
+            PrintState(cycles);
+        }
+
+        public void RunUntilBreakpoint()
+        {
+            do
+            {
+                _debugCpu.Step(_bus);
+            } while (!_breakpoints.Contains(_debugCpu.State.PC) &&
+                     _debugCpu.State.Status == CpuStatus.Running);
+        }
+
+        private void PrintState(int cycles)
+        {
+            var s = _debugCpu.State;
+            Console.WriteLine($"PC:${s.PC:X4} A:${s.A:X2} X:${s.X:X2} Y:${s.Y:X2} " +
+                             $"SP:${s.SP:X2} P:{FlagsToString(s.P)} Cycles:{cycles}");
+        }
+
+        private static string FlagsToString(byte p)
+        {
+            return string.Concat(
+                (p & 0x80) != 0 ? 'N' : '-',
+                (p & 0x40) != 0 ? 'V' : '-',
+                '-',  // Unused
+                (p & 0x10) != 0 ? 'B' : '-',
+                (p & 0x08) != 0 ? 'D' : '-',
+                (p & 0x04) != 0 ? 'I' : '-',
+                (p & 0x02) != 0 ? 'Z' : '-',
+                (p & 0x01) != 0 ? 'C' : '-'
+            );
+        }
+    }
+    ```
+
+    ---
+
+    ## Interrupt Handling
+
+    ### Signaling Interrupts
+
+    ```csharp
+    // Create CPU instance
+    var cpu = CpuFactory.Create(CpuVariant.Wdc65C02);
 
 // Signal an IRQ (handled if I flag is clear)
 cpu.SignalIrq();
@@ -575,16 +595,14 @@ This is automatic based on CPU variant - no configuration needed.
 public class TimerSystem
 {
     private readonly IPandowdyCpu _cpu;
-    private readonly CpuStateBuffer _buffer;
     private readonly IPandowdyCpuBus _bus;
     private int _timerCounter;
     private const int TimerPeriod = 1000; // cycles
 
-    public TimerSystem(CpuVariant variant, CpuStateBuffer buffer, IPandowdyCpuBus bus)
+    public TimerSystem(CpuVariant variant, IPandowdyCpuBus bus)
     {
-        _buffer = buffer;
         _bus = bus;
-        _cpu = CpuFactory.Create(variant, buffer);
+        _cpu = CpuFactory.Create(variant);
     }
 
     public void RunFrame(int cyclesPerFrame)
@@ -615,7 +633,7 @@ The WAI (Wait for Interrupt) instruction suspends the CPU until an interrupt occ
 
 ```csharp
 // After executing WAI
-if (cpuBuffer.Current.Status == CpuStatus.Waiting)
+if (cpu.State.Status == CpuStatus.Waiting)
 {
     // CPU is suspended, won't execute instructions
     // Signal an interrupt to wake it
@@ -651,15 +669,14 @@ For debugging or special scenarios, you can make halt instructions continue exec
 
 ```csharp
 // Enable bypass mode
-cpuBuffer.Current.IgnoreHaltStopWait = true;
-cpuBuffer.Prev.IgnoreHaltStopWait = true;
+cpu.State.IgnoreHaltStopWait = true;
 
 // Now JAM, STP, and WAI will set status to Bypassed
 // PC advances normally, CPU continues executing
 cpu.Step(bus);
 
 // Check if a halt was bypassed
-if (cpuBuffer.Current.Status == CpuStatus.Bypassed)
+if (cpu.State.Status == CpuStatus.Bypassed)
 {
     Console.WriteLine("A halt instruction was bypassed!");
 }
@@ -668,11 +685,10 @@ if (cpuBuffer.Current.Status == CpuStatus.Bypassed)
 cpu.Reset(bus);
 
 // Or manually reset to Running
-cpuBuffer.Current.Status = CpuStatus.Running;
+cpu.State.Status = CpuStatus.Running;
 
 // Disable bypass mode
-cpuBuffer.Current.IgnoreHaltStopWait = false;
-cpuBuffer.Prev.IgnoreHaltStopWait = false;
+cpu.State.IgnoreHaltStopWait = false;
 ```
 
 ### The Bypassed Status
@@ -726,12 +742,12 @@ public class EmulatorExample
         bus.LoadProgram(0x0400, program);
         bus.SetResetVector(0x0400);
 
-        // Create CPU state buffer and CPU instance
-        var cpuBuffer = new CpuStateBuffer();
-        var cpu = CpuFactory.Create(CpuVariant.Wdc65C02, cpuBuffer);
+        // Create debug CPU for state tracking
+        var state = new CpuState();
+        var debugCpu = CpuFactory.CreateDebug(CpuVariant.Wdc65C02, state);
 
         // Reset CPU
-        cpu.Reset(bus);
+        debugCpu.Reset(bus);
 
         Console.WriteLine("Starting emulation...\n");
 
@@ -739,29 +755,29 @@ public class EmulatorExample
         int totalCycles = 0;
         int instructionCount = 0;
 
-        while (cpuBuffer.Current.Status == CpuStatus.Running)
+        while (debugCpu.State.Status == CpuStatus.Running)
         {
             // Get current PC before execution
-            ushort pc = cpuBuffer.Current.PC;
+            ushort pc = debugCpu.State.PC;
 
             // Execute one instruction
-            int cycles = cpu.Step(bus);
+            int cycles = debugCpu.Step(bus);
             totalCycles += cycles;
             instructionCount++;
 
             // Print state
-            var s = cpuBuffer.Current;
+            var s = debugCpu.State;
             Console.WriteLine($"${pc:X4}: A=${s.A:X2} X=${s.X:X2} Y=${s.Y:X2} " +
                             $"SP=${s.SP:X2} Cycles={cycles}");
 
             // Show changed registers
-            foreach (var reg in cpuBuffer.ChangedRegisters)
+            foreach (var reg in debugCpu.ChangedRegisters)
             {
                 Console.WriteLine($"  -> {reg} changed");
             }
         }
 
-        Console.WriteLine($"\nCPU Status: {cpuBuffer.Current.Status}");
+        Console.WriteLine($"\nCPU Status: {debugCpu.State.Status}");
         Console.WriteLine($"Total instructions: {instructionCount}");
         Console.WriteLine($"Total cycles: {totalCycles}");
         Console.WriteLine($"Value at $0200: ${bus.Memory[0x0200]:X2}");
@@ -840,13 +856,15 @@ Value at $0200: $0A
 | `ClearIrq` | `void ClearIrq()` | Clear pending IRQ |
 | `HandlePendingInterrupt` | `bool HandlePendingInterrupt(IPandowdyCpuBus)` | Handle pending interrupt, returns true if handled |
 | `Variant` | `CpuVariant` | The CPU variant this instance emulates |
-| `Buffer` | `CpuStateBuffer` | Get/set the state buffer (allows swapping) |
+| `State` | `CpuState` | Get/set the CPU state (injected via factory) |
 
 ### CpuFactory Class
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `Create` | `IPandowdyCpu Create(CpuVariant, CpuStateBuffer)` | Create a CPU instance for the specified variant |
+| `Create` | `IPandowdyCpu Create(CpuVariant, CpuState)` | Create a CPU instance with the provided state |
+| `CreateDebug` | `DebugCpu CreateDebug(CpuVariant, CpuState)` | Create a debug CPU wrapper with the provided state |
+| `CreateDebug` | `DebugCpu CreateDebug(IPandowdyCpu)` | Wrap an existing CPU in a debug wrapper |
 
 ### CPU Classes
 
@@ -878,16 +896,22 @@ Value at $0200: $0A
 | `CopyFrom` | `void CopyFrom(CpuState)` | Copy values from another state (no allocation) |
 | `Reset` | `void Reset()` | Reset to power-on defaults (no bus interaction) |
 
-### CpuStateBuffer Class
+### DebugCpu Class
+
+A debugging wrapper that tracks state changes between instructions.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `Prev` | `CpuState` | State before the instruction |
-| `Current` | `CpuState` | State after the instruction |
+| `UnderlyingCpu` | `IPandowdyCpu` | The wrapped CPU instance |
+| `State` | `CpuState` | Current CPU state (same as underlying CPU) |
+| `PrevState` | `CpuState?` | State snapshot before the last instruction |
 | `PcChanged` | `bool` | PC changed this instruction |
 | `JumpOccurred` | `bool` | Non-sequential PC change |
 | `BranchOccurred` | `bool` | Branch was taken |
 | `ReturnOccurred` | `bool` | RTS/RTI executed |
 | `InterruptOccurred` | `bool` | Interrupt serviced |
-| `StackDelta` | `int` | Stack pointer change |
-| `ChangedRegisters` | `IEnumerable<string>` | Modified registers |
+| `PageCrossed` | `bool` | Page boundary crossed during addressing |
+| `StackActivityOccurred` | `bool` | Stack pointer changed |
+| `StackDelta` | `int` | Stack pointer change (negative=push, positive=pull) |
+| `ChangedRegisters` | `IEnumerable<string>` | Names of modified registers |
+

@@ -59,10 +59,10 @@ public class Rockwell65C02Tests : CoreInstructionTests
     public void PHX_Works()
     {
         LoadAndReset([0xDA]);
-        CpuBuffer.Current.X = 0x42;
-        CpuBuffer.Prev.X = 0x42;
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.X = 0x42;
+        CurrentState.X = 0x42;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
 
         StepInstruction();
 
@@ -83,8 +83,8 @@ public class Rockwell65C02Tests : CoreInstructionTests
     public void INC_Accumulator_Works()
     {
         LoadAndReset([0x1A]);
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
 
         StepInstruction();
 
@@ -702,16 +702,16 @@ public class Rockwell65C02Tests : CoreInstructionTests
     public void NOP_DoesNotAffectRegistersOrFlags()
     {
         LoadAndReset([0x03]); // 1-cycle NOP
-        CpuBuffer.Current.A = 0x42;
-        CpuBuffer.Prev.A = 0x42;
-        CpuBuffer.Current.X = 0x33;
-        CpuBuffer.Prev.X = 0x33;
-        CpuBuffer.Current.Y = 0x22;
-        CpuBuffer.Prev.Y = 0x22;
-        CpuBuffer.Current.CarryFlag = true;
-        CpuBuffer.Prev.CarryFlag = true;
-        CpuBuffer.Current.ZeroFlag = true;
-        CpuBuffer.Prev.ZeroFlag = true;
+        CurrentState.A = 0x42;
+        CurrentState.A = 0x42;
+        CurrentState.X = 0x33;
+        CurrentState.X = 0x33;
+        CurrentState.Y = 0x22;
+        CurrentState.Y = 0x22;
+        CurrentState.CarryFlag = true;
+        CurrentState.CarryFlag = true;
+        CurrentState.ZeroFlag = true;
+        CurrentState.ZeroFlag = true;
 
         StepInstruction();
 
@@ -741,14 +741,14 @@ public class Rockwell65C02Tests : CoreInstructionTests
         // Provide 3 bytes of operand data to cover all addressing modes
         LoadAndReset([opcode, 0x00, 0x04]);
         // Set up registers to avoid edge cases
-        CpuBuffer.Current.A = 0x00;
-        CpuBuffer.Prev.A = 0x00;
-        CpuBuffer.Current.X = 0x00;
-        CpuBuffer.Prev.X = 0x00;
-        CpuBuffer.Current.Y = 0x00;
-        CpuBuffer.Prev.Y = 0x00;
-        CpuBuffer.Current.SP = 0xFF;
-        CpuBuffer.Prev.SP = 0xFF;
+        CurrentState.A = 0x00;
+        CurrentState.A = 0x00;
+        CurrentState.X = 0x00;
+        CurrentState.X = 0x00;
+        CurrentState.Y = 0x00;
+        CurrentState.Y = 0x00;
+        CurrentState.SP = 0xFF;
+        CurrentState.SP = 0xFF;
 
         int cycles = StepInstruction();
 
