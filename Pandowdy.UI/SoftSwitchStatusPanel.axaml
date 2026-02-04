@@ -1,3 +1,4 @@
+
 <!--
   Copyright 2026 Mark D. Long
   Licensed under the Apache License, Version 2.0
@@ -15,95 +16,222 @@
          x:DataType="viewmodels:SystemStatusViewModel">
     
 <UserControl.Resources>
-    <converters:MhzDisplayConverter x:Key="MhzDisplayConverter"/>
+    <converters:FlagBackgroundConverter x:Key="FlagBg"/>
+    <converters:FlagForegroundConverter x:Key="FlagFg"/>
 </UserControl.Resources>
+
+<UserControl.Styles>
+    <!-- Style for flag indicators with smooth color transitions -->
+    <Style Selector="Border.flag-indicator">
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.125"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <!-- Style for text inside flag indicators with smooth foreground transitions -->
+    <Style Selector="Border.flag-indicator TextBlock">
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Foreground" Duration="0:0:0.125"/>
+            </Transitions>
+        </Setter>
+    </Style>
+</UserControl.Styles>
     
 <Border Padding="8" Margin="8" Background="#222" CornerRadius="4">
-        <Grid RowDefinitions="Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto Auto"
-              ColumnDefinitions="Auto Auto">
-            <TextBlock Text="80STORE" Grid.Row="0" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding State80Store}" Grid.Row="0" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="RAMRD" Grid.Row="1" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateRamRd}" Grid.Row="1" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="RAMWRT" Grid.Row="2" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateRamWrt}" Grid.Row="2" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="INTCXROM" Grid.Row="3" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateIntCxRom}" Grid.Row="3" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="ALTZP" Grid.Row="4" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateAltZp}" Grid.Row="4" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="SLOT C3" Grid.Row="5" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateSlotC3Rom}" Grid.Row="5" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="PB0" Grid.Row="6" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StatePb0}" Grid.Row="6" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="PB1" Grid.Row="7" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StatePb1}" Grid.Row="7" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="PB2" Grid.Row="8" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StatePb2}" Grid.Row="8" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="ANN0" Grid.Row="9" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateAnn0}" Grid.Row="9" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="ANN1" Grid.Row="10" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateAnn1}" Grid.Row="10" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="ANN2" Grid.Row="11" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateAnn2}" Grid.Row="11" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="ANN3/DGR" Grid.Row="12" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateAnn3}" Grid.Row="12" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="PAGE2" Grid.Row="13" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StatePage2}" Grid.Row="13" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="HIRES" Grid.Row="14" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateHiRes}" Grid.Row="14" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="MIXED" Grid.Row="15" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateMixed}" Grid.Row="15" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="TEXT" Grid.Row="16" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateTextMode}" Grid.Row="16" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="ALTCHAR" Grid.Row="17" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateAltCharSet}" Grid.Row="17" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="Show 80 Col" Grid.Row="18" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateShow80Col}" Grid.Row="18" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="Bank 1" Grid.Row="19" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateBank1}" Grid.Row="19" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="High Read" Grid.Row="20" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateHighRead}" Grid.Row="20" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="High Write" Grid.Row="21" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateHighWrite}" Grid.Row="21" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="PreWrite" Grid.Row="22" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StatePrewrite}" Grid.Row="22" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="FLASH ON" Grid.Row="23" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateFlashOn}" Grid.Row="23" Grid.Column="1" Foreground="White" />
-            
-            <TextBlock Text="VBLANK" Grid.Row="24" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateVBlank}" Grid.Row="24" Grid.Column="1" Foreground="White" />            
+        <StackPanel Spacing="2">
+            <!-- 80STORE Flag -->
+            <Border Classes="flag-indicator" Background="{Binding State80Store, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="80-Column Store">
+                <TextBlock Text="80STORE" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding State80Store, Converter={StaticResource FlagFg}}" />
+            </Border>
 
-            <TextBlock Text="INTC8ROM" Grid.Row="25" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateIntC8Rom}" Grid.Row="25" Grid.Column="1" Foreground="White" />            
+            <!-- RAMRD Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateRamRd, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Read from Auxiliary RAM">
+                <TextBlock Text="RAMRD" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateRamRd, Converter={StaticResource FlagFg}}" />
+            </Border>
 
-            <TextBlock Text="INTC8ROMSLOT" Grid.Row="26" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateIntC8RomSlot}" Grid.Row="26" Grid.Column="1" Foreground="White" />
+            <!-- RAMWRT Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateRamWrt, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Write to Auxiliary RAM">
+                <TextBlock Text="RAMWRT" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateRamWrt, Converter={StaticResource FlagFg}}" />
+            </Border>
 
-            <TextBlock Text="Current Mhz" Grid.Row="27" Grid.Column="0" Foreground="LightGray" Margin="0,0,8,2" />
-            <TextBlock Text="{Binding StateCurrentMhz, Converter={StaticResource MhzDisplayConverter}}" Grid.Row="27" Grid.Column="1" Foreground="White" />
-        </Grid>
+            <!-- INTCXROM Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateIntCxRom, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Internal CX ROM">
+                <TextBlock Text="INTCXROM" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateIntCxRom, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- ALTZP Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateAltZp, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Alternate Zero Page">
+                <TextBlock Text="ALTZP" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateAltZp, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- SLOT C3 Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateSlotC3Rom, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Slot C3 ROM">
+                <TextBlock Text="SLOT C3" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateSlotC3Rom, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- PB0 Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StatePb0, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Paddle Button 0">
+                <TextBlock Text="PB0" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StatePb0, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- PB1 Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StatePb1, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Paddle Button 1">
+                <TextBlock Text="PB1" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StatePb1, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- PB2 Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StatePb2, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Paddle Button 2">
+                <TextBlock Text="PB2" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StatePb2, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- ANN0 Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateAnn0, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Annunciator 0">
+                <TextBlock Text="ANN0" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateAnn0, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- ANN1 Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateAnn1, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Annunciator 1">
+                <TextBlock Text="ANN1" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateAnn1, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- ANN2 Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateAnn2, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Annunciator 2">
+                <TextBlock Text="ANN2" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateAnn2, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- ANN3/DGR Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateAnn3, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Annunciator 3 / Double Graphics">
+                <TextBlock Text="ANN3/DGR" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateAnn3, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- PAGE2 Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StatePage2, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Page 2 Video Memory">
+                <TextBlock Text="PAGE2" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StatePage2, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- HIRES Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateHiRes, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="High Resolution Graphics">
+                <TextBlock Text="HIRES" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateHiRes, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- MIXED Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateMixed, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Mixed Graphics/Text Mode">
+                <TextBlock Text="MIXED" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateMixed, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- TEXT Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateTextMode, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Text Mode">
+                <TextBlock Text="TEXT" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateTextMode, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- ALTCHAR Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateAltCharSet, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Alternate Character Set">
+                <TextBlock Text="ALTCHAR" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateAltCharSet, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- Show 80 Col Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateShow80Col, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Show 80 Column Mode">
+                <TextBlock Text="80 COL" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateShow80Col, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- Bank 1 Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateBank1, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Language Card Bank 1">
+                <TextBlock Text="BANK 1" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateBank1, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- High Read Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateHighRead, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Language Card High Read">
+                <TextBlock Text="HIGH READ" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateHighRead, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- High Write Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StateHighWrite, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Language Card High Write">
+                <TextBlock Text="HIGH WRITE" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateHighWrite, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- PreWrite Flag -->
+            <Border Classes="flag-indicator" Background="{Binding StatePrewrite, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Language Card Pre-write State">
+                <TextBlock Text="PREWRITE" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StatePrewrite, Converter={StaticResource FlagFg}}" />
+            </Border>
+
+            <!-- FLASH ON Flag
+            <Border Background="{Binding StateFlashOn, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Flash State (for blinking text)">
+                <TextBlock Text="FLASH ON" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateFlashOn, Converter={StaticResource FlagFg}}" />
+            </Border>
+            -->
+
+            <!-- VBLANK Flag
+            <Border Classes="flag-indicator" Background="{Binding StateVBlank, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Vertical Blanking">
+                <TextBlock Text="VBLANK" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateVBlank, Converter={StaticResource FlagFg}}" />
+            </Border>
+            -->
+
+            <!-- INTC8ROM Flag
+            <Border Classes="flag-indicator" Background="{Binding StateIntC8Rom, Converter={StaticResource FlagBg}}" 
+                    CornerRadius="2" Padding="4,1" ToolTip.Tip="Internal C8 ROM">
+            <Grid ColumnDefinitions="Auto,Auto" >
+                <TextBlock Text="INTC8ROM: " FontFamily="Consolas" Grid.Column="0"  FontSize="11" FontWeight="Bold"
+                           Foreground="{Binding StateIntC8Rom, Converter={StaticResource FlagFg}}" />
+                <TextBlock Text="{Binding StateIntC8RomSlot}" Grid.Column="1" Foreground="{Binding StateIntC8Rom, Converter={StaticResource FlagFg}}"
+                           FontFamily="Consolas" FontSize="11" FontWeight="Bold" />
+            </Grid>
+            </Border>
+            -->
+
+   
+        </StackPanel>
     </Border>
 </UserControl>

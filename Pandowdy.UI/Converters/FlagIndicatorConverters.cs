@@ -19,7 +19,7 @@ public class FlagBackgroundConverter : IValueConverter
     /// </summary>
     public static readonly FlagBackgroundConverter Instance = new();
 
-    private static readonly IBrush OnBrush = new SolidColorBrush(Color.Parse("#00AA00"));
+    private static readonly IBrush OnBrush = new SolidColorBrush(Color.Parse("#229922"));
     private static readonly IBrush OffBrush = new SolidColorBrush(Color.Parse("#333333"));
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -48,7 +48,7 @@ public class FlagForegroundConverter : IValueConverter
     public static readonly FlagForegroundConverter Instance = new();
 
     private static readonly IBrush OnBrush = new SolidColorBrush(Color.Parse("#000000"));
-    private static readonly IBrush OffBrush = new SolidColorBrush(Color.Parse("#666666"));
+    private static readonly IBrush OffBrush = new SolidColorBrush(Color.Parse("#999999"));
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {

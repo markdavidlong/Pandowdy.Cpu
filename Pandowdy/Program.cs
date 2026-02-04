@@ -169,6 +169,7 @@ namespace Pandowdy
                     services.AddTransient<SystemStatusViewModel>();
                     services.AddTransient<DiskStatusPanelViewModel>();
                     services.AddTransient<CpuStatusPanelViewModel>();
+                    services.AddTransient<StatusBarViewModel>();
                     services.AddTransient<MainWindowViewModel>();
 
                     services.AddSingleton<VA2M>();

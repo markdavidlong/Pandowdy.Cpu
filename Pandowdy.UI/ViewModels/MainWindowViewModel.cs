@@ -67,6 +67,12 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <value>View model showing CPU registers (PC, A, X, Y, SP) and processor flags.</value>
     public CpuStatusPanelViewModel CpuStatus { get; }
 
+    /// <summary>
+    /// Gets the view model for the status bar (aggregates CPU status and system status).
+    /// </summary>
+    /// <value>View model managing status bar content including CPU state and MHz display.</value>
+    public StatusBarViewModel StatusBar { get; }
+
     #endregion
 
     #region Emulator Control Commands
@@ -493,7 +499,8 @@ public sealed class MainWindowViewModel : ReactiveObject
                                IEmulatorState emuState,
                                SystemStatusViewModel systemStatus,
                                DiskStatusPanelViewModel diskStatus,
-                               CpuStatusPanelViewModel cpuStatus)
+                               CpuStatusPanelViewModel cpuStatus,
+                               StatusBarViewModel statusBar)
     {
         EmulatorState = emulatorState;
         //ErrorLog = errorLog;
@@ -502,6 +509,7 @@ public sealed class MainWindowViewModel : ReactiveObject
         SystemStatus = systemStatus;
         DiskStatus = diskStatus;
         CpuStatus = cpuStatus;
+        StatusBar = statusBar;
 
         // Initialize emulator control commands
         PauseCommand = ReactiveCommand.Create(() => _emuState.RequestPause());

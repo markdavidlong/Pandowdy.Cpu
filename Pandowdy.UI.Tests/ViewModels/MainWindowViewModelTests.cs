@@ -101,6 +101,7 @@ public class MainWindowViewModelTests
         public SystemStatusViewModel SystemStatusViewModel { get; }
         public DiskStatusPanelViewModel DiskStatusViewModel { get; }
         public CpuStatusPanelViewModel CpuStatusViewModel { get; }
+        public StatusBarViewModel StatusBarViewModel { get; }
         public MainWindowViewModel ViewModel { get; }
 
         public MainWindowViewModelFixture()
@@ -115,7 +116,8 @@ public class MainWindowViewModelTests
             SystemStatusViewModel = new SystemStatusViewModel(statusProvider);
             DiskStatusViewModel = new DiskStatusPanelViewModel(diskStatusProvider);
             CpuStatusViewModel = new CpuStatusPanelViewModel(emulatorCoreInterface, refreshTicker);
-            ViewModel = new MainWindowViewModel(EmulatorStateViewModel, EmulatorState, SystemStatusViewModel, DiskStatusViewModel, CpuStatusViewModel);
+            StatusBarViewModel = new StatusBarViewModel(CpuStatusViewModel, SystemStatusViewModel);
+            ViewModel = new MainWindowViewModel(EmulatorStateViewModel, EmulatorState, SystemStatusViewModel, DiskStatusViewModel, CpuStatusViewModel, StatusBarViewModel);
         }
     }
 
