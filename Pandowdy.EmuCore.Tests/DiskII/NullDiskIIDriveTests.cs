@@ -1,3 +1,7 @@
+// Copyright 2026 Mark D. Long
+// Licensed under the Apache License, Version 2.0
+// See LICENSE file for details
+
 using Pandowdy.EmuCore.DiskII;
 
 namespace Pandowdy.EmuCore.Tests.DiskII;
