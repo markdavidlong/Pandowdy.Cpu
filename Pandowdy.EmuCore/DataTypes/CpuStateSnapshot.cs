@@ -38,7 +38,7 @@ public enum CpuExecutionStatus : byte
 /// </para>
 /// <para>
 /// <strong>Thread Safety:</strong> This is a readonly struct with value semantics. Each access
-/// to <see cref="IEmulatorCoreInterface.CpuState"/> returns an independent snapshot copy.
+/// to <see cref="Interfaces.IEmulatorCoreInterface.CpuState"/> returns an independent snapshot copy.
 /// </para>
 /// <para>
 /// <strong>Flag Accessors:</strong> Individual status flags (N, V, B, D, I, Z, C) are extracted

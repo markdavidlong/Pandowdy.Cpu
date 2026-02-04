@@ -499,6 +499,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// <param name="gameController">Game controller for pushbutton and paddle state (fires events to SystemStatusProvider).</param>
     /// <param name="diskStatusProvider">Disk status provider for monitoring disk drive states (singleton, shared with UI).</param>
     /// <param name="clockCounters">CPU clocking counters for VBlank timing and cycle tracking.</param>
+    /// <param name="memoryInspector">Memory inspector for read-only access to all memory regions (RAM, ROM, slots).</param>
     /// <exception cref="ArgumentNullException">Thrown if any parameter is null.</exception>
     /// <remarks>
     /// <para>
@@ -544,7 +545,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
             VideoMemorySnapshotPool snapshotPool,
             IKeyboardSetter keyboardSetter,
             IGameControllerStatus gameController,
-            Services.IDiskStatusProvider diskStatusProvider,
+            IDiskStatusProvider diskStatusProvider,
             CpuClockingCounters clockCounters,
             IMemoryInspector memoryInspector)
         {

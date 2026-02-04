@@ -215,6 +215,8 @@ public sealed class CpuStatusPanelViewModel : ReactiveObject, IActivatableViewMo
         _emulator = emulator ?? throw new ArgumentNullException(nameof(emulator));
         _refreshTicker = refreshTicker ?? throw new ArgumentNullException(nameof(refreshTicker));
 
+        // Use WhenActivated to manage subscription lifecycle
+        // ReactiveUserControl triggers activation when view is loaded
         this.WhenActivated(disposables =>
         {
             var sub = _refreshTicker.Stream

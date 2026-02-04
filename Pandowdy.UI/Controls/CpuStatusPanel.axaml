@@ -1,9 +1,16 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Pandowdy.UI.ViewModels"
+             xmlns:conv="using:Pandowdy.UI.Converters"
              x:Class="Pandowdy.UI.Controls.CpuStatusPanel"
              x:DataType="vm:CpuStatusPanelViewModel"
              Height="32">
+
+    <UserControl.Resources>
+        <conv:FlagBackgroundConverter x:Key="FlagBg" />
+        <conv:FlagForegroundConverter x:Key="FlagFg" />
+    </UserControl.Resources>
+
     <Border Background="#1A1A1A" BorderBrush="#303030" BorderThickness="0,1,0,0" Padding="8,4">
         <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal" Spacing="4">
@@ -24,19 +31,62 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="4">
                 <TextBlock Text="SP:" Foreground="#888888" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding SP, StringFormat=X2}" Foreground="#FF8800" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding StackSize}" Foreground="#666666" FontFamily="Consolas" FontSize="10" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding SP, StringFormat=X2}" Foreground="#FF8800" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Width="20" />
+                <TextBlock Text="Size:" Foreground="#888888" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" Margin="8,0,0,0" />
+                <TextBlock Text="{Binding StackSize}" Foreground="#FF8800" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" Width="24" TextAlignment="Right" />
             </StackPanel>
             <Border Width="1" Background="#303030" Margin="4,0" />
-            <StackPanel Orientation="Horizontal" Spacing="4">
-                <TextBlock Text="Flags:" Foreground="#888888" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
-                <CheckBox IsChecked="{Binding FlagN, Mode=OneWay}" IsEnabled="False" Content="N" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center" />
-                <CheckBox IsChecked="{Binding FlagV, Mode=OneWay}" IsEnabled="False" Content="V" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center" />
-                <CheckBox IsChecked="{Binding FlagB, Mode=OneWay}" IsEnabled="False" Content="B" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center" />
-                <CheckBox IsChecked="{Binding FlagD, Mode=OneWay}" IsEnabled="False" Content="D" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center" />
-                <CheckBox IsChecked="{Binding FlagI, Mode=OneWay}" IsEnabled="False" Content="I" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center" />
-                <CheckBox IsChecked="{Binding FlagZ, Mode=OneWay}" IsEnabled="False" Content="Z" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center" />
-                <CheckBox IsChecked="{Binding FlagC, Mode=OneWay}" IsEnabled="False" Content="C" FontSize="10" Foreground="#CCCCCC" VerticalAlignment="Center" />
+            <StackPanel Orientation="Horizontal" Spacing="2">
+                <TextBlock Text="Flags:" Foreground="#888888" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0" />
+
+                <!-- N Flag -->
+                <Border Background="{Binding FlagN, Converter={StaticResource FlagBg}}" 
+                        CornerRadius="2" Padding="4,1" ToolTip.Tip="Negative Flag">
+                    <TextBlock Text="N" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                               Foreground="{Binding FlagN, Converter={StaticResource FlagFg}}" />
+                </Border>
+
+                <!-- V Flag -->
+                <Border Background="{Binding FlagV, Converter={StaticResource FlagBg}}" 
+                        CornerRadius="2" Padding="4,1" ToolTip.Tip="Overflow Flag">
+                    <TextBlock Text="V" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                               Foreground="{Binding FlagV, Converter={StaticResource FlagFg}}" />
+                </Border>
+
+                <!-- B Flag -->
+                <Border Background="{Binding FlagB, Converter={StaticResource FlagBg}}" 
+                        CornerRadius="2" Padding="4,1" ToolTip.Tip="Break Flag">
+                    <TextBlock Text="B" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                               Foreground="{Binding FlagB, Converter={StaticResource FlagFg}}" />
+                </Border>
+
+                <!-- D Flag -->
+                <Border Background="{Binding FlagD, Converter={StaticResource FlagBg}}" 
+                        CornerRadius="2" Padding="4,1" ToolTip.Tip="Decimal Mode Flag">
+                    <TextBlock Text="D" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                               Foreground="{Binding FlagD, Converter={StaticResource FlagFg}}" />
+                </Border>
+
+                <!-- I Flag -->
+                <Border Background="{Binding FlagI, Converter={StaticResource FlagBg}}" 
+                        CornerRadius="2" Padding="4,1" ToolTip.Tip="Interrupt Disable Flag">
+                    <TextBlock Text="I" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                               Foreground="{Binding FlagI, Converter={StaticResource FlagFg}}" />
+                </Border>
+
+                <!-- Z Flag -->
+                <Border Background="{Binding FlagZ, Converter={StaticResource FlagBg}}" 
+                        CornerRadius="2" Padding="4,1" ToolTip.Tip="Zero Flag">
+                    <TextBlock Text="Z" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                               Foreground="{Binding FlagZ, Converter={StaticResource FlagFg}}" />
+                </Border>
+
+                <!-- C Flag -->
+                <Border Background="{Binding FlagC, Converter={StaticResource FlagBg}}" 
+                        CornerRadius="2" Padding="4,1" ToolTip.Tip="Carry Flag">
+                    <TextBlock Text="C" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                               Foreground="{Binding FlagC, Converter={StaticResource FlagFg}}" />
+                </Border>
             </StackPanel>
             <Border Width="1" Background="#303030" Margin="4,0" />
             <StackPanel Orientation="Horizontal" Spacing="4">
