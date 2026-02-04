@@ -32,7 +32,7 @@ internal class Program
 {
     // Default path to Tom Harte's SingleStepTests repository
     private const string DefaultTestPath =  "./";
-
+    
     static void Main(string[] args)
     {
         Console.WriteLine("===========================================");
@@ -42,7 +42,6 @@ internal class Program
 
         // Allow test path override via command line or environment variable
         var testPath = GetTestPath(args);
-  
 
         if (!Directory.Exists(testPath))
         {

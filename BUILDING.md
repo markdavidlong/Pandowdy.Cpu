@@ -97,7 +97,7 @@ Pandowdy.Cpu/                  # Core library (C#)
 ├── Cpu65C02Rockwell.cs       # Rockwell 65C02 with BBR/BBS/RMB/SMB
 ├── CpuFactory.cs             # Factory for creating CPU instances
 ├── CpuState.cs               # CPU state and registers
-├── CpuStateBuffer.cs         # Double-buffered state
+├── DebugCpu.cs               # Debugging wrapper with state tracking
 ├── CpuVariant.cs             # CPU variant and status enums
 │
 └── Internals/                # Internal implementation (not part of public API)
@@ -121,7 +121,7 @@ Pandowdy.Cpu.Tests/            # Unit tests (xUnit)
 ├── CpuInstanceTests.cs       # CPU instance and factory tests
 ├── CpuModuleTests.cs         # Module-level integration tests
 ├── CpuStateTests.cs          # CPU state tests
-├── CpuStateBufferTests.cs    # Double-buffer tests
+├── DebugCpuTests.cs          # Debug wrapper tests
 ├── DecimalModeTests.cs       # BCD arithmetic tests
 ├── InterruptTests.cs         # Interrupt handling tests
 ├── InterruptEdgeCaseTests.cs # Edge cases for interrupts

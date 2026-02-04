@@ -66,16 +66,72 @@ internal static class MicroOps
     /// <param name="state">The CPU state containing the pipeline.</param>
     /// <param name="op">The micro-op to insert.</param>
     /// <remarks>
+    /// <para>
     /// During micro-op execution, PipelineIndex points to the current op. After execution,
     /// the index is incremented. This method inserts at PipelineIndex + 1 to make the
     /// new op execute next.
+    /// </para>
+    /// <para>
+    /// This method uses an in-place insertion strategy to avoid allocations:
+    /// On first insertion, the base pipeline is copied to WorkingPipeline.
+    /// Subsequent insertions modify WorkingPipeline directly.
+    /// </para>
     /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void InsertAfterCurrentOp(CpuState state, MicroOp op)
     {
         int insertIdx = state.PipelineIndex + 1;
-        var before = state.Pipeline[..insertIdx];
-        var after = state.Pipeline[insertIdx..];
-        state.Pipeline = [.. before, op, .. after];
+
+        // If not already using working pipeline, copy from base pipeline
+        if (state.WorkingPipelineLength == 0)
+        {
+            int baseLen = state.Pipeline.Length;
+            Array.Copy(state.Pipeline, state.WorkingPipeline, baseLen);
+            state.WorkingPipelineLength = baseLen;
+        }
+
+        int currentLen = state.WorkingPipelineLength;
+
+        // Shift elements after insertIdx to make room
+        for (int i = currentLen - 1; i >= insertIdx; i--)
+        {
+            state.WorkingPipeline[i + 1] = state.WorkingPipeline[i];
+        }
+
+        // Insert the new op
+        state.WorkingPipeline[insertIdx] = op;
+        state.WorkingPipelineLength = currentLen + 1;
+    }
+
+    /// <summary>
+    /// Appends a micro-op to the end of the working pipeline.
+    /// </summary>
+    /// <param name="state">The CPU state containing the pipeline.</param>
+    /// <param name="op">The micro-op to append.</param>
+    /// <remarks>
+    /// <para>
+    /// Unlike <see cref="InsertAfterCurrentOp"/> which inserts immediately after
+    /// the current operation, this method appends to the very end of the pipeline.
+    /// </para>
+    /// <para>
+    /// This is used when adding multiple penalty cycles where the first penalty
+    /// is inserted and the second should come after all existing operations.
+    /// </para>
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void AppendToWorkingPipeline(CpuState state, MicroOp op)
+    {
+        // If not already using working pipeline, copy from base pipeline
+        if (state.WorkingPipelineLength == 0)
+        {
+            int baseLen = state.Pipeline.Length;
+            Array.Copy(state.Pipeline, state.WorkingPipeline, baseLen);
+            state.WorkingPipelineLength = baseLen;
+        }
+
+        // Append at the end
+        state.WorkingPipeline[state.WorkingPipelineLength] = op;
+        state.WorkingPipelineLength++;
     }
 
     /// <summary>
@@ -231,6 +287,44 @@ internal static class MicroOps
     };
 
     /// <summary>
+    /// Dummy read at PenaltyAddress - used for page-crossing penalty cycles.
+    /// </summary>
+    /// <remarks>
+    /// This avoids allocating a closure to capture the wrong address.
+    /// The address is stored in PenaltyAddress before the penalty cycle is inserted.
+    /// </remarks>
+    public static readonly MicroOp DummyReadPenaltyAddress = (prev, current, bus) =>
+    {
+        bus.CpuRead(current.PenaltyAddress);
+    };
+
+    /// <summary>
+    /// Branch penalty cycle: reads from BranchOldPC (taken branch, no page cross).
+    /// </summary>
+    public static readonly MicroOp BranchPenaltyReadOldPCAndComplete = (prev, current, bus) =>
+    {
+        bus.CpuRead(current.BranchOldPC);
+        current.InstructionComplete = true;
+    };
+
+    /// <summary>
+    /// Branch penalty cycle T2: reads from BranchOldPC (page crossing, first penalty).
+    /// </summary>
+    public static readonly MicroOp BranchPenaltyReadOldPC = (prev, current, bus) =>
+    {
+        bus.CpuRead(current.BranchOldPC);
+    };
+
+    /// <summary>
+    /// Branch penalty cycle T3: reads from PenaltyAddress and completes (page crossing, second penalty).
+    /// </summary>
+    public static readonly MicroOp BranchPenaltyReadWrongAddrAndComplete = (prev, current, bus) =>
+    {
+        bus.CpuRead(current.PenaltyAddress);
+        current.InstructionComplete = true;
+    };
+
+    /// <summary>
     /// Dummy write to TempAddress - writes the original value back before the modified value.
     /// </summary>
     public static readonly MicroOp DummyWriteTempAddress = (prev, current, bus) =>
@@ -288,8 +382,9 @@ internal static class MicroOps
         ushort newPage = (ushort)(current.TempAddress >> 8);
         if (basePage != newPage)
         {
-            ushort wrongAddr = (ushort)((baseAddr & 0xFF00) | (current.TempAddress & 0x00FF));
-            InsertAfterCurrentOp(current, (_, n, b) => b.CpuRead(wrongAddr));
+            // Store the wrong address for the penalty cycle to read from
+            current.PenaltyAddress = (ushort)((baseAddr & 0xFF00) | (current.TempAddress & 0x00FF));
+            InsertAfterCurrentOp(current, DummyReadPenaltyAddress);
         }
     };
 
@@ -305,7 +400,9 @@ internal static class MicroOps
         ushort newPage = (ushort)(current.TempAddress >> 8);
         if (basePage != newPage)
         {
-            InsertAfterCurrentOp(current, (_, n, b) => b.CpuRead(highByteAddr));
+            // Store the high byte address for the penalty cycle to read from
+            current.PenaltyAddress = highByteAddr;
+            InsertAfterCurrentOp(current, DummyReadPenaltyAddress);
         }
     };
 
@@ -320,8 +417,9 @@ internal static class MicroOps
         ushort newPage = (ushort)(current.TempAddress >> 8);
         if (basePage != newPage)
         {
-            ushort wrongAddr = (ushort)((baseAddr & 0xFF00) | (current.TempAddress & 0x00FF));
-            InsertAfterCurrentOp(current, (_, n, b) => b.CpuRead(wrongAddr));
+            // Store the wrong address for the penalty cycle to read from
+            current.PenaltyAddress = (ushort)((baseAddr & 0xFF00) | (current.TempAddress & 0x00FF));
+            InsertAfterCurrentOp(current, DummyReadPenaltyAddress);
         }
     };
 
@@ -337,9 +435,12 @@ internal static class MicroOps
         ushort newPage = (ushort)(current.TempAddress >> 8);
         if (basePage != newPage)
         {
-            InsertAfterCurrentOp(current, (_, n, b) => b.CpuRead(highByteAddr));
+            // Store the high byte address for the penalty cycle to read from
+            current.PenaltyAddress = highByteAddr;
+            InsertAfterCurrentOp(current, DummyReadPenaltyAddress);
         }
     };
+
 
     // ========================================
     // Load/Store Micro-Ops
@@ -1045,28 +1146,30 @@ internal static class MicroOps
             ushort newPC = (ushort)(current.PC + offset);
             current.PC = newPC;
 
+            // Store addresses for penalty cycles (avoids closure allocations)
+            current.BranchOldPC = oldPC;
+
             if ((oldPC >> 8) != (newPC >> 8))
             {
-                // Page crossing
-                ushort wrongAddr = (ushort)((oldPC & 0xFF00) | (newPC & 0x00FF));
-                MicroOp penaltyT2 = (_, n, b) => b.CpuRead(oldPC);
-                MicroOp penaltyT3WithComplete = (_, n, b) =>
+                // Page crossing: need two penalty cycles
+                current.PenaltyAddress = (ushort)((oldPC & 0xFF00) | (newPC & 0x00FF));
+                InsertAfterCurrentOp(current, BranchPenaltyReadOldPC);
+
+                // Add the second penalty cycle to the working pipeline
+                if (current.WorkingPipelineLength == 0)
                 {
-                    b.CpuRead(wrongAddr);
-                    n.InstructionComplete = true;
-                };
-                InsertAfterCurrentOp(current, penaltyT2);
-                current.Pipeline = [.. current.Pipeline, penaltyT3WithComplete];
+                    // Copy base pipeline to working pipeline first
+                    int baseLen = current.Pipeline.Length;
+                    Array.Copy(current.Pipeline, current.WorkingPipeline, baseLen);
+                    current.WorkingPipelineLength = baseLen;
+                }
+                current.WorkingPipeline[current.WorkingPipelineLength] = BranchPenaltyReadWrongAddrAndComplete;
+                current.WorkingPipelineLength++;
             }
             else
             {
-                // No page crossing
-                MicroOp penaltyWithComplete = (_, n, b) =>
-                {
-                    b.CpuRead(oldPC);
-                    n.InstructionComplete = true;
-                };
-                InsertAfterCurrentOp(current, penaltyWithComplete);
+                // No page crossing: just one penalty cycle
+                InsertAfterCurrentOp(current, BranchPenaltyReadOldPCAndComplete);
             }
         }
         else
@@ -1077,6 +1180,7 @@ internal static class MicroOps
 
     /// <summary>BCS - Branch if Carry Set.</summary>
     public static readonly MicroOp BranchIfCarrySet = BranchIf(s => s.CarryFlag);
+
 
     /// <summary>BCC - Branch if Carry Clear.</summary>
     public static readonly MicroOp BranchIfCarryClear = BranchIf(s => !s.CarryFlag);
@@ -1270,8 +1374,9 @@ internal static class MicroOps
         ushort newPage = (ushort)(current.TempAddress >> 8);
         if (basePage != newPage)
         {
-            ushort wrongAddr = (ushort)((baseAddr & 0xFF00) | (current.TempAddress & 0x00FF));
-            InsertAfterCurrentOp(current, (_, n, b) => b.CpuRead(wrongAddr));
+            // Store the wrong address for the penalty cycle to read from
+            current.PenaltyAddress = (ushort)((baseAddr & 0xFF00) | (current.TempAddress & 0x00FF));
+            InsertAfterCurrentOp(current, DummyReadPenaltyAddress);
         }
     };
 
@@ -1286,8 +1391,9 @@ internal static class MicroOps
         ushort newPage = (ushort)(current.TempAddress >> 8);
         if (basePage != newPage)
         {
-            ushort operandAddr = (ushort)(current.PC - 1);
-            InsertAfterCurrentOp(current, (_, n, b) => b.CpuRead(operandAddr));
+            // Store the operand address for the penalty cycle to read from
+            current.PenaltyAddress = (ushort)(current.PC - 1);
+            InsertAfterCurrentOp(current, DummyReadPenaltyAddress);
         }
     };
 
