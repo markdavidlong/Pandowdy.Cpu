@@ -1326,7 +1326,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 if (data.DecreaseContrast.HasValue) { ViewModel.DecreaseContrast = data.DecreaseContrast.Value; }
                 if (data.ThrottleEnabled.HasValue) { ViewModel.ThrottleEnabled = data.ThrottleEnabled.Value; } else { ViewModel.ThrottleEnabled = true; }
                 if (data.ShowSoftSwitchStatus.HasValue) { ViewModel.ShowSoftSwitchStatus = data.ShowSoftSwitchStatus.Value; } else { ViewModel.ShowSoftSwitchStatus = true; }
-                if (data.ShowDiskStatus.HasValue) { ViewModel.ShowDiskStatus = data.ShowDiskStatus.Value; } else { ViewModel.ShowDiskStatus = true; }
+                if (data.ShowDiskStatus.HasValue) { ViewModel.ShowDiskStatus = data.ShowDiskStatus.Value; } else { ViewModel.ShowDiskStatus = false; }
             }
         }
         catch { }
@@ -1590,13 +1590,14 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <returns>True if accelerator was handled, false to continue processing.</returns>
     /// <remarks>
     /// <para>
-    /// <strong>Alt + Key Accelerators:</strong>
+    /// <strong>Ctrl+Alt + Key Accelerators:</strong>
     /// <list type="bullet">
-    /// <item>Alt+S: Toggle scanlines</item>
-    /// <item>Alt+M: Toggle monochrome</item>
-    /// <item>Alt+D: Toggle decrease contrast</item>
-    /// <item>Alt+X: Toggle mono mixed mode</item>
-    /// <item>Alt+W: Toggle soft switch status panel</item>
+    /// <item>Ctrl+Alt+S: Toggle scanlines</item>
+    /// <item>Ctrl+Alt+M: Toggle monochrome</item>
+    /// <item>Ctrl+Alt+D: Toggle decrease contrast</item>
+    /// <item>Ctrl+Alt+X: Toggle mono mixed mode</item>
+    /// <item>Ctrl+Alt+W: Toggle soft switch status panel</item>
+    /// <item>Ctrl+Alt+K: Toggle disk status panel</item>
     /// <item>Alt+F4: Close window</item>
     /// </list>
     /// </para>
@@ -1621,7 +1622,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// </remarks>
     private bool HandleAccelerator(KeyEventArgs e)
     {
-        if ((e.KeyModifiers & KeyModifiers.Alt) != 0)
+        if ((e.KeyModifiers & KeyModifiers.Control) != 0 && (e.KeyModifiers & KeyModifiers.Alt) != 0)
         {
             switch (e.Key)
             {
@@ -1640,6 +1641,15 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 case Key.W:
                     ViewModel?.ToggleSoftSwitchStatus.Execute().Subscribe();
                     return true;
+                case Key.K:
+                    ViewModel?.ToggleDiskStatus.Execute().Subscribe();
+                    return true;
+            }
+        }
+        if ((e.KeyModifiers & KeyModifiers.Alt) != 0)
+        {
+            switch (e.Key)
+            {
                 case Key.F4:
                     Close();
                     return true;

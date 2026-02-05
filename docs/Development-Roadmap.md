@@ -11,22 +11,22 @@
 | **Branch** | `tasks` |
 | **Tests** | 3378 tests (Including Pandowdy.Cpu.Tests) passing ✅ |
 | **Last Milestone** | CPU Migration to Pandowdy.Cpu (Task 18) ✅ COMPLETE |
-| **Current Focus** | Task 19 (Basic Debugger Implementation) ⏳ IN PROGRESS |
+| **Current Focus** | Task 22 (Intermediate Debugger Implementation) ⏳ NOT STARTED |
 
 ---
 
 ## Table of Contents
 
 1. [In Progress Tasks](#in-progress-tasks)
-   - [Task 19: Basic Debugger Implementation](#task-19-basic-debugger-implementation-high-priority)
+   - None
 2. [Active Tasks](#active-tasks)
+   - [Task 22: Intermediate Debugger Implementation](#task-22-intermediate-debugger-implementation-high-priority)
    - [Task 5: GUI Disk Management Features](#task-5-gui-disk-management-features-high-priority)
    - [Task 10: SectorDiskImageProvider Debugging](#task-10-sectordiskimageprovider-debugging-high-priority)
    - [Task 13: Audio Emulation Implementation](#task-13-audio-emulation-implementation-medium-priority)
 3. [Backlog](#backlog)
    - [Task 4: HGR Flicker Investigation](#task-4-hgr-flicker-investigation-medium-priority)
    - [Task 7: Handle BRK Loops in Interrupt Handler](#task-7-handle-brk-loops-in-interrupt-handler-low-priority)
-   - [Task 8: Check for Race Conditions at High Speeds](#task-8-check-for-race-conditions-at-high-speeds-medium-priority)
    - [Task 9: Multi-Drive Operation Deep Dive](#task-9-multi-drive-operation-deep-dive-medium-priority)
    - [Task 11: Conditional Compilation for Disk Provider Debug Output](#task-11-conditional-compilation-for-disk-provider-debug-output-medium-priority)
    - [Task 12: Flexible Window Docking System](#task-12-flexible-window-docking-system-medium-priority)
@@ -41,16 +41,176 @@
    - [Task 2: Remove VA2MBus.VBlank Event](#task-2-remove-va2mbusvblank-event)
    - [Task 3: Removed](#task-3-removed)
    - [Task 6: Clear Pending Keystrokes on Reset](#task-6-clear-pending-keystrokes-on-reset)
+   - [Task 8: Check for Race Conditions at High Speeds](#task-8-check-for-race-conditions-at-high-speeds)
    - [Task 18: Migrate to Pandowdy.Cpu](#task-18-migrate-to-pandowdycpu-critical-priority)
+   - [Task 19: Basic Debugger Foundation](#task-19-basic-debugger-foundation)
 5. [Code Style Guidelines](#code-style-guidelines)
 6. [Git Best Practices](#git-best-practices)
 7. [Testing Guidelines](#testing-guidelines)
+8. [Other notes](#other-notes)
 
 ---
 
 ## In Progress Tasks
 
-### Task 19: Basic Debugger Implementation (High Priority)
+None
+
+---
+
+## Active Tasks
+
+### Task 22: Intermediate Debugger Implementation (High Priority)
+
+**Goal:** Implement breakpoints and debugger UI panels to complete the intermediate debugging infrastructure.
+
+**Status:** ⏳ NOT STARTED
+
+**Prerequisites:**
+- ✅ Task 19 (Basic Debugger Foundation) - COMPLETED
+- Foundation infrastructure provides CPU state inspection, memory inspection, and stepping capabilities
+
+**Current State:**
+- CPU state accessible via `IEmulatorCoreInterface.CpuState` ✅
+- Memory accessible via `IEmulatorCoreInterface.MemoryInspector` ✅
+- CPU Status Panel displays real-time state ✅
+- Instruction stepping capabilities available ✅
+- Ready to implement breakpoints and UI panels
+
+**Features to Implement:**
+
+**1. Breakpoints**
+   - Address breakpoints (break when PC reaches address)
+   - Conditional breakpoints (break when condition met, e.g., A == $FF)
+   - Enable/disable breakpoints without removing
+   - Breakpoint list management (add, remove, clear all)
+
+**2. Watches**
+   - Memory watches (monitor specific addresses)
+   - Register watches (A, X, Y, SP, PC, Status)
+   - Watch display in UI panel
+   - Optional: break on memory write to watched address
+
+**3. Debugger UI Panels**
+   - Breakpoint list panel (add/remove/enable/disable)
+   - Watch panel (monitor variables)
+   - Basic disassembly view (current instruction context)
+   - Integration with existing CPU Status Panel
+
+**4. Execution Control**
+   - Pause/Resume execution
+   - Run to cursor/address
+   - Enhanced stepping modes (Step Over, Step Out, Run Until)
+
+**Technical Approach:**
+
+**Breakpoint Check Pattern:**
+```csharp
+public void RunWithBreakpoints()
+{
+    while (_running)
+    {
+        if (_breakpoints.Contains(_cpu.PC))
+        {
+            _running = false;
+            OnBreakpointHit?.Invoke(_cpu.PC);
+            break;
+        }
+
+        _cpu.Clock(bus);
+
+        if (_cpu.IsInstructionComplete())
+        {
+            CheckConditionalBreakpoints();
+            CheckWatchBreakpoints();
+        }
+    }
+}
+```
+
+**Step Over Implementation:**
+```csharp
+public void StepOver()
+{
+    ushort currentPC = _cpu.PC;
+    byte opcode = bus.CpuRead(currentPC);
+
+    if (IsJsrInstruction(opcode))
+    {
+        // Set temporary breakpoint at next instruction
+        ushort returnAddress = (ushort)(currentPC + 3); // JSR is 3 bytes
+        RunUntil(returnAddress);
+    }
+    else
+    {
+        StepInstruction();
+    }
+}
+```
+
+**Files to Create:**
+
+*Core Debugger:*
+- `Pandowdy.EmuCore\Debugging\IDebugger.cs` - Debugger interface
+- `Pandowdy.EmuCore\Debugging\Debugger.cs` - Main debugger implementation
+- `Pandowdy.EmuCore\Debugging\Breakpoint.cs` - Breakpoint model
+- `Pandowdy.EmuCore\Debugging\Watch.cs` - Watch model
+- `Pandowdy.EmuCore\Debugging\DebuggerState.cs` - Debugger state enum (Running, Paused, Stepping)
+
+*UI Components:*
+- `Pandowdy.UI\Controls\BreakpointListPanel.axaml` - Breakpoint management
+- `Pandowdy.UI\ViewModels\BreakpointListPanelViewModel.cs` - Breakpoint panel view model
+- `Pandowdy.UI\Controls\WatchPanel.axaml` - Watch variables display
+- `Pandowdy.UI\ViewModels\WatchPanelViewModel.cs` - Watch panel view model
+- `Pandowdy.UI\Controls\DisassemblyPanel.axaml` - Basic disassembly view
+- `Pandowdy.UI\ViewModels\DisassemblyPanelViewModel.cs` - Disassembly view model
+
+*Tests:*
+- `Pandowdy.EmuCore.Tests\Debugging\DebuggerTests.cs` - Unit tests for debugger
+- `Pandowdy.EmuCore.Tests\Debugging\BreakpointTests.cs` - Breakpoint logic tests
+
+**Modified Files:**
+- `Pandowdy.EmuCore\VA2M.cs` - Integrate debugger into main emulation loop
+- `Pandowdy.UI\MainWindow.axaml` - Add debugger panel/menu
+- `Pandowdy.UI\ViewModels\MainWindowViewModel.cs` - Debugger commands
+- `Pandowdy\Program.cs` - Register debugger in DI
+
+**Architecture Notes:**
+- Debugger is injected via DI (follows project guidelines)
+- Debugger coordinates with CPU execution via VA2M
+- UI binds to debugger state via ReactiveUI
+- Breakpoint checks happen at instruction boundaries (not every cycle)
+- Stepping defaults to instruction-level granularity
+
+**UI Integration:**
+- Debugger panels dockable (integrates with future Task 12)
+- Keyboard shortcuts: F5 (Run), F10 (Step Over), F11 (Step Into), Shift+F11 (Step Out)
+- Toolbar buttons for common operations
+- Status bar shows debugger state (Running/Paused/Stepping)
+
+**Testing Strategy:**
+- Unit tests for breakpoint matching
+- Unit tests for step over/into/out logic
+- Integration tests with simple 6502 programs
+- Verify stepping doesn't affect cycle timing
+
+**Benefits:**
+- ✅ Enables debugging of disk loading issues (Task 5)
+- ✅ Essential for GCR/sector debugging (Task 10)
+- ✅ Helps debug audio timing (Task 13)
+- ✅ General development productivity improvement
+- ✅ Foundation for advanced debugger features (Task 20)
+
+**Priority:** High (unblocks Tasks 5, 10, 13)
+
+**Dependencies:**
+- **Requires:** Task 19 (Basic Debugger Foundation) ✅ COMPLETED
+- **Enables:** Tasks 5, 10, 13 (debugging support)
+- **Related:** Task 12 (docking system for debugger panels)
+- **Leads to:** Task 20 (Advanced Debugger Features)
+
+---
+
+### Task 19: Basic Debugger Foundation (High Priority)
 
 **Goal:** Implement a rudimentary debugger for Pandowdy using Pandowdy.Cpu's introspection capabilities, enabling breakpoints, watches, and stepping through code.
 
@@ -1687,6 +1847,144 @@ Removed reactive push pattern from `VA2M.PublishState()` that was causing 1000+ 
 
 ---
 
+### ✅ Task 19: Basic Debugger Foundation
+
+**Completed:** 2025-02-04 - All 3378 tests passing
+
+**Summary:**
+Implemented foundational debugger infrastructure enabling read-only CPU state inspection, memory inspection, and real-time CPU status display. This provides the core capabilities needed for Task 22 (Intermediate Debugger Implementation).
+
+**What Was Completed:**
+
+**1. CPU State Snapshot Infrastructure**
+- ✅ `CpuStateSnapshot` wrapper struct (encapsulates CPU state without exposing Pandowdy.Cpu types)
+- ✅ `CpuExecutionStatus` enum (Running, Stopped, Jammed, Waiting, Bypassed)
+- ✅ `IEmulatorCoreInterface.CpuState` property returns `CpuStateSnapshot`
+- ✅ Thread-safe, readonly struct for safe cross-thread access
+- ✅ Individual flag properties (FlagN, FlagV, FlagC, etc.)
+- ✅ `AtInstructionBoundary` property for safe inspection timing
+
+**2. Memory Inspection Infrastructure**
+- ✅ `IMemoryInspector` interface (extends IDirectMemoryPoolReader with ROM access)
+- ✅ `MemoryInspector` implementation (side-effect-free reads from RAM, ROM, slot cards)
+- ✅ `IEmulatorCoreInterface.MemoryInspector` property returns `IMemoryInspector`
+- ✅ Methods: ReadRawMain, ReadRawAux, ReadSystemRom, ReadActiveHighMemory, ReadSlotRom, bulk reads
+- ✅ Thread-safe read-only access to all memory regions
+
+**3. CPU Status Panel UI**
+- ✅ `CpuStatusPanel` UI control created (displays PC, A, X, Y, SP, flags, execution status)
+- ✅ `CpuStatusPanelViewModel` created (60Hz updates via IRefreshTicker)
+- ✅ CPU Status Panel integrated into MainWindow below Apple II display
+- ✅ Real-time flag indicators with color coding
+- ✅ Execution status display (Running/Stopped/Jammed)
+
+**4. Stepping Infrastructure**
+- ✅ `IEmulatorCoreInterface.Step()` method for single instruction stepping
+- ✅ F11 keyboard shortcut for stepping
+- ✅ Step command in UI (pause/step/continue workflow)
+
+**Architecture Established:**
+```csharp
+// CPU state snapshot (thread-safe, readonly struct)
+var cpu = emulator.CpuState;
+Console.WriteLine($"PC=${cpu.PC:X4} A=${cpu.A:X2} X=${cpu.X:X2} Y=${cpu.Y:X2}");
+Console.WriteLine($"Flags: {cpu.FlagsString}"); // e.g., "Nv-bdiZc"
+Console.WriteLine($"Status: {cpu.Status}"); // Running, Stopped, Jammed, Waiting
+
+// Memory inspection (thread-safe reads)
+var mem = emulator.MemoryInspector;
+byte mainValue = mem.ReadRawMain(0x0400);      // TEXT page 1 (main)
+byte auxValue = mem.ReadRawAux(0x0400);        // TEXT page 1 (aux)
+byte romValue = mem.ReadSystemRom(0xFFFE);     // Reset vector
+byte[] block = mem.ReadMainBlock(0x2000, 0x2000); // Bulk read HGR page 1
+
+// Timing info
+ulong totalCycles = emulator.TotalCycles;
+```
+
+**Files Created:**
+- `Pandowdy.EmuCore\DataTypes\CpuStateSnapshot.cs` - CPU state wrapper
+- `Pandowdy.EmuCore\DataTypes\CpuExecutionStatus.cs` - Execution status enum
+- `Pandowdy.EmuCore\Interfaces\IMemoryInspector.cs` - Memory inspection interface
+- `Pandowdy.EmuCore\Services\MemoryInspector.cs` - Memory inspector implementation
+- `Pandowdy.UI\Controls\CpuStatusPanel.axaml` - CPU status UI control
+- `Pandowdy.UI\ViewModels\CpuStatusPanelViewModel.cs` - CPU status view model
+
+**Files Modified:**
+- `Pandowdy.EmuCore\Interfaces\IEmulatorCoreInterface.cs` - Added CpuState, MemoryInspector, Step()
+- `Pandowdy.EmuCore\VA2M.cs` - Implemented inspection properties and stepping
+- `Pandowdy.UI\MainWindow.axaml` - Integrated CPU Status Panel
+- `Pandowdy.UI\ViewModels\MainWindowViewModel.cs` - Added step command
+- `Pandowdy\Program.cs` - Registered MemoryInspector in DI
+
+**Benefits Achieved:**
+- ✅ Foundation for Task 22 (Intermediate Debugger Implementation)
+- ✅ Real-time CPU state visibility for development
+- ✅ Thread-safe inspection infrastructure
+- ✅ No performance impact on emulator core
+- ✅ Clean separation between emulation and debugging concerns
+- ✅ Single instruction stepping capability
+
+**What's NOT Included (Deferred to Task 22):**
+- ⏸️ Breakpoints (address, conditional, enable/disable, management)
+- ⏸️ Watches (memory watches, register watches)
+- ⏸️ Debugger UI panels (breakpoint list, watch panel, disassembly view)
+- ⏸️ Enhanced execution control (run to cursor, step over/out)
+
+**Priority:** High (foundation complete, ready for Task 22)
+
+**Enables:** Task 22 (Intermediate Debugger Implementation)
+
+---
+
+## Code Style Guidelines
+1. `StopEmulator()` cancelled the token and set `IsRunning = false`
+2. Cleanup of `_emuCts` and `_emuTask` happened asynchronously via `Dispatcher.UIThread.Post()`
+3. If `OnEmuStartClicked()` was called before cleanup finished, it saw `_emuCts != null` (the old cancelled one) and returned early
+4. Eventually the continuation ran and set `IsRunning = false` again, but no new emulator thread was started
+5. **Result:** UI showed "paused" but no emulator thread existed - the emulator was in a "zombie" state
+
+**Fix Applied:**
+1. **Added lock object** (`_emuStateLock`) to synchronize start/stop operations
+2. **`OnEmuStartClicked` now:**
+   - Checks if there's a pending task that's still running (not just checking CTS)
+   - Cleans up completed task state synchronously before creating new CTS
+   - Uses lock to prevent race conditions
+3. **`StopEmulator` now:**
+   - Uses lock to safely get CTS/Task references
+   - Waits up to 100ms for the task to acknowledge cancellation (should be near-instant)
+   - Cleans up state immediately instead of relying on async continuation
+   - Ensures the emulator is fully stopped before returning
+
+**Architecture Improvement:**
+Removed reactive push pattern from `VA2M.PublishState()` that was causing 1000+ Hz state updates in unthrottled mode:
+- GUI now runs at 60 Hz polling rate (controlled by `IRefreshTicker`)
+- ViewModels poll at 20 Hz (sampled from the 60 Hz ticker)
+- Emulator runs at any speed without pushing state updates
+- MHz calculated at 4 Hz (every 0.25s) and stored for query
+- Eliminates boolean boxing from flag bindings at emulation speed
+
+**Files Modified:**
+- `Pandowdy.UI\MainWindow.axaml.cs` - Added lock synchronization for start/stop
+- `Pandowdy.EmuCore\VA2M.cs` - Removed PublishState(), changed MHz reporting to 0.25s
+- `Pandowdy.UI\ViewModels\EmulatorStateViewModel.cs` - Refactored to pull architecture, removed LineNumber
+- `Pandowdy.UI.Tests\ViewModels\EmulatorStateViewModelTests.cs` - Cleaned up (TODO comments for rewrite)
+- `Pandowdy.UI.Tests\ViewModels\MainWindowViewModelTests.cs` - Fixed constructor call
+
+**Benefits:**
+- Eliminates lockup when rapidly toggling F5 (pause/continue) and F9 (throttle toggle)
+- Prevents emulator "zombie" state where UI shows paused but no thread exists
+- Robust against rapid key combinations like F5-F9-F5-F9...
+- Cleaner architecture with pull-based state management
+- Significantly reduced GC pressure in unthrottled mode
+- Boolean boxing only occurs at UI refresh rate (20 Hz) instead of emulation speed (700+ Hz)
+
+**Related Issues:**
+- Task 4 (HGR Flicker Investigation) may also benefit from this fix
+- This was the root cause of reported freezing in Release mode unthrottled
+
+---
+
 ## Code Style Guidelines
 
 > **Source:** `.github/copilot-instructions.md`
@@ -1881,6 +2179,14 @@ git mv old/path/File.cs new/path/File.cs
 - ✅ Observable streams
 - ✅ ReactiveWindow activation lifecycle
 - ✅ Full window rendering
+
+---
+
+## Other Notes
+
+### Considerations for cross-platform development
+
+- Check the Control/Cmd mappings in the GUI to make sure things work as expected (Cmd toggles options, Ctrl passes to Emulator Core)
 
 ---
 
