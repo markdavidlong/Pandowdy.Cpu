@@ -145,10 +145,11 @@ public class DiskIIIntegrationTests
 
         // Turn on motors for both drives
         controller.ReadIO(0x09); // Motor on for Drive 1
-        controller.ReadIO(0x0B); // Select Drive 2
+        controller.ReadIO(0x0B); // Select Drive 2 (Drive 1 motor turns off immediately)
         controller.ReadIO(0x09); // Motor on for Drive 2
 
-        Assert.True(controller.Drives[0].MotorOn);
+        // After switching, only Drive 2 should have motor on
+        Assert.False(controller.Drives[0].MotorOn);
         Assert.True(controller.Drives[1].MotorOn);
 
         // Reset
@@ -277,7 +278,7 @@ public class DiskIIIntegrationTests
     }
 
     [Fact]
-    public void MultiDrive_SwitchingDrives_PreservesMotorState()
+    public void MultiDrive_SwitchingDrives_TurnsOffOldDriveMotor()
     {
         var controller = CreateController();
         InstallController(controller);
@@ -286,17 +287,17 @@ public class DiskIIIntegrationTests
         controller.ReadIO(0x09);
         Assert.True(controller.Drives[0].MotorOn);
 
-        // Switch to Drive 2
+        // Switch to Drive 2 - Drive 1 motor turns off IMMEDIATELY
         controller.ReadIO(0x0B);
 
-        // Drive 1 motor should still be on
-        Assert.True(controller.Drives[0].MotorOn);
+        // Drive 1 motor should be OFF (hardware can only power one motor)
+        Assert.False(controller.Drives[0].MotorOn);
 
         // Turn motor on for Drive 2
         controller.ReadIO(0x09);
 
-        // Both drives should now have motor on
-        Assert.True(controller.Drives[0].MotorOn);
+        // Only Drive 2 should have motor on now
+        Assert.False(controller.Drives[0].MotorOn);
         Assert.True(controller.Drives[1].MotorOn);
     }
 
@@ -311,17 +312,24 @@ public class DiskIIIntegrationTests
         controller.ReadIO(0x09);
         Assert.True(controller.Drives[1].MotorOn);
 
-        // Select Drive 1
+        // Select Drive 1 - Drive 2 motor turns off immediately
         controller.ReadIO(0x0A);
+
+        // Drive 2 motor should be OFF immediately (hardware limitation)
+        Assert.False(controller.Drives[1].MotorOn);
+
+        // Turn on motor for Drive 1
+        controller.ReadIO(0x09);
+        Assert.True(controller.Drives[0].MotorOn);
 
         // Turn off motor (should affect Drive 1 now)
         controller.ReadIO(0x08);
 
-        // After timeout, Drive 1's motor should be off, Drive 2's should still be on
+        // After timeout, Drive 1's motor should be off
         AdvanceVBlanks(60);
 
         Assert.False(controller.Drives[0].MotorOn);
-        Assert.True(controller.Drives[1].MotorOn);
+        Assert.False(controller.Drives[1].MotorOn);
     }
 
     #endregion

@@ -457,7 +457,7 @@ public class DiskIIControllerCardTests
     }
 
     [Fact]
-    public void ReadIO_SwitchDrives_OldDriveMotorStaysOnInitially()
+    public void ReadIO_SwitchDrives_OldDriveMotorTurnsOffImmediately()
     {
         var card = CreateCard();
         card.OnInstalled(SlotNumber.Slot6);
@@ -466,12 +466,12 @@ public class DiskIIControllerCardTests
         card.ReadIO(0x09);
         Assert.True(card.Drives[0].MotorOn);
 
-        // Switch to drive 2 - schedules motor-off (but the current implementation
-        // only tracks one pending motor-off for the currently selected drive)
+        // Switch to drive 2 - old drive motor turns off IMMEDIATELY
+        // (hardware can only power one motor at a time)
         card.ReadIO(0x0B);
 
-        // Drive 1 motor should still be on immediately after switch
-        Assert.True(card.Drives[0].MotorOn);
+        // Drive 1 motor should be OFF immediately after switch
+        Assert.False(card.Drives[0].MotorOn);
     }
 
     [Fact]
