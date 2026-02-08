@@ -92,8 +92,9 @@ public abstract class DiskIIControllerCard : ICard
     /// <remarks>
     /// This property abstracts the motor state check. Motor is considered "running"
     /// when it's either actively on or scheduled to turn off (still spinning during delay).
+    /// Exposed as internal for test access (Phase 5).
     /// </remarks>
-    protected bool IsMotorRunning => _motorState != DiskIIMotorState.Off;
+    internal bool IsMotorRunning => _motorState != DiskIIMotorState.Off;
 
     // Phase state for stepper motor control (matching TypeScript algorithm)
     protected byte _currentPhase = 0;        // 4-bit bitfield for phases 0-3 (can have multiple active)

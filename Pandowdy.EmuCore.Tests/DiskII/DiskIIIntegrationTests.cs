@@ -114,8 +114,8 @@ public class DiskIIIntegrationTests
         // Turn motor on (default is Drive 1 selected)
         controller.ReadIO(0x09); // Motor on
 
-        Assert.True(controller.Drives[0].MotorOn);
-        Assert.False(controller.Drives[1].MotorOn);
+        // PHASE 5: Controller has single motor line powering selected drive
+        Assert.True(controller.IsMotorRunning);
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class DiskIIIntegrationTests
 
         // Turn motor on for Drive 1
         controller.ReadIO(0x09);
-        Assert.True(controller.Drives[0].MotorOn);
+        Assert.True(controller.IsMotorRunning);
 
         // Switch to Drive 2
         controller.ReadIO(0x0B);
@@ -134,7 +134,7 @@ public class DiskIIIntegrationTests
         // Motor should still be on for Drive 1, but Drive 2 is now selected
         // Turn motor on again to affect Drive 2
         controller.ReadIO(0x09);
-        Assert.True(controller.Drives[1].MotorOn);
+        Assert.True(controller.IsMotorRunning);
     }
 
     [Fact]
@@ -143,20 +143,19 @@ public class DiskIIIntegrationTests
         var controller = CreateController();
         InstallController(controller);
 
-        // Turn on motors for both drives
+        // Turn on motor for Drive 1
         controller.ReadIO(0x09); // Motor on for Drive 1
-        controller.ReadIO(0x0B); // Select Drive 2 (Drive 1 motor turns off immediately)
-        controller.ReadIO(0x09); // Motor on for Drive 2
+        Assert.True(controller.IsMotorRunning);
 
-        // After switching, only Drive 2 should have motor on
-        Assert.False(controller.Drives[0].MotorOn);
-        Assert.True(controller.Drives[1].MotorOn);
+        // Switch to Drive 2 (motor stays running, now powering Drive 2)
+        controller.ReadIO(0x0B); // Select Drive 2
+        Assert.True(controller.IsMotorRunning); // PHASE 5: Single motor line stays on
 
         // Reset
         controller.Reset();
 
-        Assert.False(controller.Drives[0].MotorOn);
-        Assert.False(controller.Drives[1].MotorOn);
+        // PHASE 5: Motor should be off after reset
+        Assert.False(controller.IsMotorRunning);
     }
 
     #endregion
@@ -173,13 +172,13 @@ public class DiskIIIntegrationTests
 
         // Turn motor on
         controller.ReadIO(0x09);
-        Assert.True(controller.Drives[0].MotorOn);
+        Assert.True(controller.IsMotorRunning);
 
         // Request motor off
         controller.ReadIO(0x08);
 
         // Motor should still be on (1-second delay)
-        Assert.True(controller.Drives[0].MotorOn);
+        Assert.True(controller.IsMotorRunning);
     }
 
     [Fact]
@@ -198,7 +197,7 @@ public class DiskIIIntegrationTests
         AdvanceVBlanks(60);
 
         // Motor should now be off
-        Assert.False(controller.Drives[0].MotorOn);
+        Assert.False(controller.IsMotorRunning);
     }
 
     [Fact]
@@ -220,7 +219,7 @@ public class DiskIIIntegrationTests
         AdvanceVBlanks(60);
 
         // Motor should still be on (cancel worked)
-        Assert.True(controller.Drives[0].MotorOn);
+        Assert.True(controller.IsMotorRunning);
     }
 
     [Fact]
@@ -239,7 +238,7 @@ public class DiskIIIntegrationTests
         AdvanceVBlanks(30);
 
         // Motor should still be on
-        Assert.True(controller.Drives[0].MotorOn);
+        Assert.True(controller.IsMotorRunning);
     }
 
     #endregion
@@ -252,12 +251,11 @@ public class DiskIIIntegrationTests
         var controller = CreateController();
         InstallController(controller);
 
-        // Turn motor on
+        // Turn motor on (Drive 1 is selected by default)
         controller.ReadIO(0x09);
 
-        // Only Drive 1 should have motor on
-        Assert.True(controller.Drives[0].MotorOn);
-        Assert.False(controller.Drives[1].MotorOn);
+        // PHASE 5: Controller has single motor line
+        Assert.True(controller.IsMotorRunning);
     }
 
     [Fact]
@@ -272,33 +270,25 @@ public class DiskIIIntegrationTests
         // Turn motor on
         controller.ReadIO(0x09);
 
-        // Only Drive 2 should have motor on
-        Assert.False(controller.Drives[0].MotorOn);
-        Assert.True(controller.Drives[1].MotorOn);
+        // PHASE 5: Controller has single motor line powering Drive 2
+        Assert.True(controller.IsMotorRunning);
     }
 
     [Fact]
-    public void MultiDrive_SwitchingDrives_TurnsOffOldDriveMotor()
+    public void MultiDrive_SwitchingDrives_MotorStaysOn()
     {
         var controller = CreateController();
         InstallController(controller);
 
         // Turn motor on for Drive 1
         controller.ReadIO(0x09);
-        Assert.True(controller.Drives[0].MotorOn);
+        Assert.True(controller.IsMotorRunning);
 
-        // Switch to Drive 2 - Drive 1 motor turns off IMMEDIATELY
+        // Switch to Drive 2 - PHASE 5: Motor stays on, now powers Drive 2
         controller.ReadIO(0x0B);
 
-        // Drive 1 motor should be OFF (hardware can only power one motor)
-        Assert.False(controller.Drives[0].MotorOn);
-
-        // Turn motor on for Drive 2
-        controller.ReadIO(0x09);
-
-        // Only Drive 2 should have motor on now
-        Assert.False(controller.Drives[0].MotorOn);
-        Assert.True(controller.Drives[1].MotorOn);
+        // PHASE 5: Motor stays running (hardware switches which drive it powers)
+        Assert.True(controller.IsMotorRunning);
     }
 
     [Fact]
@@ -310,26 +300,20 @@ public class DiskIIIntegrationTests
         // Select Drive 2 and turn on
         controller.ReadIO(0x0B);
         controller.ReadIO(0x09);
-        Assert.True(controller.Drives[1].MotorOn);
+        Assert.True(controller.IsMotorRunning);
 
-        // Select Drive 1 - Drive 2 motor turns off immediately
+        // Select Drive 1 - PHASE 5: Motor stays on, now powers Drive 1
         controller.ReadIO(0x0A);
+        Assert.True(controller.IsMotorRunning);
 
-        // Drive 2 motor should be OFF immediately (hardware limitation)
-        Assert.False(controller.Drives[1].MotorOn);
-
-        // Turn on motor for Drive 1
-        controller.ReadIO(0x09);
-        Assert.True(controller.Drives[0].MotorOn);
-
-        // Turn off motor (should affect Drive 1 now)
+        // Turn off motor (delayed)
         controller.ReadIO(0x08);
 
-        // After timeout, Drive 1's motor should be off
+        // After timeout, motor should be off
         AdvanceVBlanks(60);
 
-        Assert.False(controller.Drives[0].MotorOn);
-        Assert.False(controller.Drives[1].MotorOn);
+        // PHASE 5: Single motor state
+        Assert.False(controller.IsMotorRunning);
     }
 
     #endregion
@@ -449,11 +433,11 @@ public class DiskIIIntegrationTests
 
         // Turn on motor via I/O
         controller.ReadIO(0x09);
-        Assert.True(controller.Drives[0].MotorOn);
+        Assert.True(controller.IsMotorRunning);
 
         // Reset should turn off motor
         controller.Reset();
-        Assert.False(controller.Drives[0].MotorOn);
+        Assert.False(controller.IsMotorRunning);
     }
 
 
@@ -469,7 +453,7 @@ public class DiskIIIntegrationTests
 
             // Motor control should work
             controller13.ReadIO(0x09);
-            Assert.True(controller13.Drives[0].MotorOn);
+            Assert.True(controller13.IsMotorRunning);
         }
 
         #endregion

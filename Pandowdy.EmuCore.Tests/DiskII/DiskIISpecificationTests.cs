@@ -225,11 +225,11 @@ public class DiskIISpecificationTests
         card.OnInstalled(SlotNumber.Slot6);
         var drive = card.Drives[0];
 
-        Assert.False(drive.MotorOn, "Motor should be off initially");
+        Assert.False(card.IsMotorRunning, "Motor should be off initially");
 
         card.ReadIO(0x09); // Motor On
 
-        Assert.True(drive.MotorOn, "Motor should be on after $C0n9 access");
+        Assert.True(card.IsMotorRunning, "Motor should be on after $C0n9 access");
     }
 
     [Fact]
@@ -243,13 +243,13 @@ public class DiskIISpecificationTests
 
         // Turn motor on
         card.ReadIO(0x09);
-        Assert.True(drive.MotorOn);
+        Assert.True(card.IsMotorRunning);
 
         // Request motor off
         card.ReadIO(0x08);
 
         // Motor should still be on (delay not elapsed)
-        Assert.True(drive.MotorOn, "Motor should remain on immediately after off command (1-second delay)");
+        Assert.True(card.IsMotorRunning, "Motor should remain on immediately after off command (1-second delay)");
     }
 
     [Fact]
@@ -270,12 +270,12 @@ public class DiskIISpecificationTests
         // Advance 0.5 seconds - motor should still be on
         AdvanceCycles(500_000);
         AdvanceToVBlank(); // Trigger motor-off check
-        Assert.True(drive.MotorOn, "Motor should still be on after 0.5 seconds");
+        Assert.True(card.IsMotorRunning, "Motor should still be on after 0.5 seconds");
 
         // Advance another 0.6 seconds (total 1.1 seconds) - motor should be off
         AdvanceCycles(600_000);
         AdvanceToVBlank(); // Trigger motor-off check
-        Assert.False(drive.MotorOn, "Motor should be off after ~1 second delay");
+        Assert.False(card.IsMotorRunning, "Motor should be off after ~1 second delay");
     }
 
     [Fact]
@@ -303,7 +303,7 @@ public class DiskIISpecificationTests
         AdvanceToVBlank();
 
         // Motor should still be on (off was cancelled)
-        Assert.True(drive.MotorOn, "Motor-on should cancel pending motor-off");
+        Assert.True(card.IsMotorRunning, "Motor-on should cancel pending motor-off");
     }
 
     #endregion
@@ -329,7 +329,7 @@ public class DiskIISpecificationTests
         card.ReadIO(0x09);
 
         // Drive 1 motor should be on
-        Assert.True(card.Drives[0].MotorOn, "Drive 1 motor should be on");
+        Assert.True(card.IsMotorRunning, "Drive 1 motor should be on");
     }
 
     [Fact]
@@ -345,32 +345,32 @@ public class DiskIISpecificationTests
         card.ReadIO(0x09);
 
         // Drive 2 motor should be on
-        Assert.True(card.Drives[1].MotorOn, "Drive 2 motor should be on");
+        Assert.True(card.IsMotorRunning, "Drive 2 motor should be on");
     }
 
     [Fact]
-    public void DriveSelect_Switching_ShouldImmediatelyTurnOffOldDrive()
+    public void DriveSelect_Switching_MotorStaysOn()
     {
-        // Specification: When switching drives, the old drive's motor turns off IMMEDIATELY
-        // because the physical hardware can only supply current to one motor at a time.
+        // Specification: When switching drives with motor on, the motor STAYS ON
+        // because the physical hardware has a single motor line that switches to power the new drive.
+        // Phase 5: Motor state is controller-level, not per-drive.
         var card = CreateCard();
         card.OnInstalled(SlotNumber.Slot6);
 
         // Select Drive 1 and turn motor on
         card.ReadIO(0x0A);
         card.ReadIO(0x09);
-        Assert.True(card.Drives[0].MotorOn);
+        Assert.True(card.IsMotorRunning);
 
-        // Switch to Drive 2
+        // Switch to Drive 2 - motor stays ON (now powers Drive 2)
         card.ReadIO(0x0B);
 
-        // Drive 1 motor should be off IMMEDIATELY (no delay)
-        Assert.False(card.Drives[0].MotorOn, "Drive 1 motor should turn off immediately when switching drives");
-        Assert.False(card.Drives[1].MotorOn, "Drive 2 motor should still be off until explicitly turned on");
+        // Motor should stay on (single motor line, now powering Drive 2)
+        Assert.True(card.IsMotorRunning, "Motor should stay on when switching drives, now powers Drive 2");
 
-        // Turn on Drive 2 motor
+        // Motor is already on, but explicitly sending motor-on command is safe
         card.ReadIO(0x09);
-        Assert.True(card.Drives[1].MotorOn, "Drive 2 motor should now be on");
+        Assert.True(card.IsMotorRunning, "Motor should still be on");
     }
 
     #endregion
@@ -542,7 +542,7 @@ public class DiskIISpecificationTests
         var drive = card.Drives[0];
 
         // Motor is off by default
-        Assert.False(drive.MotorOn);
+        Assert.False(card.IsMotorRunning);
 
         int initialQuarterTrack = drive.QuarterTrack;
 

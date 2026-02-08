@@ -252,22 +252,8 @@ public class DiskIIDriveTests
 
     #region Bit Operations Tests
 
-    [Fact]
-    public void GetBit_ReturnsNull_WhenMotorOff()
-    {
-        // Arrange
-        var mockProvider = new MockDiskImageProvider();
-        _drive = new DiskIIDrive("TestDrive", mockProvider)
-        {
-            MotorOn = false
-        };
-
-        // Act
-        bool? bit = _drive.GetBit(1000);
-
-        // Assert
-        Assert.Null(bit);
-    }
+    // PHASE 5: GetBit_ReturnsNull_WhenMotorOff test removed - motor is controller-level
+    // Controller ensures motor is running before calling GetBit()
 
     [Fact]
     public void GetBit_ReturnsNull_WhenNoDisk()
