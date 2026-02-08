@@ -241,7 +241,8 @@ public abstract class DiskIIControllerCard : ICard
         {
             // CRITICAL: Motor off ($C088) can still read data if motor is running
             // This is required for some copy-protected disks like Mr. Do.woz
-            if (ioAddr == 0x8 && SelectedDrive != null && SelectedDrive.MotorOn && !_q7)
+            // PHASE 3: Check controller motor state instead of drive state
+            if (ioAddr == 0x8 && SelectedDrive != null && IsMotorRunning && !_q7)
             {
                 byte? motorOffReadResult = ReadShiftRegister();
                 // Don't reset! ProcessBits() maintains position continuity
@@ -332,7 +333,8 @@ public abstract class DiskIIControllerCard : ICard
         int position = MagnetToPosition[_currentPhase];
 
         // Only move head if motor is running and we have a valid position
-        if (SelectedDrive != null && SelectedDrive.MotorOn && position >= 0)
+        // PHASE 3: Check controller motor state instead of drive state
+        if (SelectedDrive != null && IsMotorRunning && position >= 0)
         {
             DetermineHeadMovement(position);
         }
@@ -644,7 +646,8 @@ public abstract class DiskIIControllerCard : ICard
         else if (_q6 && !_q7) // Q6=1, Q7=0: SENSE WRITE PROTECT
         {
             // Also read shift register for $C08C (LATCH_OFF/SHIFT during read mode)
-            if (ioAddr == 0x0C && SelectedDrive != null && SelectedDrive.MotorOn)
+            // PHASE 3: Check controller motor state instead of drive state
+            if (ioAddr == 0x0C && SelectedDrive != null && IsMotorRunning)
             {
                 byte result = ReadShiftRegister();
                 // Don't reset! ProcessBits() maintains position continuity
@@ -728,7 +731,8 @@ public abstract class DiskIIControllerCard : ICard
     protected virtual void ProcessBits(ulong currentCycle)
     {
         IDiskIIDrive? drive = SelectedDrive;
-        if (drive == null || !drive.MotorOn)
+        // PHASE 3: Check controller motor state instead of drive state
+        if (drive == null || !IsMotorRunning)
         {
             _lastBitShiftCycle = currentCycle;
             return;
@@ -966,7 +970,8 @@ public abstract class DiskIIControllerCard : ICard
         IDiskIIDrive? drive = SelectedDrive;
         Debug.WriteLineIf(SelectedDrive == null, "SelectedDrive is null!");
 
-        if (drive == null || !drive.MotorOn || drive.IsWriteProtected())
+        // PHASE 3: Check controller motor state instead of drive state
+        if (drive == null || !IsMotorRunning || drive.IsWriteProtected())
         {
             return;
         }

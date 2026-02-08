@@ -106,75 +106,46 @@
 ---
 
 ## **Phase 3: Update Drive Reads to Use Controller State**
-**Status:** NOT STARTED  
-**Goal:** Change `ProcessBits()` to check controller motor state instead of drive motor state  
-**Duration:** ~20 minutes  
+**Status:** ✅ **COMPLETE**  
+**Goal:** Change all controller methods to check controller motor state instead of drive motor state  
+**Duration:** ~20 minutes (actual)  
 **Risk:** MEDIUM (changes data flow path)
 
 ### Steps
 
-#### 3.1: Update ProcessBits() Motor Check
+#### 3.1: Update ProcessBits() Motor Check ✅
 **File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
 **Method:** `ProcessBits()`  
-**Action:** Change motor state check
-```csharp
-// OLD: if (drive == null || !drive.MotorOn)
-// NEW:
-if (drive == null || !IsMotorRunning)
-{
-    _lastBitShiftCycle = currentCycle;
-    return;
-}
-```
+**Action:** ✅ Changed motor state check from `!drive.MotorOn` to `!IsMotorRunning`
 
-#### 3.2: Update HandlePhaseControl() Motor Check
+#### 3.2: Update HandlePhaseControl() Motor Check ✅
 **File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
 **Method:** `HandlePhaseControl()`  
-**Action:** Change motor state check
-```csharp
-// OLD: if (SelectedDrive != null && SelectedDrive.MotorOn && position >= 0)
-// NEW:
-if (SelectedDrive != null && IsMotorRunning && position >= 0)
-```
+**Action:** ✅ Changed motor state check from `SelectedDrive.MotorOn` to `IsMotorRunning`
 
-#### 3.3: Update ReadIO() Motor Check
+#### 3.3: Update ReadIO() Motor Check ✅
 **File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
 **Method:** `ReadIO()`  
-**Action:** Change motor state check in motor-off read path
-```csharp
-// OLD: if (ioAddr == 0x8 && SelectedDrive != null && SelectedDrive.MotorOn && !_q7)
-// NEW:
-if (ioAddr == 0x8 && SelectedDrive != null && IsMotorRunning && !_q7)
-```
+**Action:** ✅ Changed motor-off read path check from `SelectedDrive.MotorOn` to `IsMotorRunning`
 
-#### 3.4: Update HandleQ6Q7Read() Motor Check
+#### 3.4: Update HandleQ6Q7Read() Motor Check ✅
 **File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
 **Method:** `HandleQ6Q7Read()`  
-**Action:** Change motor state check
-```csharp
-// OLD: if (ioAddr == 0x0C && SelectedDrive != null && SelectedDrive.MotorOn)
-// NEW:
-if (ioAddr == 0x0C && SelectedDrive != null && IsMotorRunning)
-```
+**Action:** ✅ Changed motor state check from `SelectedDrive.MotorOn` to `IsMotorRunning`
 
-#### 3.5: Update WriteShiftRegister() Motor Check
+#### 3.5: Update WriteShiftRegister() Motor Check ✅
 **File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
 **Method:** `WriteShiftRegister()`  
-**Action:** Change motor state check
-```csharp
-// OLD: if (drive == null || !drive.MotorOn || drive.IsWriteProtected())
-// NEW:
-if (drive == null || !IsMotorRunning || drive.IsWriteProtected())
-```
+**Action:** ✅ Changed motor state check from `!drive.MotorOn` to `!IsMotorRunning`
 
 ### Verification Criteria
-- [ ] Project builds successfully
-- [ ] All existing tests pass
-- [ ] Controller now exclusively checks its own motor state
-- [ ] Drives still maintain motor state but it's not consulted by controller
+- [x] Project builds successfully
+- [x] All existing tests pass (2049/2050 - same as Phase 2, pre-existing failure)
+- [x] Controller now exclusively checks its own motor state
+- [x] Drives still maintain motor state but it's not consulted by controller
 
 ### Rollback Point
-**Checkpoint 3A**: Controller reads from its own motor state
+**Checkpoint 3A**: ✅ Controller reads from its own motor state
 
 ---
 
@@ -512,6 +483,17 @@ Notes: [Any important details]
 - Updated Reset() to set `_motorState = Off` alongside drive resets
 - Both old and new states remain synchronized throughout all operations
 - All existing functionality preserved (backward compatible)
+
+**Phase 3 (Complete):**
+- Updated ProcessBits() to check `IsMotorRunning` instead of `drive.MotorOn` (critical disk I/O path)
+- Updated HandlePhaseControl() to check `IsMotorRunning` for head movement authorization
+- Updated ReadIO() to check `IsMotorRunning` in motor-off read path (copy-protected disk support)
+- Updated HandleQ6Q7Read() to check `IsMotorRunning` for latch operations
+- Updated WriteShiftRegister() to check `IsMotorRunning` for write authorization
+- Controller now exclusively reads from `_motorState` via `IsMotorRunning` property
+- Drives still maintain `MotorOn` property (Phase 2 writes to it) but controller never reads from it
+- Read-side migration complete - safe to remove drive motor property in Phase 4
+- No new test failures (2049/2050 passing, same pre-existing failure)
 
 ### Unexpected Discoveries
 **Phase 1:**
