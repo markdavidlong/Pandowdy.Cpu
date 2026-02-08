@@ -31,10 +31,11 @@ public interface IDiskIIDrive
     /// </summary>
     void Reset();
 
-    /// <summary>
-    /// Gets or sets the motor state. Motor must be on to read or write data.
-    /// </summary>
-    bool MotorOn { get; set; }
+    // PHASE 4: MotorOn removed - motor state is now controller-level, not drive-level
+    // /// <summary>
+    // /// Gets or sets the motor state. Motor must be on to read or write data.
+    // /// </summary>
+    // bool MotorOn { get; set; }
 
     /// <summary>
     /// Gets the current track position as a fractional value (0.00 to 34.75).

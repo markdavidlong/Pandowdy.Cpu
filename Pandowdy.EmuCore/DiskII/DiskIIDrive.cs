@@ -36,7 +36,6 @@ public class DiskIIDrive : IDiskIIDrive
     private IDiskImageProvider? _imageProvider;
     private readonly IDiskImageFactory? _diskImageFactory;
     private int _quarterSteps;
-    private bool _motorOn;
     private bool _hitMinLogged;
     private bool _hitMaxLogged;
 
@@ -61,7 +60,6 @@ public class DiskIIDrive : IDiskIIDrive
         // Initialize head to track 17 (typical boot track area)
         // This is only done on drive creation, not on Reset()
         _quarterSteps = 4 * 17;
-        _motorOn = false;
 
         // Notify image provider of initial track position
         _imageProvider?.SetQuarterTrack(_quarterSteps);
@@ -105,26 +103,12 @@ public class DiskIIDrive : IDiskIIDrive
     /// <inheritdoc />
     public void Reset()
     {
-        // Per interface contract: motor off, head position preserved
+        // Per interface contract: head position preserved
         // Head position (_quarterSteps) is intentionally NOT reset - it represents
         // the physical head location which doesn't change on system reset
-        MotorOn = false;
+        // Motor control is now handled at controller level
         _hitMinLogged = false;
         _hitMaxLogged = false;
-    }
-
-    /// <inheritdoc />
-    public bool MotorOn
-    {
-        get => _motorOn;
-        set
-        {
-            if (_motorOn != value)
-            {
-                _motorOn = value;
-                Debug.WriteLine($"Drive '{Name}' motor turned {(value ? "ON" : "OFF")}");
-            }
-        }
     }
 
     /// <inheritdoc />
@@ -186,11 +170,7 @@ public class DiskIIDrive : IDiskIIDrive
     /// <inheritdoc />
     public bool? GetBit(ulong currentCycle)
     {
-        if (!_motorOn)
-        {
-            return null;
-        }
-
+        // Motor control is at controller level - controller only calls this when motor is running
         if (_imageProvider == null)
         {
             return null;
@@ -202,7 +182,8 @@ public class DiskIIDrive : IDiskIIDrive
     /// <inheritdoc />
     public bool SetBit(bool value)
     {
-        if (!_motorOn || _imageProvider == null)
+        // Motor control is at controller level - controller only calls this when motor is running
+        if (_imageProvider == null)
         {
             return false;
         }

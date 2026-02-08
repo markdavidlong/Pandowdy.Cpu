@@ -150,72 +150,73 @@
 ---
 
 ## **Phase 4: Remove MotorOn from IDiskIIDrive Interface**
-**Status:** NOT STARTED  
+**Status:** ✅ **COMPLETE** (Production Code)  
 **Goal:** Remove `MotorOn` property from interface and implementations  
-**Duration:** ~45 minutes  
+**Duration:** ~45 minutes (actual)  
 **Risk:** HIGH (breaking change, requires test updates)
 
 ### Steps
 
-#### 4.1: Comment Out Interface Property
+#### 4.1: Comment Out Interface Property ✅
 **File:** `Pandowdy.EmuCore\Interfaces\IDiskIIDrive.cs`  
-**Action:** Comment out (don't delete yet)
-```csharp
-// /// <summary>
-// /// Gets or sets the motor state. Motor must be on to read or write data.
-// /// </summary>
-// bool MotorOn { get; set; }
-```
+**Action:** ✅ Commented out MotorOn property with Phase 4 marker
 
-#### 4.2: Build and Catalog Compilation Errors
-**Action:** Run build, document all compilation errors  
-**Expected Locations:**
-- `DiskIIDrive.cs` - implementation
-- `NullDiskIIDrive.cs` - implementation
-- `DiskIIStatusDecorator.cs` - may reference motor state
-- `DiskIIDebugDecorator.cs` - may log motor state
-- Test files - assertions and mocks
+#### 4.2: Build and Catalog Compilation Errors ✅
+**Action:** ✅ Ran build, documented all compilation errors  
+**Errors Found:**
+- **DiskIIDebugDecorator.cs**: 2 errors (lines 68, 71) - MotorOn property passthrough
+- **DiskIIControllerCard.cs**: 6 errors (lines 436, 451, 496, 595, 598, 1141, 1146) - drive motor assignments
+- **DiskIIStatusDecorator.cs**: 4 errors (lines 76, 79, 80, 197) - motor state tracking and sync
+- **Production code**: 12 total errors
+- **Test files**: 50+ errors (expected, Phase 5-6 will handle)
 
-**Create Error List:**
-```
-Error List (to be filled during execution):
-1. [File] [Line] [Error Message]
-2. ...
-```
-
-#### 4.3: Remove MotorOn from DiskIIDrive
+#### 4.3: Remove MotorOn from DiskIIDrive ✅
 **File:** `Pandowdy.EmuCore\DiskII\DiskIIDrive.cs`  
-**Actions:**
-1. Remove `_motorOn` field
-2. Remove `MotorOn` property getter/setter
-3. Update `Reset()` - remove motor-off logic
-4. Update constructor - remove motor initialization
+**Actions:** ✅ All complete
+1. ✅ Removed `_motorOn` field
+2. ✅ Removed `MotorOn` property getter/setter
+3. ✅ Updated `Reset()` - removed motor-off call
+4. ✅ Removed motor initialization from constructor
+5. ✅ Removed motor checks from `GetBit()` and `SetBit()` (controller handles motor state)
 
-#### 4.4: Remove MotorOn from NullDiskIIDrive
+#### 4.4: Remove MotorOn from NullDiskIIDrive ✅
 **File:** `Pandowdy.EmuCore\DiskII\NullDiskIIDrive.cs`  
-**Actions:**
-1. Remove `MotorOn` property
-2. Update `Reset()` if needed
+**Actions:** ✅ All complete
+1. ✅ Removed `_motor` field
+2. ✅ Removed `MotorOn` property
+3. ✅ Updated `Reset()` - removed motor-off call
 
-#### 4.5: Update DiskIIStatusDecorator
-**File:** `Pandowdy.EmuCore\DiskII\DiskIIStatusDecorator.cs` (to be located)  
-**Action:** Remove motor state forwarding if present
-- Decorator should only forward mechanical state (track, disk insertion)
+#### 4.5: Update DiskIIStatusDecorator ✅
+**File:** `Pandowdy.EmuCore\DiskII\DiskIIStatusDecorator.cs`  
+**Action:** ✅ Removed motor state forwarding
+- ✅ Removed `MotorOn` property passthrough
+- ✅ Removed `MotorOn` update from `SyncStatus()`
+- Decorator now only forwards mechanical state (track, disk insertion)
 - Motor state is now controller-only
 
-#### 4.6: Update DiskIIDebugDecorator
-**File:** `Pandowdy.EmuCore\DiskII\DiskIIDebugDecorator.cs` (to be located)  
-**Action:** Remove motor state logging from drive wrapper
+#### 4.6: Update DiskIIDebugDecorator ✅
+**File:** `Pandowdy.EmuCore\DiskII\DiskIIDebugDecorator.cs`  
+**Action:** ✅ Removed motor state logging from drive wrapper
+- ✅ Removed `MotorOn` property passthrough
 - Motor logging should happen in controller only
 
+#### 4.7: Update DiskIIControllerCard ✅
+**File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
+**Actions:** ✅ Removed all drive motor assignments (Phase 7 work done early)
+- ✅ HandleMotorControl(): Removed `SelectedDrive.MotorOn = true` assignment
+- ✅ CheckPendingMotorOff(): Removed `SelectedDrive.MotorOn = false` assignment
+- ✅ HandleDriveSelection(): Removed old/new drive motor transfer logic
+- ✅ Reset(): Removed foreach loop turning off drive motors
+- Controller now exclusively manages motor state, drives are passive
+
 ### Verification Criteria
-- [ ] Interface no longer declares `MotorOn`
-- [ ] Drive implementations no longer track motor state
-- [ ] Project builds with compilation errors only in tests
-- [ ] Production code compiles cleanly
+- [x] Interface no longer declares `MotorOn`
+- [x] Drive implementations no longer track motor state
+- [x] Project builds with compilation errors only in tests (50+ test errors as expected)
+- [x] Production code compiles cleanly ✅
 
 ### Rollback Point
-**Checkpoint 4A**: Interface cleaned, production code compiles
+**Checkpoint 4A**: ✅ Interface cleaned, production code compiles
 
 ---
 
@@ -494,6 +495,17 @@ Notes: [Any important details]
 - Drives still maintain `MotorOn` property (Phase 2 writes to it) but controller never reads from it
 - Read-side migration complete - safe to remove drive motor property in Phase 4
 - No new test failures (2049/2050 passing, same pre-existing failure)
+
+**Phase 4 (Complete - Production Code):**
+- Commented out `MotorOn` property in `IDiskIIDrive` interface with Phase 4 marker
+- Removed `_motorOn` field and property from `DiskIIDrive` and `NullDiskIIDrive`
+- Removed motor checks from `GetBit()` and `SetBit()` - controller ensures motor is running
+- Updated `Reset()` methods - removed motor-off calls (motor is controller-level)
+- Removed `MotorOn` property from both decorators (`DiskIIDebugDecorator`, `DiskIIStatusDecorator`)
+- Removed all drive motor assignments from controller (HandleMotorControl, CheckPendingMotorOff, HandleDriveSelection, Reset)
+- **Phase 7 work completed early** - all drive motor synchronization removed in Phase 4
+- Production code compiles cleanly - motor state fully migrated to controller
+- 50+ test errors remaining (expected, will be addressed in Phase 5-6)
 
 ### Unexpected Discoveries
 **Phase 1:**

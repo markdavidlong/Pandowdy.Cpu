@@ -63,17 +63,6 @@ public class DiskIIDebugDecorator : IDiskIIDrive
     }
 
     /// <inheritdoc />
-    public bool MotorOn
-    {
-        get => _inner.MotorOn;
-        set
-        {
-            _inner.MotorOn = value;
-            Debug.WriteLine($"IDiskIIDrive ({Name}) Motor is now {(value ? "On" : "Off")}");
-        }
-    }
-
-    /// <inheritdoc />
     public bool HasDisk => _inner.HasDisk;
 
     /// <inheritdoc />

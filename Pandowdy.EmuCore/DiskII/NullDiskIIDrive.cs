@@ -32,7 +32,6 @@ namespace Pandowdy.EmuCore.DiskII;
 /// <param name="name">The display name for this drive. Defaults to "NullDrive".</param>
 public class NullDiskIIDrive(string name = "NullDrive") : IDiskIIDrive
 {
-    private bool _motor = false;
     private int _quarterSteps = 4 * 17;
 
     /// <inheritdoc />
@@ -41,16 +40,9 @@ public class NullDiskIIDrive(string name = "NullDrive") : IDiskIIDrive
     /// <inheritdoc />
     public void Reset()
     {
-        // Per interface contract: motor off, head position preserved
+        // Per interface contract: head position preserved
         // Head position (_quarterSteps) is intentionally NOT reset
-        MotorOn = false;
-    }
-
-    /// <inheritdoc />
-    public bool MotorOn
-    {
-        get => _motor;
-        set => _motor = value;
+        // Motor control is now handled at controller level
     }
 
     /// <inheritdoc />

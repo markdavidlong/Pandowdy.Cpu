@@ -433,7 +433,7 @@ public abstract class DiskIIControllerCard : ICard
                     UpdateMotorOffScheduledStatus(false);
                 }
 
-                if (!SelectedDrive.MotorOn)  // OLD check (still works)
+                if (_motorState == DiskIIMotorState.Off)  // NEW: Check controller state
                 {
 //#if ControllerDebug
                 Debug.WriteLine($"[{_clocking.TotalCycles}] 🔵 MOTOR ON - Drive {_selectedDriveIndex + 1}, Track {SelectedDrive.Track:F2}");
@@ -446,10 +446,9 @@ public abstract class DiskIIControllerCard : ICard
                     _addressFieldState = AddressFieldState.Idle; // Reset address field state
                     _dataFieldState = DataFieldState.Idle; // Reset data field state
 
-                    // PHASE 2: Update BOTH states (dual-track)
-                    _motorState = DiskIIMotorState.On;  // NEW
-                    SelectedDrive.MotorOn = true;        // OLD (keep for now)
-                    // Motor on status is updated by DiskIIDrive.MotorOn setter
+                    // PHASE 4: Only update controller state (old drive state removed)
+                    _motorState = DiskIIMotorState.On;
+                    // Motor on status is handled by controller, not drive
                 }
             }
             else
@@ -486,14 +485,13 @@ public abstract class DiskIIControllerCard : ICard
             // Clear the schedule before turning motor off
             _motorOffScheduledCycle = 0;
 
-            // PHASE 2: Update both states (dual-track)
-            _motorState = DiskIIMotorState.Off;  // NEW
+            // PHASE 4: Only update controller state (old drive state removed)
+            _motorState = DiskIIMotorState.Off;
 
             // Update status: motor-off no longer scheduled (motor is now actually off)
             UpdateMotorOffScheduledStatus(false);
 
-            // Turn off the motor (this updates MotorOn status via DiskIIDrive)
-            SelectedDrive.MotorOn = false;        // OLD (keep for now)
+            // Motor control is now handled by controller, not drive
 
             // DON'T clear _shiftRegister - it must maintain state across motor cycles!
             _diagnosticShiftReg = 0; // Clear diagnostic shift register
@@ -583,20 +581,14 @@ public abstract class DiskIIControllerCard : ICard
                     Debug.WriteLine($"[{_clocking.TotalCycles}] 💿 DRIVE SELECT: Drive {_selectedDriveIndex + 1} (was Drive {oldDriveIndex + 1})");
        // #endif
 
-                    // Handle motor state transfer: hardware can only power one motor at a time
-                    var oldDrive = _drives[oldDriveIndex];
-                    var newDrive = _drives[_selectedDriveIndex];
-                    // PHASE 2: Use new motor state check (dual-track)
-                    bool motorWasOn = IsMotorRunning;  // NEW (instead of oldDrive.MotorOn)
+                    // Handle motor state during drive switch
+                    // PHASE 4: Motor state is controller-level, no drive assignments needed
+                    bool motorWasOn = IsMotorRunning;
 
                     if (motorWasOn)
                     {
-                        // Transfer motor state from old drive to new drive
-                        oldDrive.MotorOn = false;
-                        if (newDrive != null)
-                        {
-                            newDrive.MotorOn = true;
-                        }
+                        // Motor stays running - controller motor line switches to new drive
+                        // No need to update individual drives, they don't track motor state
 
                         // Cancel any pending scheduled motor-off if one was active
                         if (_motorOffScheduledCycle > 0)
@@ -1131,21 +1123,17 @@ public abstract class DiskIIControllerCard : ICard
         // CRITICAL: Cancel any pending motor-off FIRST to prevent stale scheduled shutdowns
         _motorOffScheduledCycle = 0;
 
-        // PHASE 2: Reset new motor state (dual-track)
-        _motorState = DiskIIMotorState.Off;  // NEW
+        // PHASE 4: Reset controller motor state (drive state removed)
+        _motorState = DiskIIMotorState.Off;
 
         // IMMEDIATE motor shutdown - reset is emergency stop, no delay
-        // Must happen before clearing shift register to prevent state corruption
-        foreach (var drive in _drives)
-        {
-            if (drive != null && drive.MotorOn)
-            {
+        // Motor control is now at controller level
 //#if ControllerDebug
-                Debug.WriteLine($"[{_clocking.TotalCycles}] 🔴 RESET: Immediate motor-off on {drive.Name}");
-//#endif
-                drive.MotorOn = false;
-            }
+        if (IsMotorRunning)
+        {
+            Debug.WriteLine($"[{_clocking.TotalCycles}] 🔴 RESET: Immediate motor-off on Drive {_selectedDriveIndex + 1}");
         }
+//#endif
 
         // NOW it's safe to reset controller state (motors are stopped)
         _shiftRegister = 0;

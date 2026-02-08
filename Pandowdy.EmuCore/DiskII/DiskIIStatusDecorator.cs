@@ -71,26 +71,6 @@ public class DiskIIStatusDecorator : IDiskIIDrive
     public bool HasDisk => _innerDrive.HasDisk;
 
     /// <inheritdoc />
-    public bool MotorOn
-    {
-        get => _innerDrive.MotorOn;
-        set
-        {
-            bool oldValue = _innerDrive.MotorOn;
-            _innerDrive.MotorOn = value;
-
-            // Update status if changed
-            if (oldValue != value)
-            {
-                _statusMutator.MutateDrive(_slotNumber, _driveNumber, builder =>
-                {
-                    builder.MotorOn = value;
-                });
-            }
-        }
-    }
-
-    /// <inheritdoc />
     public double Track => _innerDrive.Track;
 
     /// <inheritdoc />
@@ -194,7 +174,7 @@ public class DiskIIStatusDecorator : IDiskIIDrive
     {
         _statusMutator.MutateDrive(_slotNumber, _driveNumber, builder =>
         {
-            builder.MotorOn = _innerDrive.MotorOn;
+            // PHASE 4: MotorOn removed - motor state is controller-level, not drive-level
             builder.Track = _innerDrive.Track;
             builder.IsReadOnly = _innerDrive.IsWriteProtected();
             builder.HasValidTrackData = _innerDrive.HasDisk;
