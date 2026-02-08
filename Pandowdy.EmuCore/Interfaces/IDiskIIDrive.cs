@@ -5,13 +5,19 @@
 namespace Pandowdy.EmuCore.Interfaces;
 
 /// <summary>
-/// Represents a physical Disk II drive with motor control, head positioning, and disk I/O.
+/// Represents a physical Disk II drive with head positioning and disk I/O.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This interface models the mechanical and electrical behavior of a Disk II drive unit.
-/// The drive handles motor control, head stepping, and bit-level I/O delegated to an
+/// This interface models the mechanical behavior of a Disk II drive unit.
+/// The drive handles head stepping and bit-level I/O delegated to an
 /// <see cref="IDiskImageProvider"/> for format-specific data access.
+/// </para>
+/// <para>
+/// <strong>Motor State:</strong> Motor control is managed by the <see cref="DiskIIControllerCard"/>,
+/// not individual drives. The controller has a single motor line that powers the currently selected drive.
+/// Drives are passive mechanical devices that respond to head positioning commands and I/O operations
+/// when the controller's motor is running.
 /// </para>
 /// <para>
 /// <strong>Coordinate System:</strong> Track positions use quarter-track granularity (0-139)
@@ -27,7 +33,7 @@ public interface IDiskIIDrive
     string Name { get; }
 
     /// <summary>
-    /// Resets the drive state (motor off, head position preserved).
+    /// Resets the drive state (head position preserved, motor state managed by controller).
     /// </summary>
     void Reset();
 

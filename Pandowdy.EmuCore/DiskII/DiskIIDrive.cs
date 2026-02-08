@@ -8,21 +8,26 @@ using Pandowdy.EmuCore.Interfaces;
 namespace Pandowdy.EmuCore.DiskII;
 
 /// <summary>
-/// Implements a Disk II floppy disk drive with mechanical head positioning and motor control.
+/// Implements a Disk II floppy disk drive with mechanical head positioning.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This class simulates the physical characteristics of a Disk II drive:
+/// This class simulates the physical/mechanical characteristics of a Disk II drive:
 /// <list type="bullet">
 /// <item>Stepper motor with quarter-track positioning (0-139 quarter-tracks = 0-34.75 whole tracks)</item>
-/// <item>Motor on/off control</item>
 /// <item>Read/write operations through an <see cref="IDiskImageProvider"/></item>
 /// <item>Disk insert/eject operations</item>
 /// </list>
 /// </para>
 /// <para>
+/// <strong>Motor Control:</strong> Motor state is managed by the <see cref="Cards.DiskIIControllerCard"/>,
+/// not individual drives. The controller has a single motor line that powers the currently selected drive.
+/// This drive is a passive mechanical device that responds to head positioning and I/O operations
+/// when the controller's motor is running.
+/// </para>
+/// <para>
 /// The drive delegates actual bit reading/writing to the <see cref="IDiskImageProvider"/>,
-/// while managing the mechanical aspects (motor state, head position). This separation
+/// while managing the mechanical aspects (head position). This separation
 /// matches real hardware where the drive mechanism is separate from the disk media.
 /// </para>
 /// <para>

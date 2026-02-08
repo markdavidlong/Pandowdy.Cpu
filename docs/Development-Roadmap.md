@@ -1765,6 +1765,84 @@ Removed reactive push pattern from `VA2M.PublishState()` that was causing 1000+ 
 
 ---
 
+### ✅ Task 25: Disk II Motor State Refactoring - Move to Controller Level
+
+**Completed:** 2026-01 - All 2039 tests passing
+
+**Goal:** Move motor state management from individual drive implementations to controller level, reflecting the hardware reality that the controller has a single motor line powering only one drive at a time.
+
+**Architecture Change:**
+- **Before:** Each drive tracked its own `MotorOn` property; controller read/wrote this property
+- **After:** Controller owns motor state (Off/On/ScheduledOff) and active drive index; drives are passive mechanical devices
+
+**Motivation:**
+- Hardware accuracy: Real Disk II controller has ONE motor line that powers the selected drive
+- Simplified drive implementation: Drives are now purely mechanical (head position, disk I/O)
+- Clearer separation of concerns: Controller manages electrical/motor control, drives manage mechanical operations
+- Eliminated conceptual confusion: No more "motor on Drive 1" vs "motor on Drive 2" - there's ONE motor
+
+**Implementation:**
+Completed in 8 phases over multiple sessions (see `docs/DiskII-Motor-Refactoring-Plan.md`):
+1. **Phase 1:** Added shadow motor state to controller (additive only)
+2. **Phase 2:** Dual-track writes to both old and new state (backward compatible)
+3. **Phase 3:** Switched all reads to use controller state (drive state no longer consulted)
+4. **Phase 4:** Removed `MotorOn` property from `IDiskIIDrive` interface and implementations
+5. **Phase 5:** Updated all test infrastructure (removed 14 drive motor tests, fixed 9 integration tests)
+6. **Phase 6:** Integrated into Phase 5 (all test fixes completed)
+7. **Phase 7:** Completed in Phase 4 (all drive motor synchronization removed)
+8. **Phase 8:** Documentation updates (XML comments, Copilot instructions, this roadmap)
+
+**Key Changes:**
+- `DiskIIControllerCard`: Added `DiskIIMotorState` enum and `_motorState` field
+- `DiskIIControllerCard.IsMotorRunning`: Internal property for motor state checks (exposed to tests)
+- `IDiskIIDrive`: Removed `MotorOn` property
+- `DiskIIDrive` / `NullDiskIIDrive`: Removed motor state tracking
+- `DiskIIStatusDecorator`: Removed motor state forwarding (only publishes mechanical state)
+- Tests: Removed per-drive motor tests, updated to check `controller.IsMotorRunning`
+
+**Behavior Changes:**
+- Drive switching with motor on: Motor stays ON (just powers newly selected drive)
+- Previously: Appeared as if each drive had independent motor (incorrect hardware model)
+- Now: Single motor line accurately modeled
+
+**Files Modified:**
+Production code (9 files):
+- `Pandowdy.EmuCore/Interfaces/IDiskIIDrive.cs` - Updated documentation, removed MotorOn
+- `Pandowdy.EmuCore/Cards/DiskIIControllerCard.cs` - Added motor state management
+- `Pandowdy.EmuCore/DiskII/DiskIIDrive.cs` - Removed motor tracking
+- `Pandowdy.EmuCore/DiskII/NullDiskIIDrive.cs` - Removed motor tracking
+- `Pandowdy.EmuCore/DiskII/DiskIIDebugDecorator.cs` - Removed motor passthrough
+- `Pandowdy.EmuCore/DiskII/DiskIIStatusDecorator.cs` - Removed motor forwarding
+- `Pandowdy.EmuCore/Pandowdy.EmuCore.csproj` - Added InternalsVisibleTo for tests
+- `.github/copilot-instructions.md` - Added Disk II motor architecture section
+- `docs/Development-Roadmap.md` - This entry
+
+Test code (6 files):
+- `Pandowdy.EmuCore.Tests/DiskII/DiskIIDriveTests.cs` - Removed 7 motor tests
+- `Pandowdy.EmuCore.Tests/DiskII/NullDiskIIDriveTests.cs` - Removed 4 motor tests
+- `Pandowdy.EmuCore.Tests/DiskII/DiskIIDebugDecoratorTests.cs` - Removed 3 motor tests
+- `Pandowdy.EmuCore.Tests/Cards/DiskIIControllerCardTests.cs` - Fixed 2 tests
+- `Pandowdy.EmuCore.Tests/DiskII/DiskIISpecificationTests.cs` - Fixed 1 test
+- `Pandowdy.EmuCore.Tests/DiskII/DiskIIIntegrationTests.cs` - Fixed 6 tests
+
+**Verification:**
+- All 2039 tests passing (1766 EmuCore + 126 Disassembler + 147 UI)
+- Build successful
+- No skipped tests
+- Hardware-accurate behavior validated
+
+**Benefits:**
+- More accurate hardware emulation
+- Simplified drive implementations (passive mechanical devices)
+- Clearer code - motor state checks are explicitly controller-level
+- Better testability - single source of truth for motor state
+- Documentation accurately reflects implementation
+
+**Reference:**
+See `docs/DiskII-Motor-Refactoring-Plan.md` for detailed phase-by-phase execution plan and notes.
+
+---
+
 ## Code Style Guidelines
 
 > **Source:** `.github/copilot-instructions.md`

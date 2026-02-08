@@ -22,8 +22,12 @@ namespace Pandowdy.EmuCore.DiskII;
 /// <item>Never has a disk inserted (<see cref="HasDisk"/> always returns false)</item>
 /// <item>Always returns null from <see cref="GetBit"/> (no data available)</item>
 /// <item>Ignores write operations (<see cref="SetBit"/> always returns false)</item>
-/// <item>Tracks motor and position state for testing purposes</item>
+/// <item>Tracks position state for testing purposes</item>
 /// </list>
+/// </para>
+/// <para>
+/// <strong>Motor Control:</strong> Motor state is managed by the <see cref="Cards.DiskIIControllerCard"/>,
+/// not individual drives. This null drive is a passive device like all drives.
 /// </para>
 /// </remarks>
 /// <remarks>

@@ -181,9 +181,35 @@ Pandowdy.UI.Tests/
 - Name tests: `MethodName_Scenario_ExpectedOutcome`
 
 ### What Works in Headless Mode
-- ? ViewModels (ReactiveObject)
-- ? ReactiveUI properties and commands
-- ? DispatcherTimer operations
-- ? Observable streams
-- ? ReactiveWindow activation lifecycle
-- ? Full window rendering
+- ✅ ViewModels (ReactiveObject)
+- ✅ ReactiveUI properties and commands
+- ✅ DispatcherTimer operations
+- ✅ Observable streams
+- ✅ ReactiveWindow activation lifecycle
+- ✅ Full window rendering
+
+## Hardware Emulation Architecture
+
+### Disk II Controller Motor State (Since 2026-01)
+The Disk II controller emulation reflects hardware-accurate motor control:
+
+**Architecture:**
+- **Controller-Level Motor State:** The `DiskIIControllerCard` owns the motor state (Off/On/ScheduledOff)
+- **Single Motor Line:** One motor line powers only the currently selected drive at a time
+- **Passive Drives:** `IDiskIIDrive` implementations are passive mechanical devices (head position, disk media)
+- **Motor Property Removed:** Drives no longer have a `MotorOn` property (removed 2026-01)
+
+**Key Design Points:**
+- Motor state is checked via `DiskIIControllerCard.IsMotorRunning` (internal, exposed to tests via InternalsVisibleTo)
+- When switching drives with motor on, the motor stays ON - it just powers the newly selected drive
+- Motor-off delay (~1 second) is managed by the controller, not individual drives
+- `DiskIIStatusDecorator` publishes drive mechanical state (track, disk insertion) but not motor state
+- Controller publishes motor state via `IDiskStatusMutator`
+
+**For Code Changes:**
+- Never add motor state to drive implementations
+- Motor checks should be at controller level only
+- Drive operations (GetBit, SetBit, head stepping) assume controller has already verified motor is running
+- Test assertions should check `controller.IsMotorRunning`, not per-drive motor state
+
+**Reference:** See `docs/DiskII-Motor-Refactoring-Plan.md` for complete refactoring history (8 phases, completed 2026-01)

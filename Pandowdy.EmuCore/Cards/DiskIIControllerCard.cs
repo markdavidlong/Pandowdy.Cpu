@@ -32,7 +32,12 @@ public enum DiskIIMotorState
 /// </summary>
 /// <remarks>
 /// <para>
-/// The Disk II controller uses Q6 and Q7 control lines to select operating modes:
+/// The Disk II controller manages two drives with a single motor line.
+/// Motor state is controller-level: when on, the motor powers only the currently selected drive.
+/// Drives are passive mechanical devices that respond to head positioning and I/O operations.
+/// </para>
+/// <para>
+/// The controller uses Q6 and Q7 control lines to select operating modes:
 /// </para>
 /// <para>
 /// Q6/Q7 Truth Table:
@@ -52,8 +57,8 @@ public enum DiskIIMotorState
 /// </para>
 /// <para>
 /// <strong>Status Integration:</strong> This controller uses <see cref="IDiskStatusMutator"/> to
-/// publish phase changes, motor-off scheduling, and sector detection to the UI.
-/// Drives publish their own motor/track/disk state through the <see cref="DiskIIStatusDecorator"/>.
+/// publish phase changes, motor state, and sector detection to the UI.
+/// Drives publish their own track/disk state through the <see cref="DiskIIStatusDecorator"/>.
 /// </para>
 /// </remarks>
 public abstract class DiskIIControllerCard : ICard
@@ -90,9 +95,9 @@ public abstract class DiskIIControllerCard : ICard
     /// Gets whether the controller motor is currently running (On or ScheduledOff).
     /// </summary>
     /// <remarks>
-    /// This property abstracts the motor state check. Motor is considered "running"
-    /// when it's either actively on or scheduled to turn off (still spinning during delay).
-    /// Exposed as internal for test access (Phase 5).
+    /// The controller has a single motor line that powers the currently selected drive.
+    /// Motor is considered "running" when it's either actively on or scheduled to turn off
+    /// (still spinning during the ~1 second delay). Exposed as internal for test access.
     /// </remarks>
     internal bool IsMotorRunning => _motorState != DiskIIMotorState.Off;
 
