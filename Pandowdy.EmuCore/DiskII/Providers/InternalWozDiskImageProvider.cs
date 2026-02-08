@@ -54,6 +54,11 @@ public class InternalWozDiskImageProvider : IDiskImageProvider, IDisposable
     private int _currentQuarterTrack;
     private readonly HashSet<int> _missingTracks = [];
 
+    // Per-provider cycle tracking (fixes drive switching bug)
+    // Each provider instance maintains its own rotational position independent of other drives
+    private ulong _cycleOffsetAtFirstAccess = 0;
+    private bool _hasBeenAccessed = false;
+
     // Random bit pattern for simulating MC3470 behavior when no track data exists
     // Approximately 30% ones, matching the TypeScript reference implementation
     private static readonly byte[] RandBits =
@@ -453,6 +458,13 @@ public class InternalWozDiskImageProvider : IDiskImageProvider, IDisposable
     /// </summary>
     public bool? GetBit(ulong cycleCount)
     {
+        // Initialize cycle offset on first access (simulates motor start)
+        if (!_hasBeenAccessed)
+        {
+            _cycleOffsetAtFirstAccess = cycleCount;
+            _hasBeenAccessed = true;
+        }
+
         // Clamp to valid range
         if (_currentQuarterTrack < 0 || _currentQuarterTrack >= MaxQuarterTracks)
         {
@@ -492,7 +504,9 @@ public class InternalWozDiskImageProvider : IDiskImageProvider, IDisposable
         }
 
         // Calculate bit position based on cycle count (continuously spinning disk)
-        int bitPosition = (int)((cycleCount / DiskIIConstants.CyclesPerBit) % bitCount);
+        // Use relative cycles so each provider instance maintains independent rotational position
+        ulong relativeCycles = cycleCount - _cycleOffsetAtFirstAccess;
+        int bitPosition = (int)((relativeCycles / DiskIIConstants.CyclesPerBit) % bitCount);
 
         // Extract bit from track data
         int byteIndex = bitPosition / 8;
@@ -514,6 +528,13 @@ public class InternalWozDiskImageProvider : IDiskImageProvider, IDisposable
     /// </summary>
     public bool WriteBit(bool bit, ulong cycleCount)
     {
+        // Initialize cycle offset on first access (simulates motor start)
+        if (!_hasBeenAccessed)
+        {
+            _cycleOffsetAtFirstAccess = cycleCount;
+            _hasBeenAccessed = true;
+        }
+
         if (_isWriteProtected || !IsWritable)
         {
             return false;
@@ -543,7 +564,9 @@ public class InternalWozDiskImageProvider : IDiskImageProvider, IDisposable
         }
 
         // Calculate bit position
-        int bitPosition = (int)((cycleCount / DiskIIConstants.CyclesPerBit) % bitCount);
+        // Use relative cycles so each provider instance maintains independent rotational position
+        ulong relativeCycles = cycleCount - _cycleOffsetAtFirstAccess;
+        int bitPosition = (int)((relativeCycles / DiskIIConstants.CyclesPerBit) % bitCount);
 
         // Write bit to track data
         int byteIndex = bitPosition / 8;

@@ -1,18 +1,59 @@
 # Task 27: NIB Provider Analysis and Debugging
 
 **Date:** 2025-02-05  
-**Status:** In Progress  
-**Test Status:** 15/15 passing (100%)
+**Status:** ✅ **COMPLETE** - Drive switching bug fixed  
+**Test Status:** All 2039 tests passing (100%)
 
 ---
 
 ## Executive Summary
 
-The `NibDiskImageProvider` implements Apple II .nib format disk image support. After initial investigation:
+The `NibDiskImageProvider` implements Apple II .nib format disk image support. After investigation and user insights:
 
-- ✅ **All 15 existing tests passing**
-- ✅ **Implementation appears generally correct**
-- ⚠️ **Several areas identified for enhanced testing and potential edge case fixes**
+- ✅ **All tests passing after fix (2039/2039)**
+- ✅ **Drive switching bug identified and fixed**
+- ✅ **Per-provider cycle tracking implemented**
+- ✅ **Same fix applied to WOZ provider**
+
+---
+
+## ✅ FIX IMPLEMENTED (2025-02-05)
+
+### Root Cause: Drive Switching Position Bug
+
+**Problem:** Both NIB and WOZ providers used absolute `cycleCount` to calculate disk position. When switching between drives:
+1. Drive 1 reads for 1,000,000 cycles
+2. Switch to Drive 2
+3. Drive 2 calculates position as if it was spinning during Drive 1's reads
+4. Result: Drive 2 reads from wrong position (bits skipped or read twice)
+
+**Solution:** Per-provider cycle tracking
+- Each `IDiskImageProvider` instance maintains `_cycleOffsetAtFirstAccess`
+- On first access, offset is set to current `cycleCount` (simulates motor start)
+- Position calculated from `relativeCycles = cycleCount - _cycleOffsetAtFirstAccess`
+- Each disk maintains independent rotational position
+
+**Implementation:**
+```csharp
+// Added to both NibDiskImageProvider and InternalWozDiskImageProvider:
+private ulong _cycleOffsetAtFirstAccess = 0;
+private bool _hasBeenAccessed = false;
+
+// In GetBit() and WriteBit():
+if (!_hasBeenAccessed)
+{
+    _cycleOffsetAtFirstAccess = cycleCount;
+    _hasBeenAccessed = true;
+}
+ulong relativeCycles = cycleCount - _cycleOffsetAtFirstAccess;
+int bitPosition = (int)((relativeCycles / DiskIIConstants.CyclesPerBit) % DiskIIConstants.BitsPerTrack);
+```
+
+**Results:**
+- ✅ All 2039 tests passing
+- ✅ Drive switching no longer causes position errors
+- ✅ Each disk spins independently
+- ✅ Backward compatible (existing tests unchanged)
 
 ---
 

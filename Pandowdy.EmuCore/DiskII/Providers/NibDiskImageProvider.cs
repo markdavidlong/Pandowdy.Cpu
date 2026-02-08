@@ -48,6 +48,11 @@ public class NibDiskImageProvider : IDiskImageProvider, IDisposable
     private bool _disposed;
     private readonly HashSet<int> _missingTracks = []; // Track quarter-tracks with no data
 
+    // Per-provider cycle tracking (fixes drive switching bug)
+    // Each provider instance maintains its own rotational position independent of other drives
+    private ulong _cycleOffsetAtFirstAccess = 0;
+    private bool _hasBeenAccessed = false;
+
     // Random bit pattern for simulating MC3470 behavior when no track data exists
     // Approximately 30% ones, matching the TypeScript reference implementation
     private static readonly byte[] RandBits =
@@ -217,6 +222,13 @@ public class NibDiskImageProvider : IDiskImageProvider, IDisposable
     /// </remarks>
     public bool? GetBit(ulong cycleCount)
     {
+        // Initialize cycle offset on first access (simulates motor start)
+        if (!_hasBeenAccessed)
+        {
+            _cycleOffsetAtFirstAccess = cycleCount;
+            _hasBeenAccessed = true;
+        }
+
         // Convert quarter-track to full track
         int track = _currentQuarterTrack / 4;
 
@@ -240,7 +252,9 @@ public class NibDiskImageProvider : IDiskImageProvider, IDisposable
         // Cycle-based position: disk is continuously spinning tied to system clock
         // This models real hardware where the disk spins at constant speed and you
         // read wherever the disk happens to be at any given moment
-        int bitPosition = (int)((cycleCount / DiskIIConstants.CyclesPerBit) % DiskIIConstants.BitsPerTrack);
+        // Use relative cycles so each provider instance maintains independent rotational position
+        ulong relativeCycles = cycleCount - _cycleOffsetAtFirstAccess;
+        int bitPosition = (int)((relativeCycles / DiskIIConstants.CyclesPerBit) % DiskIIConstants.BitsPerTrack);
         currentTrackBuffer.BitPosition = bitPosition;
 
         byte bitValue = currentTrackBuffer.ReadNextBit();
@@ -260,6 +274,13 @@ public class NibDiskImageProvider : IDiskImageProvider, IDisposable
     /// </remarks>
     public bool WriteBit(bool bit, ulong cycleCount)
     {
+        // Initialize cycle offset on first access (simulates motor start)
+        if (!_hasBeenAccessed)
+        {
+            _cycleOffsetAtFirstAccess = cycleCount;
+            _hasBeenAccessed = true;
+        }
+
         if (_isWriteProtected)
         {
             return false;
@@ -275,7 +296,9 @@ public class NibDiskImageProvider : IDiskImageProvider, IDisposable
         }
 
         // Cycle-based position (same as reads)
-        int bitPosition = (int)((cycleCount / DiskIIConstants.CyclesPerBit) % DiskIIConstants.BitsPerTrack);
+        // Use relative cycles so each provider instance maintains independent rotational position
+        ulong relativeCycles = cycleCount - _cycleOffsetAtFirstAccess;
+        int bitPosition = (int)((relativeCycles / DiskIIConstants.CyclesPerBit) % DiskIIConstants.BitsPerTrack);
 
         // Write the bit to the current track buffer
         CircularBitBuffer currentTrackBuffer = _tracks[track];
