@@ -22,11 +22,13 @@
 2. [Active Tasks](#active-tasks)
    - [Task 22: Intermediate Debugger Implementation](#task-22-intermediate-debugger-implementation-high-priority)
    - [Task 5: GUI Disk Management Features](#task-5-gui-disk-management-features-high-priority)
-   - [Task 10: SectorDiskImageProvider Debugging](#task-10-sectordiskimageprovider-debugging-high-priority)
+   - [Task 26: WozDiskImageProvider Debugging](#task-26-wozdiskimageprovider-debugging-high-priority)
+   - [Task 27: NibDiskImageProvider Debugging](#task-27-nibdiskimageprovider-debugging-high-priority)
    - [Task 13: Audio Emulation Implementation](#task-13-audio-emulation-implementation-medium-priority)
 3. [Backlog](#backlog)
    - [Task 4: HGR Flicker Investigation](#task-4-hgr-flicker-investigation-medium-priority)
    - [Task 7: Handle BRK Loops in Interrupt Handler](#task-7-handle-brk-loops-in-interrupt-handler-low-priority)
+   - [Task 10: SectorDiskImageProvider Debugging](#task-10-sectordiskimageprovider-debugging-medium-priority)
    - [Task 9: Multi-Drive Operation Deep Dive](#task-9-multi-drive-operation-deep-dive-low-priority)
    - [Task 11: Conditional Compilation for Disk Provider Debug Output](#task-11-conditional-compilation-for-disk-provider-debug-output-medium-priority)
    - [Task 12: Flexible Window Docking System](#task-12-flexible-window-docking-system-medium-priority)
@@ -354,37 +356,100 @@ public void StepOver()
 
 ---
 
-### Task 10: SectorDiskImageProvider Debugging (High Priority)
+### Task 26: WozDiskImageProvider Debugging (High Priority)
 
-**Goal:** Thorough testing and debugging of sector-based disk image provider (DSK/DO/PO formats that require GCR synthesis).
+**Goal:** Debug and fix random Disk I/O errors occurring with WOZ format disk images in DOS 3.3.
 
 **Status:** ⏳ NOT STARTED
 
-**Problem:**
-- Potential issues with DSK/DO/PO format support
-- GCR synthesis from sector data needs validation
+**Current Issue:**
+- Random Disk I/O errors occurring in DOS 3.3 with WOZ images
+- Suspect subtle bugs in WOZ provider implementation
+- Currently using InternalWozDiskImageProvider (primary focus)
+- May also need to verify external WozDiskImageProvider
 
 **Areas to Investigate:**
-- GCR encoding correctness
-- Track synthesis timing
-- Sector interleaving
-- Address field generation
-- Checksum calculation
+- Bit timing and synchronization
+- Track data decoding (WOZ stores raw flux transitions)
+- Self-sync byte detection
+- Address field parsing
+- Data field CRC validation
+- Track wrapping/overflow handling
+- Edge cases in flux transition timing
 
 **Test Strategy:**
-- Compare synthesized NIB output with known-good NIB files
-- Test with DOS 3.3 and ProDOS system disks
-- Verify sector reads return correct data
+- Test with known-good DOS 3.3 system disks
+- Compare behavior with real hardware or other emulators
+- Add comprehensive unit tests for edge cases
+- Test with various WOZ images (WOZ1, WOZ2 formats)
+- Verify behavior with copy-protected disks
+
+**Debugging Approach:**
+- Enable detailed bit-level logging
+- Compare bit stream output with expected patterns
+- Verify timing matches WOZ specification
+- Check for off-by-one errors in track positioning
+- Validate CRC calculations
 
 **Files to Focus On:**
-- `Pandowdy.EmuCore\DiskII\Providers\SectorDiskImageProvider.cs`
-- `Pandowdy.EmuCore\DiskII\GcrEncoder.cs`
-- `Pandowdy.EmuCore.Tests\DiskII\Providers\SectorDiskImageProviderTests.cs` (13 tests exist)
+- `Pandowdy.EmuCore\DiskII\Providers\InternalWozDiskImageProvider.cs` (primary)
+- `Pandowdy.EmuCore\DiskII\Providers\WozDiskImageProvider.cs` (external wrapper)
+- `Pandowdy.EmuCore.Tests\DiskII\Providers\WozDiskImageProviderTests.cs`
+- `Pandowdy.EmuCore\DiskII\GcrEncoder.cs` (if issues with encoding)
 
-**Priority:** High (blocks DSK/DO/PO format support)
+**Priority:** High (blocking reliable DOS 3.3 usage)
 
 **Dependencies:**
-- Would greatly benefit from debugger (Task 19) for stepping through GCR encoding and sector synthesis
+- Would greatly benefit from debugger (Task 19) for stepping through bit-level decoding
+- May require Task 11 (conditional debug output) to reduce noise while debugging
+
+---
+
+### Task 27: NibDiskImageProvider Debugging (High Priority)
+
+**Goal:** Verify and debug NIB format disk image provider to ensure reliable operation.
+
+**Status:** ⏳ NOT STARTED
+
+**Current Issue:**
+- Potential subtle bugs in NIB provider (not yet confirmed)
+- Need to verify NIB provider is not contributing to DOS 3.3 I/O errors
+- NIB format is simpler than WOZ but still requires careful bit-level handling
+
+**Areas to Investigate:**
+- NIB format parsing (6-and-2 encoding)
+- Track offset calculations
+- Self-sync byte handling
+- Address field decoding
+- Data field checksum validation
+- Track length handling (NIB tracks are 6656 bytes)
+- Bit alignment and synchronization
+
+**Test Strategy:**
+- Test with known-good DOS 3.3 NIB images
+- Compare behavior with WOZ provider for same disk
+- Verify all 35 tracks read correctly
+- Test sector interleaving patterns
+- Validate checksums on all sectors
+
+**Debugging Approach:**
+- Compare NIB bit patterns with expected DOS 3.3 format
+- Verify 6-and-2 decoding tables
+- Check track offset arithmetic
+- Validate sector header and data field parsing
+- Test boundary conditions (track 0, track 34)
+
+**Files to Focus On:**
+- `Pandowdy.EmuCore\DiskII\Providers\NibDiskImageProvider.cs`
+- `Pandowdy.EmuCore.Tests\DiskII\Providers\NibDiskImageProviderTests.cs`
+- `Pandowdy.EmuCore\DiskII\GcrEncoder.cs` (6-and-2 encoding tables)
+
+**Priority:** High (ensure reliable NIB format support)
+
+**Dependencies:**
+- Should be debugged after Task 26 (WOZ debugging) to compare behavior
+- Would benefit from debugger (Task 19) for bit-level inspection
+- May require Task 11 (conditional debug output) for cleaner debugging
 
 ---
 
@@ -604,6 +669,46 @@ This matches real Disk II hardware:
 - `Pandowdy.EmuCore.Tests\DiskII\DiskIIIntegrationTests.cs` (Multi-Drive Tests region)
 
 **Priority:** Low (core implementation complete and architecturally correct)
+
+---
+
+### Task 10: SectorDiskImageProvider Debugging (Medium Priority)
+
+**Goal:** Thorough testing and debugging of sector-based disk image provider (DSK/DO/PO formats that require GCR synthesis).
+
+**Status:** ⏳ NOT STARTED
+
+**Problem:**
+- Potential issues with DSK/DO/PO format support
+- GCR synthesis from sector data needs validation
+- Lower priority than WOZ/NIB debugging (Tasks 26-27) since those formats are more commonly used
+
+**Areas to Investigate:**
+- GCR encoding correctness
+- Track synthesis timing
+- Sector interleaving (DOS 3.3 vs ProDOS)
+- Address field generation
+- Checksum calculation
+- Volume number handling
+
+**Test Strategy:**
+- Compare synthesized NIB output with known-good NIB files
+- Test with DOS 3.3 and ProDOS system disks
+- Verify sector reads return correct data
+- Test both .dsk (DOS order) and .po (ProDOS order) formats
+- Verify .do (DOS order) format support
+
+**Files to Focus On:**
+- `Pandowdy.EmuCore\DiskII\Providers\SectorDiskImageProvider.cs`
+- `Pandowdy.EmuCore\DiskII\GcrEncoder.cs`
+- `Pandowdy.EmuCore.Tests\DiskII\Providers\SectorDiskImageProviderTests.cs` (13 tests exist)
+
+**Priority:** Medium (blocks DSK/DO/PO format support, but less urgent than WOZ/NIB fixes)
+
+**Dependencies:**
+- Should be addressed after Tasks 26-27 (WOZ/NIB debugging)
+- Would benefit from debugger (Task 19) for stepping through GCR encoding and sector synthesis
+- May benefit from Task 11 (conditional debug output) for cleaner debugging
 
 ---
 
