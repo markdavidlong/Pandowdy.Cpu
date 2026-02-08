@@ -431,7 +431,7 @@ public abstract class DiskIIControllerCard : ICard
                     UpdateMotorOffScheduledStatus(false);
                 }
 
-                if (!SelectedDrive.MotorOn)
+                if (!SelectedDrive.MotorOn)  // OLD check (still works)
                 {
 //#if ControllerDebug
                 Debug.WriteLine($"[{_clocking.TotalCycles}] 🔵 MOTOR ON - Drive {_selectedDriveIndex + 1}, Track {SelectedDrive.Track:F2}");
@@ -444,7 +444,9 @@ public abstract class DiskIIControllerCard : ICard
                     _addressFieldState = AddressFieldState.Idle; // Reset address field state
                     _dataFieldState = DataFieldState.Idle; // Reset data field state
 
-                    SelectedDrive.MotorOn = true;
+                    // PHASE 2: Update BOTH states (dual-track)
+                    _motorState = DiskIIMotorState.On;  // NEW
+                    SelectedDrive.MotorOn = true;        // OLD (keep for now)
                     // Motor on status is updated by DiskIIDrive.MotorOn setter
                 }
             }
@@ -457,6 +459,8 @@ public abstract class DiskIIControllerCard : ICard
 //#if ControllerDebug
                 Debug.WriteLine($"[{_clocking.TotalCycles}] ⏱️ MOTOR-OFF SCHEDULED for cycle {_motorOffScheduledCycle} (~1 sec delay)");
 //#endif
+                    // PHASE 2: Update new motor state (dual-track)
+                    _motorState = DiskIIMotorState.ScheduledOff;  // NEW
                     // Update status: motor-off now scheduled
                     UpdateMotorOffScheduledStatus(true);
                 }
@@ -480,11 +484,14 @@ public abstract class DiskIIControllerCard : ICard
             // Clear the schedule before turning motor off
             _motorOffScheduledCycle = 0;
 
+            // PHASE 2: Update both states (dual-track)
+            _motorState = DiskIIMotorState.Off;  // NEW
+
             // Update status: motor-off no longer scheduled (motor is now actually off)
             UpdateMotorOffScheduledStatus(false);
 
             // Turn off the motor (this updates MotorOn status via DiskIIDrive)
-            SelectedDrive.MotorOn = false;
+            SelectedDrive.MotorOn = false;        // OLD (keep for now)
 
             // DON'T clear _shiftRegister - it must maintain state across motor cycles!
             _diagnosticShiftReg = 0; // Clear diagnostic shift register
@@ -577,7 +584,8 @@ public abstract class DiskIIControllerCard : ICard
                     // Handle motor state transfer: hardware can only power one motor at a time
                     var oldDrive = _drives[oldDriveIndex];
                     var newDrive = _drives[_selectedDriveIndex];
-                    bool motorWasOn = oldDrive != null && oldDrive.MotorOn;
+                    // PHASE 2: Use new motor state check (dual-track)
+                    bool motorWasOn = IsMotorRunning;  // NEW (instead of oldDrive.MotorOn)
 
                     if (motorWasOn)
                     {
@@ -1117,6 +1125,9 @@ public abstract class DiskIIControllerCard : ICard
     {
         // CRITICAL: Cancel any pending motor-off FIRST to prevent stale scheduled shutdowns
         _motorOffScheduledCycle = 0;
+
+        // PHASE 2: Reset new motor state (dual-track)
+        _motorState = DiskIIMotorState.Off;  // NEW
 
         // IMMEDIATE motor shutdown - reset is emergency stop, no delay
         // Must happen before clearing shift register to prevent state corruption

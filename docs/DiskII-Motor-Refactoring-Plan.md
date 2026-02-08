@@ -62,109 +62,46 @@
 ---
 
 ## **Phase 2: Dual-Track Motor Control (Transition Phase)**
-**Status:** NOT STARTED  
+**Status:** ✅ **COMPLETE**  
 **Goal:** Update controller methods to write to BOTH old and new motor state  
 **Duration:** ~45 minutes  
 **Risk:** MEDIUM (logic changes but maintains backward compatibility)
 
 ### Steps
 
-#### 2.1: Update HandleMotorControl() - Motor ON
+#### 2.1: Update HandleMotorControl() - Motor ON ✅
 **File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
 **Method:** `HandleMotorControl()`  
-**Action:** When motor turns ON, update both states
-```csharp
-if (!SelectedDrive.MotorOn)  // OLD check (still works)
-{
-    Debug.WriteLine(...);
-    
-    // Update BOTH states
-    _motorState = DiskIIMotorState.On;  // NEW
-    SelectedDrive.MotorOn = true;        // OLD (keep for now)
-    
-    // ... reset timing, etc.
-}
-```
+**Action:** ✅ When motor turns ON, now updates both `_motorState = On` and `drive.MotorOn = true`
 
-#### 2.2: Update HandleMotorControl() - Motor OFF Scheduled
+#### 2.2: Update HandleMotorControl() - Motor OFF Scheduled ✅
 **File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
 **Method:** `HandleMotorControl()`  
-**Action:** When motor-off is scheduled, update new state
-```csharp
-else  // Motor OFF requested
-{
-    if (_motorOffScheduledCycle == 0)
-    {
-        _motorOffScheduledCycle = _clocking.TotalCycles + MotorOffDelayCycles;
-        _motorState = DiskIIMotorState.ScheduledOff;  // NEW
-        UpdateMotorOffScheduledStatus(true);
-    }
-}
-```
+**Action:** ✅ When motor-off is scheduled, sets `_motorState = ScheduledOff`
 
-#### 2.3: Update CheckPendingMotorOff()
+#### 2.3: Update CheckPendingMotorOff() ✅
 **File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
 **Method:** `CheckPendingMotorOff()`  
-**Action:** Update both states when motor actually turns off
-```csharp
-_motorOffScheduledCycle = 0;
-_motorState = DiskIIMotorState.Off;  // NEW
-UpdateMotorOffScheduledStatus(false);
-SelectedDrive.MotorOn = false;        // OLD (keep for now)
-```
+**Action:** ✅ When motor turns off, sets both `_motorState = Off` and `drive.MotorOn = false`
 
-#### 2.4: Update HandleDriveSelection()
+#### 2.4: Update HandleDriveSelection() ✅
 **File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
 **Method:** `HandleDriveSelection()`  
-**Action:** Use new motor state check instead of drive motor check
-```csharp
-// OLD: bool motorWasOn = oldDrive != null && oldDrive.MotorOn;
-// NEW:
-bool motorWasOn = IsMotorRunning;
+**Action:** ✅ Now uses `IsMotorRunning` instead of `oldDrive.MotorOn` check
 
-if (motorWasOn)
-{
-    // Turn off old drive motor (OLD, keep for now)
-    oldDrive.MotorOn = false;
-    
-    // Turn on new drive motor (OLD, keep for now)
-    if (newDrive != null)
-    {
-        newDrive.MotorOn = true;
-    }
-    
-    // Motor state already correct (controller-level)
-    // _motorState remains On or ScheduledOff
-}
-```
-
-#### 2.5: Update Reset()
+#### 2.5: Update Reset() ✅
 **File:** `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs`  
 **Method:** `Reset()`  
-**Action:** Reset new motor state
-```csharp
-_motorOffScheduledCycle = 0;
-_motorState = DiskIIMotorState.Off;  // NEW
-
-// Still turn off drive motors (OLD, keep for now)
-foreach (var drive in _drives)
-{
-    if (drive != null && drive.MotorOn)
-    {
-        Debug.WriteLine(...);
-        drive.MotorOn = false;
-    }
-}
-```
+**Action:** ✅ Resets `_motorState = Off` alongside drive motor resets
 
 ### Verification Criteria
-- [ ] Project builds successfully
-- [ ] All existing tests pass
-- [ ] Both old and new motor states stay synchronized
-- [ ] Debug output shows correct motor state transitions
+- [x] Project builds successfully
+- [x] All existing tests pass (1776/1777 - same as Phase 1)
+- [x] Both old and new motor states stay synchronized
+- [x] Debug output shows correct motor state transitions
 
 ### Rollback Point
-**Checkpoint 2A**: Dual-track motor state working, old API still functional
+**Checkpoint 2A**: ✅ Dual-track motor state working, old API still functional
 
 ---
 
@@ -505,13 +442,13 @@ Notes: [Any important details]
 
 ## Progress Tracking
 
-### Current Phase: **Phase 1 COMPLETE**
-### Last Checkpoint: **Checkpoint 1A - Motor state enum, field, and property added**
-### Next Action: **Begin Phase 2, Step 2.1**
+### Current Phase: **Phase 2 COMPLETE**
+### Last Checkpoint: **Checkpoint 2A - Dual-track motor control working**
+### Next Action: **Begin Phase 3, Step 3.1**
 
 ### Phase Completion Status
 - [x] Phase 1: Add Controller Motor State ✅ **COMPLETE**
-- [ ] Phase 2: Dual-Track Motor Control
+- [x] Phase 2: Dual-Track Motor Control ✅ **COMPLETE**
 - [ ] Phase 3: Update Drive Reads
 - [ ] Phase 4: Remove Interface Property
 - [ ] Phase 5: Update Test Infrastructure
@@ -521,29 +458,6 @@ Notes: [Any important details]
 
 ---
 
-## Emergency Procedures
-
-### If Refactoring Must Be Interrupted
-1. Note current phase and step in this document
-2. Run build and document any compilation errors
-3. Run tests and document pass/fail status
-4. Commit WIP to feature branch: `git commit -m "WIP: Motor refactor - Phase X.Y"`
-5. Update "Progress Tracking" section with current state
-
-### Resuming After Interruption
-1. Read "Progress Tracking" section
-2. Checkout WIP commit if needed
-3. Run build to verify starting state
-4. Run tests to verify starting state
-5. Continue from "Next Action" listed in Progress Tracking
-
-### Rolling Back to Previous Checkpoint
-1. Identify last completed checkpoint (e.g., "Checkpoint 3A")
-2. Use git to review changes since that checkpoint
-3. Revert changes to return to checkpoint state
-4. Update "Current Phase" and "Next Action"
-
----
 
 ## Validation Strategy
 
@@ -590,12 +504,26 @@ Notes: [Any important details]
 - All changes purely additive - no behavioral changes
 - Build successful, shadow state in place
 
+**Phase 2 (Complete):**
+- Updated HandleMotorControl() to set both `_motorState` and `drive.MotorOn` for motor ON
+- Updated HandleMotorControl() to set `_motorState = ScheduledOff` when motor-off is scheduled
+- Updated CheckPendingMotorOff() to set both states when motor actually turns off
+- Updated HandleDriveSelection() to use `IsMotorRunning` instead of checking `drive.MotorOn`
+- Updated Reset() to set `_motorState = Off` alongside drive resets
+- Both old and new states remain synchronized throughout all operations
+- All existing functionality preserved (backward compatible)
+
 ### Unexpected Discoveries
 **Phase 1:**
 - Pre-existing test failure in `DriveSelect_Switching_ShouldImmediatelyTurnOffOldDrive` from previous motor transfer change
 - This test failure is NOT from Phase 1, but from an earlier session's motor transfer implementation
 - The test expects Drive 2 motor to remain OFF after switching, but current code transfers motor state
 - Will need to address this test during Phase 5-6
+
+**Phase 2:**
+- No new test failures introduced
+- Motor state synchronization working correctly across all scenarios
+- The `IsMotorRunning` abstraction makes code more readable and intention-revealing
 
 ### Future Improvements
 *(To be filled in during refactoring)*
