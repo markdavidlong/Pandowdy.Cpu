@@ -154,7 +154,7 @@ public class DiskImageFactoryTests
     }
 
     [Fact]
-    public void CreateProvider_ReturnsInternalWozProvider_ForWozFile()
+    public void CreateProvider_ReturnsWozProvider_ForWozFile()
     {
         // Arrange
         if (!TestDiskImages.TestImagesAvailable)
@@ -167,7 +167,7 @@ public class DiskImageFactoryTests
         using IDiskImageProvider provider = _factory.CreateProvider(TestDiskImages.TestWoz);
 
         // Assert
-        Assert.IsType<InternalWozDiskImageProvider>(provider);
+        Assert.IsType<WozDiskImageProvider>(provider);
         Assert.Equal(TestDiskImages.TestWoz, provider.FilePath);
     }
 
