@@ -132,7 +132,9 @@ public class DiskIIDrive : IDiskIIDrive
             _quarterSteps = DiskIIConstants.MaxQuarterTracks;
             if (!_hitMaxLogged)
             {
+#if ControllerDebug
                 Debug.WriteLine($"Drive '{Name}' head hit maximum position at quarter-track {_quarterSteps}");
+#endif
                 _hitMaxLogged = true;
             }
         }
@@ -157,7 +159,9 @@ public class DiskIIDrive : IDiskIIDrive
             _quarterSteps = 0;
             if (!_hitMinLogged)
             {
+#if ControllerDebug
                 Debug.WriteLine($"Drive '{Name}' head hit minimum position at quarter-track 0");
+#endif
                 _hitMinLogged = true;
             }
         }

@@ -169,10 +169,10 @@ public class WozDiskImageProvider : IDiskImageProvider, IDisposable
             _stream?.Dispose();
             throw;
         }
-
+#if ControllerDebug
         Debug.WriteLine($"Loaded .woz disk image: {filePath} (5.25\" GCR disk, {DiskIIConstants.CyclesPerBit:F6} cycles/bit)");
+#endif
     }
-
     /// <summary>
     /// Generates a random bit to simulate MC3470 controller behavior when no track data exists.
     /// </summary>
@@ -212,7 +212,9 @@ public class WozDiskImageProvider : IDiskImageProvider, IDisposable
             int printableTrack = qTrack / QuartersPerTrack;
             int printableQuarter = (qTrack % QuartersPerTrack) * 25;
             _currentQuarterTrack = qTrack;
+#if ControllerDebug
             Debug.WriteLine($"WozDiskImageProvider: Disk head moved to track {printableTrack}.{printableQuarter} (quarter-track {qTrack})");
+#endif
         }
     }
 

@@ -119,8 +119,7 @@ public abstract class DiskIIControllerCard : ICard
 
     private static readonly int[][] PositionToDirection =
     [
-        //   N  NE   E  SE   S  SW   W  NW
-        //   0   1   2   3   4   5   6   7
+        //   N-0 NE-1 E-2 SE-3 S-4 SW-5 W-6 NW-7
         [  0,  1,  2,  3,  0, -3, -2, -1 ], // 0 N
         [ -1,  0,  1,  2,  3,  0, -3, -2 ], // 1 NE
         [ -2, -1,  0,  1,  2,  3,  0, -3 ], // 2 E
@@ -378,9 +377,9 @@ public abstract class DiskIIControllerCard : ICard
             // Move the head by the calculated offset
             MoveHead(direction);
 
-//#if ControllerDebug
+#if ControllerDebug
             Debug.WriteLine($"[{_clocking.TotalCycles}] 🔄 Head moved: Position {lastPosition}→{targetPosition}, Direction={direction:+0;-0}, QuarterTrack={SelectedDrive.QuarterTrack}, Track={SelectedDrive.Track:F2}");
-//#endif
+#endif
         }
     }
 
@@ -430,9 +429,9 @@ public abstract class DiskIIControllerCard : ICard
                 // Motor ON: Cancel any pending motor-off and turn motor on immediately
                 if (_motorOffScheduledCycle > 0)
                 { 
-//#if ControllerDebug
+#if ControllerDebug
                     Debug.WriteLine($"[{_clocking.TotalCycles}] ℹ️ MOTOR-OFF CANCELLED (was scheduled for cycle {_motorOffScheduledCycle})");
-//#endif
+#endif
                     _motorOffScheduledCycle = 0;
 
                     // Update status: motor-off no longer scheduled
@@ -441,9 +440,9 @@ public abstract class DiskIIControllerCard : ICard
 
                 if (_motorState == DiskIIMotorState.Off)  // NEW: Check controller state
                 {
-//#if ControllerDebug
+#if ControllerDebug
                 Debug.WriteLine($"[{_clocking.TotalCycles}] 🔵 MOTOR ON - Drive {_selectedDriveIndex + 1}, Track {SelectedDrive.Track:F2}");
-//#endif
+#endif
                     _lastBitShiftCycle = _clocking.TotalCycles;  // Only reset timing (matches TypeScript cycleRemainder = 0)
                     // DON'T clear _shiftRegister - it must maintain state across motor cycles!
                     _diagnosticShiftReg = 0; // Clear diagnostic shift register for fresh tracking
@@ -465,9 +464,9 @@ public abstract class DiskIIControllerCard : ICard
                 if (_motorOffScheduledCycle == 0)
                 {
                     _motorOffScheduledCycle = _clocking.TotalCycles + MotorOffDelayCycles;
-//#if ControllerDebug
+#if ControllerDebug
                 Debug.WriteLine($"[{_clocking.TotalCycles}] ⏱️ MOTOR-OFF SCHEDULED for cycle {_motorOffScheduledCycle} (~1 sec delay)");
-//#endif
+#endif
                     // PHASE 2: Update new motor state (dual-track)
                     _motorState = DiskIIMotorState.ScheduledOff;  // NEW
                     // Update status: motor-off now scheduled
@@ -486,9 +485,9 @@ public abstract class DiskIIControllerCard : ICard
     {
         if (_motorOffScheduledCycle > 0 && _clocking.TotalCycles >= _motorOffScheduledCycle && SelectedDrive != null)
         {
-//#if ControllerDebug
+#if ControllerDebug
             Debug.WriteLine($"[{_clocking.TotalCycles}] 🔴 MOTOR OFF (delayed) - Drive {_selectedDriveIndex + 1}, Track {SelectedDrive.Track:F2}");
-//#endif
+#endif
 
             // Clear the schedule before turning motor off
             _motorOffScheduledCycle = 0;
@@ -585,9 +584,9 @@ public abstract class DiskIIControllerCard : ICard
 
                 if (oldDriveIndex != _selectedDriveIndex)
                 {
-       // #if ControllerDebug
+#if ControllerDebug
                     Debug.WriteLine($"[{_clocking.TotalCycles}] 💿 DRIVE SELECT: Drive {_selectedDriveIndex + 1} (was Drive {oldDriveIndex + 1})");
-       // #endif
+#endif
 
                     // Handle motor state during drive switch
                     // PHASE 4: Motor state is controller-level, no drive assignments needed
@@ -768,11 +767,6 @@ public abstract class DiskIIControllerCard : ICard
                 return;
             }
 
-            // DEBUG: Log when we get bits
-            //if (_diagnosticByteCount < 10)
-            //{
-            //    Debug.WriteLine($"[{currentCycle}] ProcessBits: elapsed={elapsedCycles:F1}, got {bitCount} bits, shiftReg=0x{_shiftRegister:X2}");
-            //}
 
             bool stopEarly = false;
 
@@ -861,11 +855,11 @@ public abstract class DiskIIControllerCard : ICard
 
                     // Verify checksum
                     byte calculatedChecksum = (byte)(volume ^ track ^ sector);
-//#if ControllerDebug
+#if ControllerDebug
                     string checksumStatus = (checksum == calculatedChecksum) ? "✓" : "✗ FAIL";
 
                     Debug.WriteLine($"     📋 Address Field: Vol={volume:D3} Track={track:D2} Sector={sector:D2} Checksum={checksum:X2} {checksumStatus}");
-//#endif
+#endif
 
                     // Update disk status with current track and sector
                     UpdateTrackAndSector(track, sector);
@@ -1175,12 +1169,12 @@ public abstract class DiskIIControllerCard : ICard
 
         // IMMEDIATE motor shutdown - reset is emergency stop, no delay
         // Motor control is now at controller level
-//#if ControllerDebug
+#if ControllerDebug
         if (IsMotorRunning)
         {
             Debug.WriteLine($"[{_clocking.TotalCycles}] 🔴 RESET: Immediate motor-off on Drive {_selectedDriveIndex + 1}");
         }
-//#endif
+#endif
 
         // NOW it's safe to reset controller state (motors are stopped)
         _shiftRegister = 0;

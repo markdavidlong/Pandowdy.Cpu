@@ -20,15 +20,15 @@
 1. [In Progress Tasks](#in-progress-tasks)
    - None
 2. [Active Tasks](#active-tasks)
+   - [Task 28: Unified Internal Disk Format Architecture](#task-28-unified-internal-disk-format-architecture-medium-priority)
+   - [Task 29: Debug Disk Image Writing](#task-29-debug-disk-image-writing-high-priority)
+   - [Task 30: Export Disk Data to File System](#task-30-export-disk-data-to-file-system-medium-priority)
    - [Task 22: Intermediate Debugger Implementation](#task-22-intermediate-debugger-implementation-high-priority)
    - [Task 5: GUI Disk Management Features](#task-5-gui-disk-management-features-high-priority)
    - [Task 13: Audio Emulation Implementation](#task-13-audio-emulation-implementation-medium-priority)
 3. [Backlog](#backlog)
    - [Task 4: HGR Flicker Investigation](#task-4-hgr-flicker-investigation-medium-priority)
    - [Task 7: Handle BRK Loops in Interrupt Handler](#task-7-handle-brk-loops-in-interrupt-handler-low-priority)
-   - [Task 10: SectorDiskImageProvider Debugging](#task-10-sectordiskimageprovider-debugging-medium-priority)
-   - [Task 9: Multi-Drive Operation Deep Dive](#task-9-multi-drive-operation-deep-dive-low-priority)
-   - [Task 11: Conditional Compilation for Disk Provider Debug Output](#task-11-conditional-compilation-for-disk-provider-debug-output-medium-priority)
    - [Task 12: Flexible Window Docking System](#task-12-flexible-window-docking-system-medium-priority)
    - [Task 14: Speed-Proportional Key Feeding](#task-14-speed-proportional-key-feeding-low-priority)
    - [Task 15: Authentic Apple II Keyboard Repeat](#task-15-authentic-apple-ii-keyboard-repeat-low-priority)
@@ -43,10 +43,15 @@
    - [Task 3: Removed](#task-3-removed)
    - [Task 6: Clear Pending Keystrokes on Reset](#task-6-clear-pending-keystrokes-on-reset)
    - [Task 8: Check for Race Conditions at High Speeds](#task-8-check-for-race-conditions-at-high-speeds)
+   - [Task 9: Multi-Drive Operation Deep Dive](#task-9-multi-drive-operation-deep-dive)
+   - [Task 10: SectorDiskImageProvider Refactoring](#task-10-sectordiskimageprovider-refactoring)
    - [Task 18: Migrate to Pandowdy.Cpu](#task-18-migrate-to-pandowdycpu-critical-priority)
    - [Task 19: Basic Debugger Foundation](#task-19-basic-debugger-foundation)
    - [Task 24: Fix DiskII Motor-Off Behavior on Drive Switching](#task-24-fix-diskii-motor-off-behavior-on-drive-switching)
    - [Task 25: Disk II Motor State Refactoring - Move to Controller Level](#task-25-disk-ii-motor-state-refactoring---move-to-controller-level)
+   - [Task 26: WozDiskImageProvider Drive Switching Fix](#task-26-wozdiskimageprovider-drive-switching-fix)
+   - [Task 27: NibDiskImageProvider Drive Switching Fix](#task-27-nibdiskimageprovider-drive-switching-fix)
+   - [Task 11: Conditional Compilation for Disk Provider Debug Output](#task-11-conditional-compilation-for-disk-provider-debug-output)
 5. [Code Style Guidelines](#code-style-guidelines)
 6. [Git Best Practices](#git-best-practices)
 7. [Testing Guidelines](#testing-guidelines)
@@ -567,6 +572,138 @@ Same drive switching bug as Task 27. Fixed by applying identical per-provider cy
 
 ---
 
+### Task 29: Debug Disk Image Writing (High Priority)
+
+**Goal:** Debug and verify disk write functionality to ensure data written to disk images is correctly persisted and readable.
+
+**Status:** ⏳ NOT STARTED
+
+**Current State:**
+- Disk read operations working correctly (Tasks 26, 27 completed)
+- Write operations implemented but not fully tested
+- Need to verify GCR encoding, checksums, and sector formatting on writes
+- Write-back to disk image files needs verification
+
+**Problem:**
+- Disk write operations may have timing or encoding issues
+- Need to verify written data can be read back correctly
+- Need to test write operations across all disk formats
+- Copy-protected disk behavior on write attempts needs investigation
+
+**Areas to Investigate:**
+- GCR encoding correctness on writes
+- Sector checksum calculation and placement
+- Write timing relative to disk rotation
+- Dirty flag tracking and write-back triggers
+- Format-specific write behavior (WOZ vs NIB vs sector-based)
+
+**Testing Strategy:**
+- Create test disk image, write data, read back and verify
+- Test sector-level writes (DOS 3.3 RWTS)
+- Test file-level operations (SAVE, BSAVE, file copy)
+- Compare written data with known-good reference
+- Verify written images can boot and operate correctly
+
+**Files to Focus On:**
+- `Pandowdy.EmuCore\DiskII\Providers\NibDiskImageProvider.cs` - WriteBit implementation
+- `Pandowdy.EmuCore\DiskII\Providers\SectorDiskImageProvider.cs` - Sector write handling
+- `Pandowdy.EmuCore\DiskII\Providers\InternalWozDiskImageProvider.cs` - WOZ write support
+- `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs` - Write enable/disable handling
+
+**Priority:** High
+
+**Dependencies:**
+- Builds on completed Tasks 26, 27 (drive switching fixes)
+- Related to Task 28 (Unified Internal Disk Format) - may benefit from unified write path
+
+---
+
+### Task 30: Export Disk Data to File System (Medium Priority)
+
+**Goal:** Implement ability to export modified disk images back to standard disk image file formats, with options to save as new file or overwrite original.
+
+**Status:** ⏳ NOT STARTED
+
+**Current State:**
+- Disk images loaded into internal representation
+- Modifications stored in memory during emulation
+- No mechanism to persist changes back to disk files
+- No "Save As" functionality for different formats
+
+**Features to Implement:**
+
+1. **Save Modified Disk Image**
+   - Save changes back to original file (if not write-protected)
+   - Preserve original format on save
+   - Prompt if overwriting original
+   - Auto-save option (configurable)
+
+2. **Save As / Export to New File**
+   - Save dialog with format selection
+   - Support export to: .dsk, .do, .po, .nib, .woz
+   - Allow renaming during save
+   - Choose destination directory
+
+3. **Format Conversion**
+   - Convert between formats during export
+   - Warn if conversion is lossy (e.g., WOZ → DSK loses copy protection)
+   - Preserve metadata where possible
+
+4. **Dirty Flag Tracking**
+   - Track modified state per drive
+   - Visual indicator in UI (asterisk in title, icon change)
+   - Prompt to save on eject/exit if dirty
+   - Clear dirty flag after successful save
+
+**Implementation Approach:**
+
+```csharp
+public interface IDiskImageExporter
+{
+    /// <summary>Export disk to specified format.</summary>
+    void Export(IDiskImageProvider source, string filePath, DiskFormat format);
+
+    /// <summary>Save disk back to original file.</summary>
+    void Save(IDiskImageProvider source);
+
+    /// <summary>Check if format conversion is lossless.</summary>
+    bool IsLosslessConversion(DiskFormat source, DiskFormat target);
+}
+```
+
+**Lossy Conversion Warnings:**
+- **WOZ → NIB/DSK:** May lose variable track lengths, timing info, copy protection
+- **NIB → DSK:** May fail if non-standard GCR encoding (copy protection)
+- **DSK → NIB/WOZ:** Lossless (synthesize standard GCR)
+
+**Files to Create:**
+- `Pandowdy.EmuCore\DiskII\Exporters\DiskImageExporter.cs` - Export coordinator
+- `Pandowdy.EmuCore\DiskII\Exporters\NibExporter.cs` - NIB format export
+- `Pandowdy.EmuCore\DiskII\Exporters\DskExporter.cs` - DSK/DO/PO export (GCR decode)
+- `Pandowdy.EmuCore\DiskII\Exporters\WozExporter.cs` - WOZ format export
+
+**Files to Modify:**
+- `Pandowdy.UI\ViewModels\MainWindowViewModel.cs` - Save/SaveAs commands
+- `Pandowdy.UI\ViewModels\DiskStatusPanelViewModel.cs` - Dirty indicator
+- `Pandowdy.UI\MainWindow.axaml` - Menu items (Save, Save As)
+- `Pandowdy.EmuCore\DiskII\Providers\*` - Add IsDirty property, track modifications
+
+**UI Integration:**
+- Menu: File → Save Disk → Drive 1 / Drive 2
+- Menu: File → Save Disk As → Drive 1 / Drive 2
+- Keyboard shortcuts: Ctrl+S (save current drive), Ctrl+Shift+S (save as)
+- Dirty indicator: "*" next to filename in disk status panel
+- Exit confirmation: "Disk in Drive 1 has unsaved changes. Save before exiting?"
+
+**Priority:** Medium
+
+**Dependencies:**
+- **Requires:** Task 29 (Debug Disk Image Writing) - writes must work correctly first
+- **Requires:** Task 5 (GUI Disk Management Features) - UI infrastructure for disk operations
+- Related to Task 28 (Unified Internal Disk Format) - exporters align with that architecture
+
+---
+
 ## Backlog
 
 ### Task 3: Removed
@@ -621,158 +758,6 @@ Same drive switching bug as Task 27. Fixed by applying identical per-provider cy
 - `legacy\6502.NET\src\Core\Emulator.cs`
 
 **Priority:** Low
-
----
-
-### Task 9: Multi-Drive Operation Deep Dive (Low Priority)
-
-**Goal:** Verify multi-drive operation matches real Disk II hardware behavior.
-
-**Status:** ✅ MOSTLY COMPLETE - Real-world testing recommended
-
-**Implementation Summary:**
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| 2 independent drives | ✅ COMPLETE | Each DiskIIDrive has own QuarterTrack, MotorOn, disk media |
-| Single motor at a time | ✅ COMPLETE | Drive switch immediately turns off old drive's motor |
-| Motor-off timing with drive switch | ✅ COMPLETE | Scheduled motor-off cancelled on switch |
-| Per-drive head position | ✅ COMPLETE | Each drive maintains own QuarterTrack (0-139) - preserved across switches |
-| Controller phase reset on switch | ✅ COMPLETE | `_currentPhase` cleared on drive switch |
-
-**Architecture Notes:**
-
-The implementation correctly separates controller state from drive state:
-
-| State | Location | Behavior on Drive Switch |
-|-------|----------|--------------------------|
-| `_currentPhase` | Controller | **Cleared** - stepper coils are shared controller hardware |
-| `QuarterTrack` | Each Drive | **Preserved** - models physical head position that stays where it was |
-| `MotorOn` | Each Drive | Old drive turned **OFF** immediately (hardware can only power one motor) |
-
-This matches real Disk II hardware:
-- The stepper motor magnets are energized by the controller, so phases must be re-established after switching
-- Each drive's head physically stays at whatever track it was on
-- Software must re-activate phases to seek on the newly selected drive
-
-**Existing Tests:**
-- `MultiDrive_Drive1Selected_ByDefault`
-- `MultiDrive_SelectDrive2_AffectsMotorCommands`
-- `MultiDrive_SwitchingDrives_TurnsOffOldDriveMotor`
-- `MultiDrive_SelectDrive1_AfterDrive2`
-
-**Remaining Verification:**
-- [ ] Test with real-world copy utilities (Copy II Plus, Locksmith, etc.)
-- [ ] Optional: Add explicit test for head position preservation across drive switches
-
-**Files:**
-- `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs` (HandleDriveSelection, lines 538-571)
-- `Pandowdy.EmuCore\DiskII\DiskIIDrive.cs` (QuarterTrack property preserved per-drive)
-- `Pandowdy.EmuCore.Tests\DiskII\DiskIIIntegrationTests.cs` (Multi-Drive Tests region)
-
-**Priority:** Low (core implementation complete and architecturally correct)
-
----
-
-### Task 10: SectorDiskImageProvider Debugging (Medium Priority)
-
-**Goal:** Thorough testing and debugging of sector-based disk image provider (DSK/DO/PO formats that require GCR synthesis).
-
-**Status:** ⏳ NOT STARTED
-
-**Problem:**
-- Potential issues with DSK/DO/PO format support
-- GCR synthesis from sector data needs validation
-- Lower priority than WOZ/NIB debugging (Tasks 26-27) since those formats are more commonly used
-
-**Areas to Investigate:**
-- GCR encoding correctness
-- Track synthesis timing
-- Sector interleaving (DOS 3.3 vs ProDOS)
-- Address field generation
-- Checksum calculation
-- Volume number handling
-
-**Test Strategy:**
-- Compare synthesized NIB output with known-good NIB files
-- Test with DOS 3.3 and ProDOS system disks
-- Verify sector reads return correct data
-- Test both .dsk (DOS order) and .po (ProDOS order) formats
-- Verify .do (DOS order) format support
-
-**Files to Focus On:**
-- `Pandowdy.EmuCore\DiskII\Providers\SectorDiskImageProvider.cs`
-- `Pandowdy.EmuCore\DiskII\GcrEncoder.cs`
-- `Pandowdy.EmuCore.Tests\DiskII\Providers\SectorDiskImageProviderTests.cs` (13 tests exist)
-
-**Priority:** Medium (blocks DSK/DO/PO format support, but less urgent than WOZ/NIB fixes)
-
-**Dependencies:**
-- Should be addressed after Tasks 26-27 (WOZ/NIB debugging)
-- Would benefit from debugger (Task 19) for stepping through GCR encoding and sector synthesis
-- May benefit from Task 11 (conditional debug output) for cleaner debugging
-
----
-
-### Task 11: Conditional Compilation for Disk Provider Debug Output (Medium Priority)
-
-**Goal:** Reduce performance impact of debugging output in disk provider classes.
-
-**Status:** ⏳ NOT STARTED
-
-**Current State:**
-- Disk provider classes output excessive debugging information
-- Debug output causes performance degradation during normal operation
-- No way to selectively enable/disable disk provider debugging
-
-**Problem:**
-- Performance is impacted by always-on informative debug output
-- Too much noise in debug console during normal operation
-- Need conditional compilation to control routine disk-related debugging
-- Warning/error messages about unexpected conditions should remain active
-
-**Proposed Solution:**
-Wrap **informative** debugging output with conditional compilation directives. Keep warning/error messages active:
-
-```csharp
-// Wrap informative messages (routine operation status):
-#if DebugDiskProviders
-    Debug.WriteLine($"Track {track}, Sector {sector}, reading...");
-    Debug.WriteLine($"Motor on, seeking to track {quarterTrack}");
-#endif
-
-// Keep warning/error messages active (unexpected conditions):
-Debug.WriteLine($"WARNING: Invalid track number {track}, clamping to valid range");
-Debug.WriteLine($"ERROR: Checksum mismatch in sector {sector}");
-Debug.WriteLine($"WARNING: Disk image size {size} does not match expected {expected}");
-```
-
-**Criteria for Wrapping:**
-- ✅ **Wrap:** Routine status, progress updates, normal operation flow
-- ✅ **Wrap:** Verbose bit/byte-level read/write logging
-- ✅ **Wrap:** Track/sector position updates during normal seeks
-- ❌ **Keep Active:** Warnings about unexpected/invalid data
-- ❌ **Keep Active:** Error conditions or data corruption detection
-- ❌ **Keep Active:** Clamping/recovery from invalid states
-
-**Files to Modify:**
-- `Pandowdy.EmuCore\DiskII\Providers\NibDiskImageProvider.cs`
-- `Pandowdy.EmuCore\DiskII\Providers\SectorDiskImageProvider.cs`
-- `Pandowdy.EmuCore\DiskII\Providers\InternalWozDiskImageProvider.cs`
-- `Pandowdy.EmuCore\DiskII\Providers\WozDiskImageProvider.cs`
-- `Pandowdy.EmuCore\DiskII\GcrEncoder.cs` (if debug output exists)
-- `Pandowdy.EmuCore\DiskII\DiskIIDrive.cs` (if debug output exists)
-- `Pandowdy.EmuCore\DiskII\DiskIIDebugDecorator.cs` (may need special handling)
-
-**Implementation Notes:**
-- Use `#if DebugDiskProviders` directive (not `DEBUG` which is too broad)
-- Keep debug code in place for future troubleshooting
-- Consider adding documentation on how to enable disk debugging
-- Verify performance improvement after changes
-
-**Priority:** Medium (performance impact, needed sooner than later)
-
-**Related:** See Task 8 (Race Conditions at High Speeds)
 
 ---
 
@@ -1781,6 +1766,11 @@ public interface IKeyboardResetter
 
 ---
 
+### Task 28: Unified Internal Disk Format Architecture (Medium Priority)
+
+- See File: docs/Internal-Disk-Format-Refactor-Plan.md
+
+
 ## Completed Tasks
 
 ### ✅ Task 1: Migrate VA2M to CpuClockingCounters.VBlankOccurred
@@ -1807,6 +1797,24 @@ public interface IKeyboardResetter
 
 ---
 
+### ✅ Task 9: Multi-Drive Operation Deep Dive
+
+**Completed:** 2025-02-06 - Multi-drive operation verified hardware-accurate
+
+---
+
+### ✅ Task 10: SectorDiskImageProvider Refactoring
+
+**Completed:** 2025-02-06 - Refactored to use DiskArc's SectorCodec for GCR synthesis
+
+---
+
+### ✅ Task 11: Conditional Compilation for Disk Provider Debug Output
+
+**Completed:** 2025-02-06 - Debug output now controlled with `#if ControllerDebug` statements
+
+---
+
 ### ✅ Task 18: Migrate to Pandowdy.Cpu
 
 **Completed:** 2025-01-27 - All 1206 tests passing
@@ -1825,13 +1833,14 @@ public interface IKeyboardResetter
 
 ---
 
+### ✅ Task 25: Disk II Motor State Refactoring - Move to Controller Level
+
+**Completed:** 2026-01 - All 2039 tests passing
+---
+
 ### ✅ Task 26: WozDiskImageProvider Drive Switching Fix
 
 **Completed:** 2025-02-05 - All 2039 tests passing
-
-**Problem:** WOZ provider used absolute `cycleCount` causing position errors when switching drives.
-
-**Solution:** Implemented per-provider cycle tracking - each disk maintains independent rotational position.
 
 See Task 27 below for complete details.
 
@@ -1841,175 +1850,8 @@ See Task 27 below for complete details.
 
 **Completed:** 2025-02-05 - All 2039 tests passing
 
-**Problem:** Random DOS 3.3 I/O errors when switching drives - bits skipped or read twice.
 
-**Root Cause:** Both NIB and WOZ providers used absolute `cycleCount` to calculate disk position. When switching drives, the newly selected drive calculated its position as if it had been spinning during the previous drive's reads, causing it to "jump ahead" to the wrong position.
 
-**Solution:** Per-provider cycle tracking
-- Added `_cycleOffsetAtFirstAccess` field (set on first read/write)
-- Added `_hasBeenAccessed` flag
-- Position calculated from `relativeCycles = cycleCount - _cycleOffsetAtFirstAccess`
-- Simulates each disk starting from arbitrary position when accessed
-
-**Implementation:**
-```csharp
-// Added to both NibDiskImageProvider and InternalWozDiskImageProvider:
-private ulong _cycleOffsetAtFirstAccess = 0;
-private bool _hasBeenAccessed = false;
-
-// In GetBit() and WriteBit():
-if (!_hasBeenAccessed)
-{
-    _cycleOffsetAtFirstAccess = cycleCount;
-    _hasBeenAccessed = true;
-}
-ulong relativeCycles = cycleCount - _cycleOffsetAtFirstAccess;
-int bitPosition = (int)((relativeCycles / DiskIIConstants.CyclesPerBit) % DiskIIConstants.BitsPerTrack);
-```
-
-**Files Modified:**
-- `Pandowdy.EmuCore/DiskII/Providers/NibDiskImageProvider.cs` - Added per-provider cycle tracking
-- `Pandowdy.EmuCore/DiskII/Providers/InternalWozDiskImageProvider.cs` - Same fix applied
-- `docs/Task-27-NIB-Provider-Analysis.md` - Created analysis document
-
-**Testing:**
-- All 2039 tests passing (no regressions)
-- Drive switching works correctly
-- Each disk maintains independent rotational position
-- Backward compatible
-
-**Technical Notes:**
-- `CyclesPerBit = 45/11` verified correct for 1.022727 MHz CPU (14.31818 MHz ÷ 14)
-- Motor architecture from Task 25 enables per-drive independence
-- Each provider instance represents one physical disk
-
-**User Insight:** Drive switching identified as primary cause of DOS 3.3 I/O errors
-
----
-
-## Code Style Guidelines
-1. `StopEmulator()` cancelled the token and set `IsRunning = false`
-2. Cleanup of `_emuCts` and `_emuTask` happened asynchronously via `Dispatcher.UIThread.Post()`
-3. If `OnEmuStartClicked()` was called before cleanup finished, it saw `_emuCts != null` (the old cancelled one) and returned early
-4. Eventually the continuation ran and set `IsRunning = false` again, but no new emulator thread was started
-5. **Result:** UI showed "paused" but no emulator thread existed - the emulator was in a "zombie" state
-
-**Fix Applied:**
-1. **Added lock object** (`_emuStateLock`) to synchronize start/stop operations
-2. **`OnEmuStartClicked` now:**
-   - Checks if there's a pending task that's still running (not just checking CTS)
-   - Cleans up completed task state synchronously before creating new CTS
-   - Uses lock to prevent race conditions
-3. **`StopEmulator` now:**
-   - Uses lock to safely get CTS/Task references
-   - Waits up to 100ms for the task to acknowledge cancellation (should be near-instant)
-   - Cleans up state immediately instead of relying on async continuation
-   - Ensures the emulator is fully stopped before returning
-
-**Architecture Improvement:**
-Removed reactive push pattern from `VA2M.PublishState()` that was causing 1000+ Hz state updates in unthrottled mode:
-- GUI now runs at 60 Hz polling rate (controlled by `IRefreshTicker`)
-- ViewModels poll at 20 Hz (sampled from the 60 Hz ticker)
-- Emulator runs at any speed without pushing state updates
-- MHz calculated at 4 Hz (every 0.25s) and stored for query
-- Eliminates boolean boxing from flag bindings at emulation speed
-
-**Files Modified:**
-- `Pandowdy.UI\MainWindow.axaml.cs` - Added lock synchronization for start/stop
-- `Pandowdy.EmuCore\VA2M.cs` - Removed PublishState(), changed MHz reporting to 0.25s
-- `Pandowdy.UI\ViewModels\EmulatorStateViewModel.cs` - Refactored to pull architecture, removed LineNumber
-- `Pandowdy.UI.Tests\ViewModels\EmulatorStateViewModelTests.cs` - Cleaned up (TODO comments for rewrite)
-- `Pandowdy.UI.Tests\ViewModels\MainWindowViewModelTests.cs` - Fixed constructor call
-
-**Benefits:**
-- Eliminates lockup when rapidly toggling F5 (pause/continue) and F9 (throttle toggle)
-- Prevents emulator "zombie" state where UI shows paused but no thread exists
-- Robust against rapid key combinations like F5-F9-F5-F9...
-- Cleaner architecture with pull-based state management
-- Significantly reduced GC pressure in unthrottled mode
-- Boolean boxing only occurs at UI refresh rate (20 Hz) instead of emulation speed (700+ Hz)
-
-**Related Issues:**
-- Task 4 (HGR Flicker Investigation) may also benefit from this fix
-- This was the root cause of reported freezing in Release mode unthrottled
-
----
-
-### ✅ Task 25: Disk II Motor State Refactoring - Move to Controller Level
-
-**Completed:** 2026-01 - All 2039 tests passing
-
-**Goal:** Move motor state management from individual drive implementations to controller level, reflecting the hardware reality that the controller has a single motor line powering only one drive at a time.
-
-**Architecture Change:**
-- **Before:** Each drive tracked its own `MotorOn` property; controller read/wrote this property
-- **After:** Controller owns motor state (Off/On/ScheduledOff) and active drive index; drives are passive mechanical devices
-
-**Motivation:**
-- Hardware accuracy: Real Disk II controller has ONE motor line that powers the selected drive
-- Simplified drive implementation: Drives are now purely mechanical (head position, disk I/O)
-- Clearer separation of concerns: Controller manages electrical/motor control, drives manage mechanical operations
-- Eliminated conceptual confusion: No more "motor on Drive 1" vs "motor on Drive 2" - there's ONE motor
-
-**Implementation:**
-Completed in 8 phases over multiple sessions (see `docs/DiskII-Motor-Refactoring-Plan.md`):
-1. **Phase 1:** Added shadow motor state to controller (additive only)
-2. **Phase 2:** Dual-track writes to both old and new state (backward compatible)
-3. **Phase 3:** Switched all reads to use controller state (drive state no longer consulted)
-4. **Phase 4:** Removed `MotorOn` property from `IDiskIIDrive` interface and implementations
-5. **Phase 5:** Updated all test infrastructure (removed 14 drive motor tests, fixed 9 integration tests)
-6. **Phase 6:** Integrated into Phase 5 (all test fixes completed)
-7. **Phase 7:** Completed in Phase 4 (all drive motor synchronization removed)
-8. **Phase 8:** Documentation updates (XML comments, Copilot instructions, this roadmap)
-
-**Key Changes:**
-- `DiskIIControllerCard`: Added `DiskIIMotorState` enum and `_motorState` field
-- `DiskIIControllerCard.IsMotorRunning`: Internal property for motor state checks (exposed to tests)
-- `IDiskIIDrive`: Removed `MotorOn` property
-- `DiskIIDrive` / `NullDiskIIDrive`: Removed motor state tracking
-- `DiskIIStatusDecorator`: Removed motor state forwarding (only publishes mechanical state)
-- Tests: Removed per-drive motor tests, updated to check `controller.IsMotorRunning`
-
-**Behavior Changes:**
-- Drive switching with motor on: Motor stays ON (just powers newly selected drive)
-- Previously: Appeared as if each drive had independent motor (incorrect hardware model)
-- Now: Single motor line accurately modeled
-
-**Files Modified:**
-Production code (9 files):
-- `Pandowdy.EmuCore/Interfaces/IDiskIIDrive.cs` - Updated documentation, removed MotorOn
-- `Pandowdy.EmuCore/Cards/DiskIIControllerCard.cs` - Added motor state management
-- `Pandowdy.EmuCore/DiskII/DiskIIDrive.cs` - Removed motor tracking
-- `Pandowdy.EmuCore/DiskII/NullDiskIIDrive.cs` - Removed motor tracking
-- `Pandowdy.EmuCore/DiskII/DiskIIDebugDecorator.cs` - Removed motor passthrough
-- `Pandowdy.EmuCore/DiskII/DiskIIStatusDecorator.cs` - Removed motor forwarding
-- `Pandowdy.EmuCore/Pandowdy.EmuCore.csproj` - Added InternalsVisibleTo for tests
-- `.github/copilot-instructions.md` - Added Disk II motor architecture section
-- `docs/Development-Roadmap.md` - This entry
-
-Test code (6 files):
-- `Pandowdy.EmuCore.Tests/DiskII/DiskIIDriveTests.cs` - Removed 7 motor tests
-- `Pandowdy.EmuCore.Tests/DiskII/NullDiskIIDriveTests.cs` - Removed 4 motor tests
-- `Pandowdy.EmuCore.Tests/DiskII/DiskIIDebugDecoratorTests.cs` - Removed 3 motor tests
-- `Pandowdy.EmuCore.Tests/Cards/DiskIIControllerCardTests.cs` - Fixed 2 tests
-- `Pandowdy.EmuCore.Tests/DiskII/DiskIISpecificationTests.cs` - Fixed 1 test
-- `Pandowdy.EmuCore.Tests/DiskII/DiskIIIntegrationTests.cs` - Fixed 6 tests
-
-**Verification:**
-- All 2039 tests passing (1766 EmuCore + 126 Disassembler + 147 UI)
-- Build successful
-- No skipped tests
-- Hardware-accurate behavior validated
-
-**Benefits:**
-- More accurate hardware emulation
-- Simplified drive implementations (passive mechanical devices)
-- Clearer code - motor state checks are explicitly controller-level
-- Better testability - single source of truth for motor state
-- Documentation accurately reflects implementation
-
-**Reference:**
-See `docs/DiskII-Motor-Refactoring-Plan.md` for detailed phase-by-phase execution plan and notes.
 
 ---
 
