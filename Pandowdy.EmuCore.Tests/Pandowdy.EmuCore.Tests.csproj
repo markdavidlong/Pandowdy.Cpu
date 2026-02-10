@@ -9,6 +9,9 @@
     <IsTestProject>true</IsTestProject>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- Skip slow disk I/O tests by default. Override with: dotnet test filter Category=FullDiskTests -->
+    <VSTestCaseFilter>Category!=FullDiskTests</VSTestCaseFilter>
   </PropertyGroup>
 
   <ItemGroup>

@@ -426,16 +426,19 @@ public class VA2MTests
 
     #endregion
 
-    #region Throttling Tests
+    #region Clock() Single-Step Tests
 
     [Fact]
-    public void Clock_WithThrottleDisabled_ExecutesQuickly()
+    public void Clock_AlwaysExecutesQuickly_NoThrottling()
     {
-        // Arrange
+        // Arrange - Clock() is now optimized for single-stepping with NO throttling
         var va2m = VA2MTestHelpers.CreateBuilder().Build();
-        va2m.ThrottleEnabled = false;
 
-        // Act - Run many cycles
+        // Clock() ignores ThrottleEnabled - it never throttles
+        // ThrottleEnabled only affects RunAsync()
+        va2m.ThrottleEnabled = true;  // This has no effect on Clock()
+
+        // Act - Run many cycles (single-step mode)
         var startTime = DateTime.UtcNow;
         for (int i = 0; i < 1000; i++)
         {
@@ -443,9 +446,29 @@ public class VA2MTests
         }
         var elapsed = DateTime.UtcNow - startTime;
 
-        // Assert - Should complete in well under 1 second
+        // Assert - Clock() is fast regardless of ThrottleEnabled setting
+        // Should complete in well under 1 second even with throttle "enabled"
         Assert.True(elapsed.TotalMilliseconds < 100, 
-            $"1000 unthrottled cycles took {elapsed.TotalMilliseconds}ms (should be < 100ms)");
+            $"1000 Clock() cycles took {elapsed.TotalMilliseconds}ms (should be < 100ms). " +
+            $"Clock() should never throttle - it's for single-stepping only.");
+    }
+
+    [Fact]
+    public void Clock_ProcessesPendingActionsBeforeAndAfter()
+    {
+        // Arrange - Verify that Clock() checks pending queue twice per cycle
+        var keyboard = new SingularKeyHandler();
+        var va2m = VA2MTestHelpers.CreateBuilder()
+            .WithKeyboardSetter(keyboard)
+            .Build();
+
+        // Act - Enqueue command and call Clock() once
+        va2m.EnqueueKey(0x41);
+        va2m.Clock();
+
+        // Assert - Command should be processed within the single Clock() call
+        Assert.True(keyboard.StrobePending());
+        Assert.Equal(0x41, keyboard.PeekCurrentKeyValue());
     }
 
     #endregion

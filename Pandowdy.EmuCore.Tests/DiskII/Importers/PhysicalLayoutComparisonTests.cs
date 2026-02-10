@@ -28,7 +28,13 @@ public class PhysicalLayoutComparisonTests
     [Fact]
     public void ComparePhysicalLayout_Track0_NewVsLegacy()
     {
+<<<<<<< HEAD
         if (!File.Exists(TestDiskImages.TestDo))
+=======
+        // Use temp copy to avoid file locking conflicts with parallel tests
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestDo);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             _output.WriteLine("test.do not found");
             return;
@@ -38,6 +44,7 @@ public class PhysicalLayoutComparisonTests
         _output.WriteLine($"=== Physical Layout Comparison: Track {track} ===");
         _output.WriteLine("");
 
+<<<<<<< HEAD
         // New importer
         var importer = new SectorImporter();
         InternalDiskImage newImage = importer.Import(TestDiskImages.TestDo);
@@ -48,6 +55,18 @@ public class PhysicalLayoutComparisonTests
         legacyProvider.SetQuarterTrack(track * 4);
         legacyProvider.GetBit(0);
         
+=======
+        // New importer (using temp copy)
+        var importer = new SectorImporter();
+        InternalDiskImage newImage = importer.Import(sourceCopy.FilePath);
+        CircularBitBuffer newTrack = newImage.Tracks[track];
+
+        // Legacy provider (using temp copy)
+        using var legacyProvider = new SectorDiskImageProvider(sourceCopy.FilePath);
+        legacyProvider.SetQuarterTrack(track * 4);
+        legacyProvider.GetBit(0);
+
+>>>>>>> internaldiskimage
         var legacyTrackCacheField = typeof(SectorDiskImageProvider)
             .GetField("_trackCache", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var legacyTrackCache = (CircularBitBuffer?[])legacyTrackCacheField!.GetValue(legacyProvider)!;

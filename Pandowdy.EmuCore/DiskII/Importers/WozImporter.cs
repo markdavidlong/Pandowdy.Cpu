@@ -124,8 +124,32 @@ public class WozImporter : IDiskImageImporter
                 // Try to get the main track (quarter position 0)
                 if (wozImage.GetTrackBits((uint)track, 0, out CircularBitBuffer? cbb) && cbb != null)
                 {
+<<<<<<< HEAD
                     tracks[track] = cbb;
                     trackBitCounts[track] = cbb.BitCount;
+=======
+                    // DiskArc returns read-only buffers; copy into writable buffers
+                    // so the emulator can write to disk
+                    int bitCount = cbb.BitCount;
+                    int byteCount = (bitCount + 7) / 8;
+                    byte[] trackData = new byte[byteCount];
+
+                    cbb.BitPosition = 0;
+                    for (int i = 0; i < byteCount; i++)
+                    {
+                        trackData[i] = cbb.ReadOctet();
+                    }
+
+                    tracks[track] = new CircularBitBuffer(
+                        trackData,
+                        byteOffset: 0,
+                        bitOffset: 0,
+                        bitCount: bitCount,
+                        new GroupBool(),
+                        isReadOnly: false
+                    );
+                    trackBitCounts[track] = bitCount;
+>>>>>>> internaldiskimage
                     tracksFound++;
                 }
                 else

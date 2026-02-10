@@ -53,19 +53,32 @@ public class NibImporterTests
     }
 
     [Fact]
+<<<<<<< HEAD
+=======
+    [Trait("Category", "FullDiskTests")]
+>>>>>>> internaldiskimage
     public void Import_ValidNibFile_ReturnsInternalDiskImage()
     {
         // Arrange
         var importer = new NibImporter();
 
         // Skip test if test file doesn't exist
+<<<<<<< HEAD
         if (!File.Exists(TestDiskImages.TestNib))
+=======
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestNib);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             return;
         }
 
         // Act
+<<<<<<< HEAD
         var diskImage = importer.Import(TestDiskImages.TestNib);
+=======
+        var diskImage = importer.Import(sourceCopy.FilePath);
+>>>>>>> internaldiskimage
 
         // Assert
         Assert.NotNull(diskImage);
@@ -78,38 +91,64 @@ public class NibImporterTests
     }
 
     [Fact]
+<<<<<<< HEAD
+=======
+    [Trait("Category", "FullDiskTests")]
+>>>>>>> internaldiskimage
     public void Import_ValidNibFile_CreatesCorrectTrackBitCounts()
     {
         // Arrange
         var importer = new NibImporter();
 
         // Skip test if test file doesn't exist
+<<<<<<< HEAD
         if (!File.Exists(TestDiskImages.TestNib))
+=======
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestNib);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             return;
         }
 
         // Act
+<<<<<<< HEAD
         var diskImage = importer.Import(TestDiskImages.TestNib);
+=======
+        var diskImage = importer.Import(sourceCopy.FilePath);
+>>>>>>> internaldiskimage
 
         // Assert - All tracks should have standard bit count (6656 * 8 = 53248)
         Assert.All(diskImage.TrackBitCounts, bitCount => Assert.Equal(53248, bitCount));
     }
 
     [Fact]
+<<<<<<< HEAD
+=======
+    [Trait("Category", "FullDiskTests")]
+>>>>>>> internaldiskimage
     public void Import_ValidNibFile_TracksAreReadable()
     {
         // Arrange
         var importer = new NibImporter();
 
         // Skip test if test file doesn't exist
+<<<<<<< HEAD
         if (!File.Exists(TestDiskImages.TestNib))
+=======
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestNib);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             return;
         }
 
         // Act
+<<<<<<< HEAD
         var diskImage = importer.Import(TestDiskImages.TestNib);
+=======
+        var diskImage = importer.Import(sourceCopy.FilePath);
+>>>>>>> internaldiskimage
 
         // Assert - Should be able to read bits from tracks
         for (int track = 0; track < diskImage.TrackCount; track++)

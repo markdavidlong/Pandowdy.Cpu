@@ -35,8 +35,14 @@ public class SectorComparisonTests
     [Fact]
     public void CompareSectorImporterVsLegacyProvider_AllTracksAllSectors_Match()
     {
+<<<<<<< HEAD
         // Skip if test file doesn't exist
         if (!File.Exists(TestDiskImages.TestDo))
+=======
+        // Use temp copy to avoid file locking conflicts with parallel tests
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestDo);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             _output.WriteLine("test.do not found, skipping test");
             return;
@@ -47,10 +53,17 @@ public class SectorComparisonTests
 
         // Import with new SectorImporter
         var importer = new SectorImporter();
+<<<<<<< HEAD
         InternalDiskImage newImage = importer.Import(TestDiskImages.TestDo);
 
         // Load with legacy SectorDiskImageProvider
         using var legacyProvider = new SectorDiskImageProvider(TestDiskImages.TestDo);
+=======
+        InternalDiskImage newImage = importer.Import(sourceCopy.FilePath);
+
+        // Load with legacy SectorDiskImageProvider
+        using var legacyProvider = new SectorDiskImageProvider(sourceCopy.FilePath);
+>>>>>>> internaldiskimage
 
         _output.WriteLine($"SectorImporter: {newImage.Tracks.Length} tracks");
         _output.WriteLine($"Legacy provider: Ready");
@@ -206,7 +219,13 @@ public class SectorComparisonTests
     [Fact]
     public void ShowTestDoTrack17PhysicalOrder()
     {
+<<<<<<< HEAD
         if (!File.Exists(TestDiskImages.TestDo))
+=======
+        // Use temp copy to avoid file locking conflicts with parallel tests
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestDo);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             _output.WriteLine("test.do not found, skipping test");
             return;
@@ -216,7 +235,11 @@ public class SectorComparisonTests
         _output.WriteLine("");
 
         var importer = new SectorImporter();
+<<<<<<< HEAD
         InternalDiskImage doImage = importer.Import(TestDiskImages.TestDo);
+=======
+        InternalDiskImage doImage = importer.Import(sourceCopy.FilePath);
+>>>>>>> internaldiskimage
 
         CircularBitBuffer track = doImage.Tracks[17];
         SectorCodec codec = StdSectorCodec.GetCodec(StdSectorCodec.CodecIndex525.Std_525_16);
@@ -255,7 +278,13 @@ public class SectorComparisonTests
     [Fact]
     public void CompareRawBufferBytes_Track0_FindFirstDifference()
     {
+<<<<<<< HEAD
         if (!File.Exists(TestDiskImages.TestDo))
+=======
+        // Use temp copy to avoid file locking conflicts with parallel tests
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestDo);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             _output.WriteLine("test.do not found, skipping test");
             return;
@@ -266,10 +295,17 @@ public class SectorComparisonTests
 
         // Import with new SectorImporter
         var importer = new SectorImporter();
+<<<<<<< HEAD
         InternalDiskImage newImage = importer.Import(TestDiskImages.TestDo);
 
         // Load with legacy SectorDiskImageProvider
         using var legacyProvider = new SectorDiskImageProvider(TestDiskImages.TestDo);
+=======
+        InternalDiskImage newImage = importer.Import(sourceCopy.FilePath);
+
+        // Load with legacy SectorDiskImageProvider
+        using var legacyProvider = new SectorDiskImageProvider(sourceCopy.FilePath);
+>>>>>>> internaldiskimage
 
         // Force track synthesis on legacy provider
         legacyProvider.SetQuarterTrack(0);
@@ -361,7 +397,13 @@ public class SectorComparisonTests
     [Fact]
     public void CompareAdvanceAndReadBits_Track0_FindFirstDifference()
     {
+<<<<<<< HEAD
         if (!File.Exists(TestDiskImages.TestDo))
+=======
+        // Use temp copy to avoid file locking conflicts with parallel tests
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestDo);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             _output.WriteLine("test.do not found, skipping test");
             return;
@@ -372,11 +414,19 @@ public class SectorComparisonTests
 
         // Import with new SectorImporter via UnifiedDiskImageProvider
         var importer = new SectorImporter();
+<<<<<<< HEAD
         InternalDiskImage newImage = importer.Import(TestDiskImages.TestDo);
         var newProvider = new UnifiedDiskImageProvider(newImage);
 
         // Load with legacy SectorDiskImageProvider
         var legacyProvider = new SectorDiskImageProvider(TestDiskImages.TestDo);
+=======
+        InternalDiskImage newImage = importer.Import(sourceCopy.FilePath);
+        var newProvider = new UnifiedDiskImageProvider(newImage);
+
+        // Load with legacy SectorDiskImageProvider
+        var legacyProvider = new SectorDiskImageProvider(sourceCopy.FilePath);
+>>>>>>> internaldiskimage
 
         // Set both to track 0
         newProvider.SetQuarterTrack(0);

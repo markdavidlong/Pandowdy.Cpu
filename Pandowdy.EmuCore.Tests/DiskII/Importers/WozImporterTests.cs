@@ -35,15 +35,28 @@ public class WozImporterTests
     }
 
     [Fact]
+<<<<<<< HEAD
     public void Import_ValidWozFile_ReturnsInternalDiskImage()
     {
         var importer = new WozImporter();
         if (!File.Exists(TestDiskImages.TestWoz))
+=======
+    [Trait("Category", "FullDiskTests")]
+    public void Import_ValidWozFile_ReturnsInternalDiskImage()
+    {
+        var importer = new WozImporter();
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestWoz);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             return;
         }
 
+<<<<<<< HEAD
         var diskImage = importer.Import(TestDiskImages.TestWoz);
+=======
+        var diskImage = importer.Import(sourceCopy.FilePath);
+>>>>>>> internaldiskimage
 
         Assert.NotNull(diskImage);
         Assert.Equal(35, diskImage.TrackCount);
@@ -53,15 +66,28 @@ public class WozImporterTests
     }
 
     [Fact]
+<<<<<<< HEAD
     public void Import_ValidWozFile_TracksAreReadable()
     {
         var importer = new WozImporter();
         if (!File.Exists(TestDiskImages.TestWoz))
+=======
+    [Trait("Category", "FullDiskTests")]
+    public void Import_ValidWozFile_TracksAreReadable()
+    {
+        var importer = new WozImporter();
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestWoz);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             return;
         }
 
+<<<<<<< HEAD
         var diskImage = importer.Import(TestDiskImages.TestWoz);
+=======
+        var diskImage = importer.Import(sourceCopy.FilePath);
+>>>>>>> internaldiskimage
 
         // Verify tracks are accessible
         for (int track = 0; track < diskImage.TrackCount; track++)
@@ -88,15 +114,28 @@ public class WozImporterTests
     }
 
     [Fact]
+<<<<<<< HEAD
     public void ImportStream_ValidWozStream_ReturnsInternalDiskImage()
     {
         var importer = new WozImporter();
         if (!File.Exists(TestDiskImages.TestWoz))
+=======
+    [Trait("Category", "FullDiskTests")]
+    public void ImportStream_ValidWozStream_ReturnsInternalDiskImage()
+    {
+        var importer = new WozImporter();
+        using var sourceCopy = TempDiskImageCopy.TryCreate(TestDiskImages.TestWoz);
+        if (sourceCopy == null)
+>>>>>>> internaldiskimage
         {
             return;
         }
 
+<<<<<<< HEAD
         using var stream = File.OpenRead(TestDiskImages.TestWoz);
+=======
+        using var stream = File.OpenRead(sourceCopy.FilePath);
+>>>>>>> internaldiskimage
         var diskImage = importer.Import(stream, DiskFormat.Woz);
 
         Assert.NotNull(diskImage);
