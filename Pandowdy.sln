@@ -48,7 +48,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docs", "Docs", "{BABE080F-8
 	ProjectSection(SolutionItems) = preProject
 		Debugger Notes.md = Debugger Notes.md
 		docs\Development-Roadmap.md = docs\Development-Roadmap.md
-		docs\Internal-Disk-Format-Refactor-Plan.md = docs\Internal-Disk-Format-Refactor-Plan.md
 		docs\RenderRefactor.md = docs\RenderRefactor.md
 	EndProjectSection
 EndProject
