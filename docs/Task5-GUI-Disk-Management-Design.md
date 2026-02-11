@@ -25,9 +25,11 @@
    - [SaveDiskMessage and SaveDiskAsMessage](#savediskmessage-and-savediskasmessage)
    - [SetWriteProtectMessage](#setwriteprotectmessage)
    - [DiskIIControllerCard.HandleMessage](#diskiicontrollercardhandlemessage)
-5. [Phase 3: UI Integration](#phase-3-ui-integration)
+5. [Phase 3A: UI Integration — Core Controls](#phase-3a-ui-integration--core-controls)
    - [DiskCardPanel — Card-Level Grouping](#diskcardpanel--card-level-grouping)
    - [Context Menus on DiskStatusWidget](#context-menus-on-diskstatuswidget)
+   - [DiskStatusWidget Command Integration](#diskstatuswidget-command-integration)
+6. [Phase 3B: UI Integration — Menus and Polish](#phase-3b-ui-integration--menus-and-polish)
    - [Peripherals Menu — Dynamic Card Discovery](#peripherals-menu--dynamic-card-discovery)
    - [File Dialog and Format Filtering](#file-dialog-and-format-filtering)
    - [Drag and Drop to Individual Drives](#drag-and-drop-to-individual-drives)
@@ -35,10 +37,10 @@
    - [Disk Image Label Elision](#disk-image-label-elision)
    - [Disk Panel Width](#disk-panel-width)
    - [Dirty Indicator](#dirty-indicator)
-6. [Phase 4: Recent Disk Images](#phase-4-recent-disk-images)
+7. [Phase 4: Recent Disk Images](#phase-4-recent-disk-images)
    - [Persistence Format](#persistence-format)
    - [UI: Peripherals → Recent Disks Submenu](#ui-peripherals--recent-disks-submenu)
-7. [Architecture Decisions](#architecture-decisions)
+8. [Architecture Decisions](#architecture-decisions)
    - [Why Generic Card Messages, Not Disk-Specific Methods](#why-generic-card-messages-not-disk-specific-methods)
    - [Why a Peripherals Menu, Not File Menu Disk Items](#why-a-peripherals-menu-not-file-menu-disk-items)
    - [Why Broadcast Messages + Card Response Channel, Not Per-Slot Queries](#why-broadcast-messages--card-response-channel-not-per-slot-queries)
@@ -46,13 +48,13 @@
    - [Why Exceptions for Failures, Not Message-Based Responses](#why-exceptions-for-failures-not-message-based-responses)
    - [Why Async / Enqueued Execution](#why-async--enqueued-execution)
    - [Swap Mechanics](#swap-mechanics)
-8. [Files to Create](#files-to-create)
-9. [Files to Modify](#files-to-modify)
-10. [Testing Strategy](#testing-strategy)
-11. [Resolved Decisions](#resolved-decisions)
-12. [Open Questions](#open-questions)
-13. [Coding Standards and Style Guidelines](#coding-standards-and-style-guidelines)
-14. [Document Maintenance](#document-maintenance)
+9. [Files to Create](#files-to-create)
+10. [Files to Modify](#files-to-modify)
+11. [Testing Strategy](#testing-strategy)
+12. [Resolved Decisions](#resolved-decisions)
+13. [Open Questions](#open-questions)
+14. [Coding Standards and Style Guidelines](#coding-standards-and-style-guidelines)
+15. [Document Maintenance](#document-maintenance)
 
 ---
 
@@ -780,7 +782,9 @@ The `DiskIIControllerCard` already has direct access to `_drives[]` (its own fie
 
 ---
 
-## Phase 3: UI Integration
+## Phase 3A: UI Integration — Core Controls
+
+> **Phase 3A Focus:** Foundational UI controls and ViewModels — the building blocks for disk management. This phase establishes `DiskCardPanel` for card-level grouping, implements context menus on individual drive widgets, and wires up the command infrastructure. Phase 3B will add menu integration and polish.
 
 ### DiskCardPanel — Card-Level Grouping
 
@@ -842,6 +846,81 @@ Each `DiskStatusWidget` (representing one drive) gets a context menu:
 - A reference to `IEmulatorCoreInterface` for sending messages
 - `InsertDiskCommand`, `InsertBlankDiskCommand`, `EjectDiskCommand`, `SaveCommand`, `SaveAsCommand`, `ToggleWriteProtectCommand` as `ReactiveCommand` instances
 - Commands are enabled/disabled based on drive state (e.g., `EjectDiskCommand` disabled when no disk, `SaveCommand` disabled when no destination path or not dirty)
+
+### DiskStatusWidget Command Integration
+
+The `DiskStatusWidgetViewModel` requires command implementations that interact with `IEmulatorCoreInterface`:
+
+**Command implementations:**
+
+```csharp
+public class DiskStatusWidgetViewModel : ReactiveObject
+{
+    private readonly IEmulatorCoreInterface _emulator;
+    private readonly SlotNumber _slot;
+    private readonly int _driveNumber;
+
+    public ReactiveCommand<Unit, Unit> InsertDiskCommand { get; }
+    public ReactiveCommand<Unit, Unit> InsertBlankDiskCommand { get; }
+    public ReactiveCommand<Unit, Unit> EjectDiskCommand { get; }
+    public ReactiveCommand<Unit, Unit> SaveCommand { get; }
+    public ReactiveCommand<Unit, Unit> SaveAsCommand { get; }
+    public ReactiveCommand<bool, Unit> ToggleWriteProtectCommand { get; }
+
+    public DiskStatusWidgetViewModel(
+        IEmulatorCoreInterface emulator,
+        SlotNumber slot,
+        int driveNumber)
+    {
+        _emulator = emulator;
+        _slot = slot;
+        _driveNumber = driveNumber;
+
+        // EjectDiskCommand enabled only when disk is inserted
+        var hasDiskObservable = this.WhenAnyValue(x => x.HasDisk);
+        EjectDiskCommand = ReactiveCommand.CreateFromTask(
+            () => _emulator.SendCardMessageAsync(_slot, new EjectDiskMessage(_driveNumber)),
+            hasDiskObservable);
+
+        // SaveCommand enabled when disk inserted, has destination, and is dirty
+        var canSaveObservable = this.WhenAnyValue(
+            x => x.HasDisk,
+            x => x.HasDestinationPath,
+            x => x.IsDirty,
+            (hasDisk, hasDest, isDirty) => hasDisk && hasDest && isDirty);
+        SaveCommand = ReactiveCommand.CreateFromTask(
+            () => _emulator.SendCardMessageAsync(_slot, new SaveDiskMessage(_driveNumber)),
+            canSaveObservable);
+
+        // SaveAsCommand enabled when disk inserted
+        SaveAsCommand = ReactiveCommand.CreateFromTask(
+            () => _emulator.SendCardMessageAsync(_slot, new SaveDiskAsMessage(_driveNumber, "")),
+            hasDiskObservable);
+
+        // ToggleWriteProtectCommand enabled when disk inserted
+        ToggleWriteProtectCommand = ReactiveCommand.CreateFromTask<bool>(
+            (writeProtect) => _emulator.SendCardMessageAsync(_slot, new SetWriteProtectMessage(_driveNumber, writeProtect)),
+            hasDiskObservable);
+
+        // InsertDiskCommand and InsertBlankDiskCommand always enabled
+        InsertDiskCommand = ReactiveCommand.CreateFromTask(
+            () => _emulator.SendCardMessageAsync(_slot, new InsertDiskMessage(_driveNumber, "")));
+        InsertBlankDiskCommand = ReactiveCommand.CreateFromTask(
+            () => _emulator.SendCardMessageAsync(_slot, new InsertBlankDiskMessage(_driveNumber)));
+    }
+}
+```
+
+**Integration with file dialogs:**
+- `InsertDiskCommand` and `SaveAsCommand` require file dialog interaction before sending messages
+- The ViewModel invokes a file dialog service, then sends the message with the chosen path
+- File dialog logic lives in Phase 3B
+
+---
+
+## Phase 3B: UI Integration — Menus and Polish
+
+> **Phase 3B Focus:** Menu integration (Peripherals menu with dynamic card discovery), file dialogs, drag-and-drop, visual polish (elision, dirty indicator, panel width). This phase builds on the foundational controls from Phase 3A.
 
 ### Peripherals Menu — Dynamic Card Discovery
 
@@ -1553,6 +1632,89 @@ public class DiskIIControllerCard
     }
 }
 ```
+
+#### XML Documentation
+
+**All public APIs must have XML documentation comments.** This includes interfaces, classes, methods, properties, and events that are part of the public surface area.
+
+**Required XML tags:**
+- `<summary>` — Brief description of the member (required for all public members)
+- `<param>` — Description of each parameter (required for methods with parameters)
+- `<returns>` — Description of return value (required for non-void methods)
+- `<exception>` — Documents exceptions that can be thrown
+- `<remarks>` — Additional details, design notes, or usage guidance
+
+**Examples from Phase 1 interfaces:**
+
+```csharp
+/// <summary>
+/// Marker interface for messages that can be sent to expansion cards via
+/// <see cref="IEmulatorCoreInterface.SendCardMessageAsync"/>.
+/// </summary>
+/// <remarks>
+/// Each card type defines its own concrete message types. The card's
+/// <see cref="ICard.HandleMessage"/> method is responsible for recognizing
+/// and executing messages it supports, and rejecting those it does not.
+/// </remarks>
+public interface ICardMessage { }
+
+/// <summary>
+/// Sends a message to a specific card or broadcasts to all cards.
+/// </summary>
+/// <param name="slot">Target slot (Slot1–Slot7), or <c>null</c> to broadcast to all slots.</param>
+/// <param name="message">The card message to deliver.</param>
+/// <returns>A task that completes when the message(s) have been processed on the emulator thread.</returns>
+/// <exception cref="CardMessageException">
+/// Thrown (on the returned Task) if a targeted card rejects the message. Not thrown for
+/// broadcast messages — individual card failures are silently ignored during broadcast.
+/// </exception>
+/// <remarks>
+/// <para>
+/// <strong>Thread Safety:</strong> Thread-safe. The message is enqueued on the emulator
+/// thread's command queue and executed at the next instruction boundary.
+/// </para>
+/// </remarks>
+Task SendCardMessageAsync(SlotNumber? slot, ICardMessage message);
+```
+
+**Property documentation:**
+
+```csharp
+/// <summary>
+/// Destination file path for save operations (null until set by import derivation or Save As).
+/// </summary>
+/// <remarks>
+/// <para>
+/// When a disk is imported, this is derived from <see cref="SourceFilePath"/> with a "_new"
+/// suffix (e.g., "game.woz" → "game_new.woz"). If the derived path already exists on disk,
+/// the suffix is auto-incremented: "game_new_2.woz", "game_new_3.woz", etc.
+/// </para>
+/// <para>
+/// This is always a separate path from <see cref="SourceFilePath"/> — the original
+/// source file is never overwritten.
+/// </para>
+/// </remarks>
+public string? DestinationFilePath { get; set; }
+```
+
+**Message record documentation:**
+
+```csharp
+/// <summary>
+/// Message requesting a disk image be inserted into a specific drive.
+/// </summary>
+/// <param name="DriveNumber">1-based drive number (1 or 2).</param>
+/// <param name="DiskImagePath">Full path to the disk image file.</param>
+public record InsertDiskMessage(int DriveNumber, string DiskImagePath) : ICardMessage;
+```
+
+**Documentation guidelines:**
+- Write in complete sentences with proper grammar and punctuation
+- Use `<c>code</c>` for inline code references and `<see cref="Member"/>` for member cross-references
+- Use `<para>` to structure multi-paragraph remarks
+- Use `<strong>` for emphasis on important concepts (e.g., "Thread Safety", "Required Messages")
+- Document non-obvious behavior, edge cases, and design decisions
+- Internal/private members may have documentation but it's not required
 
 #### Other Style Conventions
 
