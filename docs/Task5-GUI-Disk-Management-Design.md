@@ -11,8 +11,9 @@
 2. [Design Principles](#design-principles)
 3. [Phase 1: Card Message Infrastructure](#phase-1-card-message-infrastructure)
    - [ICardMessage and Message Types](#icardmessage-and-message-types)
-   - [Slot Inventory and RefreshStatusMessage](#slot-inventory-and-refreshstatusmessage)
-   - [IEmulatorCoreInterface.SendCardMessageAsync and GetSlotInventoryAsync](#iemulatorcoreinterfacesendcardmessageasync-and-getslotinventoryasync)
+   - [Card Response Channel](#card-response-channel)
+   - [IdentifyCardMessage, EnumerateDevicesMessage, and RefreshStatusMessage](#identifycardmessage-enumeratedevicesmessage-and-refreshstatusmessage)
+   - [IEmulatorCoreInterface.SendCardMessageAsync](#iemulatorcoreinterfacesendcardmessageasync)
    - [ICard.HandleMessage](#icardhandlemessage)
    - [Thread Safety and Queueing](#thread-safety-and-queueing)
    - [Error Handling](#error-handling)
@@ -40,8 +41,9 @@
 7. [Architecture Decisions](#architecture-decisions)
    - [Why Generic Card Messages, Not Disk-Specific Methods](#why-generic-card-messages-not-disk-specific-methods)
    - [Why a Peripherals Menu, Not File Menu Disk Items](#why-a-peripherals-menu-not-file-menu-disk-items)
-   - [Why Slot Inventory + Status Push, Not Card Self-Identification Messages](#why-slot-inventory--status-push-not-card-self-identification-messages)
+   - [Why Broadcast Messages + Card Response Channel, Not Per-Slot Queries](#why-broadcast-messages--card-response-channel-not-per-slot-queries)
    - [Why No Keyboard Shortcuts for Disk Operations](#why-no-keyboard-shortcuts-for-disk-operations)
+   - [Why Exceptions for Failures, Not Message-Based Responses](#why-exceptions-for-failures-not-message-based-responses)
    - [Why Async / Enqueued Execution](#why-async--enqueued-execution)
    - [Swap Mechanics](#swap-mechanics)
 8. [Files to Create](#files-to-create)
@@ -49,6 +51,8 @@
 10. [Testing Strategy](#testing-strategy)
 11. [Resolved Decisions](#resolved-decisions)
 12. [Open Questions](#open-questions)
+13. [Coding Standards and Style Guidelines](#coding-standards-and-style-guidelines)
+14. [Document Maintenance](#document-maintenance)
 
 ---
 
@@ -76,7 +80,7 @@
 
 1. **Generic over specific:** `IEmulatorCoreInterface` routes messages to cards by slot number. It has no knowledge of disk drives, printers, or any other card type.
 2. **Thread-safe by design:** All card messages are enqueued on VA2M's existing `ConcurrentQueue<Action>` command queue and executed at instruction boundaries on the emulator thread, just like `Reset()`, `EnqueueKey()`, and `SetPushButton()`.
-3. **Card-centric UI:** The UI is organized by **controller card** (`DiskCardPanel`), with each card containing one or two `DiskStatusWidget` children representing individual drives. The UI discovers cards dynamically via `GetSlotInventoryAsync()` (for slot/card names) and `IDiskStatusProvider` (for real-time disk drive status updates), not from hardcoded slot assumptions.
+3. **Card-centric UI:** The UI is organized by **controller card** (`DiskCardPanel`), with each card containing one or two `DiskStatusWidget` children representing individual drives. The UI discovers cards dynamically by broadcasting `IdentifyCardMessage` (for slot/card names via `ICardResponseProvider`) and subscribing to `IDiskStatusProvider` (for real-time disk drive status updates), not from hardcoded slot assumptions.
 4. **No keyboard shortcuts** for disk insert/eject/swap — the number of cards and drives is arbitrary (e.g., Disk II in slots 5 and 6), making fixed shortcuts impractical. All disk operations go through context menus and the Peripherals menu.
 5. **Error feedback via exceptions:** Card message handling throws a custom `CardMessageException` if the operation fails (wrong card type, bad drive number, unsupported format, etc.). The UI catches this and displays an error dialog.
 6. **Forgiving APIs:** Operations that target a no-op state (e.g., eject on empty drive) are silently ignored. The GUI should prevent such operations from being offered, but they should be benign if they occur.
@@ -155,45 +159,170 @@ public record SaveDiskAsMessage(int DriveNumber, string FilePath) : ICardMessage
 public record SetWriteProtectMessage(int DriveNumber, bool WriteProtected) : ICardMessage;
 ```
 
-### Slot Inventory and RefreshStatusMessage
+### Card Response Channel
 
-The GUI needs two things to build its Peripherals menu and status panels:
+The GUI needs a way to receive responses from cards — for identification requests, minor state changes, and other events that don't warrant a dedicated push infrastructure like `IDiskStatusProvider`. This is handled by a **subscribable response channel** that all cards can use.
 
-1. **What card is in each slot** — a simple slot inventory (card names/IDs).
-2. **A way to force cards to push their current status** — so the GUI's existing status streams are up to date.
+> **Design Note:** The card response channel is intended for **low-bandwidth, occasional messages** (e.g., card identification at startup, configuration changes). High-velocity data (motor state, track positions, dirty flags) should flow through dedicated status providers like `IDiskStatusProvider`, which have optimized snapshot types and update throttling.
 
-These are handled by two separate mechanisms:
-
-**Slot inventory** via a new method on `IEmulatorCoreInterface`:
+**Response channel interfaces:**
 
 ```csharp
 /// <summary>
-/// Identifies a card installed in a specific slot.
+/// Marker interface for card response payloads.
+/// Each response type defines its own payload record.
 /// </summary>
-/// <param name="Slot">The slot number.</param>
-/// <param name="CardId">The card's unique numeric ID (0 = empty/NullCard).</param>
-/// <param name="CardName">The card's human-readable name (e.g., "Disk II Controller").</param>
-public record SlotInfo(SlotNumber Slot, int CardId, string CardName);
+public interface ICardResponsePayload { }
+
+/// <summary>
+/// A response sent by a card through the card response channel.
+/// </summary>
+/// <param name="Slot">The slot containing the card that sent this response.</param>
+/// <param name="CardId">The card's unique numeric ID (0 = NullCard/empty slot).</param>
+/// <param name="Payload">The response-specific data.</param>
+public record CardResponse(
+    SlotNumber Slot,
+    int CardId,
+    ICardResponsePayload Payload);
+
+/// <summary>
+/// Subscribable stream of card responses. Injected into GUI/ViewModels.
+/// </summary>
+public interface ICardResponseProvider
+{
+    /// <summary>
+    /// Observable stream of all card responses.
+    /// Subscribe to receive responses from any card.
+    /// </summary>
+    IObservable<CardResponse> Responses { get; }
+}
+
+/// <summary>
+/// Allows cards to emit responses. Injected into cards that need to respond.
+/// </summary>
+public interface ICardResponseEmitter
+{
+    /// <summary>
+    /// Emits a response through the card response channel.
+    /// </summary>
+    /// <param name="slot">The slot of the card emitting the response.</param>
+    /// <param name="cardId">The card's unique ID.</param>
+    /// <param name="payload">The response payload.</param>
+    void Emit(SlotNumber slot, int cardId, ICardResponsePayload payload);
+}
 ```
 
-The GUI calls `GetSlotInventoryAsync()` to get a `IReadOnlyList<SlotInfo>` for all 7 slots. This is a lightweight read of each slot's `ICard.Name` and `ICard.Id` — no card message involved, no complex response types. The GUI uses the card names and IDs to build the Peripherals menu structure (which slots have disk controllers, which are empty, etc.).
-
-**Status refresh** via a simple card message:
+**Built-in payload types:**
 
 ```csharp
 /// <summary>
-/// Message requesting a card to push a fresh status update through its existing
+/// Response payload for card identification requests.
+/// All cards (including NullCard) respond with this payload.
+/// </summary>
+/// <param name="CardName">Human-readable card name (e.g., "Disk II Controller", "Empty Slot").</param>
+public record CardIdentityPayload(string CardName) : ICardResponsePayload;
+
+/// <summary>
+/// Response payload for device enumeration requests.
+/// </summary>
+/// <param name="Devices">List of peripheral type IDs for each device attached to this card.
+/// The list length implicitly defines the device count. Empty list for NullCard.</param>
+public record DeviceListPayload(IReadOnlyList<PeripheralType> Devices) : ICardResponsePayload;
+
+/// <summary>
+/// Identifies the type of a peripheral device attached to an expansion card.
+/// </summary>
+/// <remarks>
+/// Some combinations may seem unusual (e.g., a printer on a disk controller card),
+/// but the receiving code can choose to ignore or handle discrepancies as appropriate.
+/// </remarks>
+public enum PeripheralType
+{
+    /// <summary>Unknown or unspecified device type.</summary>
+    Unknown = 0,
+
+    /// <summary>5.25" floppy disk drive (Disk II, etc.).</summary>
+    Floppy525 = 1,
+
+    /// <summary>3.5" floppy disk drive (UniDisk 3.5, etc.).</summary>
+    Floppy35 = 2,
+
+    /// <summary>Hard disk drive (ProFile, SCSI, etc.).</summary>
+    HardDrive = 3,
+
+    /// <summary>RAM disk or memory-based storage.</summary>
+    RamDisk = 4,
+
+    /// <summary>Printer device.</summary>
+    Printer = 10,
+
+    /// <summary>Modem or serial communication device.</summary>
+    Modem = 11,
+
+    /// <summary>Generic serial port.</summary>
+    SerialPort = 12,
+
+    /// <summary>Clock/calendar device.</summary>
+    Clock = 20,
+
+    /// <summary>Audio/sound device (Mockingboard, etc.).</summary>
+    Audio = 30,
+}
+```
+
+### IdentifyCardMessage, EnumerateDevicesMessage, and RefreshStatusMessage
+
+> **Future Extensibility Note:** While the Disk II controller is limited to 2 drives (matching the original hardware), future disk controller cards may support more than two devices. A SmartPort controller, for instance, can have multiple devices on its daisy chain — including 5.25" and 3.5" floppy drives, hard drives, and other storage devices. The `EnumerateDevicesMessage` provides a generic mechanism for any card to report its attached device types.
+
+Three built-in message types that all cards handle:
+
+```csharp
+/// <summary>
+/// Message requesting a card to identify itself via the card response channel.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>All cards must handle this message.</strong> Including NullCard, which responds
+/// with CardId=0 and CardName="Empty Slot". This is the primary mechanism for the GUI
+/// to discover what cards are installed in which slots.
+/// </para>
+/// <para>
+/// When <see cref="IEmulatorCoreInterface.SendCardMessageAsync"/> is called with a null
+/// slot, this message is broadcast to all 7 slots, causing each card to emit a
+/// <see cref="CardIdentityPayload"/> response.
+/// </para>
+/// </remarks>
+public record IdentifyCardMessage() : ICardMessage;
+
+/// <summary>
+/// Message requesting a card to enumerate its attached devices.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>All cards should handle this message.</strong> Cards respond via the card response
+/// channel with a <see cref="DeviceListPayload"/> containing the number and types of devices.
+/// </para>
+/// <para>
+/// For a Disk II controller, this returns 2 devices (both floppy drives). For a SmartPort
+/// controller, this could return multiple devices of varying types. For NullCard, this
+/// returns 0 devices.
+/// </para>
+/// </remarks>
+public record EnumerateDevicesMessage() : ICardMessage;
+
+/// <summary>
+/// Message requesting a card to push a fresh status update
 /// status channel (e.g., <see cref="IDiskStatusMutator"/> for disk controllers).
 /// </summary>
 /// <remarks>
 /// <para>
-/// This message carries no response payload. The card handles it by re-publishing
-/// its current state through whatever push mechanism it uses. For example, a Disk II
-/// controller calls <see cref="IDiskStatusMutator.MutateDrive"/> for each drive,
-/// causing <see cref="IDiskStatusProvider.Stream"/> to emit a new snapshot.
+/// This message is for cards that have their own dedicated status push infrastructure.
+/// For example, a Disk II controller calls <see cref="IDiskStatusMutator.MutateDrive"/>
+/// for each drive, causing <see cref="IDiskStatusProvider.Stream"/> to emit a new snapshot.
 /// </para>
 /// <para>
-/// Cards that have no status push mechanism can silently ignore this message.
+/// Cards that have no dedicated status push mechanism can silently ignore this message
+/// (they already respond to <see cref="IdentifyCardMessage"/> via the response channel).
 /// </para>
 /// </remarks>
 public record RefreshStatusMessage() : ICardMessage;
@@ -201,17 +330,23 @@ public record RefreshStatusMessage() : ICardMessage;
 
 **How it works together:**
 
-1. At startup, the GUI calls `GetSlotInventoryAsync()` to learn which cards are in which slots.
-2. The GUI builds the Peripherals menu from the slot inventory (card names, slot numbers).
-3. For disk controllers, the GUI already subscribes to `IDiskStatusProvider.Stream` — drive state (filenames, track positions, motor state, dirty flags) flows automatically via the existing push mechanism.
-4. When the GUI needs a forced refresh (e.g., after opening the Peripherals menu), it sends `RefreshStatusMessage` to the relevant slots. Each card pushes its current state through its own channel. No response to read — the GUI receives updates via its existing subscriptions.
-5. Cards that don't handle `RefreshStatusMessage` throw `CardMessageException` via the default `HandleMessage` — the GUI catches this and ignores it.
+1. At startup, the GUI subscribes to `ICardResponseProvider.Responses` to receive card responses.
+2. The GUI calls `SendCardMessageAsync(null, new IdentifyCardMessage())` to broadcast an identification request to all 7 slots.
+3. Each card (including NullCard in empty slots) receives the message and emits a `CardResponse` with a `CardIdentityPayload` containing its name.
+4. The GUI receives 7 responses via its subscription and builds the Peripherals menu from the card names, IDs, and slot numbers.
+5. For disk controllers, the GUI sends `EnumerateDevicesMessage` to discover what devices each controller has. A Disk II controller responds with `DeviceListPayload([Floppy525, Floppy525])` — the list length (2) is the device count, and each `PeripheralType` identifies the device type. A future SmartPort controller might respond with `[Floppy525, Floppy35, HardDrive]`.
+6. For disk controllers, the GUI also subscribes to `IDiskStatusProvider.Stream` for detailed drive state (filenames, track positions, motor state, dirty flags) — this flows automatically via the existing push mechanism.
+7. When the GUI needs a forced refresh of detailed state (e.g., after opening the Peripherals menu), it sends `RefreshStatusMessage` to the relevant slots. Each card pushes its current state through its dedicated channel.
 
-**Why not a complex response type?** Each peripheral type already has its own status push infrastructure (disk controllers use `IDiskStatusProvider`, future serial cards would use their own provider). Duplicating that state into a generic response record would create two parallel representations of the same data. Instead, the query message simply triggers the push, and the GUI reads status from the streams it already subscribes to.
+**Why two separate mechanisms?**
+- **Card response channel:** Lightweight, generic — used for identification, minor state changes, and responses that don't need dedicated infrastructure. All cards use the same channel.
+- **Dedicated status providers (e.g., `IDiskStatusProvider`):** Rich, type-specific — used for frequently-updated, complex state that benefits from its own stream and snapshot types. Each peripheral type can define its own provider.
 
-### IEmulatorCoreInterface.SendCardMessageAsync and GetSlotInventoryAsync
+This separation avoids duplicating rich state into the generic response channel while still providing a unified mechanism for simple responses.
 
-Two new methods on the core interface:
+### IEmulatorCoreInterface.SendCardMessageAsync
+
+One new method on the core interface:
 
 ```csharp
 public interface IEmulatorCoreInterface : IKeyboardSetter
@@ -219,13 +354,14 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
     // ... existing members ...
 
     /// <summary>
-    /// Sends a message to the card installed in the specified slot.
+    /// Sends a message to a specific card or broadcasts to all cards.
     /// </summary>
-    /// <param name="slot">Target slot (Slot1–Slot7).</param>
+    /// <param name="slot">Target slot (Slot1–Slot7), or <c>null</c> to broadcast to all slots.</param>
     /// <param name="message">The card message to deliver.</param>
-    /// <returns>A task that completes when the message has been processed on the emulator thread.</returns>
+    /// <returns>A task that completes when the message(s) have been processed on the emulator thread.</returns>
     /// <exception cref="CardMessageException">
-    /// Thrown (on the returned Task) if the card rejects or cannot process the message.
+    /// Thrown (on the returned Task) if a targeted card rejects the message. Not thrown for
+    /// broadcast messages — individual card failures are silently ignored during broadcast.
     /// </exception>
     /// <remarks>
     /// <para>
@@ -235,35 +371,29 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
     /// and observe any errors.
     /// </para>
     /// <para>
+    /// <strong>Broadcast Mode:</strong> When <paramref name="slot"/> is <c>null</c>, the
+    /// message is delivered to all 7 slots (Slot1–Slot7). This is useful for discovery
+    /// messages like <see cref="IdentifyCardMessage"/> where all cards should respond.
+    /// During broadcast, individual card exceptions are caught and ignored — the broadcast
+    /// completes successfully as long as delivery is attempted to all slots.
+    /// </para>
+    /// <para>
+    /// <strong>Responses:</strong> Cards respond via <see cref="ICardResponseProvider"/> —
+    /// subscribe to <see cref="ICardResponseProvider.Responses"/> to receive responses.
+    /// </para>
+    /// <para>
     /// <strong>Generic Design:</strong> This method is intentionally card-type-agnostic.
     /// IEmulatorCoreInterface has no knowledge of disk drives, printers, or any specific
-    /// card type. It simply routes the message to the card in the requested slot.
+    /// card type. It simply routes the message to the card(s) in the requested slot(s).
     /// </para>
     /// </remarks>
-    Task SendCardMessageAsync(SlotNumber slot, ICardMessage message);
-
-    /// <summary>
-    /// Gets the identity of the card installed in each slot.
-    /// </summary>
-    /// <returns>A list of 7 <see cref="SlotInfo"/> records (Slot1–Slot7), including empty slots (NullCard).</returns>
-    /// <remarks>
-    /// <para>
-    /// <strong>Thread Safety:</strong> Thread-safe. Enqueued on the emulator thread like
-    /// other commands. Reads <see cref="ICard.Name"/> and <see cref="ICard.Id"/> for each slot.
-    /// </para>
-    /// <para>
-    /// <strong>Lightweight:</strong> Returns only static identity (name, ID, slot number).
-    /// For live device state, subscribe to the appropriate status provider
-    /// (e.g., <see cref="Services.IDiskStatusProvider"/> for disk drives).
-    /// </para>
-    /// </remarks>
-    Task<IReadOnlyList<SlotInfo>> GetSlotInventoryAsync();
+    Task SendCardMessageAsync(SlotNumber? slot, ICardMessage message);
 }
 ```
 
 ### ICard.HandleMessage
 
-Each card can opt into message handling:
+All cards must implement message handling, at minimum for `IdentifyCardMessage`:
 
 ```csharp
 public interface ICard : IConfigurable
@@ -279,31 +409,75 @@ public interface ICard : IConfigurable
     /// </exception>
     /// <remarks>
     /// <para>
+    /// <strong>Required Messages:</strong> All cards must handle <see cref="IdentifyCardMessage"/>
+    /// by emitting a <see cref="CardIdentityPayload"/> response via <see cref="ICardResponseEmitter"/>.
+    /// This includes NullCard (empty slots), which responds with CardId=0 and CardName="Empty Slot".
+    /// </para>
+    /// <para>
     /// <strong>Thread Context:</strong> Always called on the emulator thread at an
     /// instruction boundary. Implementations do not need to worry about thread safety
     /// relative to other emulator operations.
     /// </para>
     /// <para>
-    /// Default implementation throws <see cref="CardMessageException"/> indicating
-    /// the card does not support messages. Cards that accept messages override this.
+    /// <strong>Unrecognized Messages:</strong> Cards should throw <see cref="CardMessageException"/>
+    /// for messages they don't recognize. However, during broadcast operations (slot=null),
+    /// these exceptions are caught and ignored.
     /// </para>
     /// </remarks>
-    void HandleMessage(ICardMessage message)
+    void HandleMessage(ICardMessage message);
+}
+```
+
+**NullCard implementation (guaranteed present in empty slots):**
+
+```csharp
+public class NullCard : ICard
+{
+    public int Id => 0;
+    public string Name => "Empty Slot";
+    public SlotNumber Slot { get; init; }
+
+    private readonly ICardResponseEmitter _responseEmitter;
+
+    public NullCard(SlotNumber slot, ICardResponseEmitter responseEmitter)
     {
-        throw new CardMessageException(
-            $"Card '{Name}' in slot {Slot} does not support messages.");
+        Slot = slot;
+        _responseEmitter = responseEmitter;
+    }
+
+    public void HandleMessage(ICardMessage message)
+    {
+        switch (message)
+        {
+            case IdentifyCardMessage:
+                _responseEmitter.Emit(Slot, Id, new CardIdentityPayload(Name));
+                break;
+
+            case EnumerateDevicesMessage:
+                _responseEmitter.Emit(Slot, Id, new DeviceListPayload(Array.Empty<PeripheralType>()));
+                break;
+
+            case RefreshStatusMessage:
+                // No-op: empty slot has no status to push. This is not a failure.
+                break;
+
+            default:
+                // Empty slot cannot perform card-specific operations
+                throw new CardMessageException(
+                    $"Empty slot {Slot} does not support message type '{message.GetType().Name}'.");
+        }
     }
 }
 ```
 
-The default interface method means existing cards (NullCard, etc.) require no changes.
+> **Design Principle:** NullCard treats messages that have "nothing to do" as no-ops, not failures. `RefreshStatusMessage` on an empty slot simply does nothing — there's no status to push. `EnumerateDevicesMessage` responds with 0 devices — an empty slot has no devices, but reporting that is a valid response, not a failure. Exceptions are reserved for messages that require capabilities the slot doesn't have (e.g., `InsertDiskMessage` to an empty slot is an error because you can't insert a disk into nothing).
 
 ### Thread Safety and Queueing
 
 VA2M implements `SendCardMessageAsync` using the existing `Enqueue()` pattern with a `TaskCompletionSource<bool>` to bridge the async gap:
 
 ```csharp
-public Task SendCardMessageAsync(SlotNumber slot, ICardMessage message)
+public Task SendCardMessageAsync(SlotNumber? slot, ICardMessage message)
 {
     var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -311,8 +485,32 @@ public Task SendCardMessageAsync(SlotNumber slot, ICardMessage message)
     {
         try
         {
-            var card = Bus.Slots.GetCardIn(slot);
-            card.HandleMessage(message);
+            if (slot.HasValue)
+            {
+                // Targeted: send to specific slot, propagate exceptions
+                var card = Bus.Slots.GetCardIn(slot.Value);
+                card.HandleMessage(message);
+            }
+            else
+            {
+                // Broadcast: send to all slots, ignore individual failures
+                foreach (SlotNumber s in Enum.GetValues<SlotNumber>())
+                {
+                    if (s == SlotNumber.Unslotted)
+                    {
+                        continue;
+                    }
+                    try
+                    {
+                        var card = Bus.Slots.GetCardIn(s);
+                        card.HandleMessage(message);
+                    }
+                    catch (CardMessageException)
+                    {
+                        // Ignore individual card failures during broadcast
+                    }
+                }
+            }
             tcs.SetResult(true);
         }
         catch (CardMessageException ex)
@@ -330,37 +528,12 @@ public Task SendCardMessageAsync(SlotNumber slot, ICardMessage message)
 }
 ```
 
-VA2M implements `GetSlotInventoryAsync` using the same pattern:
-
-```csharp
-public Task<IReadOnlyList<SlotInfo>> GetSlotInventoryAsync()
-{
-    var tcs = new TaskCompletionSource<IReadOnlyList<SlotInfo>>(
-        TaskCreationOptions.RunContinuationsAsynchronously);
-
-    Enqueue(() =>
-    {
-        var slots = new List<SlotInfo>();
-        foreach (SlotNumber slot in Enum.GetValues<SlotNumber>())
-        {
-            if (slot == SlotNumber.Unslotted)
-            {
-                continue;
-            }
-            var card = Bus.Slots.GetCardIn(slot);
-            slots.Add(new SlotInfo(slot, card.Id, card.Name));
-        }
-        tcs.SetResult(slots.AsReadOnly());
-    });
-
-    return tcs.Task;
-}
-```
-
 **Key points:**
 - Message is enqueued, not executed immediately — respects instruction boundary atomicity.
 - `TaskCompletionSource` with `RunContinuationsAsynchronously` ensures continuations don't run on the emulator thread.
-- The UI can `await` the result and catch `CardMessageException` for error display.
+- **Targeted mode (slot != null):** Delivers to one slot, propagates exceptions to caller.
+- **Broadcast mode (slot == null):** Delivers to all 7 slots, ignores individual `CardMessageException` failures.
+- The UI can `await` the result and catch `CardMessageException` for targeted messages.
 - No disk operation occurs mid-instruction or mid-I/O sequence.
 
 ### Error Handling
@@ -398,9 +571,18 @@ public record InsertBlankDiskMessage(int DriveNumber, string FilePath = "") : IC
 ```
 
 - Creates a blank formatted disk image in the internal format and inserts it into the drive.
-- `FilePath`: Optional path to associate with the blank disk for later save operations. Empty string means the disk is in-memory only (no backing file until "Save As").
+- `FilePath`: Optional path to associate with the blank disk for later save operations. Empty string means the disk uses the default naming convention (see below).
 - If a disk is already inserted, it is ejected first.
 - The blank disk is writable by default (write-protect off).
+
+**Default Naming Convention for Blank Disks:**
+
+When `FilePath` is empty, the blank disk is assigned a default destination path:
+- Base filename: `blank.nib` (NIB format preserves all track data without loss)
+- Directory: The last export directory used by the application (persisted in settings)
+- Collision handling: If `blank.nib` exists, increments to `blank_new.nib`, `blank_new2.nib`, etc.
+
+This ensures blank disks always have a destination path for "Save" operations, avoiding the need for users to "Save As" before saving. The naming uses the same suffix-stripping + collision logic as imported disks.
 
 ### EjectDiskMessage
 
@@ -445,7 +627,11 @@ public record SaveDiskAsMessage(int DriveNumber, string FilePath) : ICardMessage
 
 Every `InternalDiskImage` carries an optional **destination path** (`DestinationFilePath`) and **destination format** (`DestinationFormat`). This is the path the image will be written to when the user invokes "Save" (as opposed to "Save As").
 
-- When a disk is imported from a file, the destination path is derived from the source path using a `_new` suffix on the basename. For example, importing `E:\disks\game.woz` sets `DestinationFilePath` to `E:\disks\game_new.woz` and `DestinationFormat` to `Woz`. If `game_new.woz` already exists on disk, the path is auto-incremented: `game_new_2.woz`, `game_new_3.woz`, etc., until a non-existing path is found. The collision check is performed at import time when the destination path is first derived.
+- When a disk is imported from a file, the destination path is derived from the source path using a `_new` suffix on the basename. **Any existing `_new` or `_newN` suffix is stripped first** to prevent `_new_new` patterns:
+  - `game.woz` → `game_new.woz`
+  - `game_new.woz` → `game_new2.woz` (not `game_new_new.woz`)
+  - `game_new2.woz` → `game_new3.woz`
+- If the derived path already exists on disk, the path is auto-incremented: `game_new2.woz`, `game_new3.woz`, etc., until a non-existing path is found. The collision check is performed at import time when `DestinationFilePath` is first derived.
 - When a blank disk is created, the destination path is empty (no file association until "Save As").
 - The destination format can be inferred from the file extension, or set explicitly.
 - The **original source file is never overwritten.** The `SourceFilePath` is read-only (`init`); the `DestinationFilePath` is always a separate path.
@@ -454,11 +640,13 @@ Every `InternalDiskImage` carries an optional **destination path** (`Destination
 
 | Operation | Context Menu | Behavior |
 |-----------|-------------|----------|
-| **Save** | `SaveDiskMessage` | Writes to the attached `DestinationFilePath` using `DestinationFormat`. Throws `CardMessageException` if no destination path is attached — the UI prevents this by disabling Save when `HasDestinationPath` is false. |
-| **Save As...** | `SaveDiskAsMessage` | Opens a save dialog, writes to the user-chosen path, and updates `DestinationFilePath`/`DestinationFormat` on the `InternalDiskImage` so future "Save" operations use the new path. |
+| **Save** | `SaveDiskMessage` | Writes to the attached `DestinationFilePath` using `DestinationFormat`. After a successful save, the saved file becomes the active disk in the drive (see below). Throws `CardMessageException` if no destination path is attached — the UI prevents this by disabling Save when `HasDestinationPath` is false. |
+| **Save As...** | `SaveDiskAsMessage` | Opens a save dialog, writes to the user-chosen path, and updates `DestinationFilePath`/`DestinationFormat` on the `InternalDiskImage` so future "Save" operations use the new path. The saved file becomes the active disk in the drive. |
 
 - Both use the existing `IDiskImageExporter` infrastructure (Task 30).
 - After a successful save, `InternalDiskImage.ClearDirty()` is called to reset the dirty flag.
+- **After save, the drive switches to the new file.** The `SourceFilePath` is updated to match `DestinationFilePath` — the newly-saved file is now the "active" disk. This ensures that when the application restarts, it reloads the user's saved work, not the original source file. The drive's displayed filename updates to reflect the new file.
+- A new `DestinationFilePath` is then derived from the new `SourceFilePath` using the same suffix-stripping + `_new` suffix logic. For example, if `game.woz` was saved as `game_new.woz`, the new `SourceFilePath` is `game_new.woz` and the new `DestinationFilePath` becomes `game_new2.woz`.
 - Throws `CardMessageException` if no disk is inserted, or if the export format is unsupported/lossy and the conversion fails.
 
 **New properties on `InternalDiskImage`:**
@@ -508,6 +696,16 @@ public void HandleMessage(ICardMessage message)
 {
     switch (message)
     {
+        case IdentifyCardMessage:
+            _responseEmitter.Emit(Slot, Id, new CardIdentityPayload(Name));
+            break;
+
+        case EnumerateDevicesMessage:
+            var devices = new PeripheralType[_drives.Length];
+            Array.Fill(devices, PeripheralType.Floppy525);
+            _responseEmitter.Emit(Slot, Id, new DeviceListPayload(devices));
+            break;
+
         case InsertDiskMessage insert:
             ValidateDriveNumber(insert.DriveNumber);
             _drives[insert.DriveNumber - 1].InsertDisk(insert.DiskImagePath);
@@ -671,13 +869,14 @@ Peripherals
 
 **How the menu is built:**
 
-1. At startup (and after any card configuration change), the GUI calls `GetSlotInventoryAsync()` to get the card name and ID for each slot.
-2. The GUI filters out empty slots (`CardId == 0` / NullCard) and groups cards by their `ICard.Id` to determine card type:
+1. At startup (and after any card configuration change), the GUI subscribes to `ICardResponseProvider.Responses` and broadcasts `IdentifyCardMessage` to all slots (via `SendCardMessageAsync(null, new IdentifyCardMessage())`).
+2. All 7 cards (including NullCard in empty slots) respond with `CardIdentityPayload` through the card response channel. The GUI collects these responses.
+3. The GUI filters out empty slots (`CardId == 0` / NullCard) and groups cards by their `ICard.Id` to determine card type:
    - Known disk controller IDs → under the **Disks** submenu header
    - Future: known serial card IDs → under **Communication**, etc.
-3. For disk controllers, the GUI reads `IDiskStatusProvider.Current` to get the drive-level details (filenames, drive count) that populate the submenu entries.
-4. Each card becomes a submenu item with its drives listed underneath.
-5. Clicking a drive menu item opens a **drive dialog** (not inline menu operations) — see below.
+4. For disk controllers, the GUI reads `IDiskStatusProvider.Current` to get the drive-level details (filenames, drive count) that populate the submenu entries.
+5. Each card becomes a submenu item with its drives listed underneath.
+6. Clicking a drive menu item opens a **drive dialog** (not inline menu operations) — see below.
 
 **Drive dialog:**
 
@@ -698,8 +897,8 @@ The drive dialog shows current drive state (filename, write-protect status, dirt
 **Menu rebuilding:**
 
 - The menu structure is rebuilt whenever `IDiskStatusProvider.Stream` emits a new snapshot (disk inserted/ejected, filename changed).
-- `GetSlotInventoryAsync()` is called at startup and after card configuration changes. `RefreshStatusMessage` is sent to relevant slots when the Peripherals menu is opened (lightweight — each card just re-pushes its current state through its existing channel).
-- Cards that don't handle `RefreshStatusMessage` are silently skipped (their `HandleMessage` throws, caught and ignored).
+- `IdentifyCardMessage` is broadcast at startup and after card configuration changes. All cards (including NullCard) respond through `ICardResponseProvider`.
+- `RefreshStatusMessage` is sent to relevant slots when the Peripherals menu is opened (lightweight — each card just re-pushes its current state through its existing channel). NullCard does not handle this message (throws `CardMessageException`), which is caught and ignored.
 
 **Swap Drives** remains on the `DiskCardPanel` context menu (card-level operation, not per-drive), not in the Peripherals menu.
 
@@ -847,11 +1046,12 @@ Adding `InsertDisk()`, `EjectDisk()`, `SwapDrives()` directly to `IEmulatorCoreI
 - Require interface changes for every new card type (printer, serial, audio)
 - Violate Interface Segregation Principle — the interface already has 11 members
 
-The generic `SendCardMessageAsync(SlotNumber, ICardMessage)` pattern:
+The generic `SendCardMessageAsync(SlotNumber?, ICardMessage)` pattern:
 - Supports any card type with zero core interface changes
 - Cards define their own message vocabulary
 - Future printer card adds `PrintMessage`, `SetBaudRateMessage`, etc. without touching core
 - Matches the extensible slot/card architecture already in place
+- Nullable `SlotNumber?` enables broadcast to all slots (e.g., `IdentifyCardMessage`)
 
 ### Why a Peripherals Menu, Not File Menu Disk Items
 
@@ -868,15 +1068,17 @@ The Peripherals menu also scales naturally:
 - Future serial card → appears under a "Communication" section.
 - No menu restructuring needed as card types are added.
 
-### Why Slot Inventory + Status Push, Not Card Self-Identification Messages
+### Why Broadcast Messages + Card Response Channel, Not Per-Slot Queries
 
-An earlier design used a `QueryCardInfoMessage` with a complex `CardInfoResponse` carrying sub-device state (media paths, dirty flags, etc.). This was replaced with the simpler slot inventory + status push pattern because:
+An earlier design used `GetSlotInventoryAsync()` to return slot identity via direct property reads. This was replaced with broadcast messages + a card response channel because:
 
-- **Each peripheral already has its own status push infrastructure.** Disk controllers publish via `IDiskStatusProvider`; future card types will have their own providers. Duplicating that state into a generic response record creates two parallel representations of the same data.
-- **Slot identity is static.** What's in each slot (card name, card ID) doesn't change at runtime (until card configuration changes). This is a simple read of `ICard.Name` and `ICard.Id` — no card message needed, no response buffering.
-- **`RefreshStatusMessage` is a trigger, not a query.** It tells the card "push your current state now" through its existing channel. The GUI reads the result from the stream it already subscribes to (`IDiskStatusProvider.Stream`, etc.).
-- **Fewer types to maintain.** No `CardInfoResponse`, `CardCategory`, `CardSubDeviceInfo` — just a simple `SlotInfo` record and a parameterless `RefreshStatusMessage`.
-- **Cards opt in naturally.** Cards that have no status to push simply ignore `RefreshStatusMessage` (the default `HandleMessage` throws, which the GUI catches and ignores). No special handling required.
+- **Uniform message-based architecture.** All card interactions (identification, status refresh, disk operations) flow through the same `SendCardMessageAsync` pipeline. The GUI doesn't need separate code paths for "get identity" vs. "send command."
+- **All cards participate equally.** Every card — including `NullCard` in empty slots — responds to `IdentifyCardMessage` through the same response channel. There's no special-casing for "this card has messages, that one is just a property read."
+- **Nullable slot for broadcast.** `SendCardMessageAsync(null, message)` broadcasts to all 7 slots. This eliminates the need for a separate `GetSlotInventoryAsync()` method — just broadcast `IdentifyCardMessage` and collect responses.
+- **Subscribable response channel.** The `ICardResponseProvider.Responses` stream (`IObservable<CardResponse>`) gives the GUI a unified place to receive asynchronous card responses. Each `CardResponse` carries the slot, card ID, and a typed `ICardResponsePayload`. This works for identification and any future response-bearing messages.
+- **Separation of identity vs. detailed status.** Cards respond to `IdentifyCardMessage` with lightweight `CardIdentityPayload` (just the card name). Detailed device state (disk filenames, dirty flags, etc.) flows through card-specific channels like `IDiskStatusProvider`. No duplication of data — each channel carries the appropriate level of detail.
+- **`RefreshStatusMessage` remains a trigger.** It tells a card "push your current state now" through its existing status channel. NullCard doesn't handle this (throws `CardMessageException`, caught and ignored by the GUI).
+- **Future-proof.** New card types can define their own response payloads without changing `IEmulatorCoreInterface`. The response channel is generic — only the payload type varies.
 
 ### Why No Keyboard Shortcuts for Disk Operations
 
@@ -884,6 +1086,15 @@ An earlier design used a `QueryCardInfoMessage` with a complex `CardInfoResponse
 - Each controller has 1-2 drives.
 - Fixed shortcuts like `Ctrl+1` would need to map to specific slot/drive combos, which vary per configuration.
 - Context menus and the Peripherals menu provide unambiguous targeting.
+
+### Why Exceptions for Failures, Not Message-Based Responses
+
+Card operations use the standard async/await + try/catch pattern for error handling:
+
+- **User-initiated operations expect immediate feedback.** When the user clicks "Insert Disk," they want to know immediately if it succeeded or failed. The async/await + try/catch pattern delivers this naturally.
+- **No-op vs. failure distinction is clear.** Operations that have "nothing to do" (eject on empty drive, refresh on empty slot) succeed silently. Operations that fail (insert disk into empty slot, save without destination path) throw exceptions. This makes error handling predictable.
+
+If we later need **asynchronous notifications** not tied to user requests (e.g., "Drive 1 encountered a read error during emulation"), those can flow through the response channel with appropriate payload types. But these are fire-and-forget events, not request-response pairs.
 
 ### Why Async / Enqueued Execution
 
@@ -922,8 +1133,17 @@ Disk operations (insert, eject, swap) must not occur while the emulator thread i
 | File | Description |
 |------|-------------|
 | `Pandowdy.EmuCore\Interfaces\ICardMessage.cs` | `ICardMessage` marker interface |
-| `Pandowdy.EmuCore\Messages\RefreshStatusMessage.cs` | Trigger message for cards to re-push current status |
-| `Pandowdy.EmuCore\Messages\SlotInfo.cs` | `SlotInfo` record for slot inventory |
+| `Pandowdy.EmuCore\Interfaces\ICardResponsePayload.cs` | `ICardResponsePayload` marker interface for response payloads |
+| `Pandowdy.EmuCore\Interfaces\ICardResponseProvider.cs` | `ICardResponseProvider` — subscribable stream of card responses for GUI |
+| `Pandowdy.EmuCore\Interfaces\ICardResponseEmitter.cs` | `ICardResponseEmitter` — allows cards to emit responses |
+| `Pandowdy.EmuCore\Messages\CardResponse.cs` | `CardResponse` record (Slot, CardId, Payload) |
+| `Pandowdy.EmuCore\Messages\IdentifyCardMessage.cs` | Broadcast message requesting all cards to identify themselves |
+| `Pandowdy.EmuCore\Messages\EnumerateDevicesMessage.cs` | Broadcast message requesting cards to report their attached devices |
+| `Pandowdy.EmuCore\Messages\RefreshStatusMessage.cs` | Trigger message for cards to re-push detailed status |
+| `Pandowdy.EmuCore\Messages\CardIdentityPayload.cs` | `CardIdentityPayload` response payload for identification |
+| `Pandowdy.EmuCore\Messages\DeviceListPayload.cs` | `DeviceListPayload` response payload with `IReadOnlyList<PeripheralType>` |
+| `Pandowdy.EmuCore\Messages\PeripheralType.cs` | `PeripheralType` enum (Floppy525, Floppy35, HardDrive, Printer, etc.) |
+| `Pandowdy.EmuCore\Services\CardResponseChannel.cs` | Implements both `ICardResponseProvider` and `ICardResponseEmitter` |
 | `Pandowdy.EmuCore\Exceptions\CardMessageException.cs` | Custom exception for card message failures |
 | `Pandowdy.EmuCore\DiskII\Messages\InsertDiskMessage.cs` | Insert disk message record |
 | `Pandowdy.EmuCore\DiskII\Messages\InsertBlankDiskMessage.cs` | Insert blank disk message record |
@@ -932,6 +1152,7 @@ Disk operations (insert, eject, swap) must not occur while the emulator thread i
 | `Pandowdy.EmuCore\DiskII\Messages\SaveDiskMessage.cs` | Save to attached destination path message record |
 | `Pandowdy.EmuCore\DiskII\Messages\SaveDiskAsMessage.cs` | Save As / export to user-chosen path message record |
 | `Pandowdy.EmuCore\DiskII\Messages\SetWriteProtectMessage.cs` | Write-protect toggle message record |
+| `Pandowdy.EmuCore\DiskII\DiskFormatHelper.cs` | Maps file extensions to `DiskFormat` enum; selects appropriate `IDiskImageExporter` |
 
 ### UI
 
@@ -943,20 +1164,24 @@ Disk operations (insert, eject, swap) must not occur while the emulator thread i
 | `Pandowdy.UI\Controls\DriveDialog.axaml` | Drive management dialog (insert, eject, save, write-protect, recent) |
 | `Pandowdy.UI\Controls\DriveDialog.axaml.cs` | Code-behind for DriveDialog |
 | `Pandowdy.UI\ViewModels\DriveDialogViewModel.cs` | ViewModel for drive dialog (commands, state, recent list) |
-| `Pandowdy.UI\ViewModels\PeripheralsMenuViewModel.cs` | ViewModel for building Peripherals menu from slot inventory + status streams |
+| `Pandowdy.UI\ViewModels\PeripheralsMenuViewModel.cs` | ViewModel for building Peripherals menu from card responses + status streams |
 | `Pandowdy.UI\Services\RecentDiskService.cs` | Recent disk image tracking and persistence |
 | `Pandowdy.UI\Services\DiskFileDialogService.cs` | File dialog helpers for disk image selection and save |
+| `Pandowdy.UI\Services\DriveStateService.cs` | Persists drive state (loaded disk paths per slot/drive) to config JSON; loads state at startup |
 
 ### Tests
 
 | File | Description |
 |------|-------------|
-| `Pandowdy.EmuCore.Tests\Cards\CardMessageTests.cs` | Tests for message routing through VA2M |
-| `Pandowdy.EmuCore.Tests\Cards\SlotInventoryAndRefreshTests.cs` | Tests for slot inventory and RefreshStatusMessage (Disk II, NullCard) |
-| `Pandowdy.EmuCore.Tests\Cards\DiskIIMessageHandlerTests.cs` | Tests for DiskII message handling (all 8 message types) |
+| `Pandowdy.EmuCore.Tests\Cards\CardMessageTests.cs` | Tests for message routing through VA2M (targeted and broadcast) |
+| `Pandowdy.EmuCore.Tests\Cards\CardResponseChannelTests.cs` | Tests for response channel (emit, subscribe, payload types) |
+| `Pandowdy.EmuCore.Tests\Cards\IdentifyCardMessageTests.cs` | Tests for card identification (NullCard, DiskII, broadcast) |
+| `Pandowdy.EmuCore.Tests\Cards\DiskIIMessageHandlerTests.cs` | Tests for DiskII message handling (all 9 message types) |
+| `Pandowdy.EmuCore.Tests\DiskII\DiskFormatHelperTests.cs` | Tests for extension-to-format mapping and exporter selection |
 | `Pandowdy.UI.Tests\Services\RecentDiskServiceTests.cs` | Tests for recent disk persistence |
+| `Pandowdy.UI.Tests\Services\DriveStateServiceTests.cs` | Tests for drive state persistence and reload |
 | `Pandowdy.UI.Tests\ViewModels\DriveDialogViewModelTests.cs` | Tests for drive dialog command enablement and state |
-| `Pandowdy.UI.Tests\ViewModels\PeripheralsMenuViewModelTests.cs` | Tests for Peripherals menu building from slot inventory + status streams |
+| `Pandowdy.UI.Tests\ViewModels\PeripheralsMenuViewModelTests.cs` | Tests for Peripherals menu building from card responses + status streams |
 | `Pandowdy.UI.Tests\ViewModels\DiskCardPanelViewModelTests.cs` | Tests for card panel grouping and swap command |
 
 ---
@@ -965,10 +1190,11 @@ Disk operations (insert, eject, swap) must not occur while the emulator thread i
 
 | File | Change |
 |------|--------|
-| `Pandowdy.EmuCore\Interfaces\IEmulatorCoreInterface.cs` | Add `SendCardMessageAsync` and `GetSlotInventoryAsync` methods |
-| `Pandowdy.EmuCore\Interfaces\ICard.cs` | Add `HandleMessage` default interface method |
-| `Pandowdy.EmuCore\VA2M.cs` | Implement `SendCardMessageAsync` and `GetSlotInventoryAsync` using `Enqueue()` + `TaskCompletionSource` |
-| `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs` | Implement `HandleMessage` for all 8 message types (7 disk + RefreshStatusMessage) |
+| `Pandowdy.EmuCore\Interfaces\IEmulatorCoreInterface.cs` | Add `SendCardMessageAsync(SlotNumber? slot, ICardMessage message)` method |
+| `Pandowdy.EmuCore\Interfaces\ICard.cs` | Add `HandleMessage(ICardMessage message)` method (required, no default) |
+| `Pandowdy.EmuCore\VA2M.cs` | Implement `SendCardMessageAsync` with broadcast support using `Enqueue()` + `TaskCompletionSource` |
+| `Pandowdy.EmuCore\Cards\NullCard.cs` | Implement `HandleMessage` for `IdentifyCardMessage` (emit CardIdentityPayload with Id=0, Name="Empty Slot") |
+| `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs` | Implement `HandleMessage` for all 9 message types (8 disk + IdentifyCardMessage); inject `ICardResponseEmitter` |
 | `Pandowdy.EmuCore\DiskII\DiskIIDrive.cs` | Add internal `IDiskImageProvider? ImageProvider { get; set; }` for swap support; add internal `InternalDiskImage?` accessor for dirty/destination state |
 | `Pandowdy.EmuCore\DiskII\InternalDiskImage.cs` | Add `DestinationFilePath` and `DestinationFormat` properties |
 | `Pandowdy.EmuCore\DiskII\DiskIIStatusDecorator.cs` | Propagate `IsDirty` and `HasDestinationPath` from inner drive's `InternalDiskImage` to status snapshot |
@@ -977,9 +1203,9 @@ Disk operations (insert, eject, swap) must not occur while the emulator thread i
 | `Pandowdy.UI\ViewModels\DiskStatusWidgetViewModel.cs` | Add commands (Insert, InsertBlank, Eject, Save, SaveAs, ToggleWriteProtect), drag/drop handlers |
 | `Pandowdy.UI\Controls\DiskStatusPanel.axaml` | Restructure to use `DiskCardPanel` grouping instead of flat widget list |
 | `Pandowdy.UI\ViewModels\DiskStatusPanelViewModel.cs` | Produce `DiskCardPanelViewModel` instances grouped by slot; inject `IEmulatorCoreInterface` |
-| `Pandowdy.UI\MainWindow.axaml` | Add Peripherals top-level menu (dynamically built from slot inventory + status streams) |
-| `Pandowdy.UI\ViewModels\MainWindowViewModel.cs` | Add Peripherals menu building, drive dialog commands, slot inventory dispatch |
-| `Pandowdy\Program.cs` | Register `RecentDiskService` in DI; hardcoded disk inserts remain for development |
+| `Pandowdy.UI\MainWindow.axaml` | Add Peripherals top-level menu (dynamically built from card responses + status streams) |
+| `Pandowdy.UI\ViewModels\MainWindowViewModel.cs` | Add Peripherals menu building, drive dialog commands, card identification dispatch |
+| `Pandowdy\Program.cs` | Register `CardResponseChannel`, `RecentDiskService`, `IDriveStateService` in DI; replace hardcoded disk inserts with config-based drive state loading |
 
 ---
 
@@ -1015,33 +1241,72 @@ Disk operations (insert, eject, swap) must not occur while the emulator thread i
    - `SaveDiskAsMessage` on empty drive throws `CardMessageException`
    - Save (both messages) clears `IsDirty` flag after successful export
    - Save (both messages) does not modify the original source file
+   - **Save updates `SourceFilePath` to match saved destination (drive switches to new file)**
+   - **After save, new `DestinationFilePath` is derived from new `SourceFilePath` with suffix-stripping**
    - Destination path derived from import path uses `_new` suffix
+   - **Destination path derivation strips existing `_new` suffix (`game_new.woz` → `game_new2.woz`)**
+   - **Destination path derivation strips existing `_newN` suffix (`game_new3.woz` → `game_new4.woz`)**
+   - **Destination path derivation prevents `_new_new` pattern**
    - Imported disk has `HasDestinationPath == true` in snapshot
-   - Blank disk has `HasDestinationPath == false` in snapshot until Save As
+   - **Blank disk with empty FilePath gets default destination (`blank.nib` in last export dir)**
+   - **Blank disk with empty FilePath has `HasDestinationPath == true` (can Save immediately)**
+   - **Blank disk default path uses collision handling (`blank.nib` → `blank_new.nib` if exists)**
+   - Blank disk with explicit FilePath uses that path as destination
    - `SetWriteProtectMessage` toggles write-protect state
    - `SetWriteProtectMessage` on empty drive throws `CardMessageException`
    - `SetWriteProtectMessage` updates `DiskDriveStatusSnapshot.IsReadOnly`
 
-3. **Slot inventory and status refresh:**
-   - `GetSlotInventoryAsync` returns 7 `SlotInfo` entries (one per slot)
-   - Empty slots have `CardId == 0` and `CardName == "Empty Slot"`
-   - Installed cards return correct `CardId` and `CardName`
+3. **Card identification and response channel:**
+   - `IdentifyCardMessage` broadcast to all slots results in 7 `CardResponse` emissions
+   - NullCard responds with `CardId == 0` and `CardName == "Empty Slot"`
+   - DiskIIControllerCard responds with correct `CardId` and `CardName`
+   - `CardResponse` contains correct `Slot`, `CardId`, and `CardIdentityPayload`
+   - `ICardResponseProvider.Responses` emits all 7 responses after broadcast
+   - Broadcast mode (`slot == null`) ignores individual card exceptions
+   - Targeted mode (`slot != null`) propagates card exceptions
+   - `EnumerateDevicesMessage` to NullCard returns `DeviceListPayload` with empty list
+   - `EnumerateDevicesMessage` to DiskIIControllerCard returns `DeviceListPayload` with 2 `PeripheralType.Floppy525` entries
+   - `EnumerateDevicesMessage` list length matches device count
    - `RefreshStatusMessage` to Disk II controller triggers `IDiskStatusMutator` update for all drives
-   - `RefreshStatusMessage` to NullCard throws `CardMessageException` (default HandleMessage behavior)
+   - `RefreshStatusMessage` to NullCard is a no-op (does not throw — nothing to refresh is not a failure)
+   - `InsertDiskMessage` to NullCard throws `CardMessageException` (empty slot cannot perform disk operations)
    - Status push after refresh reflects current drive state (path, filename, write-protect, dirty)
 
 4. **Thread safety:**
    - Message is not executed immediately (verify via mock)
    - Message executes after `ProcessAnyPendingActions()` at instruction boundary
    - Task completes after execution
-   - Exception propagates through Task
+   - Exception propagates through Task (targeted mode only)
+   - Broadcast mode completes successfully even if some cards throw
+
+5. **DiskFormatHelper:**
+   - `GetFormatFromExtension(".woz")` returns `DiskFormat.Woz`
+   - `GetFormatFromExtension(".nib")` returns `DiskFormat.Nib`
+   - `GetFormatFromExtension(".dsk")` returns `DiskFormat.Dsk`
+   - `GetFormatFromExtension(".do")` returns `DiskFormat.Do`
+   - `GetFormatFromExtension(".po")` returns `DiskFormat.Po`
+   - `GetFormatFromExtension(".WOZ")` returns `DiskFormat.Woz` (case-insensitive)
+   - `GetFormatFromExtension(".unknown")` returns `DiskFormat.Unknown`
+   - `GetFormatFromExtension("")` returns `DiskFormat.Unknown`
+   - `GetFormatFromExtension(null)` returns `DiskFormat.Unknown`
+   - `GetExporterForFormat(DiskFormat.Woz)` returns `WozExporter` instance
+   - `GetExporterForFormat(DiskFormat.Nib)` returns `NibExporter` instance
+   - `GetExporterForFormat(DiskFormat.Dsk)` returns `SectorExporter` with DOS ordering
+   - `GetExporterForFormat(DiskFormat.Do)` returns `SectorExporter` with DOS ordering
+   - `GetExporterForFormat(DiskFormat.Po)` returns `SectorExporter` with ProDOS ordering
+   - `GetExporterForFormat(DiskFormat.Unknown)` throws `ArgumentException`
+   - `GetExporterForFormat(DiskFormat.Internal)` throws `ArgumentException`
+   - `GetExporterForPath("game.woz")` returns `WozExporter` (convenience method)
+   - `IsExportSupported(DiskFormat.Woz)` returns `true`
+   - `IsExportSupported(DiskFormat.Internal)` returns `false`
 
 ### UI Tests
 
 1. **Peripherals menu building:**
-   - Menu is built from slot inventory + `IDiskStatusProvider` at startup
+   - Menu is built from `ICardResponseProvider` responses + `IDiskStatusProvider` at startup
+   - GUI subscribes to `ICardResponseProvider.Responses` before broadcasting `IdentifyCardMessage`
    - Disk controllers grouped under "Disks" section based on card ID
-   - Each card shows slot number and card name (from `SlotInfo`)
+   - Each card shows slot number and card name (from `CardIdentityPayload`)
    - Each drive shows S*D* label and current filename (from `DiskDriveStatusSnapshot`)
    - Empty slots (CardId == 0) are excluded from menu
    - Menu rebuilds when disk status stream emits new snapshot
@@ -1061,7 +1326,18 @@ Disk operations (insert, eject, swap) must not occur while the emulator thread i
    - Persistence round-trip (save/load)
    - Missing files handled gracefully
 
-4. **DiskStatusWidget context menu commands:**
+4. **Drive state service:**
+   - Empty drives persisted as empty (no entry in config)
+   - Loaded disk path persisted to config JSON after insert
+   - Drive state persisted after swap (paths swap in config)
+   - Drive state persisted after eject (slot entry removed or cleared)
+   - **Drive state persisted after save (new file path stored, not original)**
+   - Config loaded at startup restores previous drive state
+   - Missing files at startup result in empty drive (not crash)
+   - Missing files at startup logged as warning
+   - Round-trip persistence: insert → save config → reload → verify disk reloaded
+
+5. **DiskStatusWidget context menu commands:**
    - Insert command opens file dialog (mock)
    - Insert blank command sends correct message
    - Eject command sends correct message
@@ -1078,7 +1354,7 @@ Disk operations (insert, eject, swap) must not occur while the emulator thread i
    - Write-protect toggle is disabled when no disk inserted
    - Context menu items enabled/disabled based on drive state
 
-5. **DiskCardPanel grouping:**
+6. **DiskCardPanel grouping:**
    - Drives from same slot grouped into single DiskCardPanel
    - Drives from different slots in separate DiskCardPanels
    - DiskCardPanel swap command targets correct slot
@@ -1111,15 +1387,19 @@ These items were originally open questions that have been resolved:
 
 11. **Blank disk format:** ✅ **Configurable via Options menu.** The default blank disk format is set through a GUI options/preferences menu (e.g., Options → Blank Disk Format → Unformatted / DOS 3.3 / ProDOS). The default is **Unformatted** (all zeros in internal format) — software running in the emulator can format it as needed. The setting is persisted in the UI settings JSON alongside other preferences.
 
-12. **Save format auto-detection:** ✅ **Extension-based.** Both `SaveDiskMessage` and `SaveDiskAsMessage` determine the export format from the file extension of the destination path. The `DestinationFormat` property on `InternalDiskImage` caches this so it's computed once and reused. No explicit `DiskFormat` parameter on the message — the path is the single source of truth for format.
+12. **Save format auto-detection:** ✅ **Extension-based using `DiskFormatHelper`.** Both `SaveDiskMessage` and `SaveDiskAsMessage` determine the export format from the file extension of the destination path. The `DestinationFormat` property on `InternalDiskImage` caches this so it's computed once and reused. No explicit `DiskFormat` parameter on the message — the path is the single source of truth for format.
+
+    **Implementation:** `DiskFormatHelper.GetFormatFromExtension(string extension)` maps file extensions to the `DiskFormat` enum and selects the appropriate `IDiskImageExporter` (WozExporter, NibExporter, SectorExporter). The current minimal subset supports: `Woz`, `Nib`, `Dsk`, `Do`, `Po`, and `Internal`.
+
+    **Future Expansion:** Additional formats (e.g., `.2mg` for hard drive images) will be added as needed. See Task 31 in the Development Roadmap for the comprehensive format parity plan.
 
 13. **Disk panel width:** ✅ **Min 150, persisted in JSON.** The `DiskStatusPanel` has a default minimum width of 150 pixels. The current width is persisted in `pandowdy-ui-settings.json` and restored on startup. The implementation is intentionally simple (a stored double + `MinWidth` constraint) because the panel will move to a more flexible docking/layout system later.
 
 14. **Dirty indicator:** ✅ **✏️ emoji adjacent to filename.** When `IsDirty` is true, a ✏️ emoji is shown next to the filename in `DiskStatusWidget`. Hidden when clean or no disk inserted. Both `IsDirty` and `HasDestinationPath` are exposed through `DiskDriveStatusSnapshot` (new fields) and flow through the reactive stream. The accessor chain is: `InternalDiskImage` → `UnifiedDiskImageProvider` → `DiskIIDrive` (internal accessor) → `DiskIIStatusDecorator` → snapshot.
 
-15. **Disk operations in Peripherals menu, not File menu:** ✅ **Dedicated Peripherals top-level menu.** Disk insert/eject/save are peripheral hardware operations, not application file operations. The Peripherals menu is organized by card type (grouped by `ICard.Id` from slot inventory) and populated with live state from each card type's status provider (e.g., `IDiskStatusProvider` for disk controllers). Each drive entry opens a drive dialog with all operations. The File menu remains clean (Quit only). This architecture scales naturally as more card types are added.
+15. **Disk operations in Peripherals menu, not File menu:** ✅ **Dedicated Peripherals top-level menu.** Disk insert/eject/save are peripheral hardware operations, not application file operations. The Peripherals menu is organized by card type (grouped by `ICard.Id` from `CardIdentityPayload` responses) and populated with live state from each card type's status provider (e.g., `IDiskStatusProvider` for disk controllers). Each drive entry opens a drive dialog with all operations. The File menu remains clean (Quit only). This architecture scales naturally as more card types are added.
 
-16. **Card discovery via slot inventory + status push:** ✅ **Two-part design.** `GetSlotInventoryAsync()` returns a simple `IReadOnlyList<SlotInfo>` with the card name and ID for each slot — no card message involved, just a lightweight read of `ICard.Name`/`ICard.Id`. Live device state comes from each card type's existing push infrastructure (`IDiskStatusProvider` for disk controllers, future providers for other card types). `RefreshStatusMessage` is a simple trigger that tells a card to re-push its current state — no response payload, no complex types. This avoids duplicating status data into a parallel response record and keeps the card message system clean (messages are actions, not queries).
+16. **Card discovery via broadcast message + response channel:** ✅ **Unified message architecture.** The GUI broadcasts `IdentifyCardMessage` to all slots via `SendCardMessageAsync(null, message)` (nullable `SlotNumber?` enables broadcast). All 7 cards—including NullCard in empty slots—respond with `CardIdentityPayload` through `ICardResponseProvider.Responses`. This subscribable `IObservable<CardResponse>` stream gives the GUI a single place to receive card responses. Each `CardResponse` includes the slot, card ID, and typed payload. Detailed device state (disk filenames, dirty flags) continues to flow through card-specific channels like `IDiskStatusProvider`. `RefreshStatusMessage` is a trigger that tells a card to re-push its current state through its existing status channel—NullCard throws `CardMessageException` (caught and ignored). This design keeps all card interactions flowing through the same `SendCardMessageAsync` pipeline while separating lightweight identity from detailed status.
 
 17. **Confirmation on eject with unsaved changes:** ✅ **Yes — confirm before ejecting dirty disks.** If `IsDirty` is true when the user requests eject, the GUI shows a confirmation dialog ("Disk has unsaved changes. Eject anyway?"). The infrastructure (`IsDirty` in `DiskDriveStatusSnapshot`) already exists. Implementation: the UI checks dirty state from the snapshot before sending `EjectDiskMessage`, and shows a dialog if dirty. The `EjectDiskMessage` itself remains unconditional — the confirmation is purely a UI-layer concern.
 
@@ -1127,11 +1407,224 @@ These items were originally open questions that have been resolved:
 
 19. **Confirmation on application exit with dirty disks:** ✅ **Yes — confirm before exiting with unsaved changes.** If any drive has `IsDirty == true` when the user closes the application, the app prompts "You have unsaved disk changes. Exit anyway?" This follows standard application behavior for unsaved work. Implementation: the window closing handler checks all drives' dirty state via `IDiskStatusProvider.Current` and shows a confirmation dialog if any are dirty.
 
+20. **Startup drive state and config persistence:** ✅ **Drives default empty; config JSON persists state for reload.** At startup, drives are initialized empty (no disk images loaded). The application persists the current drive state (which disk is loaded in which drive) to the UI settings JSON (`pandowdy-ui-settings.json`) whenever a disk is inserted, ejected, saved, or swapped. On subsequent launches, the previously-loaded disks are automatically reloaded from their saved paths. This replaces the current hardcoded disk inserts in `Program.cs`. If a previously-loaded file no longer exists, the drive starts empty and a warning is logged.
+
+21. **Save switches drive to new file:** ✅ **After save, the saved file becomes the active disk.** When a disk is saved (via `SaveDiskMessage` or `SaveDiskAsMessage`), the `SourceFilePath` is updated to match `DestinationFilePath`. The drive now shows the newly-saved filename, and this is the file that will be reloaded on application restart. A new `DestinationFilePath` is derived from the new source using suffix-stripping + `_new` logic. This behavior may change in the future, but is the current approach to ensure users work with their saved changes, not the original source.
+
+22. **Naming scheme prevents `_new_new` patterns:** ✅ **Strip existing suffix before deriving new destination.** When deriving `DestinationFilePath`, any existing `_new` or `_newN` suffix is stripped from the base filename before applying the `_new` suffix. Examples: `game.woz` → `game_new.woz`; `game_new.woz` → `game_new2.woz` (not `game_new_new.woz`); `game_new2.woz` → `game_new3.woz`. The stripping uses regex to match `_new(\d*)$` in the base filename (before extension). This avoids unbounded suffix accumulation.
+
+23. **Blank disk naming convention:** ✅ **Default to `blank.nib` in last export directory.** When a blank disk is inserted without an explicit path, it is assigned a default destination path of `blank.nib` (NIB format to preserve all track data). The directory used is the last export directory (persisted in settings). If `blank.nib` exists, the name increments using the same collision logic as imported disks: `blank_new.nib`, `blank_new2.nib`, etc. This ensures blank disks always have a `DestinationFilePath` immediately, so "Save" works without requiring "Save As" first. The last export directory is updated whenever a "Save As" operation completes successfully.
+
 ---
 
 ## Open Questions
 
 *No open questions at this time. All design decisions have been resolved.*
+
+---
+
+## Coding Standards and Style Guidelines
+
+> **📋 Extracted from `.github/copilot-instructions.md` and `docs/Development-Roadmap.md`**
+> These guidelines ensure consistency across Task 5 implementation without requiring the full roadmap context.
+
+### Dependency Injection and Architecture
+
+**Prefer Dependency Injection over other patterns:**
+- ✅ **Use Constructor Injection** for required dependencies
+- ✅ **Depend on interfaces** rather than concrete implementations
+- ✅ **Register services in DI container** (`Program.cs`) with appropriate lifetimes
+- ❌ **Avoid Chain of Command** patterns where classes pass references through multiple layers
+- ❌ **Avoid internal `new` instantiation** of dependencies (hard to test, tight coupling)
+- ❌ **Avoid Service Locator** pattern (anti-pattern in modern .NET)
+
+**Example — Correct DI Pattern:**
+```csharp
+// ✅ Correct: Dependencies injected via constructor
+public class DriveDialogViewModel(
+    IEmulatorCoreInterface emulator,
+    IRecentDiskService recentDiskService,
+    IDiskStatusProvider diskStatusProvider)
+{
+    private readonly IEmulatorCoreInterface _emulator = emulator;
+    private readonly IRecentDiskService _recentDiskService = recentDiskService;
+    private readonly IDiskStatusProvider _diskStatusProvider = diskStatusProvider;
+
+    public async Task InsertDiskAsync(SlotNumber slot, int driveNumber, string path)
+    {
+        await _emulator.SendCardMessageAsync(slot, new InsertDiskMessage(driveNumber, path));
+        _recentDiskService.AddRecentDisk(path);
+    }
+}
+
+// ✅ Register in Program.cs
+services.AddSingleton<IRecentDiskService, RecentDiskService>();
+services.AddTransient<DriveDialogViewModel>();
+```
+
+**Constructor Guidelines:**
+- For classes with many dependencies (>5 parameters), consider grouping related dependencies into facade interfaces
+- Use primary constructors (C# 12) for cleaner syntax when appropriate
+- Document constructor parameters when dependency purpose isn't obvious
+- Prefer `readonly` fields for injected dependencies
+
+**Lifetime Guidelines:**
+- **Singleton:** Stateless services, global state providers (`IEmulatorCoreInterface`, `IDiskStatusProvider`)
+- **Scoped:** Per-request or per-window services (Avalonia windows)
+- **Transient:** Lightweight, stateless services created per use (dialog ViewModels)
+
+### C# Coding Style
+
+#### Always Use Curly Braces
+
+**Required for:** `if`, `else`, `for`, `foreach`, `while`, `do-while`, `using`, `lock`
+
+```csharp
+// ✅ Correct: Always use braces
+if (condition)
+{
+    DoSomething();
+}
+
+foreach (var item in collection)
+{
+    ProcessItem(item);
+}
+
+// ❌ Incorrect: Missing braces (will cause IDE0011 warning)
+if (condition)
+    DoSomething();
+```
+
+#### Property Formatting
+
+**Multi-line format for properties with:**
+- Non-default accessors (getters/setters with logic or access modifiers)
+- Private setters
+- Logic in get/set
+
+```csharp
+// ✅ Correct: Multi-line for properties with logic
+public bool HasDisk
+{
+    get => _diskImageProvider != null;
+}
+
+public string? DestinationFilePath
+{
+    get => _destinationFilePath;
+    set => this.RaiseAndSetIfChanged(ref _destinationFilePath, value);
+}
+
+// ✅ Correct: Single-line for simple auto-properties
+public string DisplayName { get; init; }
+public int DriveNumber { get; }
+public bool IsReadOnly { get; set; } = false;
+```
+
+#### Primary Constructors (C# 12)
+
+**Prefer primary constructors** when class initialization is straightforward:
+
+```csharp
+// ✅ Preferred: Primary constructor for simple DI
+public class RecentDiskService(IFileSystem fileSystem, ILogger<RecentDiskService> logger)
+{
+    private readonly IFileSystem _fileSystem = fileSystem;
+    private readonly ILogger<RecentDiskService> _logger = logger;
+
+    // ... implementation
+}
+
+// ✅ Also acceptable: Traditional constructor for complex initialization
+public class DiskIIControllerCard
+{
+    private readonly IDiskStatusMutator _statusMutator;
+    private readonly DiskIIDrive[] _drives;
+
+    public DiskIIControllerCard(IDiskStatusMutator statusMutator, IDriveFactory driveFactory)
+    {
+        _statusMutator = statusMutator;
+        _drives = new DiskIIDrive[2];
+        for (int i = 0; i < 2; i++)
+        {
+            _drives[i] = driveFactory.CreateDrive(i + 1);
+        }
+    }
+}
+```
+
+#### Other Style Conventions
+
+- Use `var` for local variables when type is obvious
+- Prefer expression-bodied members for simple one-liners
+- Use nullable reference types (`string?`, `object?`)
+- **Naming:** PascalCase for public members, camelCase for private fields with `_` prefix
+- 4-space indentation
+- Prefer field default initializers for small, read-only arrays and collections
+- Use `Array.Empty<T>()` for empty arrays to avoid unnecessary allocations
+
+### Record Types for Messages
+
+All `ICardMessage` implementations are **immutable `record` types**:
+
+```csharp
+// ✅ Correct: Record types for messages
+public record InsertDiskMessage(int DriveNumber, string DiskImagePath) : ICardMessage;
+public record EjectDiskMessage(int DriveNumber) : ICardMessage;
+public record SwapDrivesMessage() : ICardMessage;
+
+// ❌ Incorrect: Class-based mutable message
+public class InsertDiskMessage : ICardMessage
+{
+    public int DriveNumber { get; set; }  // Mutable!
+    public string DiskImagePath { get; set; }
+}
+```
+
+### Testing Guidelines
+
+#### Test Organization
+
+- Mirror production code structure in test projects
+- Use test fixtures for complex setup
+- Group tests with `#region` blocks
+- **Name tests:** `MethodName_Scenario_ExpectedOutcome`
+
+```csharp
+// ✅ Test naming examples
+[Fact]
+public void HandleMessage_InsertDiskWithValidPath_InsertsDisk() { }
+
+[Fact]
+public void HandleMessage_EjectOnEmptyDrive_IsNoOp() { }
+
+[Fact]
+public async Task SendCardMessageAsync_WithInvalidSlot_ThrowsCardMessageException() { }
+```
+
+#### Avalonia Headless Testing
+
+- Use `[Fact]` for standard tests that don't need UI thread
+- Use `[AvaloniaFact]` for tests requiring Avalonia dispatcher/threading
+- Use `[Fact(Skip = "reason")]` for tests blocked by technical limitations
+
+#### Test Coverage Requirements
+
+Every new production code file gets a corresponding test file created in the same work session. Test cases should be enumerated in the [Testing Strategy](#testing-strategy) section before implementation begins.
+
+### Git Best Practices
+
+**ALWAYS use `git mv` when moving or renaming files to preserve Git history:**
+
+```bash
+# ✅ Correct: Preserves history
+git mv Pandowdy.EmuCore/OldPath/File.cs Pandowdy.EmuCore/NewPath/File.cs
+
+# ❌ Incorrect: Loses history
+# create_file(new/path/File.cs)
+# remove_file(old/path/File.cs)
+```
 
 ---
 
@@ -1143,9 +1636,48 @@ This document is the **single source of truth** for Task 5 design decisions. It 
 - **During implementation:** When the actual code diverges from the plan (new edge cases, API adjustments, etc.).
 - **After implementation:** When a phase is complete — move relevant details to "Resolved Decisions" and note completion date.
 
+### Tasks Section Updates
+
+The [Tasks](#tasks) section at the top of this document tracks work in progress:
+
+- **When starting a phase:** Move the phase name from "Next proposed task" to "Current task in progress".
+- **When completing a phase:** Mark the current task as "✅ Complete" and update "Next proposed task" to the subsequent phase.
+- **When all phases are complete:** Set both fields to "None" or "✅ All phases complete".
+
+Example progression:
+```
+Current task in progress: Phase 1: Card Message Infrastructure
+Next proposed task: Phase 2: Disk II Message Implementations
+
+→ After Phase 1 completes:
+
+Current task in progress: Phase 2: Disk II Message Implementations  
+Next proposed task: Phase 3: UI Integration
+```
+
+### Table of Contents Updates
+
+The [Table of Contents](#table-of-contents) must stay synchronized with the document structure:
+
+- **When adding a new section:** Add a corresponding entry to the ToC with the correct anchor link.
+- **When renaming a section:** Update both the ToC entry and the anchor link.
+- **When removing a section:** Remove the corresponding ToC entry.
+- **Anchor format:** Use lowercase, replace spaces with hyphens (e.g., `## My New Section` → `#my-new-section`).
+
 Every new production code file must have a corresponding test file created in the same work session. Test cases should be enumerated in the [Testing Strategy](#testing-strategy) section before implementation begins.
+
+### Agent Guidance: Ask for Clarification
+
+> **⚠️ Important for AI Agents:** If any design decision, requirement, or implementation detail in this document is ambiguous or could be interpreted multiple ways, **ask the user for clarification** rather than making broad assumptions. This applies to:
+> - Edge cases not explicitly covered
+> - Unclear interaction between features
+> - Terminology that could have multiple meanings
+> - Implementation approaches where trade-offs aren't obvious
+> - File paths, naming conventions, or format details that seem incomplete
+>
+> A brief clarifying question is always preferable to implementing something incorrectly based on an assumption.
 
 ---
 
 *Document Created: 2026-02-10*
-*Last Updated: 2026-02-10 — Resolved all open questions: eject/exit confirmation for dirty disks (yes), destination path collision handling (_new_2/_new_3 auto-increment)*
+*Last Updated: 2026-02-10 — Added agent guidance to ask for clarification on ambiguous items.*

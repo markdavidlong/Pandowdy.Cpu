@@ -24,6 +24,7 @@
    - [Task 22: Intermediate Debugger Implementation](#task-22-intermediate-debugger-implementation-high-priority)
    - [Task 13: Audio Emulation Implementation](#task-13-audio-emulation-implementation-medium-priority)
 3. [Backlog](#backlog)
+   - [Task 31: Comprehensive Disk Image Format Support](#task-31-comprehensive-disk-image-format-support-highpriority)
    - [Task 4: HGR Flicker Investigation](#task-4-hgr-flicker-investigation-medium-priority)
    - [Task 7: Handle BRK Loops in Interrupt Handler](#task-7-handle-brk-loops-in-interrupt-handler-low-priority)
    - [Task 12: Flexible Window Docking System](#task-12-flexible-window-docking-system-medium-priority)
@@ -511,7 +512,80 @@ public void StepOver()
 
 ## Backlog
 
-### Task 3: Removed
+
+
+### Task 31: Comprehensive Disk Image Format Support (High Priority)
+
+**Goal:** Expand Pandowdy's disk image import/export capabilities to match CiderPress2's comprehensive format support via DiskArc integration.
+
+**Status:** ⏳ NOT STARTED
+
+**Current State:**
+- Pandowdy's `DiskFormat` enum supports a minimal subset: `Woz`, `Nib`, `Dsk`, `Do`, `Po`, `Internal`
+- `IDiskImageExporter` infrastructure exists with `WozExporter`, `NibExporter`, `SectorExporter`
+- Import path uses DiskArc's `FileAnalyzer` for format detection and sector ordering
+- Export path uses Pandowdy-native `DiskFormatHelper` for extension-to-format mapping
+
+**Problem:**
+- Many disk image formats are not yet supported (2IMG, DiskCopy 4.2, Trackstar, etc.)
+- Hard drive images (`.2mg`, `.po` block devices) will be needed for future SmartPort/ProFile emulation
+- Users may have disk images in formats Pandowdy cannot currently read or write
+
+**Proposed Solution:**
+
+Incrementally expand format support by leveraging DiskArc's comprehensive format handling:
+
+**Phase 1: 2IMG Support (High Priority)**
+- Add `TwoIMG` to `DiskFormat` enum
+- Implement `TwoIMGExporter` using DiskArc's `TwoIMG.CreateDisk()` 
+- Critical for hard drive images and ProDOS block devices
+- Enables future SmartPort controller emulation
+
+**Phase 2: Additional Floppy Formats (Medium Priority)**
+- Add `DiskCopy42` format support (Macintosh disk images)
+- Add `Trackstar` format support (flux-level images)
+- Add other formats as needed based on user demand
+
+**Phase 3: DiskArc Integration (Low Priority)**
+- Consider replacing `DiskFormatHelper.GetFormatFromExtension()` with DiskArc's `FileAnalyzer.ExtensionToKind()`
+- Pandowdy's `IDiskImageExporter` implementations become thin wrappers around DiskArc's `CreateDisk*()` static methods
+- Maintain Pandowdy's `DiskFormat` enum as the internal representation, with mapping to/from DiskArc's `FileKind`
+
+**DiskArc APIs to Leverage:**
+
+```csharp
+// Format detection (already used for import)
+FileAnalyzer.ExtensionToKind(extension, out FileKind kind, out SectorOrder order, ...);
+
+// Disk creation (for export)
+Woz.CreateDisk525(...)
+Woz.CreateDisk35(...)
+UnadornedSector.CreateSectorImage(...)
+UnadornedSector.CreateBlockImage(...)
+UnadornedNibble525.CreateDisk(...)
+TwoIMG.CreateDisk(...)
+TwoIMG_Nibble.CreateDisk(...)
+```
+
+**Files to Modify:**
+- `Pandowdy.EmuCore\DiskII\DiskFormat.cs` - Add new format enum values
+- `Pandowdy.EmuCore\DiskII\DiskFormatHelper.cs` - Add extension mappings for new formats
+- `Pandowdy.EmuCore\DiskII\Exporters\*` - Add new exporter implementations
+
+**Files to Create:**
+- `Pandowdy.EmuCore\DiskII\Exporters\TwoIMGExporter.cs` - 2IMG export support
+- `Pandowdy.EmuCore.Tests\DiskII\TwoIMGExporterTests.cs` - Tests for 2IMG export
+
+**Priority:** Low (Phase 1 may be elevated when SmartPort emulation begins)
+
+**Dependencies:**
+- Task 5 (GUI Disk Management) establishes the export infrastructure
+- Task 30 (Export Disk Data) provides the `IDiskImageExporter` pattern
+- Future SmartPort task will require Phase 1 (2IMG support)
+
+**Related:**
+- DiskArc library in `legacy/CiderPress2/DiskArc/`
+- Ultimate goal: rival CiderPress2's format coverage
 
 ---
 
