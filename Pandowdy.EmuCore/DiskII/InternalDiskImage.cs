@@ -98,6 +98,29 @@ public class InternalDiskImage
     public DiskFormat OriginalFormat { get; init; }
 
     /// <summary>
+    /// Destination file path for save operations (null until set by import derivation or Save As).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When a disk is imported, this is derived from <see cref="SourceFilePath"/> with a "_new"
+    /// suffix (e.g., "game.woz" → "game_new.woz"). If the derived path already exists on disk,
+    /// the suffix is auto-incremented: "game_new2.woz", "game_new3.woz", etc.
+    /// When created blank, this is null until the user performs a "Save As".
+    /// </para>
+    /// <para>
+    /// This is always a separate path from <see cref="SourceFilePath"/> — the original
+    /// source file is never overwritten.
+    /// </para>
+    /// </remarks>
+    public string? DestinationFilePath { get; set; }
+
+    /// <summary>
+    /// Format to use when saving to <see cref="DestinationFilePath"/>.
+    /// Inferred from the file extension, or set explicitly.
+    /// </summary>
+    public DiskFormat DestinationFormat { get; set; } = DiskFormat.Unknown;
+
+    /// <summary>
     /// Initializes a new internal disk image with the specified track count.
     /// </summary>
     /// <param name="trackCount">Number of tracks (typically 35 or 40).</param>

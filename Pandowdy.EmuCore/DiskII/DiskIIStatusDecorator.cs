@@ -92,6 +92,14 @@ public class DiskIIStatusDecorator : IDiskIIDrive
             builder.DiskImageFilename = System.IO.Path.GetFileName(diskImagePath);
             builder.IsReadOnly = _innerDrive.IsWriteProtected();
             builder.HasValidTrackData = true; // Assume valid after insertion
+
+            // Get dirty/destination state from internal image
+            if (_innerDrive is DiskIIDrive concreteDrive)
+            {
+                var internalImage = concreteDrive.InternalImage;
+                builder.IsDirty = internalImage?.IsDirty ?? false;
+                builder.HasDestinationPath = !string.IsNullOrEmpty(internalImage?.DestinationFilePath);
+            }
         });
     }
 
@@ -107,6 +115,8 @@ public class DiskIIStatusDecorator : IDiskIIDrive
             builder.DiskImageFilename = string.Empty;
             builder.IsReadOnly = false;
             builder.HasValidTrackData = false;
+            builder.IsDirty = false;
+            builder.HasDestinationPath = false;
         });
     }
 
@@ -195,6 +205,14 @@ public class DiskIIStatusDecorator : IDiskIIDrive
             builder.Track = _innerDrive.Track;
             builder.IsReadOnly = _innerDrive.IsWriteProtected();
             builder.HasValidTrackData = _innerDrive.HasDisk;
+
+            // Get dirty/destination state from internal image
+            if (_innerDrive is DiskIIDrive concreteDrive)
+            {
+                var internalImage = concreteDrive.InternalImage;
+                builder.IsDirty = internalImage?.IsDirty ?? false;
+                builder.HasDestinationPath = !string.IsNullOrEmpty(internalImage?.DestinationFilePath);
+            }
 
             // Note: DiskImagePath/Filename are not exposed by IDiskIIDrive interface
             // These will be set when InsertDisk() is called

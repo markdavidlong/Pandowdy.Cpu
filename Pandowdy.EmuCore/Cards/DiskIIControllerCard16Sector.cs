@@ -27,10 +27,12 @@ namespace Pandowdy.EmuCore.Cards;
 /// <param name="cpuClocking">The CPU clocking counters for timing operations.</param>
 /// <param name="factory">Factory for creating drive instances.</param>
 /// <param name="statusMutator">Status mutator for publishing controller state changes.</param>
+/// <param name="responseEmitter">Card response emitter for publishing card identification responses.</param>
 public class DiskIIControllerCard16Sector(
     CpuClockingCounters cpuClocking,
     IDiskIIFactory factory,
-    IDiskStatusMutator statusMutator) : DiskIIControllerCard(cpuClocking, factory, statusMutator)
+    IDiskStatusMutator statusMutator,
+    ICardResponseEmitter responseEmitter) : DiskIIControllerCard(cpuClocking, factory, statusMutator, responseEmitter)
 {
     private static readonly byte[] Rom =
     [
@@ -70,6 +72,6 @@ public class DiskIIControllerCard16Sector(
     /// <inheritdoc />
     public override ICard Clone()
     {
-        return new DiskIIControllerCard16Sector(_clocking, _diskIIFactory, _statusMutator);
+        return new DiskIIControllerCard16Sector(_clocking, _diskIIFactory, _statusMutator, _responseEmitter);
     }
 }

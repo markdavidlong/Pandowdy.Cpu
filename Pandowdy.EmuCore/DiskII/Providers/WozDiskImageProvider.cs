@@ -31,10 +31,6 @@ namespace Pandowdy.EmuCore.DiskII.Providers;
 /// Disk position is calculated from absolute CPU cycle count, modeling a continuously spinning
 /// disk where reads occur at the current rotational position.
 /// </para>
-/// <para>
-/// <strong>Note:</strong> This provider uses CiderPress2's Woz class for parsing. For a
-/// dependency-free alternative, use <see cref="InternalWozDiskImageProvider"/>.
-/// </para>
 /// </remarks>
 public class WozDiskImageProvider : IDiskImageProvider, IDisposable
 {
@@ -87,10 +83,6 @@ public class WozDiskImageProvider : IDiskImageProvider, IDisposable
     /// <summary>
     /// Gets the optimal bit timing for this disk image.
     /// </summary>
-    /// <remarks>
-    /// This CiderPress2-based provider doesn't expose the optimal timing from WOZ metadata.
-    /// For accurate timing, use <see cref="InternalWozDiskImageProvider"/> instead.
-    /// </remarks>
     public byte OptimalBitTiming => 32; // Default timing
 
     /// <summary>
@@ -357,10 +349,6 @@ public class WozDiskImageProvider : IDiskImageProvider, IDisposable
     /// <param name="elapsedCycles">CPU cycles elapsed since last call.</param>
     /// <param name="bits">Buffer to receive the bits read.</param>
     /// <returns>Number of bits actually read.</returns>
-    /// <remarks>
-    /// <strong>Stub Implementation:</strong> This CiderPress2-based provider uses legacy absolute timing.
-    /// For proper incremental timing, use <see cref="InternalWozDiskImageProvider"/> instead.
-    /// </remarks>
     public int AdvanceAndReadBits(double elapsedCycles, Span<bool> bits)
     {
         // Stub implementation - uses sequential reading without proper timing

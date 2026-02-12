@@ -37,6 +37,8 @@ namespace Pandowdy.EmuCore.Services;
 /// <param name="MotorOffScheduled">True if motor-off has been requested but delayed (~1 second).</param>
 /// <param name="PhaseState">Stepper motor phase state (low nibble: bits 3-0 = phases 3-0).</param>
 /// <param name="HasValidTrackData">True if the current track position has valid disk data.</param>
+/// <param name="IsDirty">True if the disk has been modified since load or last save.</param>
+/// <param name="HasDestinationPath">True if the disk has an attached destination path for Save operations.</param>
 public record DiskDriveStatusSnapshot(
     int SlotNumber,
     int DriveNumber,
@@ -48,7 +50,9 @@ public record DiskDriveStatusSnapshot(
     bool MotorOn,
     bool MotorOffScheduled,
     byte PhaseState,
-    bool HasValidTrackData
+    bool HasValidTrackData,
+    bool IsDirty,
+    bool HasDestinationPath
 )
 {
     /// <summary>
@@ -265,7 +269,9 @@ public sealed class DiskStatusProvider : IDiskStatusMutator
             MotorOn: false,
             MotorOffScheduled: false,
             PhaseState: 0,  // No phases active
-            HasValidTrackData: false
+            HasValidTrackData: false,
+            IsDirty: false,
+            HasDestinationPath: false
         );
 
         // Add to array and sort by slot, then drive
@@ -379,6 +385,12 @@ public sealed class DiskDriveStatusBuilder(DiskDriveStatusSnapshot snapshot)
     /// <summary>True if current track has valid data.</summary>
     public bool HasValidTrackData = snapshot.HasValidTrackData;
 
+    /// <summary>True if disk has been modified since load or last save.</summary>
+    public bool IsDirty = snapshot.IsDirty;
+
+    /// <summary>True if disk has an attached destination path for Save operations.</summary>
+    public bool HasDestinationPath = snapshot.HasDestinationPath;
+
     /// <summary>
     /// Builds an immutable <see cref="DiskDriveStatusSnapshot"/>.
     /// </summary>
@@ -393,7 +405,9 @@ public sealed class DiskDriveStatusBuilder(DiskDriveStatusSnapshot snapshot)
         MotorOn,
         MotorOffScheduled,
         PhaseState,
-        HasValidTrackData
+        HasValidTrackData,
+        IsDirty,
+        HasDestinationPath
     );
 }
 

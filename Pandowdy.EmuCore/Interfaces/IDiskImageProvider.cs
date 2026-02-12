@@ -23,7 +23,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// <list type="bullet">
 /// <item><see cref="DiskII.Providers.NibDiskImageProvider"/> - Raw GCR nibble format (.nib)</item>
 /// <item><see cref="DiskII.Providers.SectorDiskImageProvider"/> - Sector format (.dsk/.do/.po)</item>
-/// <item><see cref="DiskII.Providers.InternalWozDiskImageProvider"/> - WOZ flux timing (.woz)</item>
+/// <item><see cref="DiskII.Providers.WozDiskImageProvider"/> - WOZ flux timing (.woz)</item>
 /// </list>
 /// </para>
 /// </remarks>

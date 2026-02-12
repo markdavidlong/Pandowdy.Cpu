@@ -51,6 +51,15 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
     private int _randPos;
 
     /// <summary>
+    /// Gets the internal disk image (for dirty/destination tracking).
+    /// </summary>
+    /// <remarks>
+    /// Exposed for <see cref="DiskIIDrive"/> to provide access to dirty state
+    /// and destination path information through its internal accessor.
+    /// </remarks>
+    internal InternalDiskImage InternalImage => _diskImage;
+
+    /// <summary>
     /// Gets the file path of the disk image.
     /// </summary>
     public string FilePath => _diskImage.SourceFilePath ?? "(internal)";

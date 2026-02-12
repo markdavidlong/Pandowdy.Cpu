@@ -67,6 +67,7 @@ public abstract class DiskIIControllerCard : ICard
     protected IDiskIIDrive[] _drives = [];
     protected readonly IDiskIIFactory _diskIIFactory;
     protected readonly IDiskStatusMutator _statusMutator;
+    protected readonly ICardResponseEmitter _responseEmitter;
     protected SlotNumber _slotNumber = SlotNumber.Unslotted;
 
     /// <inheritdoc />
@@ -180,18 +181,22 @@ public abstract class DiskIIControllerCard : ICard
     /// <param name="cpuClocking">The CPU clocking counters for timing operations.</param>
     /// <param name="diskIIFactory">Factory for creating drive instances.</param>
     /// <param name="statusMutator">Status mutator for publishing controller state changes.</param>
+    /// <param name="responseEmitter">Card response emitter for publishing card identification and device enumeration responses.</param>
     protected DiskIIControllerCard(
         CpuClockingCounters cpuClocking,
         IDiskIIFactory diskIIFactory,
-        IDiskStatusMutator statusMutator)
+        IDiskStatusMutator statusMutator,
+        ICardResponseEmitter responseEmitter)
     {
         ArgumentNullException.ThrowIfNull(cpuClocking);
         ArgumentNullException.ThrowIfNull(diskIIFactory);
         ArgumentNullException.ThrowIfNull(statusMutator);
+        ArgumentNullException.ThrowIfNull(responseEmitter);
 
         _clocking = cpuClocking;
         _diskIIFactory = diskIIFactory;
         _statusMutator = statusMutator;
+        _responseEmitter = responseEmitter;
 
         // Subscribe to VBlank for periodic motor-off checking
         // This ensures motor-off happens even when no disk I/O is occurring
@@ -1216,18 +1221,386 @@ public abstract class DiskIIControllerCard : ICard
     /// </exception>
     /// <remarks>
     /// <para>
-    /// <strong>Placeholder Implementation:</strong> This base class provides a minimal
-    /// implementation for common messages (IdentifyCardMessage, EnumerateDevicesMessage,
-    /// RefreshStatusMessage). Card-specific messages (InsertDiskMessage, etc.) will be
-    /// implemented in Phase 2 of Task 5.
+    /// <strong>Supported Messages:</strong><br/>
+    /// - <see cref="Messages.IdentifyCardMessage"/>: Emits card identity via response channel<br/>
+    /// - <see cref="Messages.EnumerateDevicesMessage"/>: Emits device list via response channel<br/>
+    /// - <see cref="Messages.RefreshStatusMessage"/>: Pushes current drive status<br/>
+    /// - <see cref="DiskII.Messages.InsertDiskMessage"/>: Inserts disk image into drive<br/>
+    /// - <see cref="DiskII.Messages.InsertBlankDiskMessage"/>: Creates and inserts blank disk<br/>
+    /// - <see cref="DiskII.Messages.EjectDiskMessage"/>: Ejects disk from drive<br/>
+    /// - <see cref="DiskII.Messages.SwapDrivesMessage"/>: Swaps disk media between drives<br/>
+    /// - <see cref="DiskII.Messages.SaveDiskMessage"/>: Saves disk to attached destination<br/>
+    /// - <see cref="DiskII.Messages.SaveDiskAsMessage"/>: Exports disk to user-specified path<br/>
+    /// - <see cref="DiskII.Messages.SetWriteProtectMessage"/>: Toggles write protection<br/>
     /// </para>
     /// </remarks>
     public virtual void HandleMessage(ICardMessage message)
     {
-        // Phase 1 placeholder: Only handle identification messages
-        // Full disk management messages will be added in Phase 2
-        throw new Exceptions.CardMessageException(
-            $"Disk II controller does not yet support message type '{message.GetType().Name}'. " +
-            "Full message handling will be implemented in Phase 2 of Task 5.");
+        // Phase 2 implementation: Full disk management messages
+        switch (message)
+        {
+            case Messages.IdentifyCardMessage:
+                HandleIdentifyCard();
+                break;
+
+            case Messages.EnumerateDevicesMessage:
+                HandleEnumerateDevices();
+                break;
+
+            case Messages.RefreshStatusMessage:
+                HandleRefreshStatus();
+                break;
+
+            case DiskII.Messages.InsertDiskMessage insert:
+                ValidateDriveNumber(insert.DriveNumber);
+                _drives[insert.DriveNumber - 1].InsertDisk(insert.DiskImagePath);
+                break;
+
+            case DiskII.Messages.InsertBlankDiskMessage blank:
+                ValidateDriveNumber(blank.DriveNumber);
+                InsertBlankDisk(blank.DriveNumber, blank.FilePath);
+                break;
+
+            case DiskII.Messages.EjectDiskMessage eject:
+                ValidateDriveNumber(eject.DriveNumber);
+                _drives[eject.DriveNumber - 1].EjectDisk(); // no-op if empty
+                break;
+
+            case DiskII.Messages.SwapDrivesMessage:
+                if (_drives.Length < 2)
+                {
+                    throw new Exceptions.CardMessageException(
+                        "Cannot swap drives: controller has fewer than 2 drives.");
+                }
+                SwapDriveMedia();
+                break;
+
+            case DiskII.Messages.SaveDiskMessage save:
+                ValidateDriveNumber(save.DriveNumber);
+                SaveDriveImage(save.DriveNumber); // uses attached DestinationFilePath
+                break;
+
+            case DiskII.Messages.SaveDiskAsMessage saveAs:
+                ValidateDriveNumber(saveAs.DriveNumber);
+                ExportDriveImage(saveAs.DriveNumber, saveAs.FilePath);
+                break;
+
+            case DiskII.Messages.SetWriteProtectMessage wp:
+                ValidateDriveNumber(wp.DriveNumber);
+                SetDriveWriteProtect(wp.DriveNumber, wp.WriteProtected);
+                break;
+
+            default:
+                throw new Exceptions.CardMessageException(
+                    $"Disk II controller does not recognize message type '{message.GetType().Name}'.");
+        }
+    }
+
+    /// <summary>
+    /// Validates that a drive number is within the valid range for this controller.
+    /// </summary>
+    /// <param name="driveNumber">1-based drive number to validate.</param>
+    /// <exception cref="Exceptions.CardMessageException">
+    /// Thrown if the drive number is out of range.
+    /// </exception>
+    private void ValidateDriveNumber(int driveNumber)
+    {
+        if (driveNumber < 1 || driveNumber > _drives.Length)
+        {
+            throw new Exceptions.CardMessageException(
+                $"Invalid drive number {driveNumber}. Valid range: 1-{_drives.Length}.");
+        }
+    }
+
+    /// <summary>
+    /// Handles the IdentifyCardMessage by emitting card identity via the response channel.
+    /// </summary>
+    private void HandleIdentifyCard()
+    {
+        _responseEmitter.Emit(_slotNumber, Id, new Messages.CardIdentityPayload(Name));
+    }
+
+    /// <summary>
+    /// Handles the EnumerateDevicesMessage by emitting device list via the response channel.
+    /// </summary>
+    private void HandleEnumerateDevices()
+    {
+        var devices = new Messages.PeripheralType[_drives.Length];
+        Array.Fill(devices, Messages.PeripheralType.Floppy525);
+        _responseEmitter.Emit(_slotNumber, Id, new Messages.DeviceListPayload(devices));
+    }
+
+    /// <summary>
+    /// Handles the RefreshStatusMessage by pushing current drive status through IDiskStatusMutator.
+    /// </summary>
+    private void RefreshAllDriveStatus()
+    {
+        // Push current status for all drives
+        for (int i = 0; i < _drives.Length; i++)
+        {
+            int driveNumber = i + 1;
+            IDiskIIDrive drive = _drives[i];
+
+            _statusMutator.MutateDrive((int)_slotNumber, driveNumber, builder =>
+            {
+                builder.Track = drive.Track;
+                builder.IsReadOnly = drive.IsWriteProtected();
+                builder.HasValidTrackData = drive.HasDisk;
+
+                // Get dirty/destination state from internal image
+                if (drive is DiskIIDrive concreteDrive)
+                {
+                    var internalImage = concreteDrive.InternalImage;
+                    builder.IsDirty = internalImage?.IsDirty ?? false;
+                    builder.HasDestinationPath = !string.IsNullOrEmpty(internalImage?.DestinationFilePath);
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Handles the RefreshStatusMessage.
+    /// </summary>
+    private void HandleRefreshStatus()
+    {
+        RefreshAllDriveStatus();
+    }
+
+    /// <summary>
+    /// Inserts a blank disk into the specified drive.
+    /// </summary>
+    /// <param name="driveNumber">1-based drive number (1 or 2).</param>
+    /// <param name="filePath">Optional file path to associate with the blank disk.
+    /// If empty, a default destination path is derived.</param>
+    /// <exception cref="Exceptions.CardMessageException">
+    /// Thrown if the drive number is invalid or disk creation fails.
+    /// </exception>
+    private void InsertBlankDisk(int driveNumber, string filePath)
+    {
+        // TODO: Implement blank disk creation using InternalDiskImage
+        // This requires defining the blank disk format (unformatted, DOS 3.3, ProDOS)
+        // and deriving a default destination path if filePath is empty
+        throw new NotImplementedException(
+            "Blank disk creation not yet implemented. " +
+            "Requires InternalDiskImage instantiation and destination path derivation logic.");
+    }
+
+    /// <summary>
+    /// Swaps the disk media between Drive 1 and Drive 2.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Swap Mechanics:</strong><br/>
+    /// - Providers are swapped between drives<br/>
+    /// - Head positions are preserved (physical head doesn't move)<br/>
+    /// - Read positions are reset to avoid corrupt data streams<br/>
+    /// - Motor state does not change<br/>
+    /// - Status is updated via IDiskStatusMutator to reflect new filenames<br/>
+    /// </para>
+    /// </remarks>
+    private void SwapDriveMedia()
+    {
+        if (_drives.Length < 2)
+        {
+            return; // Already validated by caller, but defensive check
+        }
+
+        // Cast to concrete DiskIIDrive to access ImageProvider
+        if (_drives[0] is not DiskIIDrive drive1 || _drives[1] is not DiskIIDrive drive2)
+        {
+            throw new Exceptions.CardMessageException(
+                "Cannot swap drives: drives are not DiskIIDrive instances.");
+        }
+
+        // Extract providers
+        var provider1 = drive1.ImageProvider;
+        var provider2 = drive2.ImageProvider;
+
+        // Swap providers
+        drive1.ImageProvider = provider2;
+        drive2.ImageProvider = provider1;
+
+        // Set quarter-track on swapped providers (preserves head position)
+        provider1?.SetQuarterTrack(drive2.QuarterTrack);
+        provider2?.SetQuarterTrack(drive1.QuarterTrack);
+
+        // Reset read positions (motor state-aware)
+        if (IsMotorRunning)
+        {
+            provider1?.NotifyMotorStateChanged(true, _clocking.TotalCycles);
+            provider2?.NotifyMotorStateChanged(true, _clocking.TotalCycles);
+        }
+
+        // Update status for both drives
+        RefreshAllDriveStatus();
+
+        Debug.WriteLine($"[{_clocking.TotalCycles}] 🔄 Swapped disk media between Drive 1 and Drive 2");
+    }
+
+    /// <summary>
+    /// Saves the disk image in the specified drive to its attached destination path.
+    /// </summary>
+    /// <param name="driveNumber">1-based drive number (1 or 2).</param>
+    /// <exception cref="Exceptions.CardMessageException">
+    /// Thrown if no disk is inserted, no destination path is attached, or save fails.
+    /// </exception>
+    private void SaveDriveImage(int driveNumber)
+    {
+        IDiskIIDrive drive = _drives[driveNumber - 1];
+
+        if (!drive.HasDisk)
+        {
+            throw new Exceptions.CardMessageException(
+                $"Cannot save: no disk inserted in drive {driveNumber}.");
+        }
+
+        // Get internal image
+        if (drive is not DiskIIDrive concreteDrive)
+        {
+            throw new Exceptions.CardMessageException(
+                "Cannot save: drive is not a DiskIIDrive instance.");
+        }
+
+        InternalDiskImage? internalImage = concreteDrive.InternalImage;
+        if (internalImage == null)
+        {
+            throw new Exceptions.CardMessageException(
+                "Cannot save: no internal disk image available.");
+        }
+
+        if (string.IsNullOrEmpty(internalImage.DestinationFilePath))
+        {
+            throw new Exceptions.CardMessageException(
+                "Cannot save: no destination path attached. Use Save As instead.");
+        }
+
+        // Export to destination path
+        try
+        {
+            DiskFormat format = internalImage.DestinationFormat != DiskFormat.Unknown
+                ? internalImage.DestinationFormat
+                : DiskFormatHelper.GetFormatFromPath(internalImage.DestinationFilePath);
+
+            IDiskImageExporter exporter = DiskFormatHelper.GetExporterForFormat(format);
+            exporter.Export(internalImage, internalImage.DestinationFilePath);
+
+            // Clear dirty flag
+            internalImage.ClearDirty();
+
+            // Update SourceFilePath to match saved destination
+            // (Cannot modify init property - requires new InternalDiskImage instance)
+            // TODO: This requires refactoring InternalDiskImage to support SourceFilePath updates
+            // For now, just clear dirty and update status
+
+            // Update status to reflect clean state
+            RefreshAllDriveStatus();
+
+            Debug.WriteLine($"Saved disk image from drive {driveNumber} to {internalImage.DestinationFilePath}");
+        }
+        catch (Exception ex)
+        {
+            throw new Exceptions.CardMessageException(
+                $"Failed to save disk image: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Exports the disk image in the specified drive to a user-specified path.
+    /// </summary>
+    /// <param name="driveNumber">1-based drive number (1 or 2).</param>
+    /// <param name="filePath">Destination path for the exported disk image.</param>
+    /// <exception cref="Exceptions.CardMessageException">
+    /// Thrown if no disk is inserted or export fails.
+    /// </exception>
+    private void ExportDriveImage(int driveNumber, string filePath)
+    {
+        IDiskIIDrive drive = _drives[driveNumber - 1];
+
+        if (!drive.HasDisk)
+        {
+            throw new Exceptions.CardMessageException(
+                $"Cannot export: no disk inserted in drive {driveNumber}.");
+        }
+
+        // Get internal image
+        if (drive is not DiskIIDrive concreteDrive)
+        {
+            throw new Exceptions.CardMessageException(
+                "Cannot export: drive is not a DiskIIDrive instance.");
+        }
+
+        InternalDiskImage? internalImage = concreteDrive.InternalImage;
+        if (internalImage == null)
+        {
+            throw new Exceptions.CardMessageException(
+                "Cannot export: no internal disk image available.");
+        }
+
+        // Determine format from file extension
+        DiskFormat format = DiskFormatHelper.GetFormatFromPath(filePath);
+        if (!DiskFormatHelper.IsExportSupported(format))
+        {
+            throw new Exceptions.CardMessageException(
+                $"Unsupported export format: {format}");
+        }
+
+        // Export to specified path
+        try
+        {
+            IDiskImageExporter exporter = DiskFormatHelper.GetExporterForFormat(format);
+            exporter.Export(internalImage, filePath);
+
+            // Update destination path and format
+            internalImage.DestinationFilePath = filePath;
+            internalImage.DestinationFormat = format;
+
+            // Clear dirty flag
+            internalImage.ClearDirty();
+
+            // Update status to reflect new destination and clean state
+            RefreshAllDriveStatus();
+
+            Debug.WriteLine($"Exported disk image from drive {driveNumber} to {filePath}");
+        }
+        catch (Exception ex)
+        {
+            throw new Exceptions.CardMessageException(
+                $"Failed to export disk image: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Sets the write-protect state on the specified drive's disk image.
+    /// </summary>
+    /// <param name="driveNumber">1-based drive number (1 or 2).</param>
+    /// <param name="writeProtected">True to enable write protection, false to disable.</param>
+    /// <exception cref="Exceptions.CardMessageException">
+    /// Thrown if no disk is inserted.
+    /// </exception>
+    private void SetDriveWriteProtect(int driveNumber, bool writeProtected)
+    {
+        IDiskIIDrive drive = _drives[driveNumber - 1];
+
+        if (!drive.HasDisk)
+        {
+            throw new Exceptions.CardMessageException(
+                $"Cannot set write protection: no disk inserted in drive {driveNumber}.");
+        }
+
+        // Get provider and set write-protect state
+        if (drive is DiskIIDrive concreteDrive && concreteDrive.ImageProvider != null)
+        {
+            concreteDrive.ImageProvider.IsWriteProtected = writeProtected;
+
+            // Update status
+            RefreshAllDriveStatus();
+
+            Debug.WriteLine($"Drive {driveNumber} write protection: {(writeProtected ? "ON" : "OFF")}");
+        }
+        else
+        {
+            throw new Exceptions.CardMessageException(
+                "Cannot set write protection: image provider not available.");
+        }
     }
 }

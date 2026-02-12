@@ -71,13 +71,25 @@
   - NullCard.HandleMessage fully implemented
   - VA2M.SendCardMessageAsync with broadcast support
 
+- **Phase 2: Disk II Message Implementations** (Completed: 2026-02-10)
+  - All Disk II message types created (InsertDiskMessage, InsertBlankDiskMessage, EjectDiskMessage, SwapDrivesMessage, SaveDiskMessage, SaveDiskAsMessage, SetWriteProtectMessage)
+  - DiskFormatHelper.cs created with format mapping and exporter selection
+  - DiskIIControllerCard.HandleMessage fully implemented (all 10 message types)
+  - Helper methods implemented: ValidateDriveNumber, SwapDriveMedia, SaveDriveImage, ExportDriveImage, SetDriveWriteProtect, RefreshAllDriveStatus
+  - InsertBlankDisk marked as TODO (requires UI settings for last export directory)
+  - DiskIIStatusDecorator propagates IsDirty and HasDestinationPath to status snapshots
+  - Test files created: DiskFormatHelperTests.cs (29 passing tests), DiskIIMessageHandlerTests.cs (25 passing tests)
+  - All existing test files updated for ICardResponseEmitter parameter
+  - Build compiles successfully
+  - All tests pass (54 new tests + all existing tests)
+
 ### Current task in progress:
 
-- None (Phase 1 complete)
+- None (Phase 2 complete)
 
 ### Next proposed task:
 
-- Phase 2: Disk II Message Implementations
+- Phase 3A: UI Integration — Core Controls
 
 ---
 

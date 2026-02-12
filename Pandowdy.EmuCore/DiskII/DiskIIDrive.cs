@@ -3,6 +3,7 @@
 // See LICENSE file for details
 
 using System.Diagnostics;
+using Pandowdy.EmuCore.DiskII.Providers;
 using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.EmuCore.DiskII;
@@ -43,6 +44,46 @@ public class DiskIIDrive : IDiskIIDrive
     private int _quarterSteps;
     private bool _hitMinLogged;
     private bool _hitMaxLogged;
+
+    /// <summary>
+    /// Gets or sets the image provider for this drive (internal accessor for swap support).
+    /// </summary>
+    /// <remarks>
+    /// This property is used by <see cref="Cards.DiskIIControllerCard"/> to swap
+    /// disk media between drives. The controller manages the swap operation directly
+    /// since it owns the drive array.
+    /// </remarks>
+    internal IDiskImageProvider? ImageProvider
+    {
+        get => _imageProvider;
+        set => _imageProvider = value;
+    }
+
+    /// <summary>
+    /// Gets the internal disk image from the current provider (for dirty/destination tracking).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This property provides access to the <see cref="InternalDiskImage"/> for reading
+    /// dirty state and destination path information. Used by <see cref="DiskIIStatusDecorator"/>
+    /// to propagate these fields to the UI via <see cref="Services.IDiskStatusMutator"/>.
+    /// </para>
+    /// <para>
+    /// Returns null if no disk is inserted or if the provider is not a
+    /// <see cref="UnifiedDiskImageProvider"/>.
+    /// </para>
+    /// </remarks>
+    internal InternalDiskImage? InternalImage
+    {
+        get
+        {
+            if (_imageProvider is UnifiedDiskImageProvider unifiedProvider)
+            {
+                return unifiedProvider.InternalImage;
+            }
+            return null;
+        }
+    }
 
     /// <inheritdoc />
     public string Name { get; }

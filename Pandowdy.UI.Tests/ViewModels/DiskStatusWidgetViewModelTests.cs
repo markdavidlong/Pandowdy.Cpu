@@ -36,7 +36,9 @@ public class DiskStatusWidgetViewModelTests
         bool motorOn = false,
         bool motorOffScheduled = false,
         byte phaseState = 0b0000,
-        bool hasValidTrackData = false)
+        bool hasValidTrackData = false,
+        bool isDirty = false,
+        bool hasDestinationPath = false)
     {
         return new DiskDriveStatusSnapshot(
             slotNumber,
@@ -49,7 +51,9 @@ public class DiskStatusWidgetViewModelTests
             motorOn,
             motorOffScheduled,
             phaseState,
-            hasValidTrackData);
+            hasValidTrackData,
+            isDirty,
+            hasDestinationPath);
     }
 
     #endregion
