@@ -22,12 +22,12 @@
             <Border Background="#303030"
                     BorderBrush="#505050"
                     BorderThickness="0,0,0,1"
-                    Padding="8,6"
+                    Padding="6,3"
                     CornerRadius="4,4,0,0">
                 <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Grid.Column="0"
                                Text="{Binding CardTitle}"
-                               FontSize="12"
+                               FontSize="10"
                                FontWeight="SemiBold"
                                Foreground="#00FF00"
                                VerticalAlignment="Center" />
@@ -36,7 +36,7 @@
                     <Button Grid.Column="1"
                             Content="⚙"
                             FontSize="14"
-                            Padding="4,2"
+                            Padding="4,1"
                             Background="Transparent"
                             BorderThickness="0"
                             Foreground="#00FF00">

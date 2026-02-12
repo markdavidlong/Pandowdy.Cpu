@@ -95,6 +95,7 @@
   - DiskStatusWidgetViewModelTests updated for new constructor signature
   - MainWindowViewModelTests updated for DiskStatusPanelViewModel constructor change
   - Build compiles successfully
+  - Double clicking a DiskStatusWidget should open the "Insert Disk" dialog for that drive
   - All tests pass (157 total: 150 existing + 7 new)
 
 ### Current task in progress:
