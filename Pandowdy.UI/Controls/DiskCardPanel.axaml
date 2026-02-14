@@ -31,7 +31,7 @@
                                FontWeight="SemiBold"
                                Foreground="#00FF00"
                                VerticalAlignment="Center" />
-                    
+
                     <!-- Context menu for card-level operations -->
                     <Button Grid.Column="1"
                             Content="⚙"
@@ -39,13 +39,14 @@
                             Padding="4,1"
                             Background="Transparent"
                             BorderThickness="0"
-                            Foreground="#00FF00">
-                        <Button.Flyout>
-                            <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            Foreground="#00FF00"
+                            x:Name="CardMenuButton">
+                        <Button.ContextMenu>
+                            <ContextMenu>
                                 <MenuItem Header="Swap Drives"
                                           Command="{Binding SwapDrivesCommand}" />
-                            </MenuFlyout>
-                        </Button.Flyout>
+                            </ContextMenu>
+                        </Button.ContextMenu>
                     </Button>
                 </Grid>
             </Border>

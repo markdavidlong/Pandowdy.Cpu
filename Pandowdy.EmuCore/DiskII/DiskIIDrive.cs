@@ -53,7 +53,7 @@ public class DiskIIDrive : IDiskIIDrive
     /// disk media between drives. The controller manages the swap operation directly
     /// since it owns the drive array.
     /// </remarks>
-    internal IDiskImageProvider? ImageProvider
+    public IDiskImageProvider? ImageProvider
     {
         get => _imageProvider;
         set => _imageProvider = value;
@@ -73,7 +73,7 @@ public class DiskIIDrive : IDiskIIDrive
     /// <see cref="UnifiedDiskImageProvider"/>.
     /// </para>
     /// </remarks>
-    internal InternalDiskImage? InternalImage
+    public InternalDiskImage? InternalImage
     {
         get
         {
@@ -277,4 +277,17 @@ public class DiskIIDrive : IDiskIIDrive
 
     /// <inheritdoc />
     public byte OptimalBitTiming => _imageProvider?.OptimalBitTiming ?? 32;
+
+    /// <inheritdoc />
+    public string? CurrentDiskPath
+    {
+        get
+        {
+            if (_imageProvider is UnifiedDiskImageProvider unifiedProvider)
+            {
+                return unifiedProvider.InternalImage?.SourceFilePath;
+            }
+            return null;
+        }
+    }
 }

@@ -214,3 +214,6 @@ The Disk II controller emulation reflects hardware-accurate motor control:
 - Test assertions should check `controller.IsMotorRunning`, not per-drive motor state
 
 **Reference:** See `docs/DiskII-Motor-Refactoring-Plan.md` for complete refactoring history (8 phases, completed 2026-01)
+
+## Disk Image Formats
+- When discussing disk image formats, use "nibble format" instead of ".nib" or ".nib extension" to work around rendering/display issues in VS.

@@ -6,8 +6,11 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using Pandowdy.EmuCore.Cards;
 using Pandowdy.EmuCore.DiskII.Messages;
+using Pandowdy.EmuCore.Exceptions;
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.UI.Interfaces;
 using ReactiveUI;
 
 namespace Pandowdy.UI.ViewModels;
@@ -28,6 +31,7 @@ namespace Pandowdy.UI.ViewModels;
 public class DiskCardPanelViewModel : ReactiveObject
 {
     private readonly IEmulatorCoreInterface _emulator;
+    private readonly IMessageBoxService _messageBoxService;
     private readonly SlotNumber _slot;
 
     /// <summary>
@@ -59,16 +63,19 @@ public class DiskCardPanelViewModel : ReactiveObject
     /// Initializes a new instance of the <see cref="DiskCardPanelViewModel"/> class.
     /// </summary>
     /// <param name="emulator">Emulator core interface for sending card messages.</param>
+    /// <param name="messageBoxService">Service for displaying error dialogs.</param>
     /// <param name="slot">The expansion slot number containing this card.</param>
     /// <param name="cardName">The human-readable card name.</param>
     /// <param name="drives">Collection of drive ViewModels for this card.</param>
     public DiskCardPanelViewModel(
         IEmulatorCoreInterface emulator,
+        IMessageBoxService messageBoxService,
         SlotNumber slot,
         string cardName,
         ObservableCollection<DiskStatusWidgetViewModel> drives)
     {
         _emulator = emulator;
+        _messageBoxService = messageBoxService;
         _slot = slot;
         CardName = cardName;
         Drives = drives;
@@ -82,7 +89,17 @@ public class DiskCardPanelViewModel : ReactiveObject
             .Select(_ => Drives.Count == 2 && Drives.Any(d => d.HasDisk));
 
         SwapDrivesCommand = ReactiveCommand.CreateFromTask(
-            async () => await _emulator.SendCardMessageAsync(_slot, new SwapDrivesMessage()),
+            async () =>
+            {
+                try
+                {
+                    await _emulator.SendCardMessageAsync(_slot, new SwapDrivesMessage());
+                }
+                catch (CardMessageException ex)
+                {
+                    await _messageBoxService.ShowErrorAsync("Swap Drives Failed", ex.Message);
+                }
+            },
             canSwapObservable);
     }
 }

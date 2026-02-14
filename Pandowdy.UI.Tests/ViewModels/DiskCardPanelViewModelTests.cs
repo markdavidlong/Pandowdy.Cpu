@@ -9,6 +9,7 @@ using Moq;
 using Pandowdy.EmuCore.DiskII.Messages;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.ViewModels;
 using Xunit;
 
@@ -20,13 +21,15 @@ namespace Pandowdy.UI.Tests.ViewModels;
 public class DiskCardPanelViewModelTests
 {
     private readonly Mock<IEmulatorCoreInterface> _mockEmulator;
+    private readonly Mock<IMessageBoxService> _mockMessageBoxService;
 
     public DiskCardPanelViewModelTests()
     {
         _mockEmulator = new Mock<IEmulatorCoreInterface>();
+        _mockMessageBoxService = new Mock<IMessageBoxService>();
     }
 
-    private static DiskStatusWidgetViewModel CreateMockDriveViewModel(
+    private DiskStatusWidgetViewModel CreateMockDriveViewModel(
         IEmulatorCoreInterface emulator,
         int slotNumber,
         int driveNumber,
@@ -47,7 +50,7 @@ public class DiskCardPanelViewModelTests
             IsDirty: false,
             HasDestinationPath: hasDisk
         );
-        return new DiskStatusWidgetViewModel(emulator, snapshot);
+        return new DiskStatusWidgetViewModel(emulator, _mockMessageBoxService.Object, snapshot);
     }
 
     #region Constructor Tests
@@ -63,9 +66,7 @@ public class DiskCardPanelViewModelTests
         };
 
         // Act
-        var vm = new DiskCardPanelViewModel(
-            _mockEmulator.Object,
-            SlotNumber.Slot6,
+        var vm = new DiskCardPanelViewModel(_mockEmulator.Object, _mockMessageBoxService.Object, SlotNumber.Slot6,
             "Disk II Controller",
             drives);
 
@@ -87,9 +88,7 @@ public class DiskCardPanelViewModelTests
         };
 
         // Act
-        var vm = new DiskCardPanelViewModel(
-            _mockEmulator.Object,
-            SlotNumber.Slot5,
+        var vm = new DiskCardPanelViewModel(_mockEmulator.Object, _mockMessageBoxService.Object, SlotNumber.Slot5,
             "Test Card",
             drives);
 
@@ -110,9 +109,7 @@ public class DiskCardPanelViewModelTests
             CreateMockDriveViewModel(_mockEmulator.Object, 6, 1, hasDisk: true)
         };
 
-        var vm = new DiskCardPanelViewModel(
-            _mockEmulator.Object,
-            SlotNumber.Slot6,
+        var vm = new DiskCardPanelViewModel(_mockEmulator.Object, _mockMessageBoxService.Object, SlotNumber.Slot6,
             "Disk II Controller",
             drives);
 
@@ -133,9 +130,7 @@ public class DiskCardPanelViewModelTests
             CreateMockDriveViewModel(_mockEmulator.Object, 6, 2, hasDisk: false)
         };
 
-        var vm = new DiskCardPanelViewModel(
-            _mockEmulator.Object,
-            SlotNumber.Slot6,
+        var vm = new DiskCardPanelViewModel(_mockEmulator.Object, _mockMessageBoxService.Object, SlotNumber.Slot6,
             "Disk II Controller",
             drives);
 
@@ -156,9 +151,7 @@ public class DiskCardPanelViewModelTests
             CreateMockDriveViewModel(_mockEmulator.Object, 6, 2, hasDisk: false)
         };
 
-        var vm = new DiskCardPanelViewModel(
-            _mockEmulator.Object,
-            SlotNumber.Slot6,
+        var vm = new DiskCardPanelViewModel(_mockEmulator.Object, _mockMessageBoxService.Object, SlotNumber.Slot6,
             "Disk II Controller",
             drives);
 
@@ -179,9 +172,7 @@ public class DiskCardPanelViewModelTests
             CreateMockDriveViewModel(_mockEmulator.Object, 6, 2, hasDisk: true)
         };
 
-        var vm = new DiskCardPanelViewModel(
-            _mockEmulator.Object,
-            SlotNumber.Slot6,
+        var vm = new DiskCardPanelViewModel(_mockEmulator.Object, _mockMessageBoxService.Object, SlotNumber.Slot6,
             "Disk II Controller",
             drives);
 
@@ -202,9 +193,7 @@ public class DiskCardPanelViewModelTests
             CreateMockDriveViewModel(_mockEmulator.Object, 6, 2, hasDisk: false)
         };
 
-        var vm = new DiskCardPanelViewModel(
-            _mockEmulator.Object,
-            SlotNumber.Slot6,
+        var vm = new DiskCardPanelViewModel(_mockEmulator.Object, _mockMessageBoxService.Object, SlotNumber.Slot6,
             "Disk II Controller",
             drives);
 

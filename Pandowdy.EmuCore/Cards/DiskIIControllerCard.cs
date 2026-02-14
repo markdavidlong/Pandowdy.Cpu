@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.DiskII;
+using Pandowdy.EmuCore.DiskII.Providers;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 
@@ -443,7 +444,7 @@ public abstract class DiskIIControllerCard : ICard
                     UpdateMotorOffScheduledStatus(false);
                 }
 
-                if (_motorState == DiskIIMotorState.Off)  // NEW: Check controller state
+                if (_motorState == DiskIIMotorState.Off)  // Only initialize if motor was off
                 {
 #if ControllerDebug
                 Debug.WriteLine($"[{_clocking.TotalCycles}] 🔵 MOTOR ON - Drive {_selectedDriveIndex + 1}, Track {SelectedDrive.Track:F2}");
@@ -456,11 +457,8 @@ public abstract class DiskIIControllerCard : ICard
                     _addressFieldState = AddressFieldState.Idle; // Reset address field state
                     _dataFieldState = DataFieldState.Idle; // Reset data field state
 
-                    // PHASE 4: Only update controller state (old drive state removed)
-                    _motorState = DiskIIMotorState.On;
-                    // Notify drive (and its provider) that motor turned on
-                    SelectedDrive.NotifyMotorStateChanged(true, _clocking.TotalCycles);
-                    // Motor on status is handled by controller, not drive
+                    // Set motor state and notify (encapsulated)
+                    SetMotorState(DiskIIMotorState.On);
                 }
             }
             else
@@ -472,10 +470,8 @@ public abstract class DiskIIControllerCard : ICard
 #if ControllerDebug
                 Debug.WriteLine($"[{_clocking.TotalCycles}] ⏱️ MOTOR-OFF SCHEDULED for cycle {_motorOffScheduledCycle} (~1 sec delay)");
 #endif
-                    // PHASE 2: Update new motor state (dual-track)
-                    _motorState = DiskIIMotorState.ScheduledOff;  // NEW
-                    // Update status: motor-off now scheduled
-                    UpdateMotorOffScheduledStatus(true);
+                    // Set motor state to ScheduledOff (encapsulated)
+                    SetMotorState(DiskIIMotorState.ScheduledOff);
                 }
             }
         }
@@ -497,13 +493,8 @@ public abstract class DiskIIControllerCard : ICard
             // Clear the schedule before turning motor off
             _motorOffScheduledCycle = 0;
 
-            // PHASE 4: Only update controller state (old drive state removed)
-            _motorState = DiskIIMotorState.Off;
-
-            // Update status: motor-off no longer scheduled (motor is now actually off)
-            UpdateMotorOffScheduledStatus(false);
-
-            // Motor control is now handled by controller, not drive
+            // Set motor state to Off (encapsulated - handles notification)
+            SetMotorState(DiskIIMotorState.Off);
 
             // DON'T clear _shiftRegister - it must maintain state across motor cycles!
             _diagnosticShiftReg = 0; // Clear diagnostic shift register
@@ -524,6 +515,57 @@ public abstract class DiskIIControllerCard : ICard
     }
 
     /// <summary>
+    /// Sets the motor state and automatically updates all related status notifications.
+    /// </summary>
+    /// <param name="newState">The new motor state to transition to.</param>
+    /// <remarks>
+    /// <para>
+    /// This method encapsulates the coupling between motor state changes and GUI notifications.
+    /// It ensures that whenever the controller motor state changes, the appropriate status
+    /// updates are sent to the UI for the currently selected drive.
+    /// </para>
+    /// <para>
+    /// State transitions handled:
+    /// <list type="bullet">
+    /// <item>Off → On: Motor starts, notifies drive, updates MotorOn=true, MotorOffScheduled=false</item>
+    /// <item>Off/On → ScheduledOff: Motor still running, updates MotorOffScheduled=true</item>
+    /// <item>ScheduledOff → On: Cancels scheduled off, updates MotorOffScheduled=false</item>
+    /// <item>On/ScheduledOff → Off: Motor stops, notifies drive, updates MotorOn=false, MotorOffScheduled=false</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    private void SetMotorState(DiskIIMotorState newState)
+    {
+        if (_motorState == newState)
+        {
+            return; // No change needed
+        }
+
+        DiskIIMotorState oldState = _motorState;
+        _motorState = newState;
+
+        // Determine status flags based on new state
+        bool motorOn = (newState == DiskIIMotorState.On || newState == DiskIIMotorState.ScheduledOff);
+        bool motorOffScheduled = (newState == DiskIIMotorState.ScheduledOff);
+
+        // Update status flags for currently selected drive
+        UpdateMotorOffScheduledStatus(motorOffScheduled);
+        UpdateMotorOnStatus(motorOn);
+
+        // Notify drive if motor running state actually changed (Off ↔ On/ScheduledOff)
+        if (SelectedDrive != null)
+        {
+            bool wasRunning = (oldState != DiskIIMotorState.Off);
+            bool isRunning = (newState != DiskIIMotorState.Off);
+
+            if (wasRunning != isRunning)
+            {
+                SelectedDrive.NotifyMotorStateChanged(isRunning, _clocking.TotalCycles);
+            }
+        }
+    }
+
+    /// <summary>
     /// Updates the MotorOffScheduled status flag for the currently selected drive.
     /// </summary>
     /// <param name="scheduled">True if motor-off is scheduled, false if cancelled or completed.</param>
@@ -535,6 +577,21 @@ public abstract class DiskIIControllerCard : ICard
         _statusMutator.MutateDrive(slotNumber, driveNumber, builder =>
         {
             builder.MotorOffScheduled = scheduled;
+        });
+    }
+
+    /// <summary>
+    /// Updates the MotorOn status flag for the currently selected drive.
+    /// </summary>
+    /// <param name="motorOn">True if motor is running, false if motor is off.</param>
+    private void UpdateMotorOnStatus(bool motorOn)
+    {
+        int slotNumber = (int)_slotNumber;
+        int driveNumber = _selectedDriveIndex + 1; // Convert 0-based to 1-based
+
+        _statusMutator.MutateDrive(slotNumber, driveNumber, builder =>
+        {
+            builder.MotorOn = motorOn;
         });
     }
 
@@ -600,35 +657,52 @@ public abstract class DiskIIControllerCard : ICard
                     if (motorWasOn)
                     {
                         // Motor stays running - controller motor line switches to new drive
-                        // No need to update individual drives, they don't track motor state
+                        // Need to update status: OLD drive motor OFF, NEW drive motor ON
+
+                        // Clear OLD drive's motor status
+                        int slotNumber = (int)_slotNumber;
+                        int oldDriveNumber = oldDriveIndex + 1;
+                        _statusMutator.MutateDrive(slotNumber, oldDriveNumber, builder =>
+                        {
+                            builder.MotorOn = false;
+                            builder.MotorOffScheduled = false;
+                        });
 
                         // Cancel any pending scheduled motor-off if one was active
                         if (_motorOffScheduledCycle > 0)
                         {
                             _motorOffScheduledCycle = 0;
-                            UpdateMotorOffScheduledStatus(false);
                         }
+
+                        // Set NEW drive's motor status (will be set after _selectedDriveIndex is updated)
+                        // This will happen at the end when we call UpdatePhaseState()
                     }
 
                     // Clear OLD drive's phase state in status display before switching
-                    int slotNumber = (int)_slotNumber;
-                    int oldDriveNumber = oldDriveIndex + 1;
-                    _statusMutator.MutateDrive(slotNumber, oldDriveNumber, builder =>
+                    int slotNumber2 = (int)_slotNumber;
+                    int oldDriveNumber2 = oldDriveIndex + 1;
+                    _statusMutator.MutateDrive(slotNumber2, oldDriveNumber2, builder =>
                     {
                         builder.PhaseState = 0;
                     });
 
-                    // CRITICAL: Reset bit timing when switching drives
-                    // The timing state is controller-level, not per-drive, so we must reset it
-                    // to prevent stale timing from affecting the new drive
-                    _lastBitShiftCycle = _clocking.TotalCycles;
+                        // CRITICAL: Reset bit timing when switching drives
+                        // The timing state is controller-level, not per-drive, so we must reset it
+                        // to prevent stale timing from affecting the new drive
+                        _lastBitShiftCycle = _clocking.TotalCycles;
 
-                    // Clear controller phases during drive switch (common hardware behavior)
-                    _currentPhase = 0;
+                        // Clear controller phases during drive switch (common hardware behavior)
+                        _currentPhase = 0;
 
-                    // Handle NEW drive: phases start at ---- (software will activate as needed)
-                    UpdatePhaseState();
-                }
+                        // Handle NEW drive: phases start at ---- (software will activate as needed)
+                        UpdatePhaseState();
+
+                        // If motor was running, update NEW drive's motor status
+                        if (motorWasOn)
+                        {
+                            UpdateMotorOnStatus(true);
+                        }
+                    }
             }
 
     /// <summary>
@@ -1154,7 +1228,9 @@ public abstract class DiskIIControllerCard : ICard
             _diskIIFactory.CreateDrive($"{slotName}-D1"),
             _diskIIFactory.CreateDrive($"{slotName}-D2")
         ];
+#if ControllerDebug
         Debug.WriteLine($"DiskIIControllerCard installed in {slot}: Created {_drives.Length} drives");
+#endif
     }
 
     /// <inheritdoc />
@@ -1166,19 +1242,13 @@ public abstract class DiskIIControllerCard : ICard
     /// <inheritdoc />
     public void Reset()
     {
-        // CRITICAL: Cancel any pending motor-off FIRST to prevent stale scheduled shutdowns
         _motorOffScheduledCycle = 0;
 
-        // PHASE 4: Reset controller motor state (drive state removed)
-        _motorState = DiskIIMotorState.Off;
+        // Set motor state to Off (encapsulated - handles notification)
+        SetMotorState(DiskIIMotorState.Off);
 
-        // IMMEDIATE motor shutdown - reset is emergency stop, no delay
-        // Motor control is now at controller level
 #if ControllerDebug
-        if (IsMotorRunning)
-        {
-            Debug.WriteLine($"[{_clocking.TotalCycles}] 🔴 RESET: Immediate motor-off on Drive {_selectedDriveIndex + 1}");
-        }
+        Debug.WriteLine($"[{_clocking.TotalCycles}] 🔴 RESET: Immediate motor-off on Drive {_selectedDriveIndex + 1}");
 #endif
 
         // NOW it's safe to reset controller state (motors are stopped)
@@ -1204,11 +1274,7 @@ public abstract class DiskIIControllerCard : ICard
         _dataFieldState = DataFieldState.Idle;
         _dataFieldIndex = 0;
 
-        // Reset to Drive 1
-        _selectedDriveIndex = 0;
-
-        // Update status to reflect reset state
-        UpdateMotorOffScheduledStatus(false); // No motor-off scheduled
+        // Update phase state for currently selected drive
         UpdatePhaseState(); // All phases off
     }
 
@@ -1347,13 +1413,17 @@ public abstract class DiskIIControllerCard : ICard
                 builder.IsReadOnly = drive.IsWriteProtected();
                 builder.HasValidTrackData = drive.HasDisk;
 
-                // Get dirty/destination state from internal image
-                if (drive is DiskIIDrive concreteDrive)
-                {
-                    var internalImage = concreteDrive.InternalImage;
-                    builder.IsDirty = internalImage?.IsDirty ?? false;
-                    builder.HasDestinationPath = !string.IsNullOrEmpty(internalImage?.DestinationFilePath);
-                }
+                // Get dirty/destination state from internal image (via interface)
+                var internalImage = drive.InternalImage;
+                builder.IsDirty = internalImage?.IsDirty ?? false;
+                builder.HasDestinationPath = !string.IsNullOrEmpty(internalImage?.DestinationFilePath);
+
+                // Update disk image path and filename from CurrentDiskPath
+                string? currentPath = drive.CurrentDiskPath;
+                builder.DiskImagePath = currentPath ?? string.Empty;
+                builder.DiskImageFilename = !string.IsNullOrEmpty(currentPath) 
+                    ? System.IO.Path.GetFileName(currentPath) 
+                    : string.Empty;
             });
         }
     }
@@ -1377,12 +1447,102 @@ public abstract class DiskIIControllerCard : ICard
     /// </exception>
     private void InsertBlankDisk(int driveNumber, string filePath)
     {
-        // TODO: Implement blank disk creation using InternalDiskImage
-        // This requires defining the blank disk format (unformatted, DOS 3.3, ProDOS)
-        // and deriving a default destination path if filePath is empty
-        throw new NotImplementedException(
-            "Blank disk creation not yet implemented. " +
-            "Requires InternalDiskImage instantiation and destination path derivation logic.");
+        IDiskIIDrive drive = _drives[driveNumber - 1];
+
+        try
+        {
+            // Eject any existing disk first
+            drive.EjectDisk();
+
+            // Derive destination path if not provided
+            if (string.IsNullOrEmpty(filePath))
+            {
+                // TODO: Get last export directory from settings (for now, use current directory)
+                string directory = Environment.CurrentDirectory;
+                filePath = System.IO.Path.Combine(directory, "blank.nib");
+
+                // Handle collision: blank.nib -> blank_new.nib -> blank_new2.nib, etc.
+                filePath = DeriveUniqueDestinationPath(filePath);
+            }
+
+            // Create a blank internal disk image (35 tracks, unformatted)
+            var blankImage = new InternalDiskImage(
+                trackCount: 35,
+                standardTrackBitCount: 51200) // Standard NIB bit count
+            {
+                // Set source and destination paths (blank disk is its own source)
+                SourceFilePath = filePath,
+                OriginalFormat = DiskFormat.Nib,
+                DestinationFilePath = filePath,
+                DestinationFormat = DiskFormat.Nib
+            };
+
+            // Create provider and insert into drive
+            var provider = new UnifiedDiskImageProvider(blankImage);
+            drive.ImageProvider = provider;
+            provider.SetQuarterTrack(drive.QuarterTrack);
+
+            // Update status
+            RefreshAllDriveStatus();
+
+#if ControllerDebug
+            Debug.WriteLine($"Inserted blank disk into drive {driveNumber}: {filePath}");
+#endif
+        }
+        catch (Exception ex)
+        {
+            throw new Exceptions.CardMessageException(
+                $"Failed to insert blank disk into drive {driveNumber}: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Derives a unique destination path by checking for file existence and incrementing suffix.
+    /// </summary>
+    /// <param name="proposedPath">The initially proposed file path.</param>
+    /// <returns>A unique file path that doesn't exist on disk.</returns>
+    /// <remarks>
+    /// <para>
+    /// If the proposed path already exists, this method increments a suffix:
+    /// <code>
+    /// blank.nib -> blank_new.nib (if blank.nib exists)
+    /// blank.nib -> blank_new2.nib (if both blank.nib and blank_new.nib exist)
+    /// blank_new.nib -> blank_new2.nib (strips existing suffix before incrementing)
+    /// </code>
+    /// </para>
+    /// </remarks>
+    private static string DeriveUniqueDestinationPath(string proposedPath)
+    {
+        // If proposed path doesn't exist, use it as-is
+        if (!System.IO.File.Exists(proposedPath))
+        {
+            return proposedPath;
+        }
+
+        string directory = System.IO.Path.GetDirectoryName(proposedPath) ?? string.Empty;
+        string filenameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(proposedPath);
+        string extension = System.IO.Path.GetExtension(proposedPath);
+
+        // Strip existing _new or _newN suffix using regex
+#pragma warning disable SYSLIB1045 // Convert to 'GeneratedRegexAttribute'
+        var match = System.Text.RegularExpressions.Regex.Match(filenameWithoutExt, @"^(.+?)_new(\d*)$");
+#pragma warning restore SYSLIB1045 // Convert to 'GeneratedRegexAttribute'
+        string baseName = match.Success ? match.Groups[1].Value : filenameWithoutExt;
+
+        // Try incrementing suffix until we find a non-existing path
+        int suffix = 1;
+        string candidatePath;
+        do
+        {
+            string newFilename = suffix == 1
+                ? $"{baseName}_new{extension}"
+                : $"{baseName}_new{suffix}{extension}";
+            candidatePath = System.IO.Path.Combine(directory, newFilename);
+            suffix++;
+        }
+        while (System.IO.File.Exists(candidatePath) && suffix < 1000); // Safety limit
+
+        return candidatePath;
     }
 
     /// <summary>
@@ -1391,11 +1551,16 @@ public abstract class DiskIIControllerCard : ICard
     /// <remarks>
     /// <para>
     /// <strong>Swap Mechanics:</strong><br/>
-    /// - Providers are swapped between drives<br/>
-    /// - Head positions are preserved (physical head doesn't move)<br/>
-    /// - Read positions are reset to avoid corrupt data streams<br/>
-    /// - Motor state does not change<br/>
+    /// - Controller swaps internal image providers between drives<br/>
+    /// - Preserves all in-memory modifications (dirty data)<br/>
+    /// - Updates providers with new drive's quarter-track position<br/>
+    /// - Resets read timing if motor is running<br/>
     /// - Status is updated via IDiskStatusMutator to reflect new filenames<br/>
+    /// </para>
+    /// <para>
+    /// <strong>Implementation:</strong><br/>
+    /// Uses internal accessors within the same assembly to swap providers directly,
+    /// avoiding reload from disk which would lose unsaved changes.
     /// </para>
     /// </remarks>
     private void SwapDriveMedia()
@@ -1405,26 +1570,18 @@ public abstract class DiskIIControllerCard : ICard
             return; // Already validated by caller, but defensive check
         }
 
-        // Cast to concrete DiskIIDrive to access ImageProvider
-        if (_drives[0] is not DiskIIDrive drive1 || _drives[1] is not DiskIIDrive drive2)
-        {
-            throw new Exceptions.CardMessageException(
-                "Cannot swap drives: drives are not DiskIIDrive instances.");
-        }
+        // Swap internal image providers directly via interface (preserves dirty data)
+        IDiskImageProvider? provider1 = _drives[0].ImageProvider;
+        IDiskImageProvider? provider2 = _drives[1].ImageProvider;
 
-        // Extract providers
-        var provider1 = drive1.ImageProvider;
-        var provider2 = drive2.ImageProvider;
+        _drives[0].ImageProvider = provider2;
+        _drives[1].ImageProvider = provider1;
 
-        // Swap providers
-        drive1.ImageProvider = provider2;
-        drive2.ImageProvider = provider1;
+        // Update providers with their new drive's quarter-track position
+        provider1?.SetQuarterTrack(_drives[1].QuarterTrack);
+        provider2?.SetQuarterTrack(_drives[0].QuarterTrack);
 
-        // Set quarter-track on swapped providers (preserves head position)
-        provider1?.SetQuarterTrack(drive2.QuarterTrack);
-        provider2?.SetQuarterTrack(drive1.QuarterTrack);
-
-        // Reset read positions (motor state-aware)
+        // If motor is running, reset read positions to avoid corrupt data streams
         if (IsMotorRunning)
         {
             provider1?.NotifyMotorStateChanged(true, _clocking.TotalCycles);
@@ -1433,8 +1590,9 @@ public abstract class DiskIIControllerCard : ICard
 
         // Update status for both drives
         RefreshAllDriveStatus();
-
-        Debug.WriteLine($"[{_clocking.TotalCycles}] 🔄 Swapped disk media between Drive 1 and Drive 2");
+#if ControllerDebug
+        Debug.WriteLine($"[{_clocking.TotalCycles}] 🔄 Swapped disk media between Drive 1 and Drive 2 (preserving dirty data)");
+#endif
     }
 
     /// <summary>
@@ -1454,19 +1612,9 @@ public abstract class DiskIIControllerCard : ICard
                 $"Cannot save: no disk inserted in drive {driveNumber}.");
         }
 
-        // Get internal image
-        if (drive is not DiskIIDrive concreteDrive)
-        {
-            throw new Exceptions.CardMessageException(
-                "Cannot save: drive is not a DiskIIDrive instance.");
-        }
-
-        InternalDiskImage? internalImage = concreteDrive.InternalImage;
-        if (internalImage == null)
-        {
-            throw new Exceptions.CardMessageException(
+        // Access internal state via interface
+        InternalDiskImage? internalImage = drive.InternalImage ?? throw new Exceptions.CardMessageException(
                 "Cannot save: no internal disk image available.");
-        }
 
         if (string.IsNullOrEmpty(internalImage.DestinationFilePath))
         {
@@ -1494,8 +1642,9 @@ public abstract class DiskIIControllerCard : ICard
 
             // Update status to reflect clean state
             RefreshAllDriveStatus();
-
+#if ControllerDebug
             Debug.WriteLine($"Saved disk image from drive {driveNumber} to {internalImage.DestinationFilePath}");
+#endif
         }
         catch (Exception ex)
         {
@@ -1522,19 +1671,9 @@ public abstract class DiskIIControllerCard : ICard
                 $"Cannot export: no disk inserted in drive {driveNumber}.");
         }
 
-        // Get internal image
-        if (drive is not DiskIIDrive concreteDrive)
-        {
-            throw new Exceptions.CardMessageException(
-                "Cannot export: drive is not a DiskIIDrive instance.");
-        }
-
-        InternalDiskImage? internalImage = concreteDrive.InternalImage;
-        if (internalImage == null)
-        {
-            throw new Exceptions.CardMessageException(
+        // Access internal state via interface
+        InternalDiskImage? internalImage = drive.InternalImage ?? throw new Exceptions.CardMessageException(
                 "Cannot export: no internal disk image available.");
-        }
 
         // Determine format from file extension
         DiskFormat format = DiskFormatHelper.GetFormatFromPath(filePath);
@@ -1559,8 +1698,9 @@ public abstract class DiskIIControllerCard : ICard
 
             // Update status to reflect new destination and clean state
             RefreshAllDriveStatus();
-
+#if ControllerDebug
             Debug.WriteLine($"Exported disk image from drive {driveNumber} to {filePath}");
+#endif
         }
         catch (Exception ex)
         {
@@ -1587,20 +1727,19 @@ public abstract class DiskIIControllerCard : ICard
                 $"Cannot set write protection: no disk inserted in drive {driveNumber}.");
         }
 
-        // Get provider and set write-protect state
-        if (drive is DiskIIDrive concreteDrive && concreteDrive.ImageProvider != null)
-        {
-            concreteDrive.ImageProvider.IsWriteProtected = writeProtected;
-
-            // Update status
-            RefreshAllDriveStatus();
-
-            Debug.WriteLine($"Drive {driveNumber} write protection: {(writeProtected ? "ON" : "OFF")}");
-        }
-        else
+        // Access provider via interface
+        if (drive.ImageProvider == null)
         {
             throw new Exceptions.CardMessageException(
                 "Cannot set write protection: image provider not available.");
         }
+
+        drive.ImageProvider.IsWriteProtected = writeProtected;
+
+        // Update status
+        RefreshAllDriveStatus();
+#if ControllerDebug
+        Debug.WriteLine($"Drive {driveNumber} write protection: {(writeProtected ? "ON" : "OFF")}");
+#endif
     }
 }

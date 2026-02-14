@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reactive.Linq;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.UI.Interfaces;
 using ReactiveUI;
 
 namespace Pandowdy.UI.ViewModels;
@@ -34,6 +35,7 @@ public class DiskStatusPanelViewModel : ReactiveObject
 {
     private readonly IDiskStatusProvider _statusProvider;
     private readonly IEmulatorCoreInterface _emulator;
+    private readonly IMessageBoxService _messageBoxService;
 
     /// <summary>
     /// Gets the collection of disk card panels, grouped by expansion slot.
@@ -45,10 +47,15 @@ public class DiskStatusPanelViewModel : ReactiveObject
     /// </summary>
     /// <param name="emulator">Emulator core interface for sending card messages.</param>
     /// <param name="statusProvider">Status provider for observing drive state changes.</param>
-    public DiskStatusPanelViewModel(IEmulatorCoreInterface emulator, IDiskStatusProvider statusProvider)
+    /// <param name="messageBoxService">Service for displaying error and confirmation dialogs.</param>
+    public DiskStatusPanelViewModel(
+        IEmulatorCoreInterface emulator,
+        IDiskStatusProvider statusProvider,
+        IMessageBoxService messageBoxService)
     {
         _emulator = emulator;
         _statusProvider = statusProvider;
+        _messageBoxService = messageBoxService;
 
         // Initialize card panels grouped by slot
         Cards = [];
@@ -66,13 +73,14 @@ public class DiskStatusPanelViewModel : ReactiveObject
 
             foreach (var driveSnapshot in slotGroup)
             {
-                drives.Add(new DiskStatusWidgetViewModel(_emulator, driveSnapshot));
+                drives.Add(new DiskStatusWidgetViewModel(_emulator, _messageBoxService, driveSnapshot));
             }
 
             // TODO: Card name should come from card identification (Phase 3B)
             // For now, hardcode "Disk II Controller" for slots with drives
             var cardPanel = new DiskCardPanelViewModel(
                 _emulator,
+                _messageBoxService,
                 slotNumber,
                 "Disk II Controller",
                 drives);

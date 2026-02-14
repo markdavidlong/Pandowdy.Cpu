@@ -14,7 +14,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// <see cref="IDiskImageProvider"/> for format-specific data access.
 /// </para>
 /// <para>
-/// <strong>Motor State:</strong> Motor control is managed by the <see cref="DiskIIControllerCard"/>,
+/// <strong>Motor State:</strong> Motor control is managed by the <see cref="Cards.DiskIIControllerCard"/>,
 /// not individual drives. The controller has a single motor line that powers the currently selected drive.
 /// Drives are passive mechanical devices that respond to head positioning commands and I/O operations
 /// when the controller's motor is running.
@@ -133,4 +133,45 @@ public interface IDiskIIDrive
     /// Gets whether a disk is currently inserted in the drive.
     /// </summary>
     bool HasDisk { get; }
+
+    /// <summary>
+    /// Gets the file path of the currently inserted disk image, or null if no disk is inserted.
+    /// </summary>
+    /// <remarks>
+    /// This property allows the controller to coordinate disk swapping and other disk management
+    /// operations by querying which disk is currently in each drive.
+    /// </remarks>
+    string? CurrentDiskPath { get; }
+
+    /// <summary>
+    /// Gets or sets the internal disk image provider for this drive.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Internal API:</strong> This property is intended for use by
+    /// <see cref="Cards.DiskIIControllerCard"/> for operations that require direct
+    /// provider access (e.g., swapping disk media between drives).
+    /// </para>
+    /// <para>
+    /// External code should use <see cref="InsertDisk"/> and <see cref="EjectDisk"/> instead
+    /// of manipulating the provider directly.
+    /// </para>
+    /// </remarks>
+    IDiskImageProvider? ImageProvider { get; set; }
+
+    /// <summary>
+    /// Gets the internal disk image, if available.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Internal API:</strong> This property is intended for use by
+    /// <see cref="Cards.DiskIIControllerCard"/> to access dirty flags and destination
+    /// paths for status reporting.
+    /// </para>
+    /// <para>
+    /// Returns null if no disk is inserted, or if the drive is using a provider that doesn't
+    /// wrap an <see cref="DiskII.InternalDiskImage"/> (e.g., direct file-based providers).
+    /// </para>
+    /// </remarks>
+    DiskII.InternalDiskImage? InternalImage { get; }
 }

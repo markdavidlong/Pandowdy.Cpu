@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using Moq;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Messages;
@@ -114,10 +115,11 @@ public class MainWindowViewModelTests
             var diskStatusProvider = new DiskStatusProvider();
             var emulatorCoreInterface = new TestEmulatorCoreInterface();
             var refreshTicker = new TestRefreshTicker();
+            var mockMessageBoxService = new Mock<IMessageBoxService>();
 
             EmulatorStateViewModel = new EmulatorStateViewModel(emulatorCoreInterface, refreshTicker);
             SystemStatusViewModel = new SystemStatusViewModel(statusProvider);
-            DiskStatusViewModel = new DiskStatusPanelViewModel(emulatorCoreInterface, diskStatusProvider);
+            DiskStatusViewModel = new DiskStatusPanelViewModel(emulatorCoreInterface, diskStatusProvider, mockMessageBoxService.Object);
             CpuStatusViewModel = new CpuStatusPanelViewModel(emulatorCoreInterface, refreshTicker);
             StatusBarViewModel = new StatusBarViewModel(CpuStatusViewModel, SystemStatusViewModel);
             ViewModel = new MainWindowViewModel(EmulatorStateViewModel, EmulatorState, SystemStatusViewModel, DiskStatusViewModel, CpuStatusViewModel, StatusBarViewModel);

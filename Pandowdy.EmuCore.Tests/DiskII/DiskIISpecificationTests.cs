@@ -1012,6 +1012,16 @@ internal class MockDiskIIDrive(string name) : IDiskIIDrive
     {
         // Mock - do nothing
     }
+
+    public string? CurrentDiskPath => null;
+
+    public IDiskImageProvider? ImageProvider
+    {
+        get => null;
+        set { /* Mock - do nothing */ }
+    }
+
+    public InternalDiskImage? InternalImage => null;
 }
 
 #endregion

@@ -1038,11 +1038,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             }
 
             // Clean up any completed task state (handles case where continuation hasn't run yet)
-            if (_emuCts != null)
-            {
-                _emuCts.Dispose();
-                _emuCts = null;
-            }
+            _emuCts?.Dispose();
+            _emuCts = null;
             _emuTask = null;
 
             // Create new cancellation token source

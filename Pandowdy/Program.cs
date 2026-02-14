@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Pandowdy.Cpu;
 using Pandowdy.UI;
 using Pandowdy.UI.Interfaces;
+using Pandowdy.UI.Services;
 using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.UI.ViewModels;
@@ -169,6 +170,7 @@ namespace Pandowdy
 
                     // UI services
                     services.AddSingleton<IRefreshTicker, AvaloniaRefreshTicker>();
+                    services.AddSingleton<IMessageBoxService, MessageBoxService>();
 
                     // ViewModels
                     services.AddTransient<EmulatorStateViewModel>();

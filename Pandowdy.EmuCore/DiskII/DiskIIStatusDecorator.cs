@@ -38,6 +38,11 @@ public class DiskIIStatusDecorator : IDiskIIDrive
     private readonly int _driveNumber;
 
     /// <summary>
+    /// Gets the inner drive for unwrapping decorator chains (internal use only).
+    /// </summary>
+    internal IDiskIIDrive InnerDrive => _innerDrive;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="DiskIIStatusDecorator"/> class.
     /// </summary>
     /// <param name="innerDrive">The actual drive implementation to wrap.</param>
@@ -191,6 +196,29 @@ public class DiskIIStatusDecorator : IDiskIIDrive
     /// <inheritdoc />
     public byte OptimalBitTiming => _innerDrive.OptimalBitTiming;
 
+    /// <inheritdoc />
+    public string? CurrentDiskPath => _innerDrive.CurrentDiskPath;
+
+    /// <summary>
+    /// Gets or sets the internal disk image provider.
+    /// </summary>
+    /// <remarks>
+    /// Delegates to the inner drive's provider.
+    /// </remarks>
+    public IDiskImageProvider? ImageProvider
+    {
+        get => _innerDrive.ImageProvider;
+        set => _innerDrive.ImageProvider = value;
+    }
+
+    /// <summary>
+    /// Gets the internal disk image.
+    /// </summary>
+    /// <remarks>
+    /// Delegates to the inner drive's internal image.
+    /// </remarks>
+    public InternalDiskImage? InternalImage => _innerDrive.InternalImage;
+
     #endregion
 
     /// <summary>
@@ -206,13 +234,10 @@ public class DiskIIStatusDecorator : IDiskIIDrive
             builder.IsReadOnly = _innerDrive.IsWriteProtected();
             builder.HasValidTrackData = _innerDrive.HasDisk;
 
-            // Get dirty/destination state from internal image
-            if (_innerDrive is DiskIIDrive concreteDrive)
-            {
-                var internalImage = concreteDrive.InternalImage;
-                builder.IsDirty = internalImage?.IsDirty ?? false;
-                builder.HasDestinationPath = !string.IsNullOrEmpty(internalImage?.DestinationFilePath);
-            }
+            // Get dirty/destination state from internal image (via interface)
+            var internalImage = _innerDrive.InternalImage;
+            builder.IsDirty = internalImage?.IsDirty ?? false;
+            builder.HasDestinationPath = !string.IsNullOrEmpty(internalImage?.DestinationFilePath);
 
             // Note: DiskImagePath/Filename are not exposed by IDiskIIDrive interface
             // These will be set when InsertDisk() is called

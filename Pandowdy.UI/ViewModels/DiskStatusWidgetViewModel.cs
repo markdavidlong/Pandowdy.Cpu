@@ -4,9 +4,16 @@
 
 using System;
 using System.Reactive;
+using System.Threading.Tasks;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
+using Pandowdy.EmuCore.Cards;
+using Pandowdy.EmuCore.DiskII.Messages;
+using Pandowdy.EmuCore.Exceptions;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.UI.Interfaces;
+using Pandowdy.UI.Services;
 using ReactiveUI;
 
 namespace Pandowdy.UI.ViewModels;
@@ -31,16 +38,23 @@ namespace Pandowdy.UI.ViewModels;
 public class DiskStatusWidgetViewModel : ReactiveObject
 {
     private readonly IEmulatorCoreInterface _emulator;
+    private readonly IMessageBoxService _messageBoxService;
     private DiskDriveStatusSnapshot _snapshot;
+    private IStorageProvider? _storageProvider;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DiskStatusWidgetViewModel"/> class.
     /// </summary>
     /// <param name="emulator">Emulator core interface for sending card messages.</param>
+    /// <param name="messageBoxService">Service for displaying error and confirmation dialogs.</param>
     /// <param name="initialSnapshot">Initial drive status snapshot.</param>
-    public DiskStatusWidgetViewModel(IEmulatorCoreInterface emulator, DiskDriveStatusSnapshot initialSnapshot)
+    public DiskStatusWidgetViewModel(
+        IEmulatorCoreInterface emulator,
+        IMessageBoxService messageBoxService,
+        DiskDriveStatusSnapshot initialSnapshot)
     {
         _emulator = emulator;
+        _messageBoxService = messageBoxService;
         _snapshot = initialSnapshot;
 
         // Create observables for command enablement
@@ -51,21 +65,122 @@ public class DiskStatusWidgetViewModel : ReactiveObject
             x => x.IsDirty,
             (hasDisk, hasDest, isDirty) => hasDisk && hasDest && isDirty);
 
-        // Commands - note: actual file dialog integration will come in Phase 3B
-        // For now, these commands send messages with empty paths (which will fail)
-        // The UI layer will intercept these and show file dialogs before sending
-        InsertDiskCommand = ReactiveCommand.Create(() => { /* File dialog in Phase 3B */ });
-        InsertBlankDiskCommand = ReactiveCommand.Create(() => { /* Implementation in Phase 3B */ });
+        // Commands that show file dialogs
+        InsertDiskCommand = ReactiveCommand.CreateFromTask(async () => await InsertDiskWithDialogAsync());
+        InsertBlankDiskCommand = ReactiveCommand.CreateFromTask(async () => await InsertBlankDiskAsync());
 
         EjectDiskCommand = ReactiveCommand.CreateFromTask(
-            async () => await _emulator.SendCardMessageAsync(
-                (SlotNumber)_snapshot.SlotNumber,
-                new Pandowdy.EmuCore.DiskII.Messages.EjectDiskMessage(_snapshot.DriveNumber)),
+            async () =>
+            {
+                // Show confirmation if disk has unsaved changes
+                if (_snapshot.IsDirty)
+                {
+                    var confirmed = await _messageBoxService.ShowConfirmationAsync(
+                        "Unsaved Changes",
+                        "Disk has unsaved changes. Eject anyway?");
+                    if (!confirmed)
+                    {
+                        return;
+                    }
+                }
+
+                await _emulator.SendCardMessageAsync(
+                    (SlotNumber)_snapshot.SlotNumber,
+                    new EjectDiskMessage(_snapshot.DriveNumber));
+            },
             hasDiskObservable);
 
-        SaveCommand = ReactiveCommand.Create(() => { /* Implementation in Phase 3B */ }, canSaveObservable);
-        SaveAsCommand = ReactiveCommand.Create(() => { /* Implementation in Phase 3B */ }, hasDiskObservable);
-        ToggleWriteProtectCommand = ReactiveCommand.Create(() => { /* Implementation in Phase 3B */ }, hasDiskObservable);
+        SaveCommand = ReactiveCommand.CreateFromTask(
+            async () => await _emulator.SendCardMessageAsync(
+                (SlotNumber)_snapshot.SlotNumber,
+                new SaveDiskMessage(_snapshot.DriveNumber)),
+            canSaveObservable);
+
+        SaveAsCommand = ReactiveCommand.CreateFromTask(async () => await SaveAsAsync(), hasDiskObservable);
+
+        ToggleWriteProtectCommand = ReactiveCommand.CreateFromTask(
+            async () =>
+            {
+                // Toggle the current state
+                bool newState = !_snapshot.IsReadOnly;
+                await _emulator.SendCardMessageAsync(
+                    (SlotNumber)_snapshot.SlotNumber,
+                    new SetWriteProtectMessage(_snapshot.DriveNumber, newState));
+            },
+            hasDiskObservable);
+    }
+
+    /// <summary>
+    /// Sets the storage provider for file dialog operations.
+    /// </summary>
+    /// <param name="storageProvider">The storage provider from the active window.</param>
+    public void SetStorageProvider(IStorageProvider storageProvider)
+    {
+        _storageProvider = storageProvider;
+    }
+
+    /// <summary>
+    /// Inserts a disk image from a file path (called by drag-and-drop or command).
+    /// </summary>
+    /// <param name="filePath">The full path to the disk image file.</param>
+    public async Task InsertDiskAsync(string filePath)
+    {
+        await _emulator.SendCardMessageAsync(
+            (SlotNumber)_snapshot.SlotNumber,
+            new InsertDiskMessage(_snapshot.DriveNumber, filePath));
+    }
+
+    private async Task InsertDiskWithDialogAsync()
+    {
+        if (_storageProvider == null)
+        {
+            return;
+        }
+
+        var filePath = await DiskFileDialogService.PickDiskImageForInsertAsync(_storageProvider);
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            try
+            {
+                await InsertDiskAsync(filePath);
+            }
+            catch (CardMessageException ex)
+            {
+                await _messageBoxService.ShowErrorAsync("Insert Disk Failed", ex.Message);
+            }
+        }
+    }
+
+    private async Task InsertBlankDiskAsync()
+    {
+        await _emulator.SendCardMessageAsync(
+            (SlotNumber)_snapshot.SlotNumber,
+            new InsertBlankDiskMessage(_snapshot.DriveNumber));
+    }
+
+    private async Task SaveAsAsync()
+    {
+        if (_storageProvider == null)
+        {
+            return;
+        }
+
+        var suggestedName = _snapshot.DiskImageFilename;
+        var filePath = await DiskFileDialogService.PickDiskImageForSaveAsync(_storageProvider, suggestedName);
+
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            try
+            {
+                await _emulator.SendCardMessageAsync(
+                    (SlotNumber)_snapshot.SlotNumber,
+                    new SaveDiskAsMessage(_snapshot.DriveNumber, filePath));
+            }
+            catch (CardMessageException ex)
+            {
+                await _messageBoxService.ShowErrorAsync("Save Disk Failed", ex.Message);
+            }
+        }
     }
 
     /// <summary>
