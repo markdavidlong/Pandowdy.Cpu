@@ -2,10 +2,15 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using System;
+using System.Linq;
+using System.Reactive;
+using System.Threading.Tasks;
+using Avalonia.Controls;
 using ReactiveUI;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
-using System.Reactive;
+using Pandowdy.UI.Interfaces;
 
 namespace Pandowdy.UI.ViewModels;
 
@@ -72,6 +77,12 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     /// <value>View model managing status bar content including CPU state and MHz display.</value>
     public StatusBarViewModel StatusBar { get; }
+
+    /// <summary>
+    /// Gets the view model for the Peripherals menu (dynamic card/drive discovery).
+    /// </summary>
+    /// <value>View model managing the Peripherals menu structure with disk controllers and drives.</value>
+    public PeripheralsMenuViewModel PeripheralsMenu { get; }
 
     #endregion
 
@@ -367,22 +378,18 @@ public sealed class MainWindowViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// Backing field for DecreaseContrast property.
+    /// Backing field for DecreaseFringing property.
     /// </summary>
-    private bool _decreaseContrast;
-    
+    private bool _decreaseFringing;
+
     /// <summary>
-    /// Gets or sets whether to decrease display contrast for a softer appearance.
+    /// Gets or sets whether to decrease display fringing for a softer appearance.
     /// </summary>
-    /// <value>True to decrease contrast, false for normal contrast.</value>
-    /// <remarks>
-    /// Reduces the intensity difference between bright and dark pixels, simulating
-    /// an aged CRT monitor or reducing eye strain.
-    /// </remarks>
-    public bool DecreaseContrast
+    /// <value>True to decrease fringing, false for normal fringing.</value>
+    public bool DecreaseFringing
     {
-        get => _decreaseContrast;
-        set => this.RaiseAndSetIfChanged(ref _decreaseContrast, value);
+        get => _decreaseFringing;
+        set => this.RaiseAndSetIfChanged(ref _decreaseFringing, value);
     }
 
     /// <summary>
@@ -457,7 +464,80 @@ public sealed class MainWindowViewModel : ReactiveObject
     public bool ShowDiskStatus
     {
         get => _showDiskStatus;
-        set => this.RaiseAndSetIfChanged(ref _showDiskStatus, value);
+        set
+        {
+            if (_showDiskStatus != value)
+            {
+                this.RaiseAndSetIfChanged(ref _showDiskStatus, value);
+                this.RaisePropertyChanged(nameof(EffectiveDiskPanelWidth));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Backing field for DiskPanelWidth property.
+    /// </summary>
+    private double _diskPanelWidth = 200.0;
+
+    /// <summary>
+    /// Gets or sets the width of the disk status panel.
+    /// </summary>
+    /// <value>Width in pixels, default 200.0.</value>
+    /// <remarks>
+    /// <para>
+    /// Controls the width of the resizable disk status panel. This value is persisted
+    /// to settings so the panel width is restored between application sessions.
+    /// </para>
+    /// <para>
+    /// Minimum width is enforced by the GridSplitter to prevent the panel from becoming
+    /// unusably narrow.
+    /// </para>
+    /// </remarks>
+    public double DiskPanelWidth
+    {
+        get => _diskPanelWidth;
+        set
+        {
+            // Clamp to valid range (150-400)
+            var clampedValue = value < 150.0 ? 150.0 : (value > 400.0 ? 400.0 : value);
+            if (_diskPanelWidth != clampedValue)
+            {
+                this.RaiseAndSetIfChanged(ref _diskPanelWidth, clampedValue);
+                // Only update EffectiveDiskPanelWidth if panel is currently shown
+                if (ShowDiskStatus)
+                {
+                    this.RaisePropertyChanged(nameof(EffectiveDiskPanelWidth));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the effective width of the disk status panel column.
+    /// </summary>
+    /// <value>
+    /// Returns 0 when ShowDiskStatus is false (column collapsed),
+    /// or DiskPanelWidth when ShowDiskStatus is true.
+    /// Setting this value updates DiskPanelWidth only when the panel is visible.
+    /// </value>
+    /// <remarks>
+    /// This property provides two-way binding support for the GridSplitter while
+    /// automatically collapsing the column when the panel is hidden. The GridSplitter
+    /// can modify this property, which updates DiskPanelWidth (and persists the user's
+    /// chosen width) only when the panel is visible.
+    /// </remarks>
+    public double EffectiveDiskPanelWidth
+    {
+        get => ShowDiskStatus ? DiskPanelWidth : 0.0;
+        set
+        {
+            // Only update the actual width if the panel is shown
+            // (Ignore GridSplitter attempts to resize when panel is hidden)
+            if (ShowDiskStatus && value != DiskPanelWidth)
+            {
+                DiskPanelWidth = value;
+            }
+        }
     }
 
     #endregion
@@ -512,14 +592,14 @@ public sealed class MainWindowViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit> ToggleMonochrome { get; }
     
     /// <summary>
-    /// Gets the command to toggle reduced contrast display on/off.
+    /// Gets the command to toggle reduced fringing display on/off.
     /// </summary>
-    /// <value>Command that inverts the DecreaseContrast property.</value>
+    /// <value>Command that inverts the DecreaseFringing property.</value>
     /// <remarks>
-    /// Bound to menu item or keyboard shortcut. Updates <see cref="DecreaseContrast"/>
+    /// Bound to menu item or keyboard shortcut. Updates <see cref="DecreaseFringing"/>
     /// which the view observes to control display intensity.
     /// </remarks>
-    public ReactiveCommand<Unit, Unit> ToggleDecreaseContrast { get; }
+    public ReactiveCommand<Unit, Unit> ToggleDecreaseFringing { get; }
     
     /// <summary>
     /// Gets the command to toggle monochrome mixed mode on/off.
@@ -560,6 +640,16 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     private readonly IEmulatorState _emuState;
 
+    /// <summary>
+    /// Drive state service for saving disk state on exit.
+    /// </summary>
+    private readonly IDriveStateService _driveStateService;
+
+    /// <summary>
+    /// Message box service for showing exit confirmation dialogs.
+    /// </summary>
+    private readonly IMessageBoxService _messageBoxService;
+
     #endregion
 
     #region Constructor
@@ -573,6 +663,9 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <param name="diskStatus">View model for displaying disk drive status.</param>
     /// <param name="cpuStatus">View model for displaying CPU register and flag status.</param>
     /// <param name="statusBar">View model for displaying status bar content (aggregates CPU status and system status).</param>
+    /// <param name="peripheralsMenu">View model for the Peripherals menu (dynamic card/drive discovery).</param>
+    /// <param name="driveStateService">Drive state service for saving disk state on exit.</param>
+    /// <param name="messageBoxService">Message box service for showing exit confirmation dialogs.</param>
     /// <remarks>
     /// <para>
     /// <strong>Dependency Injection:</strong> All dependencies are injected via constructor,
@@ -601,7 +694,10 @@ public sealed class MainWindowViewModel : ReactiveObject
                                SystemStatusViewModel systemStatus,
                                DiskStatusPanelViewModel diskStatus,
                                CpuStatusPanelViewModel cpuStatus,
-                               StatusBarViewModel statusBar)
+                               StatusBarViewModel statusBar,
+                               PeripheralsMenuViewModel peripheralsMenu,
+                               IDriveStateService driveStateService,
+                               IMessageBoxService messageBoxService)
     {
         EmulatorState = emulatorState;
         //ErrorLog = errorLog;
@@ -611,6 +707,9 @@ public sealed class MainWindowViewModel : ReactiveObject
         DiskStatus = diskStatus;
         CpuStatus = cpuStatus;
         StatusBar = statusBar;
+        PeripheralsMenu = peripheralsMenu;
+        _driveStateService = driveStateService;
+        _messageBoxService = messageBoxService;
 
         // Initialize emulator control commands
         PauseCommand = ReactiveCommand.Create(() => _emuState.RequestPause());
@@ -624,7 +723,7 @@ public sealed class MainWindowViewModel : ReactiveObject
         ToggleCapsLock = ReactiveCommand.Create(() => { CapsLockEnabled = !CapsLockEnabled; });
         ToggleScanLines = ReactiveCommand.Create(() => { ShowScanLines = !ShowScanLines; });
         ToggleMonochrome = ReactiveCommand.Create(() => { ForceMonochrome = !ForceMonochrome; });
-        ToggleDecreaseContrast = ReactiveCommand.Create(() => { DecreaseContrast = !DecreaseContrast; });
+        ToggleDecreaseFringing = ReactiveCommand.Create(() => { DecreaseFringing = !DecreaseFringing; });
         ToggleMonoMixed = ReactiveCommand.Create(() => { MonoMixed = !MonoMixed; });
         ToggleSoftSwitchStatus = ReactiveCommand.Create(() => { ShowSoftSwitchStatus = !ShowSoftSwitchStatus; });
         ToggleDiskStatus = ReactiveCommand.Create(() => { ShowDiskStatus = !ShowDiskStatus; });
@@ -635,6 +734,53 @@ public sealed class MainWindowViewModel : ReactiveObject
         ResetEmu = ReactiveCommand.Create(() => { });
         StepOnce = ReactiveCommand.Create(() => { });
         TogglePauseOrContinue = ReactiveCommand.Create(() => { });
+    }
+
+    #endregion
+
+    #region Application Lifecycle
+
+    /// <summary>
+    /// Handles application exit, checking for dirty disks and saving drive state.
+    /// </summary>
+    /// <returns>True to allow exit, false to cancel.</returns>
+    /// <remarks>
+    /// <para>
+    /// <strong>Dirty Disk Confirmation:</strong> If any disk has unsaved changes,
+    /// shows a confirmation dialog before exiting. User can cancel exit to save disks.
+    /// </para>
+    /// <para>
+    /// <strong>Drive State Persistence:</strong> Always saves drive state before exit
+    /// (which disks are inserted in which drives) so they can be restored on next launch.
+    /// </para>
+    /// </remarks>
+    public async Task<bool> OnClosingAsync()
+    {
+        // Check for dirty disks
+        var dirtyDisks = DiskStatus.Cards
+            .SelectMany(card => card.Drives)
+            .Where(drive => drive.IsDirty)
+            .ToList();
+
+        if (dirtyDisks.Any())
+        {
+            var diskList = string.Join("\n", dirtyDisks.Select(d => $"  • {d.DiskId}: {d.Filename}"));
+            var message = $"The following disks have unsaved changes:\n\n{diskList}\n\nExit anyway?";
+
+            var confirmed = await _messageBoxService.ShowConfirmationAsync(
+                "Unsaved Changes",
+                message);
+
+            if (!confirmed)
+            {
+                return false; // Cancel exit
+            }
+        }
+
+        // Drive state is now saved via GuiSettingsService in MainWindow.SaveWindowAndDisplaySettings()
+        // No need to call _driveStateService.CaptureDriveStateAsync() here
+
+        return true; // Allow exit
     }
 
     #endregion

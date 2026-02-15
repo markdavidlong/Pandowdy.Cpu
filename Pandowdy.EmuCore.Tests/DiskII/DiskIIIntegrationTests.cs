@@ -25,6 +25,7 @@ public class DiskIIIntegrationTests
 {
     private readonly CpuClockingCounters _clocking = new();
     private readonly DiskStatusProvider _statusProvider = new();
+    private readonly CardResponseChannel _responseChannel = new();
     private readonly DiskImageFactory _imageFactory = new();
     private readonly DiskIIFactory _driveFactory;
 
@@ -37,7 +38,7 @@ public class DiskIIIntegrationTests
 
     private DiskIIControllerCard16Sector CreateController()
     {
-        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
     }
 
     private static void InstallController(DiskIIControllerCard16Sector controller, SlotNumber slot = SlotNumber.Slot6)
@@ -445,7 +446,7 @@ public class DiskIIIntegrationTests
         [Fact]
         public void FullStack_13SectorController_WorksSameAs16Sector()
         {
-            var controller13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
+            var controller13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
             controller13.OnInstalled(SlotNumber.Slot6);
 
             // Should create 2 drives just like 16-sector
@@ -458,3 +459,4 @@ public class DiskIIIntegrationTests
 
         #endregion
     }
+

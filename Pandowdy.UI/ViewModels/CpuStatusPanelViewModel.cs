@@ -318,7 +318,7 @@ public sealed class CpuStatusPanelViewModel : ReactiveObject, IActivatableViewMo
     /// <summary>
     /// Reads a byte from the address space as the CPU would see it.
     /// </summary>
-    private byte ReadCpuByte(IMemoryInspector mem, ushort address)
+    private static byte ReadCpuByte(IMemoryInspector mem, ushort address)
     {
         // For high memory ($C100-$FFFF), use ReadActiveHighMemory to respect ROM/LC RAM mapping
         if (address >= 0xC100)

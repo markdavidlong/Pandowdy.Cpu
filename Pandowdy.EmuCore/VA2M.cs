@@ -500,6 +500,11 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </summary>
     private readonly IMemoryInspector _memoryInspector;
 
+    /// <summary>
+    /// Slots manager for accessing expansion cards by slot number.
+    /// </summary>
+    private readonly ISlots _slots;
+
     private IGameControllerStatus _gameController;
 
     /// <summary>
@@ -518,12 +523,13 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// <param name="diskStatusProvider">Disk status provider for monitoring disk drive states (singleton, shared with UI).</param>
     /// <param name="clockCounters">CPU clocking counters for VBlank timing and cycle tracking.</param>
     /// <param name="memoryInspector">Memory inspector for read-only access to all memory regions (RAM, ROM, slots).</param>
+    /// <param name="slots">Slots manager for accessing expansion cards by slot number.</param>
     /// <exception cref="ArgumentNullException">Thrown if any parameter is null.</exception>
     /// <remarks>
     /// <para>
     /// <strong>Initialization Sequence:</strong>
     /// <list type="number">
-    /// <item>Store dependency references (all 12 required)</item>
+    /// <item>Store dependency references (all 13 required)</item>
     /// <item>Load embedded Apple IIe ROM from resources</item>
     /// <item>Subscribe to VBlank event via <paramref name="clockCounters"/>.<see cref="CpuClockingCounters.VBlankOccurred"/></item>
     /// <item>Start flash timer for cursor blinking (~2.1 Hz)</item>
@@ -539,7 +545,9 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// fires ButtonChanged and PaddleChanged events that SystemStatusProvider observes directly.
     /// VA2M delegates SetPushButton() calls to this controller.</item>
     /// <item><strong>Rendering:</strong> The <paramref name="renderingService"/> runs on a separate thread,
-    /// processing snapshots allocated from <paramref name="snapshotPool"/>. Capture is non-blocking (~1-3Î¼s).</item>
+    /// processing snapshots allocated from <paramref name="snapshotPool"/>. Capture is non-blocking (~1-3μs).</item>
+    /// <item><strong>Slots:</strong> The injected <paramref name="slots"/> (Slots) provides access to
+    /// expansion cards for message routing via SendCardMessageAsync.</item>
     /// </list>
     /// </para>
     /// <para>
@@ -565,7 +573,8 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
             IGameControllerStatus gameController,
             IDiskStatusProvider diskStatusProvider,
             CpuClockingCounters clockCounters,
-            IMemoryInspector memoryInspector)
+            IMemoryInspector memoryInspector,
+            ISlots slots)
         {
             ArgumentNullException.ThrowIfNull(stateSink);
             ArgumentNullException.ThrowIfNull(frameSink);
@@ -580,6 +589,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
             ArgumentNullException.ThrowIfNull(diskStatusProvider);
             ArgumentNullException.ThrowIfNull(clockCounters);
             ArgumentNullException.ThrowIfNull(memoryInspector);
+            ArgumentNullException.ThrowIfNull(slots);
 
 
             _stateSink = stateSink;
@@ -593,6 +603,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
         _gameController = gameController;
         _clockCounters = clockCounters;
         _memoryInspector = memoryInspector;
+        _slots = slots;
         Bus = bus;
         MemoryPool = memoryPool;
 
@@ -1433,6 +1444,92 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     public void SetPushButton(byte num, bool pressed)
     {
         Enqueue(() =>  _gameController.SetButton(num,pressed));
+    }
+
+    /// <summary>
+    /// Sends a message to a specific card or broadcasts to all cards.
+    /// </summary>
+    /// <param name="slot">Target slot (Slot1–Slot7), or <c>null</c> to broadcast to all slots.</param>
+    /// <param name="message">The card message to deliver.</param>
+    /// <returns>A task that completes when the message(s) have been processed on the emulator thread.</returns>
+    /// <exception cref="Exceptions.CardMessageException">
+    /// Thrown (on the returned Task) if a targeted card rejects the message. Not thrown for
+    /// broadcast messages — individual card failures are silently ignored during broadcast.
+    /// </exception>
+    /// <remarks>
+    /// <para>
+    /// <strong>Thread Safety:</strong> Thread-safe. The message is enqueued on the emulator
+    /// thread's command queue and executed at the next instruction boundary, identical to
+    /// Reset() and EnqueueKey(). The returned Task allows the caller to await completion
+    /// and observe any errors.
+    /// </para>
+    /// <para>
+    /// <strong>Broadcast Mode:</strong> When <paramref name="slot"/> is <c>null</c>, the
+    /// message is delivered to all 7 slots (Slot1–Slot7). This is useful for discovery
+    /// messages like <see cref="Messages.IdentifyCardMessage"/> where all cards should respond.
+    /// During broadcast, individual card exceptions are caught and ignored — the broadcast
+    /// completes successfully as long as delivery is attempted to all slots.
+    /// </para>
+    /// <para>
+    /// <strong>Responses:</strong> Cards respond via <see cref="ICardResponseProvider"/> —
+    /// subscribe to <see cref="ICardResponseProvider.Responses"/> to receive responses.
+    /// </para>
+    /// <para>
+    /// <strong>Generic Design:</strong> This method is intentionally card-type-agnostic.
+    /// IEmulatorCoreInterface has no knowledge of disk drives, printers, or any specific
+    /// card type. It simply routes the message to the card(s) in the requested slot(s).
+    /// </para>
+    /// </remarks>
+    public System.Threading.Tasks.Task SendCardMessageAsync(SlotNumber? slot, ICardMessage message)
+    {
+        var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>(
+            System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Enqueue(() =>
+        {
+            try
+            {
+                if (slot.HasValue)
+                {
+                    // Targeted: send to specific slot, propagate exceptions
+                    var card = _slots.GetCardIn(slot.Value);
+                    card.HandleMessage(message);
+                }
+                else
+                {
+                    // Broadcast: send to all slots, ignore individual failures
+                    foreach (SlotNumber s in Enum.GetValues<SlotNumber>())
+                    {
+                        if (s == SlotNumber.Unslotted)
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            var card = _slots.GetCardIn(s);
+                            card.HandleMessage(message);
+                        }
+                        catch (Exceptions.CardMessageException)
+                        {
+                            // Ignore individual card failures during broadcast
+                        }
+                    }
+                }
+                tcs.SetResult(true);
+            }
+            catch (Exceptions.CardMessageException ex)
+            {
+                tcs.SetException(ex);
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(new Exceptions.CardMessageException(
+                    $"Unexpected error sending message to slot {slot}: {ex.Message}", ex));
+            }
+        });
+
+        return tcs.Task;
     }
 
 

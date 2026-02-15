@@ -89,6 +89,7 @@ public bool ThrottleEnabled { get => _throttleEnabled; set => this.RaiseAndSetIf
 - Prefer expression-bodied members for simple one-liners
 - Use nullable reference types (`string?`, `object?`)
 - Follow naming conventions: PascalCase for public members, camelCase for private fields with `_` prefix
+- **Prefer using Primary Constructors (C# 12)** when class initialization is straightforward (i.e., no complicated tasks at construction aside from field assignments). This is especially important when generating Unit Tests, where this pattern is often forgotten.
 
 ## Project Structure
 
@@ -111,7 +112,7 @@ Pandowdy.EmuCore/
     ??? FrameProvider.cs           - Double-buffered frame management
     ??? FrameGenerator.cs          - Frame generation coordinator
     ??? CharacterRomProvider.cs    - Apple IIe character ROM provider
-    ??? LegacyBitmapRenderer.cs    - Bitmap rendering service
+    ??? LegacyBitmapRenderer.cs     - Bitmap rendering service
 ```
 
 ### Pandowdy.EmuCore.Tests (Test Mirror)
@@ -213,3 +214,6 @@ The Disk II controller emulation reflects hardware-accurate motor control:
 - Test assertions should check `controller.IsMotorRunning`, not per-drive motor state
 
 **Reference:** See `docs/DiskII-Motor-Refactoring-Plan.md` for complete refactoring history (8 phases, completed 2026-01)
+
+## Disk Image Formats
+- When discussing disk image formats, use "nibble format" instead of ".nib" or ".nib extension" to work around rendering/display issues in VS.

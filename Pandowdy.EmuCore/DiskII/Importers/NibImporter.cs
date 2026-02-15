@@ -64,7 +64,7 @@ public class NibImporter : IDiskImageImporter
     /// <exception cref="InvalidDataException">Thrown if stream format is invalid.</exception>
     public InternalDiskImage Import(Stream stream, DiskFormat format)
     {
-        ArgumentNullException.ThrowIfNull(nameof(stream));
+        ArgumentNullException.ThrowIfNull(stream);
 
         if (format != DiskFormat.Nib)
         {
@@ -79,6 +79,11 @@ public class NibImporter : IDiskImageImporter
     /// </summary>
     private static InternalDiskImage ImportFromStream(Stream stream, string? sourcePath)
     {
+        if (stream == null)
+        {
+            throw new ArgumentNullException(nameof(stream));
+        }
+
         // Load the entire disk image into memory
         byte[] diskData = new byte[stream.Length];
         int bytesRead = stream.Read(diskData, 0, diskData.Length);

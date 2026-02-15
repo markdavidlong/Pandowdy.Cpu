@@ -55,11 +55,12 @@ public class DiskIISpecificationTests
 
     private readonly CpuClockingCounters _clocking = new();
     private readonly DiskStatusProvider _statusProvider = new();
+    private readonly CardResponseChannel _responseChannel = new();
     private readonly MockDiskIIFactory _driveFactory = new();
 
     private DiskIIControllerCard16Sector CreateCard()
     {
-        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
     }
 
     private void AdvanceCycles(int cycles)
@@ -239,7 +240,7 @@ public class DiskIISpecificationTests
         // Motor should NOT turn off immediately
         var card = CreateCard();
         card.OnInstalled(SlotNumber.Slot6);
-        var drive = card.Drives[0];
+        var _ = card.Drives[0];
 
         // Turn motor on
         card.ReadIO(0x09);
@@ -259,7 +260,7 @@ public class DiskIISpecificationTests
         // At 1.023 MHz, that's ~1,023,000 cycles
         var card = CreateCard();
         card.OnInstalled(SlotNumber.Slot6);
-        var drive = card.Drives[0];
+        var _ = card.Drives[0];
 
         // Turn motor on
         card.ReadIO(0x09);
@@ -284,7 +285,7 @@ public class DiskIISpecificationTests
         // Specification: Motor-on command cancels any pending motor-off
         var card = CreateCard();
         card.OnInstalled(SlotNumber.Slot6);
-        var drive = card.Drives[0];
+        var _ = card.Drives[0];
 
         // Turn motor on
         card.ReadIO(0x09);
@@ -1011,6 +1012,16 @@ internal class MockDiskIIDrive(string name) : IDiskIIDrive
     {
         // Mock - do nothing
     }
+
+    public string? CurrentDiskPath => null;
+
+    public IDiskImageProvider? ImageProvider
+    {
+        get => null;
+        set { /* Mock - do nothing */ }
+    }
+
+    public InternalDiskImage? InternalImage => null;
 }
 
 #endregion

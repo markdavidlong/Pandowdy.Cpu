@@ -1,0 +1,67 @@
+<!--
+  Copyright 2026 Mark D. Long
+  Licensed under the Apache License, Version 2.0
+  See LICENSE file for details
+-->
+
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Pandowdy.UI.ViewModels"
+             xmlns:controls="using:Pandowdy.UI.Controls"
+             x:Class="Pandowdy.UI.Controls.DiskCardPanel"
+             x:DataType="vm:DiskCardPanelViewModel"
+             MinWidth="180">
+
+    <Border Background="#252525"
+            BorderBrush="#404040"
+            BorderThickness="1"
+            CornerRadius="4"
+            Margin="0,0,0,8">
+        
+        <StackPanel>
+            <!-- Card Header -->
+            <Border Background="#303030"
+                    BorderBrush="#505050"
+                    BorderThickness="0,0,0,1"
+                    Padding="6,3"
+                    CornerRadius="4,4,0,0">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding CardTitle}"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               Foreground="#00FF00"
+                               VerticalAlignment="Center" />
+
+                    <!-- Context menu for card-level operations -->
+                    <Button Grid.Column="1"
+                            Content="⚙"
+                            FontSize="14"
+                            Padding="4,1"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="#00FF00"
+                            x:Name="CardMenuButton">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Swap Drives"
+                                          Command="{Binding SwapDrivesCommand}" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Drive Widgets -->
+            <ItemsControl ItemsSource="{Binding Drives}"
+                          Margin="4">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:DiskStatusWidgetViewModel">
+                        <controls:DiskStatusWidget DataContext="{Binding}"
+                                                   Margin="4,4,4,0" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+</UserControl>

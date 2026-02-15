@@ -5,6 +5,8 @@
 using Pandowdy.EmuCore.Cards;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.DiskII;
+using Pandowdy.EmuCore.DiskII.Messages;
+using Pandowdy.EmuCore.DiskII.Providers;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 
@@ -17,13 +19,14 @@ public class DiskIIControllerCardTests
 {
     private readonly CpuClockingCounters _clocking = new();
     private readonly DiskStatusProvider _statusProvider = new();
+    private readonly CardResponseChannel _responseChannel = new();
     private readonly MockDiskIIFactory _driveFactory = new();
 
     #region Helper Methods
 
     private DiskIIControllerCard16Sector CreateCard()
     {
-        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
     }
 
     private void AdvanceCycles(int cycles)
@@ -49,21 +52,21 @@ public class DiskIIControllerCardTests
     public void Constructor_ThrowsOnNullClocking()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new DiskIIControllerCard16Sector(null!, _driveFactory, _statusProvider));
+            new DiskIIControllerCard16Sector(null!, _driveFactory, _statusProvider, _responseChannel));
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullDriveFactory()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new DiskIIControllerCard16Sector(_clocking, null!, _statusProvider));
+            new DiskIIControllerCard16Sector(_clocking, null!, _statusProvider, _responseChannel));
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullStatusMutator()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new DiskIIControllerCard16Sector(_clocking, _driveFactory, null!));
+            new DiskIIControllerCard16Sector(_clocking, _driveFactory, null!, _responseChannel));
     }
 
     [Fact]
@@ -80,35 +83,35 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_Name_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         Assert.Equal("Disk II", card.Name);
     }
 
     [Fact]
     public void Card16Sector_Description_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         Assert.Equal("Disk II Controller - 16-Sector ROM", card.Description);
     }
 
     [Fact]
     public void Card16Sector_Id_Returns10()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         Assert.Equal(10, card.Id);
     }
 
     [Fact]
     public void Card16Sector_Slot_ReturnsUnslotted_BeforeInstall()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         Assert.Equal(SlotNumber.Unslotted, card.Slot);
     }
 
     [Fact]
     public void Card16Sector_Clone_ReturnsNewInstance()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         var clone = card.Clone();
 
         Assert.NotSame(card, clone);
@@ -118,7 +121,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_Clone_IsUnslotted()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         card.OnInstalled(SlotNumber.Slot6);
 
         var clone = card.Clone();
@@ -130,7 +133,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_Clone_HasSameProperties()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         var clone = (DiskIIControllerCard16Sector)card.Clone();
 
         // Clone should have same metadata
@@ -146,28 +149,28 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card13Sector_Name_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         Assert.Equal("Disk II (13-Sector)", card.Name);
     }
 
     [Fact]
     public void Card13Sector_Description_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         Assert.Equal("Disk II Controller - 13-Sector ROM", card.Description);
     }
 
     [Fact]
     public void Card13Sector_Id_Returns11()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         Assert.Equal(11, card.Id);
     }
 
     [Fact]
     public void Card13Sector_Clone_ReturnsNewInstance()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         var clone = card.Clone();
 
         Assert.NotSame(card, clone);
@@ -177,7 +180,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card13Sector_Clone_IsUnslotted()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
         card.OnInstalled(SlotNumber.Slot5);
 
         var clone = card.Clone();
@@ -255,7 +258,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_ReadRom_ReturnsValidBytes()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
 
         // First byte should be 0xA2 (LDX #$20)
         Assert.Equal((byte)0xA2, card.ReadRom(0x00));
@@ -264,7 +267,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_ReadRom_ReturnsNullForOutOfBounds()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
 
         // ROM is 256 bytes, offset 0x100 is out of bounds
         // ReadRom takes byte, so we can only test up to 255
@@ -277,7 +280,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_ReadRom_ContainsBootSignature()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
 
         // Check for known boot ROM pattern at $C6F8 (offset 0xF8)
         // JMP $0801 = 4C 01 08
@@ -293,7 +296,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card13Sector_ReadRom_ReturnsValidBytes()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
 
         // First byte should be 0xA2 (LDX #$20) - same as 16-sector
         Assert.Equal((byte)0xA2, card.ReadRom(0x00));
@@ -302,8 +305,8 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card13Sector_ReadRom_DiffersFrom16Sector()
     {
-        var card16 = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider);
-        var card13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider);
+        var card16 = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
 
         // The ROMs should differ at some point
         bool foundDifference = false;
@@ -1149,6 +1152,153 @@ public class DiskIIControllerCardTests
             }
 
 /// <summary>
+/// Integration tests for disk swap functionality with real disk metadata.
+/// </summary>
+/// <remarks>
+/// These tests verify that when drives are swapped, the disk image metadata
+/// (dirty flags, file paths, formats) swap correctly along with the actual disk data.
+/// This is critical to ensure that Save/Export operations write to the correct files.
+/// </remarks>
+public class DiskSwapMetadataTests
+{
+    [Fact]
+    public void SwapImageProviders_SwapsAllMetadataIncludingDirtyFlags()
+    {
+        // Arrange: Create two disk images with different metadata
+        // Note: Paths are test placeholders - no actual files are accessed
+        var image1 = new InternalDiskImage(
+            trackCount: TestConstants.DiskParameters.StandardTrackCount,
+            standardTrackBitCount: TestConstants.DiskParameters.StandardTrackBitCount)
+        {
+            SourceFilePath = TestConstants.DiskImagePaths.TestDisk1Woz,
+            DestinationFilePath = TestConstants.DiskImagePaths.TestDisk1WozNew,
+            OriginalFormat = DiskFormat.Woz,
+            DestinationFormat = DiskFormat.Woz
+        };
+        image1.MarkDirty(); // Drive 1 has modifications
+
+        var image2 = new InternalDiskImage(
+            trackCount: TestConstants.DiskParameters.StandardTrackCount,
+            standardTrackBitCount: TestConstants.DiskParameters.StandardTrackBitCount)
+        {
+            SourceFilePath = TestConstants.DiskImagePaths.TestDisk2Dsk,
+            DestinationFilePath = TestConstants.DiskImagePaths.TestDisk2DskNew,
+            OriginalFormat = DiskFormat.Dsk,
+            DestinationFormat = DiskFormat.Dsk
+        };
+        // Drive 2 is NOT dirty
+
+        var provider1 = new UnifiedDiskImageProvider(image1);
+        var provider2 = new UnifiedDiskImageProvider(image2);
+
+        var drive1 = new DiskIIDrive(TestConstants.DriveNames.Drive1, provider1);
+        var drive2 = new DiskIIDrive(TestConstants.DriveNames.Drive2, provider2);
+
+        // Capture state before swap
+        Assert.True(drive1.InternalImage?.IsDirty ?? false, "Drive 1 should start dirty");
+        Assert.False(drive2.InternalImage?.IsDirty ?? true, "Drive 2 should start clean");
+        Assert.Equal(TestConstants.DiskImagePaths.TestDisk1Woz, drive1.CurrentDiskPath);
+        Assert.Equal(TestConstants.DiskImagePaths.TestDisk2Dsk, drive2.CurrentDiskPath);
+
+        // Act: Simulate the swap by exchanging ImageProvider properties (what SwapDriveMedia does)
+        (drive2.ImageProvider, drive1.ImageProvider) = (drive1.ImageProvider, drive2.ImageProvider);
+
+        // Assert: All metadata should swap along with the providers
+        Assert.False(drive1.InternalImage?.IsDirty ?? true, "Drive 1 should now be clean (has image2)");
+        Assert.True(drive2.InternalImage?.IsDirty ?? false, "Drive 2 should now be dirty (has image1)");
+
+        // File paths swap
+        Assert.Equal(TestConstants.DiskImagePaths.TestDisk2Dsk, drive1.CurrentDiskPath);
+        Assert.Equal(TestConstants.DiskImagePaths.TestDisk1Woz, drive2.CurrentDiskPath);
+
+        // Destination paths swap
+        Assert.Equal(TestConstants.DiskImagePaths.TestDisk2DskNew, drive1.InternalImage?.DestinationFilePath);
+        Assert.Equal(TestConstants.DiskImagePaths.TestDisk1WozNew, drive2.InternalImage?.DestinationFilePath);
+
+        // Source paths swap
+        Assert.Equal(TestConstants.DiskImagePaths.TestDisk2Dsk, drive1.InternalImage?.SourceFilePath);
+        Assert.Equal(TestConstants.DiskImagePaths.TestDisk1Woz, drive2.InternalImage?.SourceFilePath);
+
+        // Formats swap
+        Assert.Equal(DiskFormat.Dsk, drive1.InternalImage?.OriginalFormat);
+        Assert.Equal(DiskFormat.Woz, drive2.InternalImage?.OriginalFormat);
+        Assert.Equal(DiskFormat.Dsk, drive1.InternalImage?.DestinationFormat);
+        Assert.Equal(DiskFormat.Woz, drive2.InternalImage?.DestinationFormat);
+    }
+
+    [Fact]
+    public void SwapImageProviders_PreservesDirtyDataWhenOneDriveEmpty()
+    {
+        // Arrange: One drive with dirty data, one empty
+        // Note: Paths are test placeholders - no actual files are accessed
+        var image1 = new InternalDiskImage(
+            trackCount: TestConstants.DiskParameters.StandardTrackCount,
+            standardTrackBitCount: TestConstants.DiskParameters.StandardTrackBitCount)
+        {
+            SourceFilePath = TestConstants.DiskImagePaths.GameWoz,
+            DestinationFilePath = TestConstants.DiskImagePaths.GameWozNew,
+            OriginalFormat = DiskFormat.Woz,
+            DestinationFormat = DiskFormat.Woz
+        };
+        image1.MarkDirty();
+
+        var provider1 = new UnifiedDiskImageProvider(image1);
+        var drive1 = new DiskIIDrive(TestConstants.DriveNames.Drive1, provider1);
+        var drive2 = new DiskIIDrive(TestConstants.DriveNames.Drive2); // Empty drive
+
+        // Verify initial state
+        Assert.NotNull(drive1.InternalImage);
+        Assert.True(drive1.InternalImage.IsDirty);
+        Assert.Equal(TestConstants.DiskImagePaths.GameWoz, drive1.CurrentDiskPath);
+        Assert.Null(drive2.InternalImage);
+        Assert.Null(drive2.CurrentDiskPath);
+
+        // Act: Swap providers
+        (drive2.ImageProvider, drive1.ImageProvider) = (drive1.ImageProvider, drive2.ImageProvider);
+
+        // Assert: Dirty disk with all metadata now in Drive 2
+        Assert.Null(drive1.InternalImage); // Drive 1 should now be empty
+        Assert.Null(drive1.CurrentDiskPath);
+
+        Assert.NotNull(drive2.InternalImage); // Drive 2 should now have the disk
+        Assert.True(drive2.InternalImage.IsDirty); // Dirty flag must be preserved
+        Assert.Equal(TestConstants.DiskImagePaths.GameWoz, drive2.CurrentDiskPath);
+        Assert.Equal(TestConstants.DiskImagePaths.GameWozNew, drive2.InternalImage.DestinationFilePath);
+    }
+
+    [Fact]
+    public void SwapImageProviders_PreservesTrackDataReferences()
+    {
+        // Arrange: Create a disk with track data
+        // Note: Paths are test placeholders - no actual files are accessed
+        var image1 = new InternalDiskImage(
+            trackCount: TestConstants.DiskParameters.StandardTrackCount,
+            standardTrackBitCount: TestConstants.DiskParameters.StandardTrackBitCount)
+        {
+            SourceFilePath = TestConstants.DiskImagePaths.OriginalWoz,
+            DestinationFilePath = TestConstants.DiskImagePaths.ModifiedWoz
+        };
+        image1.MarkDirty();
+
+        var provider1 = new UnifiedDiskImageProvider(image1);
+        var drive1 = new DiskIIDrive(TestConstants.DriveNames.Drive1, provider1);
+        var drive2 = new DiskIIDrive(TestConstants.DriveNames.Drive2);
+
+        // Capture reference to track data before swap
+        var trackBeforeSwap = image1.Tracks[0];
+
+        // Act: Swap providers (simulating what Swap Drives does)
+        (drive2.ImageProvider, drive1.ImageProvider) = (drive1.ImageProvider, drive2.ImageProvider);
+
+        // Assert: The same track object is still accessible from the swapped location
+        Assert.NotNull(drive2.InternalImage);
+        Assert.True(drive2.InternalImage.IsDirty);
+        Assert.Same(trackBeforeSwap, drive2.InternalImage.Tracks[0]); // Same object reference
+        Assert.Equal(TestConstants.DiskParameters.StandardTrackCount, drive2.InternalImage.TrackCount); // All track data preserved
+    }
+}
+
+/// <summary>
 /// Mock implementation of IDiskIIFactory for testing.
 /// </summary>
 internal class MockDiskIIFactory : IDiskIIFactory
@@ -1230,4 +1380,15 @@ internal class MockDiskIIDrive(string name) : IDiskIIDrive
     public void InsertDisk(string diskImagePath) { }
 
     public void EjectDisk() { }
+
+    public string? CurrentDiskPath => null;
+
+    public IDiskImageProvider? ImageProvider
+    {
+        get => null;
+        set { /* Mock - do nothing */ }
+    }
+
+    public InternalDiskImage? InternalImage => null;
 }
+

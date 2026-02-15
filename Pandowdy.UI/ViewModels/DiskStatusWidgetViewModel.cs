@@ -3,8 +3,15 @@
 // See LICENSE file for details
 
 using System;
+using System.Reactive;
+using System.Threading.Tasks;
 using Avalonia.Media;
+using Pandowdy.EmuCore.Cards;
+using Pandowdy.EmuCore.DiskII.Messages;
+using Pandowdy.EmuCore.Exceptions;
+using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.UI.Interfaces;
 using ReactiveUI;
 
 namespace Pandowdy.UI.ViewModels;
@@ -21,10 +28,172 @@ namespace Pandowdy.UI.ViewModels;
 /// <strong>Color Coding:</strong> Uses red for read-only indicators to provide
 /// visual feedback about write-protection status.
 /// </para>
+/// <para>
+/// <strong>Commands:</strong> Provides reactive commands for disk operations (insert, eject,
+/// save, etc.) that are enabled/disabled based on drive state.
+/// </para>
 /// </remarks>
-public class DiskStatusWidgetViewModel(DiskDriveStatusSnapshot initialSnapshot) : ReactiveObject
+public class DiskStatusWidgetViewModel : ReactiveObject
 {
-    private DiskDriveStatusSnapshot _snapshot = initialSnapshot;
+    private readonly IEmulatorCoreInterface _emulator;
+    private readonly IDiskFileDialogService _fileDialogService;
+    private readonly IMessageBoxService _messageBoxService;
+    private DiskDriveStatusSnapshot _snapshot;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DiskStatusWidgetViewModel"/> class.
+    /// </summary>
+    /// <param name="emulator">Emulator core interface for sending card messages.</param>
+    /// <param name="fileDialogService">Service for displaying file picker dialogs.</param>
+    /// <param name="messageBoxService">Service for displaying error and confirmation dialogs.</param>
+    /// <param name="initialSnapshot">Initial drive status snapshot.</param>
+    public DiskStatusWidgetViewModel(
+        IEmulatorCoreInterface emulator,
+        IDiskFileDialogService fileDialogService,
+        IMessageBoxService messageBoxService,
+        DiskDriveStatusSnapshot initialSnapshot)
+    {
+        _emulator = emulator;
+        _fileDialogService = fileDialogService;
+        _messageBoxService = messageBoxService;
+        _snapshot = initialSnapshot;
+
+        // Create observables for command enablement
+        var hasDiskObservable = this.WhenAnyValue(x => x.HasDisk);
+        var canSaveObservable = this.WhenAnyValue(
+            x => x.HasDisk,
+            x => x.HasDestinationPath,
+            x => x.IsDirty,
+            (hasDisk, hasDest, isDirty) => hasDisk && hasDest && isDirty);
+
+        // Commands that show file dialogs
+        InsertDiskCommand = ReactiveCommand.CreateFromTask(async () => await InsertDiskWithDialogAsync());
+        InsertBlankDiskCommand = ReactiveCommand.CreateFromTask(async () => await InsertBlankDiskAsync());
+
+        EjectDiskCommand = ReactiveCommand.CreateFromTask(
+            async () =>
+            {
+                // Show confirmation if disk has unsaved changes
+                if (_snapshot.IsDirty)
+                {
+                    var confirmed = await _messageBoxService.ShowConfirmationAsync(
+                        "Unsaved Changes",
+                        "Disk has unsaved changes. Eject anyway?");
+                    if (!confirmed)
+                    {
+                        return;
+                    }
+                }
+
+                await _emulator.SendCardMessageAsync(
+                    (SlotNumber)_snapshot.SlotNumber,
+                    new EjectDiskMessage(_snapshot.DriveNumber));
+            },
+            hasDiskObservable);
+
+        SaveCommand = ReactiveCommand.CreateFromTask(
+            async () => await _emulator.SendCardMessageAsync(
+                (SlotNumber)_snapshot.SlotNumber,
+                new SaveDiskMessage(_snapshot.DriveNumber)),
+            canSaveObservable);
+
+        SaveAsCommand = ReactiveCommand.CreateFromTask(async () => await SaveAsAsync(), hasDiskObservable);
+
+        ToggleWriteProtectCommand = ReactiveCommand.CreateFromTask(
+            async () =>
+            {
+                // Toggle the current state
+                bool newState = !_snapshot.IsReadOnly;
+                await _emulator.SendCardMessageAsync(
+                    (SlotNumber)_snapshot.SlotNumber,
+                    new SetWriteProtectMessage(_snapshot.DriveNumber, newState));
+            },
+            hasDiskObservable);
+    }
+
+    /// <summary>
+    /// Inserts a disk image from a file path (called by drag-and-drop or command).
+    /// </summary>
+    /// <param name="filePath">The full path to the disk image file.</param>
+    public async Task InsertDiskAsync(string filePath)
+    {
+        await _emulator.SendCardMessageAsync(
+            (SlotNumber)_snapshot.SlotNumber,
+            new InsertDiskMessage(_snapshot.DriveNumber, filePath));
+    }
+
+    private async Task InsertDiskWithDialogAsync()
+    {
+        var filePath = await _fileDialogService.ShowOpenFileDialogAsync();
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            try
+            {
+                await InsertDiskAsync(filePath);
+            }
+            catch (CardMessageException ex)
+            {
+                await _messageBoxService.ShowErrorAsync("Insert Disk Failed", ex.Message);
+            }
+        }
+    }
+
+    private async Task InsertBlankDiskAsync()
+    {
+        await _emulator.SendCardMessageAsync(
+            (SlotNumber)_snapshot.SlotNumber,
+            new InsertBlankDiskMessage(_snapshot.DriveNumber));
+    }
+
+    private async Task SaveAsAsync()
+    {
+        var suggestedName = _snapshot.DiskImageFilename;
+        var filePath = await _fileDialogService.ShowSaveFileDialogAsync(suggestedName);
+
+        if (!string.IsNullOrEmpty(filePath))
+        {
+            try
+            {
+                await _emulator.SendCardMessageAsync(
+                    (SlotNumber)_snapshot.SlotNumber,
+                    new SaveDiskAsMessage(_snapshot.DriveNumber, filePath));
+            }
+            catch (CardMessageException ex)
+            {
+                await _messageBoxService.ShowErrorAsync("Save Disk Failed", ex.Message);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the command for inserting a disk image.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> InsertDiskCommand { get; }
+
+    /// <summary>
+    /// Gets the command for inserting a blank disk.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> InsertBlankDiskCommand { get; }
+
+    /// <summary>
+    /// Gets the command for ejecting the current disk.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> EjectDiskCommand { get; }
+
+    /// <summary>
+    /// Gets the command for saving the disk to its attached destination path.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> SaveCommand { get; }
+
+    /// <summary>
+    /// Gets the command for saving the disk to a user-chosen path (Save As).
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> SaveAsCommand { get; }
+
+    /// <summary>
+    /// Gets the command for toggling write-protect state.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> ToggleWriteProtectCommand { get; }
 
     /// <summary>
     /// Updates the widget with a new snapshot.
@@ -33,6 +202,9 @@ public class DiskStatusWidgetViewModel(DiskDriveStatusSnapshot initialSnapshot) 
     {
         _snapshot = snapshot;
         this.RaisePropertyChanged(nameof(DiskId));
+        this.RaisePropertyChanged(nameof(HasDisk));
+        this.RaisePropertyChanged(nameof(IsDirty));
+        this.RaisePropertyChanged(nameof(HasDestinationPath));
         this.RaisePropertyChanged(nameof(Filename));
         this.RaisePropertyChanged(nameof(DiskImagePathTooltip));
         this.RaisePropertyChanged(nameof(FilenameForeground));
@@ -46,6 +218,21 @@ public class DiskStatusWidgetViewModel(DiskDriveStatusSnapshot initialSnapshot) 
     /// Gets the disk identifier (e.g., "S6D1").
     /// </summary>
     public string DiskId => _snapshot.DiskId;
+
+    /// <summary>
+    /// Gets a value indicating whether a disk is inserted in this drive.
+    /// </summary>
+    public bool HasDisk => !string.IsNullOrEmpty(_snapshot.DiskImageFilename);
+
+    /// <summary>
+    /// Gets a value indicating whether the disk has unsaved changes.
+    /// </summary>
+    public bool IsDirty => _snapshot.IsDirty;
+
+    /// <summary>
+    /// Gets a value indicating whether the disk has an attached destination path for Save operations.
+    /// </summary>
+    public bool HasDestinationPath => _snapshot.HasDestinationPath;
 
     /// <summary>
     /// Gets the filename without path, or "(empty)" if no disk.

@@ -84,54 +84,42 @@ namespace Pandowdy.EmuCore.Interfaces
     /// <summary>
     /// Event arguments for button state change events.
     /// </summary>
-    public class GameControllerButtonChangedEventArgs : EventArgs
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="GameControllerButtonChangedEventArgs"/> class.
+    /// </remarks>
+    /// <param name="buttonNumber">Button number (0-2).</param>
+    /// <param name="isPressed">New button state.</param>
+    public class GameControllerButtonChangedEventArgs(int buttonNumber, bool isPressed) : EventArgs
     {
         /// <summary>
         /// Gets the button number that changed (0-2).
         /// </summary>
-        public int ButtonNumber { get; }
+        public int ButtonNumber { get; } = buttonNumber;
 
         /// <summary>
         /// Gets the new button state (true = pressed, false = released).
         /// </summary>
-        public bool IsPressed { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GameControllerButtonChangedEventArgs"/> class.
-        /// </summary>
-        /// <param name="buttonNumber">Button number (0-2).</param>
-        /// <param name="isPressed">New button state.</param>
-        public GameControllerButtonChangedEventArgs(int buttonNumber, bool isPressed)
-        {
-            ButtonNumber = buttonNumber;
-            IsPressed = isPressed;
-        }
+        public bool IsPressed { get; } = isPressed;
     }
 
     /// <summary>
     /// Event arguments for paddle value change events.
     /// </summary>
-    public class GameControllerPaddleChangedEventArgs : EventArgs
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="GameControllerPaddleChangedEventArgs"/> class.
+    /// </remarks>
+    /// <param name="paddleNumber">Paddle number (0-3).</param>
+    /// <param name="value">New paddle value.</param>
+    public class GameControllerPaddleChangedEventArgs(int paddleNumber, byte value) : EventArgs
     {
         /// <summary>
         /// Gets the paddle number that changed (0-3).
         /// </summary>
-        public int PaddleNumber { get; }
+        public int PaddleNumber { get; } = paddleNumber;
 
         /// <summary>
         /// Gets the new paddle value (0-255).
         /// </summary>
-        public byte Value { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GameControllerPaddleChangedEventArgs"/> class.
-        /// </summary>
-        /// <param name="paddleNumber">Paddle number (0-3).</param>
-        /// <param name="value">New paddle value.</param>
-        public GameControllerPaddleChangedEventArgs(int paddleNumber, byte value)
-        {
-            PaddleNumber = paddleNumber;
-            Value = value;
-        }
+        public byte Value { get; } = value;
     }
 }

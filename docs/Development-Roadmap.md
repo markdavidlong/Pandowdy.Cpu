@@ -8,9 +8,9 @@
 
 | Status | Details |
 |--------|---------|
-| **Branch** | `tasks` |
-| **Tests** | 2039 tests (1766 EmuCore + 126 Disassembler + 147 UI) passing ✅ |
-| **Last Milestone** | Task 27: Drive Switching Bug Fixed (NIB/WOZ Providers) ✅ COMPLETE |
+| **Branch** | `newtasks` |
+| **Tests** | 2246 tests (1766 EmuCore + 126 Disassembler + 354 UI) passing ✅ |
+| **Last Milestone** | Task 5: GUI Disk Management Features ✅ COMPLETE |
 | **Current Focus** | Task 22 (Intermediate Debugger Implementation) ⏳ NOT STARTED |
 
 ---
@@ -20,13 +20,11 @@
 1. [In Progress Tasks](#in-progress-tasks)
    - None
 2. [Active Tasks](#active-tasks)
-   - [Task 28: Unified Internal Disk Format Architecture](#task-28-unified-internal-disk-format-architecture-medium-priority)
-   - [Task 29: Debug Disk Image Writing](#task-29-debug-disk-image-writing-high-priority)
-   - [Task 30: Export Disk Data to File System](#task-30-export-disk-data-to-file-system-medium-priority)
+   - Task 32: Implement .skillet project files
    - [Task 22: Intermediate Debugger Implementation](#task-22-intermediate-debugger-implementation-high-priority)
-   - [Task 5: GUI Disk Management Features](#task-5-gui-disk-management-features-high-priority)
    - [Task 13: Audio Emulation Implementation](#task-13-audio-emulation-implementation-medium-priority)
 3. [Backlog](#backlog)
+   - [Task 31: Comprehensive Disk Image Format Support](#task-31-comprehensive-disk-image-format-support-highpriority)
    - [Task 4: HGR Flicker Investigation](#task-4-hgr-flicker-investigation-medium-priority)
    - [Task 7: Handle BRK Loops in Interrupt Handler](#task-7-handle-brk-loops-in-interrupt-handler-low-priority)
    - [Task 12: Flexible Window Docking System](#task-12-flexible-window-docking-system-medium-priority)
@@ -37,21 +35,26 @@
    - [Task 20: Advanced Debugger Features](#task-20-advanced-debugger-features-low-priority)
    - [Task 21: Peripheral Discovery and Enumeration API](#task-21-peripheral-discovery-and-enumeration-api-medium-priority)
    - [Task 23: Split IKeyboardSetter into IKeyboardSetter and IKeyboardResetter](#task-23-split-ikeyboardsetter-into-ikeyboardsetter-and-ikeyboardresetter-low-priority)
+   - Task 31: Implement DHGR graphics
 4. [Completed Tasks](#completed-tasks)
    - [Task 1: Migrate VA2M to CpuClockingCounters.VBlankOccurred](#task-1-migrate-va2m-to-cpuclockingcountersvblankoccurred)
    - [Task 2: Remove VA2MBus.VBlank Event](#task-2-remove-va2mbusvblank-event)
    - [Task 3: Removed](#task-3-removed)
+   - [Task 5: GUI Disk Management Features](#task-5-gui-disk-management-features)
    - [Task 6: Clear Pending Keystrokes on Reset](#task-6-clear-pending-keystrokes-on-reset)
    - [Task 8: Check for Race Conditions at High Speeds](#task-8-check-for-race-conditions-at-high-speeds)
    - [Task 9: Multi-Drive Operation Deep Dive](#task-9-multi-drive-operation-deep-dive)
    - [Task 10: SectorDiskImageProvider Refactoring](#task-10-sectordiskimageprovider-refactoring)
+   - [Task 11: Conditional Compilation for Disk Provider Debug Output](#task-11-conditional-compilation-for-disk-provider-debug-output)
    - [Task 18: Migrate to Pandowdy.Cpu](#task-18-migrate-to-pandowdycpu-critical-priority)
    - [Task 19: Basic Debugger Foundation](#task-19-basic-debugger-foundation)
    - [Task 24: Fix DiskII Motor-Off Behavior on Drive Switching](#task-24-fix-diskii-motor-off-behavior-on-drive-switching)
    - [Task 25: Disk II Motor State Refactoring - Move to Controller Level](#task-25-disk-ii-motor-state-refactoring---move-to-controller-level)
    - [Task 26: WozDiskImageProvider Drive Switching Fix](#task-26-wozdiskimageprovider-drive-switching-fix)
    - [Task 27: NibDiskImageProvider Drive Switching Fix](#task-27-nibdiskimageprovider-drive-switching-fix)
-   - [Task 11: Conditional Compilation for Disk Provider Debug Output](#task-11-conditional-compilation-for-disk-provider-debug-output)
+   - [Task 28: Unified Internal Disk Format Architecture](#task-28-unified-internal-disk-format-architecture)
+   - [Task 29: Debug Disk Image Writing](#task-29-debug-disk-image-writing)
+   - [Task 30: Export Disk Data to File System](#task-30-export-disk-data-to-file-system)
 5. [Code Style Guidelines](#code-style-guidelines)
 6. [Git Best Practices](#git-best-practices)
 7. [Testing Guidelines](#testing-guidelines)
@@ -309,156 +312,26 @@ public void StepOver()
 
 ## Active Tasks
 
-### Task 5: GUI Disk Management Features (High Priority)
+### Task 22: Intermediate Debugger Implementation (High Priority)
 
-**Goal:** Add user-facing disk management capabilities to the GUI.
+**Goal:** Expand basic debugger with intermediate features for comprehensive debugging.
 
 **Status:** ⏳ NOT STARTED
 
-**Features to Implement:**
+**Prerequisites:**
+- Task 19 (Basic Debugger Implementation) must be completed first
 
-1. **Insert Disk Image from GUI**
-   - File open dialog to select disk images
-   - Support all formats: .dsk, .do, .po, .nib, .woz, .2mg
-   - Menu item: File → Insert Disk → Drive 1 / Drive 2
-   - Keyboard shortcuts (e.g., Ctrl+1, Ctrl+2)
-
-2. **Eject Disk from GUI**
-   - Context menu on drive status panel
-   - Menu item: File → Eject Disk → Drive 1 / Drive 2
-   - Confirmation if disk has unsaved changes (write support)
-
-3. **Swap Drive 1 and Drive 2 Disk Images**
-   - Quick swap button/menu item
-   - Useful for programs that expect different disk in different drive
-   - Keyboard shortcut (e.g., Ctrl+Shift+S for swap)
-
-4. **Drag and Drop Support**
-   - Drop disk image file onto drive status panel
-   - Drop onto main window defaults to Drive 1
-
-5. **Recent Disk Images**
-   - Track recently used disk images
-   - Quick access submenu
-
-**Files to Modify:**
-- `Pandowdy.UI\MainWindow.axaml` - Add menu items
-- `Pandowdy.UI\ViewModels\MainWindowViewModel.cs` - Add command handlers
-- `Pandowdy.UI\Controls\DiskStatusPanel.axaml` - Add context menu, drag/drop support
-- `Pandowdy.UI\ViewModels\DiskStatusPanelViewModel.cs` - Add insert/eject/swap logic
-- `Pandowdy\Program.cs` - Remove hardcoded disk inserts (lines 181-204)
+**Features to Add:**
+- Data breakpoints (break on memory read/write)
+- Memory viewer with hex editor
+- Enhanced disassembly view
+- Execution history/trace buffer
+- Symbol file support
 
 **Priority:** High
 
-**Notes:**
-- Hardcoded test images in `Program.cs` are intentional for development
-- Location on E:\ drive is intentional for development
-
 **Dependencies:**
-- Would benefit from debugger (Task 19) for troubleshooting disk load/format issues
-
----
-
-### Task 26: WozDiskImageProvider Debugging (High Priority)
-
-**Goal:** Debug and fix random Disk I/O errors occurring with WOZ format disk images in DOS 3.3.
-
-**Status:** ✅ **COMPLETE** (2025-02-05) - Fixed by Task 27 solution
-
-**Resolution:**
-Same drive switching bug as Task 27. Fixed by applying identical per-provider cycle tracking to `InternalWozDiskImageProvider`. See Task 27 below for complete details.
-
-**The Problem:**
-WOZ provider used absolute `cycleCount` to calculate disk position, causing position errors when switching between drives.
-
-**The Fix:**
-Applied same per-provider cycle tracking as NIB provider:
-```csharp
-// Added to InternalWozDiskImageProvider:
-private ulong _cycleOffsetAtFirstAccess = 0;
-private bool _hasBeenAccessed = false;
-
-// Position now calculated from relative cycles
-ulong relativeCycles = cycleCount - _cycleOffsetAtFirstAccess;
-int bitPosition = (int)((relativeCycles / DiskIIConstants.CyclesPerBit) % bitCount);
-```
-
-**Testing:**
-- All 2039 tests passing
-- Drive switching works correctly
-- Each WOZ disk maintains independent rotational position
-
----
-
-### Task 27: NibDiskImageProvider Debugging (High Priority)
-
-**Goal:** Verify and debug NIB format disk image provider to ensure reliable operation.
-
-**Status:** ✅ **COMPLETE** (2025-02-05)
-
-**Resolution:**
-- ✅ **Root Cause Identified:** Drive switching position bug
-- ✅ **Fix Implemented:** Per-provider cycle tracking
-- ✅ **All Tests Passing:** 2039/2039 tests
-- ✅ **No Regressions:** Backward compatible
-
-**The Problem:**
-Both NIB and WOZ providers used absolute `cycleCount` to calculate disk position. When switching between drives, the newly selected drive would calculate its position as if it had been spinning during the previous drive's reads, causing it to "jump ahead" to the wrong position.
-
-**The Solution:**
-Each `IDiskImageProvider` instance now maintains independent rotational position:
-- Added `_cycleOffsetAtFirstAccess` field (set on first read/write)
-- Added `_hasBeenAccessed` flag
-- Position calculated from `relativeCycles = cycleCount - _cycleOffsetAtFirstAccess`
-- Simulates each disk starting from arbitrary position when accessed
-
-**Implementation:**
-```csharp
-// Added to NibDiskImageProvider:
-private ulong _cycleOffsetAtFirstAccess = 0;
-private bool _hasBeenAccessed = false;
-
-// In GetBit() and WriteBit():
-if (!_hasBeenAccessed)
-{
-    _cycleOffsetAtFirstAccess = cycleCount;
-    _hasBeenAccessed = true;
-}
-ulong relativeCycles = cycleCount - _cycleOffsetAtFirstAccess;
-int bitPosition = (int)((relativeCycles / DiskIIConstants.CyclesPerBit) % DiskIIConstants.BitsPerTrack);
-```
-
-**Files Modified:**
-- `Pandowdy.EmuCore\DiskII\Providers\NibDiskImageProvider.cs` - Added per-provider cycle tracking
-- `Pandowdy.EmuCore\DiskII\Providers\InternalWozDiskImageProvider.cs` - Same fix applied
-- `docs\Task-27-NIB-Provider-Analysis.md` - Updated with fix documentation
-
-**Testing:**
-- All 2039 tests passing (no regressions)
-- Drive switching no longer causes position errors
-- Each disk maintains independent rotational position
-- Backward compatible with existing code
-
-**Technical Notes:**
-- `CyclesPerBit = 45/11` verified correct for 1.022727 MHz CPU (14.31818 MHz ÷ 14)
-- Each provider instance represents one physical disk
-- Motor architecture from Task 25 enables per-drive independence
-- Position tied to elapsed time since first access
-
-**User Insight:** Drive switching identified as primary cause of DOS 3.3 I/O errors
-
----
-
-### Task 26: WozDiskImageProvider Debugging (High Priority)
-
-**Goal:** Debug and fix WOZ format disk image provider for reliable DOS 3.3 operation.
-
-**Status:** ✅ **COMPLETE** (2025-02-05) - Fixed by Task 27 solution
-
-**Resolution:**
-Same drive switching bug as Task 27. Fixed by applying identical per-provider cycle tracking to `InternalWozDiskImageProvider`. See Task 27 for complete details.
-
----
+- Builds on Task 19 foundation
 
 ### Task 13: Audio Emulation Implementation (Medium Priority)
 
@@ -482,6 +355,8 @@ Same drive switching bug as Task 27. Fixed by applying identical per-provider cy
 **Candidate Libraries:**
 - **Silk.NET.OpenAL** is probably the most likely candidate. - Modern .NET 8 OpenAL bindings
 
+
+**Status:** ⏳ NOT STARTED
 
 **Phase 2: Apple IIe Speaker Emulation**
 
@@ -567,146 +442,84 @@ Same drive switching bug as Task 27. Fixed by applying identical per-provider cy
 
 **Priority:** Medium
 
-**Dependencies:**
-- May benefit from debugger (Task 19) for debugging cycle-timing and audio sync issues
-
----
-
-### Task 29: Debug Disk Image Writing (High Priority)
-
-**Goal:** Debug and verify disk write functionality to ensure data written to disk images is correctly persisted and readable.
-
-**Status:** ⏳ NOT STARTED
-
-**Current State:**
-- Disk read operations working correctly (Tasks 26, 27 completed)
-- Write operations implemented but not fully tested
-- Need to verify GCR encoding, checksums, and sector formatting on writes
-- Write-back to disk image files needs verification
-
-**Problem:**
-- Disk write operations may have timing or encoding issues
-- Need to verify written data can be read back correctly
-- Need to test write operations across all disk formats
-- Copy-protected disk behavior on write attempts needs investigation
-
-**Areas to Investigate:**
-- GCR encoding correctness on writes
-- Sector checksum calculation and placement
-- Write timing relative to disk rotation
-- Dirty flag tracking and write-back triggers
-- Format-specific write behavior (WOZ vs NIB vs sector-based)
-
-**Testing Strategy:**
-- Create test disk image, write data, read back and verify
-- Test sector-level writes (DOS 3.3 RWTS)
-- Test file-level operations (SAVE, BSAVE, file copy)
-- Compare written data with known-good reference
-- Verify written images can boot and operate correctly
-
-**Files to Focus On:**
-- `Pandowdy.EmuCore\DiskII\Providers\NibDiskImageProvider.cs` - WriteBit implementation
-- `Pandowdy.EmuCore\DiskII\Providers\SectorDiskImageProvider.cs` - Sector write handling
-- `Pandowdy.EmuCore\DiskII\Providers\InternalWozDiskImageProvider.cs` - WOZ write support
-- `Pandowdy.EmuCore\Cards\DiskIIControllerCard.cs` - Write enable/disable handling
-
-**Priority:** High
-
-**Dependencies:**
-- Builds on completed Tasks 26, 27 (drive switching fixes)
-- Related to Task 28 (Unified Internal Disk Format) - may benefit from unified write path
-
----
-
-### Task 30: Export Disk Data to File System (Medium Priority)
-
-**Goal:** Implement ability to export modified disk images back to standard disk image file formats, with options to save as new file or overwrite original.
-
-**Status:** ⏳ NOT STARTED
-
-**Current State:**
-- Disk images loaded into internal representation
-- Modifications stored in memory during emulation
-- No mechanism to persist changes back to disk files
-- No "Save As" functionality for different formats
-
-**Features to Implement:**
-
-1. **Save Modified Disk Image**
-   - Save changes back to original file (if not write-protected)
-   - Preserve original format on save
-   - Prompt if overwriting original
-   - Auto-save option (configurable)
-
-2. **Save As / Export to New File**
-   - Save dialog with format selection
-   - Support export to: .dsk, .do, .po, .nib, .woz
-   - Allow renaming during save
-   - Choose destination directory
-
-3. **Format Conversion**
-   - Convert between formats during export
-   - Warn if conversion is lossy (e.g., WOZ → DSK loses copy protection)
-   - Preserve metadata where possible
-
-4. **Dirty Flag Tracking**
-   - Track modified state per drive
-   - Visual indicator in UI (asterisk in title, icon change)
-   - Prompt to save on eject/exit if dirty
-   - Clear dirty flag after successful save
-
-**Implementation Approach:**
-
-```csharp
-public interface IDiskImageExporter
-{
-    /// <summary>Export disk to specified format.</summary>
-    void Export(IDiskImageProvider source, string filePath, DiskFormat format);
-
-    /// <summary>Save disk back to original file.</summary>
-    void Save(IDiskImageProvider source);
-
-    /// <summary>Check if format conversion is lossless.</summary>
-    bool IsLosslessConversion(DiskFormat source, DiskFormat target);
-}
-```
-
-**Lossy Conversion Warnings:**
-- **WOZ → NIB/DSK:** May lose variable track lengths, timing info, copy protection
-- **NIB → DSK:** May fail if non-standard GCR encoding (copy protection)
-- **DSK → NIB/WOZ:** Lossless (synthesize standard GCR)
-
-**Files to Create:**
-- `Pandowdy.EmuCore\DiskII\Exporters\DiskImageExporter.cs` - Export coordinator
-- `Pandowdy.EmuCore\DiskII\Exporters\NibExporter.cs` - NIB format export
-- `Pandowdy.EmuCore\DiskII\Exporters\DskExporter.cs` - DSK/DO/PO export (GCR decode)
-- `Pandowdy.EmuCore\DiskII\Exporters\WozExporter.cs` - WOZ format export
-
-**Files to Modify:**
-- `Pandowdy.UI\ViewModels\MainWindowViewModel.cs` - Save/SaveAs commands
-- `Pandowdy.UI\ViewModels\DiskStatusPanelViewModel.cs` - Dirty indicator
-- `Pandowdy.UI\MainWindow.axaml` - Menu items (Save, Save As)
-- `Pandowdy.EmuCore\DiskII\Providers\*` - Add IsDirty property, track modifications
-
-**UI Integration:**
-- Menu: File → Save Disk → Drive 1 / Drive 2
-- Menu: File → Save Disk As → Drive 1 / Drive 2
-- Keyboard shortcuts: Ctrl+S (save current drive), Ctrl+Shift+S (save as)
-- Dirty indicator: "*" next to filename in disk status panel
-- Exit confirmation: "Disk in Drive 1 has unsaved changes. Save before exiting?"
-
-**Priority:** Medium
-
-**Dependencies:**
-- **Requires:** Task 29 (Debug Disk Image Writing) - writes must work correctly first
-- **Requires:** Task 5 (GUI Disk Management Features) - UI infrastructure for disk operations
-- Related to Task 28 (Unified Internal Disk Format) - exporters align with that architecture
-
 ---
 
 ## Backlog
 
-### Task 3: Removed
+
+
+### Task 31: Comprehensive Disk Image Format Support (High Priority)
+
+**Goal:** Expand Pandowdy's disk image import/export capabilities to match CiderPress2's comprehensive format support via DiskArc integration.
+
+**Status:** ⏳ NOT STARTED
+
+**Current State:**
+- Pandowdy's `DiskFormat` enum supports a minimal subset: `Woz`, `Nib`, `Dsk`, `Do`, `Po`, `Internal`
+- `IDiskImageExporter` infrastructure exists with `WozExporter`, `NibExporter`, `SectorExporter`
+- Import path uses DiskArc's `FileAnalyzer` for format detection and sector ordering
+- Export path uses Pandowdy-native `DiskFormatHelper` for extension-to-format mapping
+
+**Problem:**
+- Many disk image formats are not yet supported (2IMG, DiskCopy 4.2, Trackstar, etc.)
+- Hard drive images (`.2mg`, `.po` block devices) will be needed for future SmartPort/ProFile emulation
+- Users may have disk images in formats Pandowdy cannot currently read or write
+
+**Proposed Solution:**
+
+Incrementally expand format support by leveraging DiskArc's comprehensive format handling:
+
+**Phase 1: 2IMG Support (High Priority)**
+- Add `TwoIMG` to `DiskFormat` enum
+- Implement `TwoIMGExporter` using DiskArc's `TwoIMG.CreateDisk()` 
+- Critical for hard drive images and ProDOS block devices
+- Enables future SmartPort controller emulation
+
+**Phase 2: Additional Floppy Formats (Medium Priority)**
+- Add `DiskCopy42` format support (Macintosh disk images)
+- Add `Trackstar` format support (flux-level images)
+- Add other formats as needed based on user demand
+
+**Phase 3: DiskArc Integration (Low Priority)**
+- Consider replacing `DiskFormatHelper.GetFormatFromExtension()` with DiskArc's `FileAnalyzer.ExtensionToKind()`
+- Pandowdy's `IDiskImageExporter` implementations become thin wrappers around DiskArc's `CreateDisk*()` static methods
+- Maintain Pandowdy's `DiskFormat` enum as the internal representation, with mapping to/from DiskArc's `FileKind`
+
+**DiskArc APIs to Leverage:**
+
+```csharp
+// Format detection (already used for import)
+FileAnalyzer.ExtensionToKind(extension, out FileKind kind, out SectorOrder order, ...);
+
+// Disk creation (for export)
+Woz.CreateDisk525(...)
+Woz.CreateDisk35(...)
+UnadornedSector.CreateSectorImage(...)
+UnadornedSector.CreateBlockImage(...)
+UnadornedNibble525.CreateDisk(...)
+TwoIMG.CreateDisk(...)
+TwoIMG_Nibble.CreateDisk(...)
+```
+
+**Files to Modify:**
+- `Pandowdy.EmuCore\DiskII\DiskFormat.cs` - Add new format enum values
+- `Pandowdy.EmuCore\DiskII\DiskFormatHelper.cs` - Add extension mappings for new formats
+- `Pandowdy.EmuCore\DiskII\Exporters\*` - Add new exporter implementations
+
+**Files to Create:**
+- `Pandowdy.EmuCore\DiskII\Exporters\TwoIMGExporter.cs` - 2IMG export support
+- `Pandowdy.EmuCore.Tests\DiskII\TwoIMGExporterTests.cs` - Tests for 2IMG export
+
+**Priority:** Low (Phase 1 may be elevated when SmartPort emulation begins)
+
+**Dependencies:**
+- Task 5 (GUI Disk Management) establishes the export infrastructure
+- Task 30 (Export Disk Data) provides the `IDiskImageExporter` pattern
+- Future SmartPort task will require Phase 1 (2IMG support)
+
+**Related:**
+- DiskArc library in `legacy/CiderPress2/DiskArc/`
+- Ultimate goal: rival CiderPress2's format coverage
 
 ---
 
@@ -1766,14 +1579,6 @@ public interface IKeyboardResetter
 
 ---
 
-### Task 28: Unified Internal Disk Format Architecture (Medium Priority)
-
-**See File: docs/Internal-Disk-Format-Refactor-Plan.md**
-
-**Related:**
-- Complements Task 10 (SectorDiskImageProvider Debugging) - will be replaced by this architecture
-- Enables future Pandowdy project format (.skillet)
-
 ## Completed Tasks
 
 ### ✅ Task 1: Migrate VA2M to CpuClockingCounters.VBlankOccurred
@@ -1785,6 +1590,25 @@ public interface IKeyboardResetter
 ---
 
 ### ✅ Task 3: Removed
+
+---
+
+### ✅ Task 5: GUI Disk Management Features
+
+**Completed:** 2026-01 - All 2246 tests passing (230 UI tests)
+
+**Summary:** Implemented comprehensive GUI disk management capabilities including:
+- Insert/Eject disk via context menus and dialogs
+- Drag-and-drop disk image support
+- Swap drives functionality
+- Save As disk operations
+- Dirty disk indicators and confirmation dialogs
+- Write-protect toggle
+- Settings persistence (window, display, drive state)
+- Peripherals menu with dynamic card discovery
+- Exit confirmation for unsaved disks
+
+**See Also:** `docs/Task5-Gui-Disk-Management-Implementation.md` for complete implementation details
 
 ---
 
@@ -1853,8 +1677,23 @@ See Task 27 below for complete details.
 
 **Completed:** 2025-02-05 - All 2039 tests passing
 
+---
 
+### ✅ Task 28: Unified Internal Disk Format Architecture
 
+**Completed:** 2026-02-05 - Internal disk format unified
+
+---
+
+### ✅ Task 29: Debug Disk Image Writing
+
+**Completed:** 2026-02-05 - Disk write functionality verified
+
+---
+
+### ✅ Task 30: Export Disk Data to File System
+
+**Completed:** 2026-02-05 - Disk export functionality implemented
 
 ---
 
@@ -1910,9 +1749,9 @@ public bool IsEnabled { get; set; } = true;
 - Use nullable reference types (`string?`, `object?`)
 - Follow naming conventions: PascalCase for public members, camelCase for private fields with `_` prefix
 - 4-space indentation
-- Prefer using Primary Constructors when class initialization is straightforward
-- Prefer field default initializers for small, read‑only arrays and collections; use new[] { ... } for literal content and Array.Empty<T>() for empty arrays to avoid unnecessary allocations.
-- Use `var` for other local variables when type is obvious
+- Prefer using Primary Constructors when class initialization is straightforward (i.e., no complicated tasks at construction aside from field assignments)
+- Prefer field default initializers for small, read‑only arrays and collections; use new[] { ... } for literal content and Array.Empty<T>() for empty arrays to avoid unnecessary allocations
+- Use `var` for local variables when type is obvious
 
 ### 4. Dependency Injection and Architecture
 

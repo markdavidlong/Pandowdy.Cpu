@@ -34,6 +34,11 @@ public class DiskIIDebugDecorator : IDiskIIDrive
     private readonly IDiskIIDrive _inner;
 
     /// <summary>
+    /// Gets the inner drive for unwrapping decorator chains (internal use only).
+    /// </summary>
+    internal IDiskIIDrive InnerDrive => _inner;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="DiskIIDebugDecorator"/> class.
     /// </summary>
     /// <param name="inner">The drive implementation to wrap.</param>
@@ -156,4 +161,39 @@ public class DiskIIDebugDecorator : IDiskIIDrive
         Debug.WriteLine($"IDiskIIDrive ({Name}) EjectDisk()");
         _inner.EjectDisk();
     }
+
+    /// <inheritdoc />
+    public string? CurrentDiskPath
+    {
+        get
+        {
+            var path = _inner.CurrentDiskPath;
+            // Debug.WriteLine($"IDiskIIDrive ({Name}) CurrentDiskPath => {path ?? "(none)"}");
+            return path;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the internal disk image provider.
+    /// </summary>
+    /// <remarks>
+    /// Delegates to the inner drive's provider.
+    /// </remarks>
+    public IDiskImageProvider? ImageProvider
+    {
+        get => _inner.ImageProvider;
+        set
+        {
+            Debug.WriteLine($"IDiskIIDrive ({Name}) Setting ImageProvider to {(value != null ? "non-null" : "null")}");
+            _inner.ImageProvider = value;
+        }
+    }
+
+    /// <summary>
+    /// Gets the internal disk image.
+    /// </summary>
+    /// <remarks>
+    /// Delegates to the inner drive's internal image.
+    /// </remarks>
+    public InternalDiskImage? InternalImage => _inner.InternalImage;
 }

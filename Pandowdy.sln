@@ -48,8 +48,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docs", "Docs", "{BABE080F-8
 	ProjectSection(SolutionItems) = preProject
 		Debugger Notes.md = Debugger Notes.md
 		docs\Development-Roadmap.md = docs\Development-Roadmap.md
-		docs\Internal-Disk-Format-Refactor-Plan.md = docs\Internal-Disk-Format-Refactor-Plan.md
 		docs\RenderRefactor.md = docs\RenderRefactor.md
+		docs\Task5-Gui-Disk-Management-Implementation.md = docs\Task5-Gui-Disk-Management-Implementation.md
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiskArc", "legacy\CiderPress2\DiskArc\DiskArc.csproj", "{F5E74FE8-2A77-4E18-9BAC-3F0245F96DEE}"

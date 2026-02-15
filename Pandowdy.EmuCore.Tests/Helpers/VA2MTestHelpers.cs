@@ -30,6 +30,7 @@ public static class VA2MTestHelpers
         private IDiskStatusProvider? _diskStatusProvider;
         private CpuClockingCounters? _clockCounters;
         private IMemoryInspector? _memoryInspector;
+        private ISlots? _slots;
 
         public VA2MBuilder()
         {
@@ -51,6 +52,7 @@ public static class VA2MTestHelpers
                 ?? new SingularKeyHandler(), _gameController, vblank);
 
             var testSlots = new TestSlots(_systemStatusProvider);
+            _slots = testSlots;
             _memoryPool = new AddressSpaceController(
                 new TestLanguageCard(), 
                 new TestSystemRamSelector(),
@@ -141,7 +143,8 @@ public static class VA2MTestHelpers
                 _gameController!,
                 _diskStatusProvider!,
                 _clockCounters!,
-                _memoryInspector!
+                _memoryInspector!,
+                _slots!
             );
         }
     }

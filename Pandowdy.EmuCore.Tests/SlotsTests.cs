@@ -2,8 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using System.Diagnostics.CodeAnalysis;
 using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Messages;
 using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Tests;
@@ -47,6 +49,7 @@ public class SlotsTests
         public string GetMetadata() => string.Empty;
         public bool ApplyMetadata(string metadata) => true;
         public void Reset() { }
+        public void HandleMessage(ICardMessage message) { }
         public ICard Clone() => new MockCard(Id, Name, _ioFillValue, _romFillValue, _extRomFillValue);
     }
 
@@ -74,6 +77,7 @@ public class SlotsTests
         public string GetMetadata() => string.Empty;
         public bool ApplyMetadata(string metadata) => true;
         public void Reset() { }
+        public void HandleMessage(ICardMessage message) { }
         public ICard Clone() => new NonResponsiveCard(Id, Name);
     }
 
@@ -82,8 +86,9 @@ public class SlotsTests
     /// </summary>
     private class MockCardFactory : ICardFactory
     {
-        private readonly Dictionary<int, ICard> _cardsById = new();
-        private readonly Dictionary<string, ICard> _cardsByName = new();
+        private readonly Dictionary<int, ICard> _cardsById = [];
+        private readonly Dictionary<string, ICard> _cardsByName = [];
+        [SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance", Justification = "Interface usage provides test flexibility")]
         private readonly ICard _nullCard;
 
         public MockCardFactory()
@@ -111,7 +116,7 @@ public class SlotsTests
 
         public List<(int Id, string Name)> GetAllCardTypes()
         {
-            return _cardsById.Values.Select(c => (c.Id, c.Name)).ToList();
+            return [.. _cardsById.Values.Select(c => (c.Id, c.Name))];
         }
     }
 
@@ -723,7 +728,7 @@ public class SlotsTests
         status.SetIntC8Rom(false);
 
         // Act - Peek at slot 6 ROM (should not activate extended ROM)
-        byte result = slots.Peek(0x0600);
+        slots.Peek(0x0600);
 
         // Assert
         Assert.Equal(0, status.StateIntC8RomSlot); // Should remain 0
@@ -1513,6 +1518,7 @@ public class SlotsTests
         public string GetMetadata() => string.Empty;
         public bool ApplyMetadata(string metadata) => true;
         public void Reset() => _onReset?.Invoke();
+        public void HandleMessage(ICardMessage message) { }
         public ICard Clone() => new TestableCard(Id, Name, _ioFillValue, _romFillValue, _extRomFillValue, _onReset, _onWriteIO, _onWriteRom, _onWriteExtRom);
     }
 

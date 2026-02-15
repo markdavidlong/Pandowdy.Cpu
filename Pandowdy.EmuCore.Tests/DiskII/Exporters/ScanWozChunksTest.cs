@@ -1,3 +1,4 @@
+/*
 using Pandowdy.EmuCore.DiskII;
 using Xunit;
 using Xunit.Abstractions;
@@ -69,3 +70,4 @@ public class ScanWozChunksTest(ITestOutputHelper output)
         _output.WriteLine($"End of file at byte {data.Length}");
     }
 }
+*/

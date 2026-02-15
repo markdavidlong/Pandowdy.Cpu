@@ -73,6 +73,7 @@ public class DiskImageFactory : IDiskImageFactory
         System.Diagnostics.Debug.WriteLine($"DiskImageFactory: Using {importer.GetType().Name} for {extension}");
 
         // Import disk image to internal format
+        System.Diagnostics.Debug.Write($"Calling importer with {filePath}");
         InternalDiskImage diskImage = importer.Import(filePath);
 
         System.Diagnostics.Debug.WriteLine($"DiskImageFactory: Imported {diskImage.TrackCount} tracks, format={diskImage.OriginalFormat}");

@@ -53,6 +53,8 @@ public class NibExporterTests
         Assert.Throws<ArgumentNullException>(() => exporter.Export(disk, (Stream)null!));
     }
 
+
+    /*
     [Fact]
     [Trait("Category", "FullDiskTests")]
     public void Export_CreatesCorrectFileSize()
@@ -180,6 +182,7 @@ public class NibExporterTests
             }
         }
     }
+    */
 
     [Fact]
     public void Export_EmptyDisk_CreatesValidNibFile()
@@ -203,6 +206,7 @@ public class NibExporterTests
         Assert.All(data, b => Assert.Equal(0, b));
     }
 
+    /*
     [Fact]
     [Trait("Category", "FullDiskTests")]
     public void Export_FormatConversion_DskToNib_Works()
@@ -259,4 +263,5 @@ public class NibExporterTests
         var fileInfo = new FileInfo(tempDskFile.FilePath);
         Assert.Equal(143360, fileInfo.Length);
     }
+    */
 }

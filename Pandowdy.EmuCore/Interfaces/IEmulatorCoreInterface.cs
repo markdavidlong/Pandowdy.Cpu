@@ -103,7 +103,43 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
     /// </para>
     /// </remarks>
     void SetPushButton(byte num, bool pressed);
-    
+
+    /// <summary>
+    /// Sends a message to a specific card or broadcasts to all cards.
+    /// </summary>
+    /// <param name="slot">Target slot (Slot1–Slot7), or <c>null</c> to broadcast to all slots.</param>
+    /// <param name="message">The card message to deliver.</param>
+    /// <returns>A task that completes when the message(s) have been processed on the emulator thread.</returns>
+    /// <exception cref="Exceptions.CardMessageException">
+    /// Thrown (on the returned Task) if a targeted card rejects the message. Not thrown for
+    /// broadcast messages — individual card failures are silently ignored during broadcast.
+    /// </exception>
+    /// <remarks>
+    /// <para>
+    /// <strong>Thread Safety:</strong> Thread-safe. The message is enqueued on the emulator
+    /// thread's command queue and executed at the next instruction boundary, identical to
+    /// Reset() and EnqueueKey(). The returned Task allows the caller to await completion
+    /// and observe any errors.
+    /// </para>
+    /// <para>
+    /// <strong>Broadcast Mode:</strong> When <paramref name="slot"/> is <c>null</c>, the
+    /// message is delivered to all 7 slots (Slot1–Slot7). This is useful for discovery
+    /// messages like <see cref="Messages.IdentifyCardMessage"/> where all cards should respond.
+    /// During broadcast, individual card exceptions are caught and ignored — the broadcast
+    /// completes successfully as long as delivery is attempted to all slots.
+    /// </para>
+    /// <para>
+    /// <strong>Responses:</strong> Cards respond via <see cref="ICardResponseProvider"/> —
+    /// subscribe to <see cref="ICardResponseProvider.Responses"/> to receive responses.
+    /// </para>
+    /// <para>
+    /// <strong>Generic Design:</strong> This method is intentionally card-type-agnostic.
+    /// IEmulatorCoreInterface has no knowledge of disk drives, printers, or any specific
+    /// card type. It simply routes the message to the card(s) in the requested slot(s).
+    /// </para>
+    /// </remarks>
+    System.Threading.Tasks.Task SendCardMessageAsync(SlotNumber? slot, ICardMessage message);
+
     #endregion
     
     #region Execution Control

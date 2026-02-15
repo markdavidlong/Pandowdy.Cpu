@@ -3,9 +3,11 @@
 // See LICENSE file for details
 
 using System;
+using System.Threading.Tasks;
 using Pandowdy.UI.ViewModels;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.Helpers;
+using Pandowdy.UI.Services;
 using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
 
@@ -70,10 +72,18 @@ namespace Pandowdy.UI;
 /// The 60 Hz refresh ticker that triggers periodic display updates, ensuring smooth
 /// animation and responsive UI. Must not be null.
 /// </param>
+/// <param name="driveStateService">
+/// The drive state service for restoring disk images from saved state. Must not be null.
+/// </param>
+/// <param name="guiSettingsService">
+/// The GUI settings service for loading and saving all GUI configuration. Must not be null.
+/// </param>
 public sealed class MainWindowFactory(
     MainWindowViewModel viewModel,
     IEmulatorCoreInterface machine,
-    IRefreshTicker refreshTicker) : IMainWindowFactory
+    IRefreshTicker refreshTicker,
+    IDriveStateService driveStateService,
+    GuiSettingsService guiSettingsService) : IMainWindowFactory
 {
     /// <summary>
     /// Main window view model containing UI state, commands, and child view models.
@@ -83,7 +93,7 @@ public sealed class MainWindowFactory(
     /// data binding and reactive subscriptions.
     /// </remarks>
     private readonly MainWindowViewModel _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
-    
+
     /// <summary>
     /// Emulator core control interface providing complete control surface for the emulator.
     /// </summary>
@@ -108,7 +118,7 @@ public sealed class MainWindowFactory(
     /// </para>
     /// </remarks>
     private readonly IEmulatorCoreInterface _machine = machine ?? throw new ArgumentNullException(nameof(machine));
-    
+
     /// <summary>
     /// 60 Hz refresh ticker for driving periodic display updates.
     /// </summary>
@@ -117,6 +127,24 @@ public sealed class MainWindowFactory(
     /// to its Stream to trigger RequestRefresh() calls on the display at 60 Hz.
     /// </remarks>
     private readonly IRefreshTicker _refreshTicker = refreshTicker ?? throw new ArgumentNullException(nameof(refreshTicker));
+
+    /// <summary>
+    /// Drive state service for restoring disk images from saved state.
+    /// </summary>
+    /// <remarks>
+    /// Validated as non-null in constructor. Passed to MainWindow.Initialize() which uses it
+    /// to restore disk images during the initial startup sequence.
+    /// </remarks>
+    private readonly IDriveStateService _driveStateService = driveStateService ?? throw new ArgumentNullException(nameof(driveStateService));
+
+    /// <summary>
+    /// GUI settings service for loading and saving all GUI configuration.
+    /// </summary>
+    /// <remarks>
+    /// Validated as non-null in constructor. Used to load settings before window creation
+    /// and apply them to the ViewModel, ensuring correct initial state.
+    /// </remarks>
+    private readonly GuiSettingsService _guiSettingsService = guiSettingsService ?? throw new ArgumentNullException(nameof(guiSettingsService));
 
     /// <summary>
     /// Creates a new <see cref="MainWindow"/> instance and initializes it with all dependencies.
@@ -185,31 +213,59 @@ public sealed class MainWindowFactory(
     /// </exception>
     public MainWindow Create()
     {
+        // Load ALL settings BEFORE creating window (using async-over-sync pattern)
+        // This ensures all ViewModel properties have correct values when XAML bindings activate
+        var guiSettings = Task.Run(async () => await _guiSettingsService.LoadAsync()).Result;
+
+        // Apply settings to ViewModel
+        GuiSettingsService.ApplyToViewModel(_viewModel, guiSettings);
+
+        // Restore drive state from master settings file
+        // This loads disk images into drives based on saved state
+        _driveStateService.RestoreDriveState(guiSettings.DriveState);
+
         var window = new MainWindow();
-        window.Initialize(_viewModel, _machine, _refreshTicker);
-        
+        window.Initialize(_viewModel, _machine, _refreshTicker, _driveStateService, _guiSettingsService);
+
         // Restore window position/size BEFORE showing (Windows 11 best practice)
         // This gives Windows 11 less opportunity to override our saved position
-        var settings = WindowSettingsHelper.Load();
-        
-        // For maximized windows: set position/size first (as restore bounds), THEN maximize in OnOpened
-        // For normal windows: just set position/size normally
-        if (settings != null && settings.IsMaximized)
+        if (guiSettings.Window != null)
         {
-            // Set the normal bounds - these become "restore bounds" for when user un-maximizes
-            window.Position = new Avalonia.PixelPoint(settings.Left, settings.Top);
-            window.Width = settings.Width;
-            window.Height = settings.Height;
-            // Don't set WindowState here - let OnOpened do it after window is shown
-            // Store a flag so OnOpened knows to maximize
-            window.Tag = "ShouldMaximize";
+            var isMaximized = guiSettings.Window.IsMaximized ?? false;
+
+            // For maximized windows: set position/size first (as restore bounds), THEN maximize in OnOpened
+            // For normal windows: just set position/size normally
+            if (isMaximized)
+            {
+                // Set the normal bounds - these become "restore bounds" for when user un-maximizes
+                if (guiSettings.Window.Left.HasValue && guiSettings.Window.Top.HasValue)
+                {
+                    window.Position = new Avalonia.PixelPoint(guiSettings.Window.Left.Value, guiSettings.Window.Top.Value);
+                }
+
+                if (guiSettings.Window.Width.HasValue && guiSettings.Window.Height.HasValue)
+                {
+                    window.Width = guiSettings.Window.Width.Value;
+                    window.Height = guiSettings.Window.Height.Value;
+                }
+
+                // Don't set WindowState here - let OnOpened do it after window is shown
+                // Store a flag so OnOpened knows to maximize
+                window.Tag = "ShouldMaximize";
+            }
+            else
+            {
+                // Normal (non-maximized) restore - use WindowSettingsHelper for validation
+                WindowSettingsHelper.Restore(window, guiSettings.Window);
+            }
         }
         else
         {
-            // Normal (non-maximized) restore
-            WindowSettingsHelper.Restore(window, settings);
+            // No saved window settings - use defaults (centered)
+            WindowSettingsHelper.Restore(window, null);
         }
-        
+
         return window;
     }
-}
+
+    }

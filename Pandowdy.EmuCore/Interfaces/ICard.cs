@@ -315,6 +315,32 @@ public interface ICard : IConfigurable
     /// </remarks>
     public void Reset();
 
+    /// <summary>
+    /// Handles a message sent to this card.
+    /// </summary>
+    /// <param name="message">The message to process.</param>
+    /// <exception cref="Exceptions.CardMessageException">
+    /// Thrown if the message is not recognized or cannot be processed.
+    /// </exception>
+    /// <remarks>
+    /// <para>
+    /// <strong>Required Messages:</strong> All cards must handle <see cref="Messages.IdentifyCardMessage"/>
+    /// by emitting a <see cref="Messages.CardIdentityPayload"/> response via <see cref="ICardResponseEmitter"/>.
+    /// This includes NullCard (empty slots), which responds with CardId=0 and CardName="Empty Slot".
+    /// </para>
+    /// <para>
+    /// <strong>Thread Context:</strong> Always called on the emulator thread at an
+    /// instruction boundary. Implementations do not need to worry about thread safety
+    /// relative to other emulator operations.
+    /// </para>
+    /// <para>
+    /// <strong>Unrecognized Messages:</strong> Cards should throw <see cref="Exceptions.CardMessageException"/>
+    /// for messages they don't recognize. However, during broadcast operations (slot=null),
+    /// these exceptions are caught and ignored.
+    /// </para>
+    /// </remarks>
+    void HandleMessage(ICardMessage message);
+
 }
 
 

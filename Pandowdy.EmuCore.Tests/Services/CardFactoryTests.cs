@@ -3,6 +3,7 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Messages;
 using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Tests.Services;
@@ -13,6 +14,16 @@ namespace Pandowdy.EmuCore.Tests.Services;
 public class CardFactoryTests
 {
     #region Helper Classes
+
+    /// <summary>
+    /// Mock ICardResponseEmitter for testing.
+    /// </summary>
+    private class MockCardResponseEmitter : ICardResponseEmitter
+    {
+        public void Emit(SlotNumber slot, int cardId, ICardResponsePayload payload) { }
+    }
+
+    private static readonly ICardResponseEmitter MockEmitter = new MockCardResponseEmitter();
 
     /// <summary>
     /// Mock card for testing with configurable properties.
@@ -35,6 +46,7 @@ public class CardFactoryTests
         public bool ApplyMetadata(string metadata) => true;
         public void OnInstalled(SlotNumber slot) { Slot = slot; }
         public void Reset() { }
+        public void HandleMessage(ICardMessage message) { }
     }
 
     #endregion
@@ -53,7 +65,7 @@ public class CardFactoryTests
     public void Constructor_WithEmptyList_Succeeds()
     {
         // Arrange & Act
-        var factory = new CardFactory(Array.Empty<ICard>());
+        var factory = new CardFactory([]);
 
         // Assert
         Assert.NotNull(factory);
@@ -136,7 +148,7 @@ public class CardFactoryTests
     {
         // Arrange
         var originalCard = new MockCard { Id = 5, Name = "Test Card" };
-        var factory = new CardFactory(new ICard[] { originalCard });
+        var factory = new CardFactory([originalCard]);
 
         // Act
         var clonedCard = factory.GetCardWithId(5);
@@ -152,7 +164,7 @@ public class CardFactoryTests
     public void GetCardWithId_WithInvalidId_ReturnsNull()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new MockCard { Id = 1, Name = "Card 1" } });
+        var factory = new CardFactory([new MockCard { Id = 1, Name = "Card 1" }]);
 
         // Act
         var card = factory.GetCardWithId(999);
@@ -165,7 +177,7 @@ public class CardFactoryTests
     public void GetCardWithId_MultipleCallsWithSameId_ReturnsIndependentClones()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new MockCard { Id = 3, Name = "Card 3" } });
+        var factory = new CardFactory([new MockCard { Id = 3, Name = "Card 3" }]);
 
         // Act
         var card1 = factory.GetCardWithId(3);
@@ -183,7 +195,7 @@ public class CardFactoryTests
     public void GetCardWithId_WithNullCard_ReturnsClonedNullCard()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new NullCard() });
+        var factory = new CardFactory([new NullCard(MockEmitter)]);
 
         // Act
         var card = factory.GetCardWithId(0);
@@ -203,7 +215,7 @@ public class CardFactoryTests
     {
         // Arrange
         var originalCard = new MockCard { Id = 10, Name = "SuperSerial Card" };
-        var factory = new CardFactory(new ICard[] { originalCard });
+        var factory = new CardFactory([originalCard]);
 
         // Act
         var clonedCard = factory.GetCardWithName("SuperSerial Card");
@@ -219,7 +231,7 @@ public class CardFactoryTests
     public void GetCardWithName_WithInvalidName_ReturnsNull()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new MockCard { Id = 1, Name = "Card 1" } });
+        var factory = new CardFactory([new MockCard { Id = 1, Name = "Card 1" }]);
 
         // Act
         var card = factory.GetCardWithName("Nonexistent Card");
@@ -232,7 +244,7 @@ public class CardFactoryTests
     public void GetCardWithName_IsCaseSensitive()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new MockCard { Id = 1, Name = "Disk II" } });
+        var factory = new CardFactory([new MockCard { Id = 1, Name = "Disk II" }]);
 
         // Act
         var exactMatch = factory.GetCardWithName("Disk II");
@@ -247,7 +259,7 @@ public class CardFactoryTests
     public void GetCardWithName_MultipleCallsWithSameName_ReturnsIndependentClones()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new MockCard { Id = 7, Name = "Test Card" } });
+        var factory = new CardFactory([new MockCard { Id = 7, Name = "Test Card" }]);
 
         // Act
         var card1 = factory.GetCardWithName("Test Card");
@@ -263,7 +275,7 @@ public class CardFactoryTests
     public void GetCardWithName_WithNullOrEmptyName_ReturnsNull()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new MockCard { Id = 1, Name = "Card 1" } });
+        var factory = new CardFactory([new MockCard { Id = 1, Name = "Card 1" }]);
 
         // Act
         var nullResult = factory.GetCardWithName(null!);
@@ -282,7 +294,7 @@ public class CardFactoryTests
     public void GetNullCard_WithNullCardRegistered_ReturnsNullCard()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new NullCard() });
+        var factory = new CardFactory([new NullCard(MockEmitter)]);
 
         // Act
         var card = factory.GetNullCard();
@@ -297,7 +309,7 @@ public class CardFactoryTests
     public void GetNullCard_WithoutNullCardRegistered_ReturnsNull()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new MockCard { Id = 1, Name = "Card 1" } });
+        var factory = new CardFactory([new MockCard { Id = 1, Name = "Card 1" }]);
 
         // Act
         var card = factory.GetNullCard();
@@ -310,7 +322,7 @@ public class CardFactoryTests
     public void GetNullCard_MultipleCallsWithNullCardRegistered_ReturnsIndependentClones()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new NullCard() });
+        var factory = new CardFactory([new NullCard(MockEmitter)]);
 
         // Act
         var card1 = factory.GetNullCard();
@@ -354,7 +366,7 @@ public class CardFactoryTests
     public void GetAllCardTypes_WithEmptyFactory_ReturnsEmptyList()
     {
         // Arrange
-        var factory = new CardFactory(Array.Empty<ICard>());
+        var factory = new CardFactory([]);
 
         // Act
         var cardTypes = factory.GetAllCardTypes();
@@ -368,7 +380,7 @@ public class CardFactoryTests
     public void GetAllCardTypes_WithSingleCard_ReturnsSingleItemList()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new MockCard { Id = 5, Name = "Solo Card" } });
+        var factory = new CardFactory([new MockCard { Id = 5, Name = "Solo Card" }]);
 
         // Act
         var cardTypes = factory.GetAllCardTypes();
@@ -385,7 +397,7 @@ public class CardFactoryTests
         // Arrange
         var cards = new ICard[]
         {
-            new NullCard(),
+            new NullCard(MockEmitter),
             new MockCard { Id = 1, Name = "Disk II" }
         };
         var factory = new CardFactory(cards);
@@ -409,7 +421,7 @@ public class CardFactoryTests
         // Arrange
         var cards = new ICard[]
         {
-            new NullCard(),
+            new NullCard(MockEmitter),
             new MockCard { Id = 1, Name = "Disk II 13-Sector" },
             new MockCard { Id = 2, Name = "Disk II 16-Sector" },
             new MockCard { Id = 3, Name = "80-Column Card" }
@@ -464,7 +476,7 @@ public class CardFactoryTests
     public void EdgeCase_GetCardWithId_WithZeroId_ReturnsNullCardIfRegistered()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new NullCard() });
+        var factory = new CardFactory([new NullCard(MockEmitter)]);
 
         // Act
         var card = factory.GetCardWithId(0);
@@ -478,7 +490,7 @@ public class CardFactoryTests
     public void EdgeCase_GetCardWithId_WithNegativeId_ReturnsNull()
     {
         // Arrange
-        var factory = new CardFactory(new ICard[] { new MockCard { Id = 1, Name = "Card 1" } });
+        var factory = new CardFactory([new MockCard { Id = 1, Name = "Card 1" }]);
 
         // Act
         var card = factory.GetCardWithId(-1);

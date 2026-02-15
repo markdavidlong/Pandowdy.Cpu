@@ -3,6 +3,7 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Messages;
 using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.EmuCore.Tests.Services;
@@ -62,9 +63,9 @@ public class MemoryInspectorTests
         public byte Read(ushort address) => _fillValue;
         public byte Peek(ushort address) => _fillValue;
         public void Write(ushort address, byte val) { }
-        public string GetMetadata() => string.Empty;
-        public bool ApplyMetadata(string metadata) => true;
-        public void Reset() { }
+        public static string GetMetadata() => string.Empty;
+        public static bool ApplyMetadata(string _) => true;
+        public static void Reset() { }
     }
 
     private class MockCard(int id, string name, byte romFill = 0x00, byte extRomFill = 0x00) : ICard
@@ -87,6 +88,7 @@ public class MemoryInspectorTests
         public string GetMetadata() => string.Empty;
         public bool ApplyMetadata(string metadata) => true;
         public void Reset() { }
+        public void HandleMessage(ICardMessage message) { }
         public ICard Clone() => new MockCard(Id, Name, _romFill, _extRomFill);
     }
 

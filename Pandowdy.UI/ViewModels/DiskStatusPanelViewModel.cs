@@ -6,7 +6,9 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive.Linq;
+using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.UI.Interfaces;
 using ReactiveUI;
 
 namespace Pandowdy.UI.ViewModels;
@@ -16,42 +18,78 @@ namespace Pandowdy.UI.ViewModels;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>Observable Collection:</strong> Manages an <see cref="ObservableCollection{T}"/>
-/// of <see cref="DiskStatusWidgetViewModel"/> instances, one per drive in the system.
+/// <strong>Card-Level Grouping:</strong> Manages an <see cref="ObservableCollection{T}"/>
+/// of <see cref="DiskCardPanelViewModel"/> instances, one per disk controller card.
+/// Each card panel contains 1-2 drive widgets.
 /// </para>
 /// <para>
 /// <strong>Auto-Update:</strong> Subscribes to <see cref="IDiskStatusProvider.Stream"/>
 /// and automatically updates widget ViewModels when drive state changes.
 /// </para>
 /// <para>
-/// <strong>Ordering:</strong> Widgets are ordered by slot (1-7), then drive (1-2),
-/// matching the physical layout of an Apple IIe.
+/// <strong>Ordering:</strong> Card panels are ordered by slot (1-7), and drives within
+/// each card are ordered by drive number (1-2), matching the physical layout of an Apple IIe.
 /// </para>
 /// </remarks>
 public class DiskStatusPanelViewModel : ReactiveObject
 {
     private readonly IDiskStatusProvider _statusProvider;
+    private readonly IEmulatorCoreInterface _emulator;
+    private readonly IDiskFileDialogService _fileDialogService;
+    private readonly IMessageBoxService _messageBoxService;
 
     /// <summary>
-    /// Gets the collection of disk status widgets (14 drives: 7 slots Ã— 2 drives).
+    /// Gets the collection of disk card panels, grouped by expansion slot.
     /// </summary>
-    public ObservableCollection<DiskStatusWidgetViewModel> Drives { get; }
+    public ObservableCollection<DiskCardPanelViewModel> Cards { get; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DiskStatusPanelViewModel"/> class.
     /// </summary>
+    /// <param name="emulator">Emulator core interface for sending card messages.</param>
     /// <param name="statusProvider">Status provider for observing drive state changes.</param>
-    public DiskStatusPanelViewModel(IDiskStatusProvider statusProvider)
+    /// <param name="fileDialogService">Service for displaying file picker dialogs.</param>
+    /// <param name="messageBoxService">Service for displaying error and confirmation dialogs.</param>
+    public DiskStatusPanelViewModel(
+        IEmulatorCoreInterface emulator,
+        IDiskStatusProvider statusProvider,
+        IDiskFileDialogService fileDialogService,
+        IMessageBoxService messageBoxService)
     {
+        _emulator = emulator;
         _statusProvider = statusProvider;
+        _fileDialogService = fileDialogService;
+        _messageBoxService = messageBoxService;
 
-        // Initialize widgets for all 14 drives (7 slots Ã— 2 drives)
-        Drives = new ObservableCollection<DiskStatusWidgetViewModel>();
+        // Initialize card panels grouped by slot
+        Cards = [];
 
         var initialSnapshot = _statusProvider.Current;
-        foreach (var driveSnapshot in initialSnapshot.Drives.OrderBy(d => d.SlotNumber).ThenBy(d => d.DriveNumber))
+        var drivesBySlot = initialSnapshot.Drives
+            .OrderBy(d => d.SlotNumber)
+            .ThenBy(d => d.DriveNumber)
+            .GroupBy(d => d.SlotNumber);
+
+        foreach (var slotGroup in drivesBySlot)
         {
-            Drives.Add(new DiskStatusWidgetViewModel(driveSnapshot));
+            var slotNumber = (SlotNumber)slotGroup.Key;
+            var drives = new ObservableCollection<DiskStatusWidgetViewModel>();
+
+            foreach (var driveSnapshot in slotGroup)
+            {
+                drives.Add(new DiskStatusWidgetViewModel(_emulator, _fileDialogService, _messageBoxService, driveSnapshot));
+            }
+
+            // TODO: Card name should come from card identification (Phase 3B)
+            // For now, hardcode "Disk II Controller" for slots with drives
+            var cardPanel = new DiskCardPanelViewModel(
+                _emulator,
+                _messageBoxService,
+                slotNumber,
+                "Disk II Controller",
+                drives);
+
+            Cards.Add(cardPanel);
         }
 
         // Subscribe to status updates
@@ -66,9 +104,12 @@ public class DiskStatusPanelViewModel : ReactiveObject
     private void UpdateDrives(DiskStatusSnapshot snapshot)
     {
         // Update each widget with its corresponding drive snapshot
-        for (int i = 0; i < snapshot.Drives.Length && i < Drives.Count; i++)
+        // Flatten the card panels to get all drive widgets
+        var allDrives = Cards.SelectMany(card => card.Drives).ToList();
+
+        for (int i = 0; i < snapshot.Drives.Length && i < allDrives.Count; i++)
         {
-            Drives[i].UpdateSnapshot(snapshot.Drives[i]);
+            allDrives[i].UpdateSnapshot(snapshot.Drives[i]);
         }
     }
 }

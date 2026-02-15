@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+/*
 using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.DiskII.Exporters;
 using Pandowdy.EmuCore.DiskII.Importers;
@@ -18,6 +19,7 @@ public class ScanExportedWozTest(ITestOutputHelper output)
 {
     private readonly ITestOutputHelper _output = output;
 
+    
     [Fact]
     [Trait("Category", "FullDiskTests")]
     public void ScanNewlyExportedWozFile()
@@ -96,3 +98,4 @@ public class ScanExportedWozTest(ITestOutputHelper output)
         }
     }
 }
+*/

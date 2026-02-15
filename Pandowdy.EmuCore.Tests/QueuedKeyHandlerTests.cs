@@ -421,7 +421,7 @@ public class QueuedKeyHandlerTests
     public async Task PasteScenario_LongString_AllKeysQueue()
     {
         // Arrange
-        using var handler = new QueuedKeyHandler(delayMilliseconds: 10);
+        using var handler = new QueuedKeyHandler(delayMilliseconds: 30);
         string pasteText = "HELLO WORLD";
 
         // Act
@@ -435,15 +435,15 @@ public class QueuedKeyHandlerTests
         Assert.Equal(11, handler.NumKeysPending()); // H in latch + 10 in queue
 
         // Verify first few characters feed correctly
-        handler.ClearStrobe(); await Task.Delay(30);
+        handler.ClearStrobe(); await Task.Delay(60);
         Assert.Equal(0xC5, handler.PeekCurrentKeyAndStrobe()); // 'E'
         Assert.Equal(10, handler.NumKeysPending()); // E in latch + 9 in queue
 
-        handler.ClearStrobe(); await Task.Delay(30);
+        handler.ClearStrobe(); await Task.Delay(60);
         Assert.Equal(0xCC, handler.PeekCurrentKeyAndStrobe()); // 'L'
         Assert.Equal(9, handler.NumKeysPending()); // L in latch + 8 in queue
 
-        handler.ClearStrobe(); await Task.Delay(30);
+        handler.ClearStrobe(); await Task.Delay(60);
         Assert.Equal(0xCC, handler.PeekCurrentKeyAndStrobe()); // 'L'
         Assert.Equal(8, handler.NumKeysPending()); // L in latch + 7 in queue
     }

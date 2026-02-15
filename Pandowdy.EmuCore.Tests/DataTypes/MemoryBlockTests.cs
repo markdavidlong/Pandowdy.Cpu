@@ -423,7 +423,7 @@ public class MemoryBlockTests
     {
         // Arrange
         var memory = new MemoryBlock(0x10000); // Need full 64KB for these addresses
-        byte[] sourceData = { 0x01, 0x02, 0x03, 0x04, 0x05 };
+        byte[] sourceData = [0x01, 0x02, 0x03, 0x04, 0x05];
         ushort sourceAddress = 0x0100;
         ushort destAddress = 0x0200;
 

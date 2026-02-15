@@ -8,15 +8,32 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Pandowdy.UI.ViewModels"
              x:Class="Pandowdy.UI.Controls.DiskStatusWidget"
-             x:DataType="vm:DiskStatusWidgetViewModel">
+             x:DataType="vm:DiskStatusWidgetViewModel"
+             DragDrop.AllowDrop="True">
 
     <Border BorderBrush="#D4C5A9" 
             BorderThickness="2" 
             Background="#202020"
             CornerRadius="4"
             Padding="8"
-            Margin="0,0,0,4">
-        
+            Margin="0,0,0,4"
+            x:Name="RootBorder">
+
+        <!-- Context Menu -->
+        <Border.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="Insert Disk..." Command="{Binding InsertDiskCommand}" />
+                <MenuItem Header="Insert Blank Disk" Command="{Binding InsertBlankDiskCommand}" />
+                <MenuItem Header="Eject Disk" Command="{Binding EjectDiskCommand}" />
+                <Separator />
+                <MenuItem Header="Save" Command="{Binding SaveCommand}" />
+                <MenuItem Header="Save As..." Command="{Binding SaveAsCommand}" />
+                <Separator />
+                <MenuItem Header="Write Protect" 
+                          Command="{Binding ToggleWriteProtectCommand}" />
+            </ContextMenu>
+        </Border.ContextMenu>
+
         <StackPanel Spacing="4">
             <TextBlock Text="{Binding DiskId}"
                        FontSize="16"
@@ -24,13 +41,23 @@
                        Foreground="#00FF00"
                        HorizontalAlignment="Center" />
 
-            <TextBlock Text="{Binding Filename}"
-                       FontSize="14"
-                       Foreground="{Binding FilenameForeground}"
-                       HorizontalAlignment="Center"
-                       TextTrimming="CharacterEllipsis"
-                       MaxWidth="150"
-                       ToolTip.Tip="{Binding DiskImagePathTooltip}" />
+            <!-- Filename with dirty indicator -->
+            <StackPanel Orientation="Horizontal" 
+                        HorizontalAlignment="Center"
+                        Spacing="4">
+                <TextBlock Text="{Binding Filename}"
+                           FontSize="14"
+                           Foreground="{Binding FilenameForeground}"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="130"
+                           ToolTip.Tip="{Binding DiskImagePathTooltip}" />
+
+                <!-- Dirty indicator (✏️) - visible only when disk is dirty -->
+                <TextBlock Text="✏️"
+                           FontSize="14"
+                           IsVisible="{Binding IsDirty}"
+                           ToolTip.Tip="Disk has unsaved changes" />
+            </StackPanel>
 
             <TextBlock Text="{Binding TrackSectorText}"
                        FontSize="14"

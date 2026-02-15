@@ -11,13 +11,27 @@ namespace Pandowdy.EmuCore.Tests;
 /// </summary>
 public class NullCardTests
 {
+    #region Test Helpers
+
+    /// <summary>
+    /// Mock ICardResponseEmitter for testing - ignores all emitted responses.
+    /// </summary>
+    private class MockCardResponseEmitter : ICardResponseEmitter
+    {
+        public void Emit(SlotNumber slot, int cardId, ICardResponsePayload payload) { }
+    }
+
+    private static readonly ICardResponseEmitter MockEmitter = new MockCardResponseEmitter();
+
+    #endregion
+
     #region Constructor and Properties
 
     [Fact]
     public void Constructor_CreatesInstanceWithCorrectProperties()
     {
         // Act
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Assert
         Assert.Equal(0, card.Id);
@@ -34,7 +48,7 @@ public class NullCardTests
     public void ReadIO_ReturnsNull()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act
         var result = card.ReadIO(0x50);
@@ -50,7 +64,7 @@ public class NullCardTests
     public void ReadIO_WithVariousOffsets_AlwaysReturnsNull(byte offset)
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act
         var result = card.ReadIO(offset);
@@ -63,7 +77,7 @@ public class NullCardTests
     public void ReadRom_ReturnsNull()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act
         var result = card.ReadRom(0x80);
@@ -79,7 +93,7 @@ public class NullCardTests
     public void ReadRom_WithVariousOffsets_AlwaysReturnsNull(byte offset)
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act
         var result = card.ReadRom(offset);
@@ -92,7 +106,7 @@ public class NullCardTests
     public void ReadExtendedRom_ReturnsNull()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act
         var result = card.ReadExtendedRom(0x0400);
@@ -108,7 +122,7 @@ public class NullCardTests
     public void ReadExtendedRom_WithVariousOffsets_AlwaysReturnsNull(ushort offset)
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act
         var result = card.ReadExtendedRom(offset);
@@ -125,7 +139,7 @@ public class NullCardTests
     public void WriteIO_DoesNotThrowException()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act & Assert (should not throw)
         card.WriteIO(0x50, 0xAA);
@@ -138,7 +152,7 @@ public class NullCardTests
     public void WriteIO_WithVariousValues_DoesNotThrowException(byte offset, byte value)
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act & Assert (should not throw)
         card.WriteIO(offset, value);
@@ -148,7 +162,7 @@ public class NullCardTests
     public void WriteRom_DoesNotThrowException()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act & Assert (should not throw)
         card.WriteRom(0x80, 0xBB);
@@ -161,7 +175,7 @@ public class NullCardTests
     public void WriteRom_WithVariousValues_DoesNotThrowException(byte offset, byte value)
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act & Assert (should not throw)
         card.WriteRom(offset, value);
@@ -171,7 +185,7 @@ public class NullCardTests
     public void WriteExtendedRom_DoesNotThrowException()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act & Assert (should not throw)
         card.WriteExtendedRom(0x0400, 0xCC);
@@ -184,7 +198,7 @@ public class NullCardTests
     public void WriteExtendedRom_WithVariousValues_DoesNotThrowException(ushort offset, byte value)
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act & Assert (should not throw)
         card.WriteExtendedRom(offset, value);
@@ -198,7 +212,7 @@ public class NullCardTests
     public void Clone_CreatesNewInstance()
     {
         // Arrange
-        var original = new NullCard();
+        var original = new NullCard(MockEmitter);
 
         // Act
         var clone = original.Clone();
@@ -213,7 +227,7 @@ public class NullCardTests
     public void Clone_CreatesInstanceWithSameProperties()
     {
         // Arrange
-        var original = new NullCard();
+        var original = new NullCard(MockEmitter);
 
         // Act
         var clone = original.Clone();
@@ -232,7 +246,7 @@ public class NullCardTests
     public void GetMetadata_ReturnsEmptyString()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act
         var metadata = card.GetMetadata();
@@ -246,7 +260,7 @@ public class NullCardTests
     public void ApplyMetadata_AlwaysReturnsTrue()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act
         var result = card.ApplyMetadata("some metadata");
@@ -263,7 +277,7 @@ public class NullCardTests
     public void ApplyMetadata_WithVariousInputs_AlwaysReturnsTrue(string? metadata)
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act
         var result = card.ApplyMetadata(metadata);
@@ -280,7 +294,7 @@ public class NullCardTests
     public void OnInstalled_SetsSlotNumber()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
         Assert.Equal(SlotNumber.Unslotted, card.Slot);
 
         // Act
@@ -301,7 +315,7 @@ public class NullCardTests
     public void OnInstalled_WithAllSlots_SetsSlotNumberCorrectly(SlotNumber slot)
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act
         card.OnInstalled(slot);
@@ -314,7 +328,7 @@ public class NullCardTests
     public void OnInstalled_MultipleCallsWithDifferentSlots_UpdatesSlot()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act & Assert
         card.OnInstalled(SlotNumber.Slot1);
@@ -335,7 +349,7 @@ public class NullCardTests
     public void Reset_DoesNotThrowException()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act & Assert (should not throw)
         card.Reset();
@@ -345,7 +359,7 @@ public class NullCardTests
     public void Reset_DoesNotChangeSlotNumber()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
         card.OnInstalled(SlotNumber.Slot5);
 
         // Act
@@ -363,7 +377,7 @@ public class NullCardTests
     public void Integration_FullLifecycle_InstallReadWriteReset()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
 
         // Act - Install
         card.OnInstalled(SlotNumber.Slot2);
@@ -392,7 +406,7 @@ public class NullCardTests
     public void Integration_CloneLifecycle_IndependentInstances()
     {
         // Arrange
-        var original = new NullCard();
+        var original = new NullCard(MockEmitter);
         original.OnInstalled(SlotNumber.Slot3);
 
         // Act
@@ -414,7 +428,7 @@ public class NullCardTests
     public void EdgeCase_MultipleReadsAndWrites_NeverChangeState()
     {
         // Arrange
-        var card = new NullCard();
+        var card = new NullCard(MockEmitter);
         card.OnInstalled(SlotNumber.Slot4);
 
         // Act - Perform many operations

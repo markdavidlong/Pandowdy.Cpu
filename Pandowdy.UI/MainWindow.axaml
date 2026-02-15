@@ -15,10 +15,9 @@
 		mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="480"
 		x:Class="Pandowdy.UI.MainWindow"
 		Title="Pandowdy"
-		Width="800" Height="600"
 		MinWidth="800" MinHeight="600"
-				WindowStartupLocation="Manual"
-				Icon="assets/ico/pandowdy.ico"
+		WindowStartupLocation="Manual"
+		Icon="assets/ico/pandowdy.ico"
 		KeyDown="OnMainWindowKeyDown">
 	<DockPanel>
 		<Menu x:Name="MainMenu" DockPanel.Dock="Top" DataContext="{Binding}">
@@ -30,12 +29,23 @@
 				<MenuItem Header="_Paste" Click="OnPasteClicked" InputGesture="Ctrl+Shift+V" />
 			</MenuItem>
 
+			<MenuItem Header="_Peripherals">
+				<MenuItem Header="_Disks" ItemsSource="{Binding PeripheralsMenu.DiskMenuItems}">
+					<MenuItem.Styles>
+						<Style Selector="MenuItem">
+							<Setter Property="Header" Value="{Binding Header}" />
+							<Setter Property="ItemsSource" Value="{Binding Drives}" />
+						</Style>
+					</MenuItem.Styles>
+				</MenuItem>
+			</MenuItem>
+
 			<MenuItem Header="_View">
 
 				<MenuItem x:Name="ScanLinesMenuItem" Header="_Scan Lines" ToggleType="CheckBox" IsChecked="{Binding ShowScanLines}" Command="{Binding ToggleScanLines}" InputGesture="Ctrl+Alt+S" />
 				<MenuItem x:Name="MonochromeMenuItem" Header="_Monochrome" ToggleType="CheckBox" IsChecked="{Binding ForceMonochrome}" Command="{Binding ToggleMonochrome}" InputGesture="Ctrl+Alt+M" />
 				<MenuItem x:Name="MonoMixedMenuItem" Header="_Monochrome Mixed Text" ToggleType="CheckBox" IsChecked="{Binding MonoMixed}" Command="{Binding ToggleMonoMixed}" InputGesture="Ctrl+Alt+X" />
-				<MenuItem x:Name="DecreaseContrastMenuItem" Header="_Decrease Color Fringing" ToggleType="CheckBox" IsChecked="{Binding DecreaseContrast}" Command="{Binding ToggleDecreaseContrast}" InputGesture="Ctrl+Alt+D"/>
+				<MenuItem x:Name="DecreaseFringingMenuItem" Header="_Decrease Color Fringing" ToggleType="CheckBox" IsChecked="{Binding DecreaseFringing}" Command="{Binding ToggleDecreaseFringing}" InputGesture="Ctrl+Alt+D"/>
 				<Separator/>
 				<MenuItem x:Name="ShowSoftSwitchStatusMenuItem" Header="Show SoftS_witch Status" ToggleType="CheckBox" IsChecked="{Binding ShowSoftSwitchStatus}" Command="{Binding ToggleSoftSwitchStatus}" InputGesture="Ctrl+Alt+W"/>
 				<MenuItem x:Name="ShowDiskStatusMenuItem" Header="Show _Disk Status" ToggleType="CheckBox" IsChecked="{Binding ShowDiskStatus}" Command="{Binding ToggleDiskStatus}" InputGesture="Ctrl+Alt+K"/>
@@ -54,45 +64,79 @@
 		</Menu>
 
 		<!-- Status bar (bottom, full-width) -->
-		<controls:StatusBar x:Name="StatusBar"
-							DockPanel.Dock="Bottom"
-							DataContext="{Binding StatusBar}" />
+			<controls:StatusBar x:Name="StatusBar"
+								DockPanel.Dock="Bottom"
+								DataContext="{Binding StatusBar}" />
 
-		<!-- Right-side status panel (SoftSwitch) -->
-		<local:SoftSwitchStatusPanel x:Name="SoftSwitchStatusPanel" 
-									 DockPanel.Dock="Right"
-									 DataContext="{Binding SystemStatus}" />
+			<!-- Main content area with Grid layout for resizable panels -->
+				<Grid x:Name="MainGrid">
+					<Grid.ColumnDefinitions>
+						<!-- Column 0: Main display area (takes remaining space) -->
+						<ColumnDefinition Width="*" />
+						<!-- Column 1: GridSplitter for disk panel resize -->
+						<ColumnDefinition Width="Auto" />
+						<!-- Column 2: Disk status panel (resizable, minimum 200px for card visibility) -->
+						<ColumnDefinition Width="{Binding EffectiveDiskPanelWidth, Mode=TwoWay}" MinWidth="200" MaxWidth="400" />
+						<!-- Column 3: GridSplitter for soft switch panel -->
+						<ColumnDefinition Width="Auto" />
+						<!-- Column 4: Soft switch status panel (fixed width) -->
+						<ColumnDefinition Width="Auto" />
+					</Grid.ColumnDefinitions>
 
-		<!-- Disk status panel (between display and soft switch panel) -->
-		<controls:DiskStatusPanel x:Name="DiskStatusPanel"
-									DockPanel.Dock="Right"
-									DataContext="{Binding DiskStatus}" />
+				<!-- Apple2Display in column 0 -->
+				<Border Grid.Column="0"
+						Background="#D4C5A9" 
+						Padding="16"
+						CornerRadius="6"
+						HorizontalAlignment="Stretch"
+						VerticalAlignment="Stretch">
+					<Border Background="#222" 
+							Padding="24"
+							CornerRadius="6"
+							HorizontalAlignment="Stretch"
+							VerticalAlignment="Stretch">
+						<Border Background="#000" 
+								Padding="10"
+								CornerRadius="6"
+								HorizontalAlignment="Stretch"
+								VerticalAlignment="Stretch">
+							<local:Apple2Display x:Name="ScreenDisplay"  
+												 HorizontalAlignment="Center"
+												 VerticalAlignment="Center" />
+						</Border>
+					</Border>
+				</Border>
 
-		<!-- Apple2Display centered with black background, padding, margin, and rounded corners -->
-<Border Background="#D4C5A9" 
-        Padding="16"
-        CornerRadius="6"
-        HorizontalAlignment="Stretch"
-        VerticalAlignment="Stretch">
-    <Border Background="#222" 
-            Padding="24"
-            CornerRadius="6"
-            HorizontalAlignment="Stretch"
-            VerticalAlignment="Stretch">
-        <Border Background="#000" 
-                Padding="10"
-                CornerRadius="6"
-                HorizontalAlignment="Stretch"
-                VerticalAlignment="Stretch">
-            <local:Apple2Display x:Name="ScreenDisplay"  
-                                 HorizontalAlignment="Center"
-                                 VerticalAlignment="Center" 
-                              />
-        </Border>
-    </Border>
-</Border>
+				<!-- GridSplitter for disk panel in column 1 -->
+				<GridSplitter Grid.Column="1"
+								Width="4"
+								Background="#404040"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Stretch"
+								IsVisible="{Binding ShowDiskStatus}" />
 
-	</DockPanel>
+				<!-- Disk status panel in column 2 -->
+				<controls:DiskStatusPanel Grid.Column="2"
+											x:Name="DiskStatusPanel"
+											DataContext="{Binding DiskStatus}"
+											IsVisible="{Binding ShowDiskStatus}" />
+
+				<!-- GridSplitter for soft switch panel in column 3 -->
+				<GridSplitter Grid.Column="3"
+								Width="4"
+								Background="#404040"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Stretch"
+								IsVisible="{Binding ShowSoftSwitchStatus}" />
+
+				<!-- Soft switch status panel in column 4 -->
+				<local:SoftSwitchStatusPanel Grid.Column="4"
+											 x:Name="SoftSwitchStatusPanel" 
+											 DataContext="{Binding SystemStatus}"
+											 IsVisible="{Binding ShowSoftSwitchStatus}" />
+			</Grid>
+
+		</DockPanel>
 
 	<Window.Styles>
 		<!-- styles omitted -->

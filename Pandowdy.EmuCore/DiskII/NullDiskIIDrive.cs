@@ -137,4 +137,28 @@ public class NullDiskIIDrive(string name = "NullDrive") : IDiskIIDrive
     /// <inheritdoc />
     /// <returns>Always returns false since no disk is ever present.</returns>
     public bool HasDisk => false;
+
+    /// <inheritdoc />
+    /// <returns>Always returns null since no disk is ever present.</returns>
+    public string? CurrentDiskPath => null;
+
+    /// <summary>
+    /// Gets or sets the internal disk image provider.
+    /// </summary>
+    /// <remarks>
+    /// Null drive never has a provider. Setting this property is a no-op.
+    /// </remarks>
+    public IDiskImageProvider? ImageProvider
+    {
+        get => null;
+        set { /* No-op: null drive never has a provider */ }
+    }
+
+    /// <summary>
+    /// Gets the internal disk image.
+    /// </summary>
+    /// <remarks>
+    /// Null drive never has an internal image.
+    /// </remarks>
+    public InternalDiskImage? InternalImage => null;
 }

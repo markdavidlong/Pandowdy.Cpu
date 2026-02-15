@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Pandowdy.Cpu;
 using Pandowdy.UI;
 using Pandowdy.UI.Interfaces;
+using Pandowdy.UI.Services;
 using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.UI.ViewModels;
@@ -72,6 +73,12 @@ namespace Pandowdy
                     services.AddSingleton<DiskStatusProvider>();
                     services.AddSingleton<IDiskStatusProvider>(sp => sp.GetRequiredService<DiskStatusProvider>());
                     services.AddSingleton<IDiskStatusMutator>(sp => sp.GetRequiredService<DiskStatusProvider>());
+
+                    // Card Response Channel - provides response stream and emitter for card messaging
+                    // Single instance shared between cards (emitter) and UI (provider)
+                    services.AddSingleton<CardResponseChannel>();
+                    services.AddSingleton<ICardResponseProvider>(sp => sp.GetRequiredService<CardResponseChannel>());
+                    services.AddSingleton<ICardResponseEmitter>(sp => sp.GetRequiredService<CardResponseChannel>());
 
                     services.AddSingleton<ICardFactory, CardFactory>();
                     services.AddSingleton<ISlots, Slots>();
@@ -163,6 +170,10 @@ namespace Pandowdy
 
                     // UI services
                     services.AddSingleton<IRefreshTicker, AvaloniaRefreshTicker>();
+                    services.AddSingleton<IMessageBoxService, MessageBoxService>();
+                    services.AddSingleton<IDiskFileDialogService, DiskFileDialogService>();
+                    services.AddSingleton<GuiSettingsService>(); // Master GUI settings service
+                    services.AddSingleton<IDriveStateService, DriveStateService>();
 
                     // ViewModels
                     services.AddTransient<EmulatorStateViewModel>();
@@ -170,6 +181,7 @@ namespace Pandowdy
                     services.AddTransient<DiskStatusPanelViewModel>();
                     services.AddTransient<CpuStatusPanelViewModel>();
                     services.AddTransient<StatusBarViewModel>();
+                    services.AddTransient<PeripheralsMenuViewModel>();
                     services.AddTransient<MainWindowViewModel>();
 
                     services.AddSingleton<VA2M>();
@@ -186,43 +198,22 @@ namespace Pandowdy
         }
 
 
-        private static Task InitializeCoreAsync(IServiceProvider services)
+        private static async Task InitializeCoreAsync(IServiceProvider services)
         {
+            System.Diagnostics.Debug.WriteLine("[Program] === Initializing Emulator Core ===");
+
             // Install Disk II controller in slot 6 (standard Apple II configuration)
             var slots = services.GetRequiredService<ISlots>();
             slots.InstallCard(10, SlotNumber.Slot6); // 10 = DiskIIControllerCard16Sector
             slots.InstallCard(10, SlotNumber.Slot5); // 10 = DiskIIControllerCard16Sector
 
-            // Insert a disk into Drive 1 (optional - for testing)
-            if (slots.GetCardIn(SlotNumber.Slot6) is DiskIIControllerCard diskController6)
-            {
-                // Example: Insert a disk image into Drive 1
-                // diskController6.Drives[0].InsertDisk(@"E:\XPS Diagnostic IIe 1.0.5.nib");
-                // diskController6.Drives[0].InsertDisk(@"E:\A2eDiagnostics_v2.1.nib");
-                diskController6.Drives[0].InsertDisk(diskImagePath: @"E:\test.do");
-                // diskController6.Drives[0].InsertDisk(@"E:\missing_ring_good.nib");
-                diskController6.Drives[0].InsertDisk(@"E:\test.woz");
+            System.Diagnostics.Debug.WriteLine("[Program] Disk II controllers installed in slots 5 and 6");
+            System.Diagnostics.Debug.WriteLine("[Program] === Core Initialization Complete ===");
+            System.Diagnostics.Debug.WriteLine("[Program] Note: Disk image restoration deferred to GUI (MainWindow.InitialStartup)");
 
-                // Example: Insert a disk image into Drive 2
-                // diskController6.Drives[1].InsertDisk(@"C:\path\to\data.dsk");
-                diskController6.Drives[1].InsertDisk(@"E:\test.nib");
-            }
-
-            // Insert a disk into Drive 1 (optional - for testing)
-            if (slots.GetCardIn(SlotNumber.Slot5) is DiskIIControllerCard diskController5)
-            {
-                // Example: Insert a disk image into Drive 1
-                // diskController5.Drives[0].InsertDisk(@"E:\XPS Diagnostic IIe 1.0.5.nib");
-               // diskController5.Drives[0].InsertDisk(@"E:\test.nib");
-                diskController5.Drives[0].InsertDisk(@"E:\test.do");
-                
-                // diskController5.Drives[0].InsertDisk(@"E:\A2eDiagnostics_v2.1.nib");
-
-                // Example: Insert a disk image into Drive 2
-                // diskController5.Drives[1].InsertDisk(diskImagePath: @"E:\XPS Diagnostic IIe 1.0.5.nib");
-                diskController5.Drives[1].InsertDisk(@"E:\blank.nib");
-            }
-            return Task.CompletedTask;
+            // Disk image restoration has been moved to MainWindow.InitialStartup()
+            // This ensures the GUI is fully initialized before restoring user state
+            await Task.CompletedTask;
         }
     }
 }

@@ -2,7 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using Pandowdy.EmuCore.Exceptions;
 using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Messages;
 
 namespace Pandowdy.EmuCore;
 
@@ -67,8 +69,13 @@ namespace Pandowdy.EmuCore;
 /// <seealso cref="IConfigurable"/>
 /// <seealso cref="ISlots"/>
 /// <seealso cref="ICardFactory"/>
-public class NullCard : ICard
+/// <remarks>
+/// Initializes a new instance of the <see cref="NullCard"/> class.
+/// </remarks>
+/// <param name="responseEmitter">The card response emitter for sending card responses.</param>
+public class NullCard(ICardResponseEmitter responseEmitter) : ICard
 {
+    private readonly ICardResponseEmitter _responseEmitter = responseEmitter;
     private SlotNumber _slotNumber = SlotNumber.Unslotted;
 
     public SlotNumber Slot { get => _slotNumber; }
@@ -191,7 +198,7 @@ public class NullCard : ICard
     /// independent NullCard instances, even though they behave identically.
     /// </para>
     /// </remarks>
-    public ICard Clone() => new NullCard();
+    public ICard Clone() => new NullCard(_responseEmitter);
 
     /// <summary>
     /// Gets the configuration metadata for this NullCard.
@@ -234,9 +241,57 @@ public class NullCard : ICard
     public bool ApplyMetadata(string? metadata) => true;
 
 
-    public void OnInstalled(SlotNumber slot) { _slotNumber = slot; }
+    public void OnInstalled(SlotNumber slot)
+    {
+        _slotNumber = slot;
+    }
 
+    public void Reset()
+    {
+        /* NOP */
+    }
 
-    public void Reset() { /* NOP */ }
+    /// <summary>
+    /// Handles a message sent to this empty slot.
+    /// </summary>
+    /// <param name="message">The message to process.</param>
+    /// <exception cref="CardMessageException">
+    /// Thrown if the message requires card-specific operations that an empty slot cannot perform.
+    /// </exception>
+    /// <remarks>
+    /// <para>
+    /// <strong>Supported Messages:</strong>
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description><see cref="IdentifyCardMessage"/>: Responds with CardId=0 and CardName="Empty Slot"</description></item>
+    /// <item><description><see cref="EnumerateDevicesMessage"/>: Responds with an empty device list (0 devices)</description></item>
+    /// <item><description><see cref="RefreshStatusMessage"/>: No-op (empty slot has no status to push)</description></item>
+    /// </list>
+    /// <para>
+    /// All other messages throw <see cref="CardMessageException"/> because an empty slot
+    /// cannot perform card-specific operations like inserting disks or configuring peripherals.
+    /// </para>
+    /// </remarks>
+    public void HandleMessage(ICardMessage message)
+    {
+        switch (message)
+        {
+            case IdentifyCardMessage:
+                _responseEmitter.Emit(Slot, Id, new CardIdentityPayload(Name));
+                break;
 
+            case EnumerateDevicesMessage:
+                _responseEmitter.Emit(Slot, Id, new DeviceListPayload([]));
+                break;
+
+            case RefreshStatusMessage:
+                // No-op: empty slot has no status to push. This is not a failure.
+                break;
+
+            default:
+                // Empty slot cannot perform card-specific operations
+                throw new CardMessageException(
+                    $"Empty slot {Slot} does not support message type '{message.GetType().Name}'.");
+        }
+    }
 }
