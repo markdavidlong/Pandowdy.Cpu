@@ -1,6 +1,7 @@
 # Pandowdy `.skillet` Project System — Development Blueprint
 
 > **Authoritative Design Spec:** `docs/Skillet_Project_File_Development.md`  
+> **Deferred Features Reference:** `docs/Skillet_Deferred_Features_Reference.md`  
 > **This Document:** Implementation blueprint translating the conceptual design into engineering-ready structures.  
 > **Status:** DRAFT — Ready for Task 32 execution phases.
 
@@ -17,10 +18,10 @@
 7. [Originals vs Working Copies](#7-originals-vs-working-copies)
 8. [JSON Defaults vs `.skillet` Overrides — Resolution Model](#8-json-defaults-vs-skillet-overrides--resolution-model)
 9. [UI Workflow: Startup, Creation, Switching](#9-ui-workflow-startup-creation-switching)
-10. [Debugger Subsystem Storage Model](#10-debugger-subsystem-storage-model)
-11. [AppleSoft Subsystem Storage Model](#11-applesoft-subsystem-storage-model)
+10. [Debugger Subsystem Storage Model](#10-debugger-subsystem-storage-model) *(stub — see deferred ref)*
+11. [AppleSoft Subsystem Storage Model](#11-applesoft-subsystem-storage-model) *(stub — see deferred ref)*
 12. [Workspace / UI Layout Persistence Model](#12-workspace--ui-layout-persistence-model)
-13. [Project-Type Flexibility](#13-project-type-flexibility)
+13. [Project-Type Flexibility](#13-project-type-flexibility) *(summary — see deferred ref)*
 14. [Legacy Save Logic Removal](#14-legacy-save-logic-removal)
 15. [SQLite Access Patterns & Concurrency](#15-sqlite-access-patterns--concurrency)
 16. [DI Registration & Service Wiring](#16-di-registration--service-wiring)
@@ -108,12 +109,7 @@ Pandowdy.Project/
 ├── Models/
 │   ├── ProjectMetadata.cs          — Project name, created, modified
 │   ├── DiskImageRecord.cs          — Disk image metadata model
-│   ├── MountConfiguration.cs       — Slot/drive mount assignments
-│   ├── BreakpointRecord.cs         — Debugger breakpoint model
-│   ├── WatchRecord.cs              — Debugger watch model
-│   ├── SymbolRecord.cs             — Symbol table entry
-│   ├── AppleSoftSourceRecord.cs    — AppleSoft source model
-│   └── WorkspaceLayout.cs          — UI layout model
+│   └── MountConfiguration.cs       — Slot/drive mount assignments
 ├── Services/
 │   ├── SkilletProject.cs           — ISkilletProject implementation
 │   ├── SkilletProjectManager.cs    — ISkilletProjectManager implementation
@@ -126,6 +122,10 @@ Pandowdy.Project/
 └── Migrations/
     └── V1_InitialSchema.cs         — Initial schema migration
 ```
+
+Models for deferred features (`BreakpointRecord`, `WatchRecord`, `SymbolRecord`,
+`AppleSoftSourceRecord`, `WorkspaceLayout`) will be added when their respective
+phases are implemented.
 
 ### Corresponding Test Project: `Pandowdy.Project.Tests/`
 
@@ -143,6 +143,31 @@ PRAGMA user_version = 1;              -- Schema version for migrations
 PRAGMA journal_mode = WAL;            -- Write-Ahead Logging for concurrency
 PRAGMA foreign_keys = ON;
 ```
+
+### V1 vs Deferred Tables
+
+The V1 schema creates only the 6 tables required by Phases 1–3:
+
+| V1 Table | Purpose |
+|----------|---------|  
+| `project_metadata` | Singleton project-level key-value pairs |
+| `disk_images` | Disk image metadata and blobs |
+| `mount_configuration` | Slot/drive mount assignments |
+| `emulator_overrides` | Per-project emulator setting overrides |
+| `display_overrides` | Per-project display setting overrides |
+| `project_settings` | General-purpose key-value store |
+
+All other tables (`breakpoints`, `watches`, `symbols`, `disassembly_cache`,
+`applesoft_sources`, `execution_history`, `workspace_layout`, `user_annotations`)
+are **deferred** — they will be created by future schema migrations when their
+respective features are designed and implemented. The migration infrastructure
+(`ISchemaMigration`, `SkilletSchemaManager`) makes adding tables later zero-cost.
+This avoids speculative schema design for features whose technical requirements
+are not yet finalized.
+
+---
+
+### V1 Tables
 
 ### Table: `project_metadata`
 
@@ -174,8 +199,8 @@ CREATE TABLE disk_images (
     original_format     TEXT NOT NULL,                -- DiskFormat enum name ('Woz','Nib','Dsk','Do','Po')
     import_source_path  TEXT,                         -- Full path at import time (informational only)
     imported_utc        TEXT NOT NULL,                -- ISO 8601 timestamp
-    track_count         INTEGER NOT NULL DEFAULT 35,
-    optimal_bit_timing  INTEGER NOT NULL DEFAULT 32,
+    track_count         INTEGER NOT NULL DEFAULT 35,  -- Track-based images only (see §6.2 Block Device Support)
+    optimal_bit_timing  INTEGER NOT NULL DEFAULT 32,  -- Track-based images only
     is_write_protected  INTEGER NOT NULL DEFAULT 0,   -- SQLite boolean
     persist_working     INTEGER NOT NULL DEFAULT 1,   -- Whether to persist working copy on save
     notes               TEXT,                         -- User annotations
@@ -236,139 +261,6 @@ CREATE TABLE display_overrides (
 -- ('force_monochrome', 'false')
 ```
 
-### Table: `breakpoints`
-
-Debugger breakpoints (Task 19/22 integration).
-
-```sql
-CREATE TABLE breakpoints (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    address         INTEGER NOT NULL,                -- PC address ($0000-$FFFF)
-    is_enabled      INTEGER NOT NULL DEFAULT 1,
-    hit_count       INTEGER NOT NULL DEFAULT 0,
-    break_after     INTEGER,                         -- Break after N hits (null = every hit)
-    condition       TEXT,                            -- Conditional expression (future)
-    breakpoint_type TEXT NOT NULL DEFAULT 'address', -- 'address','data_read','data_write','io'
-    label           TEXT,                            -- User label
-    group_name      TEXT,                            -- Breakpoint group (future)
-    created_utc     TEXT NOT NULL
-);
-
-CREATE INDEX idx_breakpoints_address ON breakpoints(address);
-CREATE INDEX idx_breakpoints_type ON breakpoints(breakpoint_type);
-```
-
-### Table: `watches`
-
-Debugger watch expressions.
-
-```sql
-CREATE TABLE watches (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    expression  TEXT NOT NULL,       -- Address or expression (e.g., "$0400", "A", "$0300+X")
-    label       TEXT,                -- User label
-    format      TEXT DEFAULT 'hex', -- 'hex', 'decimal', 'binary', 'ascii'
-    byte_count  INTEGER DEFAULT 1,  -- Number of bytes to display
-    sort_order  INTEGER NOT NULL DEFAULT 0
-);
-```
-
-### Table: `symbols`
-
-Symbol tables for disassembly/debugging.
-
-```sql
-CREATE TABLE symbols (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    address     INTEGER NOT NULL,
-    name        TEXT NOT NULL,
-    symbol_type TEXT NOT NULL DEFAULT 'label',  -- 'label','equate','entry_point','data'
-    source      TEXT,                           -- Origin: 'user','import','auto'
-    comment     TEXT,
-    UNIQUE(address, name)
-);
-
-CREATE INDEX idx_symbols_address ON symbols(address);
-CREATE INDEX idx_symbols_name ON symbols(name);
-```
-
-### Table: `disassembly_cache`
-
-Cached disassembly results.
-
-```sql
-CREATE TABLE disassembly_cache (
-    address         INTEGER PRIMARY KEY NOT NULL,  -- Start address
-    opcode_bytes    BLOB NOT NULL,                 -- Raw bytes (1-3)
-    mnemonic        TEXT NOT NULL,                 -- e.g., "LDA"
-    operand_text    TEXT,                           -- e.g., "$0400,X"
-    instruction_len INTEGER NOT NULL,              -- 1, 2, or 3
-    is_data         INTEGER NOT NULL DEFAULT 0,    -- Marked as data, not code
-    comment         TEXT                           -- User annotation
-);
-```
-
-### Table: `applesoft_sources`
-
-AppleSoft program storage (future subsystem).
-
-```sql
-CREATE TABLE applesoft_sources (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    name            TEXT NOT NULL,
-    source_text     TEXT,            -- Detokenized source
-    tokenized_blob  BLOB,           -- Tokenized Applesoft representation
-    ast_json        TEXT,            -- AST as JSON
-    semantic_json   TEXT,            -- Semantic analysis (variable types, flow)
-    disk_image_id   INTEGER,         -- Optional link to source disk
-    origin_address  INTEGER,         -- Memory address where program was found
-    created_utc     TEXT NOT NULL,
-    modified_utc    TEXT NOT NULL,
-    FOREIGN KEY (disk_image_id) REFERENCES disk_images(id) ON DELETE SET NULL
-);
-```
-
-### Table: `execution_history`
-
-Optional execution trace buffer (Task 22).
-
-```sql
-CREATE TABLE execution_history (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id      TEXT NOT NULL,       -- Groups traces by debug session
-    sequence        INTEGER NOT NULL,    -- Ordering within session
-    address         INTEGER NOT NULL,    -- PC at execution
-    opcode          INTEGER NOT NULL,    -- Opcode byte
-    operand_lo      INTEGER,             -- Operand byte 1 (if applicable)
-    operand_hi      INTEGER,             -- Operand byte 2 (if applicable)
-    a_reg           INTEGER NOT NULL,
-    x_reg           INTEGER NOT NULL,
-    y_reg           INTEGER NOT NULL,
-    sp_reg          INTEGER NOT NULL,
-    status_reg      INTEGER NOT NULL,
-    cycle_count     INTEGER NOT NULL
-);
-
-CREATE INDEX idx_exec_history_session ON execution_history(session_id, sequence);
-```
-
-### Table: `workspace_layout`
-
-Per-project UI layout state.
-
-```sql
-CREATE TABLE workspace_layout (
-    key     TEXT PRIMARY KEY NOT NULL,
-    value   TEXT NOT NULL
-);
-
--- Example rows:
--- ('panel_layout_json',    '{"panels":[...]}')
--- ('open_files_json',      '["file1.bas","file2.bas"]')
--- ('emulator_visible',     'true')
--- ('editor_visible',       'false')
-```
-
 ### Table: `project_settings`
 
 General-purpose key-value store for project-level settings not covered above.
@@ -380,22 +272,14 @@ CREATE TABLE project_settings (
 );
 ```
 
-### Table: `user_annotations`
+---
 
-Free-form annotations attached to addresses or disk images.
+### Deferred Tables
 
-```sql
-CREATE TABLE user_annotations (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    target_type     TEXT NOT NULL,      -- 'address', 'disk_image', 'applesoft_line'
-    target_id       TEXT NOT NULL,      -- Address (hex), disk_image_id, line number
-    annotation      TEXT NOT NULL,
-    created_utc     TEXT NOT NULL,
-    modified_utc    TEXT NOT NULL
-);
-
-CREATE INDEX idx_annotations_target ON user_annotations(target_type, target_id);
-```
+Additional tables for debugger state, AppleSoft sources, workspace layout, and
+user annotations will be created by future schema migrations when their features
+are implemented. See `docs/Skillet_Deferred_Features_Reference.md` §1 for
+reference designs.
 
 ---
 
@@ -440,6 +324,12 @@ public sealed class DiskImageRecord
 > **Note:** Blob data (`original_blob`, `working_blob`) is accessed via `DiskBlobStore` using
 > streaming APIs, never loaded into `DiskImageRecord` to avoid large heap allocations.
 
+> **Note:** `DiskImageRecord` is designed for track-based disk images (`InternalDiskImage`).
+> `TrackCount` and `OptimalBitTiming` are not meaningful for block-based devices. If
+> `InternalBlockDeviceImage` is introduced for hard drive images (see §6.2 Block Device
+> Support), a corresponding model with block-specific properties (`BlockCount`, `BlockSize`)
+> will be added alongside the necessary schema migration.
+
 ### `MountConfiguration`
 
 ```csharp
@@ -451,61 +341,9 @@ public sealed record MountConfiguration(
     bool AutoMount);
 ```
 
-### `BreakpointRecord`
-
-```csharp
-public sealed class BreakpointRecord
-{
-    public long Id { get; init; }
-    public required int Address { get; set; }
-    public bool IsEnabled { get; set; } = true;
-    public int HitCount { get; set; }
-    public int? BreakAfter { get; set; }
-    public string? Condition { get; set; }
-    public string BreakpointType { get; set; } = "address";
-    public string? Label { get; set; }
-    public string? GroupName { get; set; }
-    public DateTime CreatedUtc { get; init; }
-}
-```
-
-### `WatchRecord`
-
-```csharp
-public sealed class WatchRecord
-{
-    public long Id { get; init; }
-    public required string Expression { get; set; }
-    public string? Label { get; set; }
-    public string Format { get; set; } = "hex";
-    public int ByteCount { get; set; } = 1;
-    public int SortOrder { get; set; }
-}
-```
-
-### `SymbolRecord`
-
-```csharp
-public sealed record SymbolRecord(
-    long Id,
-    int Address,
-    string Name,
-    string SymbolType,   // "label", "equate", "entry_point", "data"
-    string? Source,       // "user", "import", "auto"
-    string? Comment);
-```
-
-### `WorkspaceLayout`
-
-```csharp
-public sealed class WorkspaceLayout
-{
-    public string? PanelLayoutJson { get; set; }
-    public List<string> OpenFiles { get; set; } = [];
-    public bool EmulatorVisible { get; set; } = true;
-    public bool EditorVisible { get; set; }
-}
-```
+Models for deferred features (`BreakpointRecord`, `WatchRecord`, `SymbolRecord`,
+`WorkspaceLayout`) will be added when their respective phases are implemented.
+See `docs/Skillet_Deferred_Features_Reference.md` §2 for reference designs.
 
 ---
 
@@ -519,7 +357,7 @@ User clicks "Create New Skillet Project"
   → SkilletProjectManager.CreateAsync(filePath, projectName)
     → Create new SQLite file at filePath
     → Set pragmas (application_id, user_version, journal_mode, foreign_keys)
-    → Run SkilletSchemaManager.InitializeSchema() — creates all tables
+    → Run SkilletSchemaManager.InitializeSchema() — creates V1 tables
     → Insert project_metadata rows (name, timestamps, version)
     → Insert default mount_configuration rows (slot 6, drives 1 & 2, empty)
     → Return ISkilletProject handle
@@ -541,8 +379,6 @@ User selects project from recent list or file dialog
     → Return ISkilletProject handle
   → SettingsResolver merges JSON defaults with skillet overrides
   → Load mount_configuration → auto-mount disk images into emulator
-  → Load workspace_layout → restore UI state
-  → Load breakpoints, watches, symbols → feed into debugger subsystem
   → Update pandowdy-settings.json: set active_project_path, update recent list
   → UI transitions from Start Page to main workspace
 ```
@@ -556,8 +392,6 @@ User presses Ctrl+S or auto-save timer fires
     → For each mounted disk with persist_working = true AND working_dirty = true:
       → Serialize InternalDiskImage to blob
       → UPDATE disk_images SET working_blob = ?, working_dirty = 0, modified_utc = ?
-    → Persist current breakpoints, watches, symbols (upsert)
-    → Persist workspace_layout
     → Update project_metadata modified_utc
     → COMMIT
 ```
@@ -598,26 +432,9 @@ public interface ISkilletProject : IDisposable
     Task<IReadOnlyList<MountConfiguration>> GetMountConfigurationAsync();
     Task SetMountAsync(int slot, int driveNumber, long? diskImageId);
 
-    // Debugger state
-    Task<IReadOnlyList<BreakpointRecord>> GetBreakpointsAsync();
-    Task UpsertBreakpointAsync(BreakpointRecord breakpoint);
-    Task RemoveBreakpointAsync(long id);
-
-    Task<IReadOnlyList<WatchRecord>> GetWatchesAsync();
-    Task UpsertWatchAsync(WatchRecord watch);
-    Task RemoveWatchAsync(long id);
-
-    Task<IReadOnlyList<SymbolRecord>> GetSymbolsAsync();
-    Task UpsertSymbolAsync(SymbolRecord symbol);
-    Task ImportSymbolFileAsync(Stream symbolData, string format);
-
     // Settings
     Task<string?> GetSettingAsync(string table, string key);
     Task SetSettingAsync(string table, string key, string value);
-
-    // Workspace layout
-    Task<WorkspaceLayout> GetWorkspaceLayoutAsync();
-    Task SaveWorkspaceLayoutAsync(WorkspaceLayout layout);
 
     // Lifecycle
     Task SaveAsync();
@@ -664,28 +481,82 @@ User: "Import Disk Image" → file dialog → selects game.woz
 
 ### 6.2 Blob Serialization Strategy
 
-The `InternalDiskImage` is serialized to blob using a compact binary format:
+The `InternalDiskImage` is serialized to blob using a compact binary format.
+All blobs stored in `.skillet` are compressed — originals, working copies, and
+future snapshots alike. Every blob in storage is cold by definition: the hot
+data is always the in-memory `InternalDiskImage` that the emulator reads and
+writes directly. Blobs are only deserialized at mount time and serialized at
+save time — infrequent lifecycle boundaries where compression cost is negligible.
+Disk images often contain large runs of zeros or repeated byte patterns, so
+compression significantly reduces `.skillet` file size.
 
 ```
-[Header]
+[Header] (uncompressed, 10 bytes)
   4 bytes: magic ("PIDI" — Pandowdy Internal Disk Image)
   2 bytes: format version (1)
+  1 byte:  compression method (0 = none, 1 = Deflate)
   1 byte:  track count
   1 byte:  optimal bit timing
   1 byte:  write protected flag
 
-[Per Track] × track_count
-  4 bytes: bit count (little-endian int32)
-  4 bytes: byte count (little-endian int32, = ceil(bit_count/8))
-  N bytes: raw track data
+[Payload] (compressed via method specified in header)
+  [Per Track] × track_count
+    4 bytes: bit count (little-endian int32)
+    4 bytes: byte count (little-endian int32, = ceil(bit_count/8))
+    N bytes: raw track data
 
-[Footer]
-  4 bytes: CRC-32 of all preceding bytes
+[Footer] (uncompressed)
+  4 bytes: CRC-32 of header + compressed payload
 ```
 
 This is implemented in `DiskBlobStore.Serialize()` / `DiskBlobStore.Deserialize()`.
 
-The CRC-32 uses the existing `System.IO.Hashing` package already referenced by `Pandowdy.EmuCore`.
+The CRC-32 uses the existing `System.IO.Hashing` package already referenced by
+`Pandowdy.EmuCore`. Compression uses `System.IO.Compression.DeflateStream`
+(built into the .NET runtime — no additional package required).
+
+### Compression Details
+
+- **Algorithm:** Deflate via `DeflateStream` (`System.IO.Compression`).
+- **Level:** `CompressionLevel.Optimal` for storage. Speed is not critical —
+  serialize/deserialize happens at lifecycle boundaries (mount, save), never
+  per-cycle.
+- **Scope:** The per-track payload is compressed as a single Deflate stream.
+  The 10-byte header and 4-byte CRC footer remain uncompressed so the header
+  can be read and the CRC validated without decompressing.
+- **method byte = 0 (none):** Reserved for diagnostic/debugging use. The
+  deserializer must handle uncompressed payloads, but `Serialize()` always
+  writes method = 1 (Deflate) in production.
+- **Expected ratio:** Typical Apple II disk images compress to ~40–60% of
+  original size. The primary size range spans 140KB 5.25" floppies (most
+  common, ~230KB in PIDI nibblized form), 880KB 3.5" floppies (common), and
+  32MB hard drive images (upper bound — may use a block-based blob format
+  instead of PIDI; see Block Device Support below). A 140KB floppy (~230KB
+  PIDI) typically stores as ~100–140KB compressed. At the upper bound, a hard
+  drive image (~32MB uncompressed) is still fast to compress/decompress at
+  lifecycle boundaries regardless of blob format — these are infrequent bulk
+  operations, not per-cycle work, and the data sizes involved are modest by
+  modern standards.
+- **No new dependencies:** `System.IO.Compression` is part of the .NET runtime.
+  `DeflateStream` is available in all target frameworks (net8.0+).
+
+### Block Device Support (Future)
+
+The PIDI format is designed for track-based `InternalDiskImage` — floppy disk
+images where data is organized as nibblized tracks with per-track bit counts.
+Hard drive images (up to 65,536 × 512-byte blocks, ~32MB) may use a
+block-based internal representation (`InternalBlockDeviceImage`) rather than
+the track-based model. If so, a separate blob format (e.g., "PIBI" — Pandowdy
+Internal Block Image) would be defined with block-oriented payload structure
+instead of per-track layout. The `DiskBlobStore` would gain a second
+serializer, and the blob magic bytes would distinguish PIDI from PIBI at
+deserialization time. The same compression strategy (Deflate) and CRC-32
+footer apply regardless of internal format.
+
+This is not part of the V1 implementation. The schema, model, and blob format
+changes for block devices will be designed when `InternalBlockDeviceImage` is
+created. The migration infrastructure makes adding the necessary schema
+columns and tables zero-cost at that point.
 
 ### 6.3 Internal Use
 
@@ -696,13 +567,14 @@ Mount: slot 6, drive 1, disk_image_id = 3
   → DiskBlobStore.DeserializeAsync(project, diskImageId: 3, useWorking: true)
     → SELECT working_blob FROM disk_images WHERE id = 3
     → If working_blob IS NULL → SELECT original_blob (regenerate)
-    → Deserialize blob → InternalDiskImage
+    → Validate CRC-32 on compressed blob
+    → Decompress payload (Deflate) → reconstruct InternalDiskImage
   → Feed InternalDiskImage into DiskIIControllerCard via existing InsertDiskMessage
   → Emulator reads/writes InternalDiskImage in-memory as normal
 ```
 
-All modifications happen in-memory. On project save, the modified `InternalDiskImage`
-is serialized back to `working_blob`.
+All modifications happen in-memory (uncompressed). On project save, the modified
+`InternalDiskImage` is serialized and compressed back to `working_blob`.
 
 ### 6.4 Export Flow
 
@@ -740,6 +612,7 @@ User: "Revert to Original" → context menu on disk
 | **Null meaning** | N/A (required NOT NULL) | Regenerate from original |
 | **Dirty tracking** | N/A | `working_dirty` flag |
 | **Persistence policy** | Always persisted | Controlled by `persist_working` |
+| **Compression** | Deflate (always) | Deflate (always) |
 
 ### `persist_working` Flag
 
@@ -760,20 +633,20 @@ periodically."*
                  ┌──────────────────┐
                  │  .skillet file   │
                  │                  │
-                 │  original_blob ──┼──── Immutable, always present
-                 │  working_blob  ──┼──── Nullable, may be regenerated
+                 │  original_blob ──┼──── Immutable, compressed (Deflate)
+                 │  working_blob  ──┼──── Nullable, compressed (Deflate)
                  └────────┬─────────┘
-                          │ deserialize on mount
+                          │ decompress + deserialize on mount
                           ▼
                  ┌──────────────────┐
-                 │ InternalDiskImage│  ← In-memory, used by emulator
+                 │ InternalDiskImage│  ← In-memory, uncompressed, used by emulator
                  │  (mutable)       │
                  └────────┬─────────┘
-                          │ serialize on save (if persist_working)
+                          │ serialize + compress on save (if persist_working)
                           ▼
                  ┌──────────────────┐
                  │  .skillet file   │
-                 │  working_blob    │  ← Updated
+                 │  working_blob    │  ← Updated, compressed
                  └──────────────────┘
 ```
 
@@ -852,20 +725,18 @@ public class SettingsResolver(
 | Setting | Layer | Table |
 |---------|-------|-------|
 | Window geometry | JSON | — |
-| Panel visibility | JSON (default), Skillet (override) | `workspace_layout` |
 | Display: scanlines | JSON (default), Skillet (override) | `display_overrides` |
 | Display: monochrome | JSON (default), Skillet (override) | `display_overrides` |
 | Emulator: throttle | JSON (default), Skillet (override) | `emulator_overrides` |
 | Emulator: caps lock | JSON (default), Skillet (override) | `emulator_overrides` |
 | Recent projects | JSON | — |
 | Active project path | JSON | — |
-| Breakpoints | Skillet only | `breakpoints` |
-| Watches | Skillet only | `watches` |
-| Symbols | Skillet only | `symbols` |
 | Disk images | Skillet only | `disk_images` |
 | Mount config | Skillet only | `mount_configuration` |
-| AppleSoft sources | Skillet only | `applesoft_sources` |
-| User annotations | Skillet only | `user_annotations` |
+
+Settings for deferred features (breakpoints, watches, symbols, AppleSoft sources,
+workspace layout, user annotations) are documented in
+`docs/Skillet_Deferred_Features_Reference.md` §8.
 
 ### Runtime Change Persistence
 
@@ -974,117 +845,17 @@ File
 
 ## 10. Debugger Subsystem Storage Model
 
-### Current State
-- Task 19 (Basic Debugger Foundation) is in progress.
-- `CpuStateSnapshot`, `CpuExecutionStatus`, `IMemoryInspector` exist.
-- Debugger core stepping exists; breakpoints and UI panels are NOT STARTED.
-
-### Storage Approach
-
-Debugger state is stored in the `.skillet` and loaded when the project opens.
-This enables **reproducible debugging sessions**.
-
-### Breakpoints
-
-Stored in `breakpoints` table. Loaded into the debugger's in-memory breakpoint set
-on project open. Changes are persisted on project save.
-
-```csharp
-// On project open:
-var breakpoints = await project.GetBreakpointsAsync();
-foreach (var bp in breakpoints)
-{
-    debugger.AddBreakpoint(bp.Address, bp.IsEnabled, bp.Condition);
-}
-
-// On project save:
-var activeBreakpoints = debugger.GetAllBreakpoints();
-foreach (var bp in activeBreakpoints)
-{
-    await project.UpsertBreakpointAsync(bp.ToRecord());
-}
-```
-
-### Watches
-
-Stored in `watches` table. Loaded into debugger watch panel.
-Sort order preserves user's preferred arrangement.
-
-### Symbols
-
-Stored in `symbols` table. Populated from:
-- **User-defined:** Manually added labels/equates.
-- **Imported:** Loaded from symbol files (future: various formats).
-- **Auto-detected:** Common Apple II ROM entry points (future).
-
-Symbols enhance disassembly output by replacing raw addresses with labels.
-
-### Disassembly Cache
-
-Stored in `disassembly_cache` table. Acts as a warm cache for the
-`Pandowdy.Disassembler` output. Invalidated when memory changes are detected
-at cached addresses.
-
-### Execution History
-
-Stored in `execution_history` table (Task 22). Sessions are grouped by `session_id`.
-Bounded: old sessions are pruned automatically (configurable max rows, default 100,000).
+*Deferred.* See `docs/Skillet_Deferred_Features_Reference.md` §4 for the full
+debugger storage design (breakpoints, watches, symbols, disassembly cache,
+execution history).
 
 ---
 
 ## 11. AppleSoft Subsystem Storage Model
 
-### Current State
-- No AppleSoft subsystem exists yet.
-- Storage model is defined here for future implementation.
-
-### Storage Approach
-
-Each AppleSoft program is a row in `applesoft_sources`:
-
-| Column | Content |
-|--------|---------|
-| `source_text` | Human-readable detokenized BASIC source |
-| `tokenized_blob` | Raw tokenized bytes as found in Apple II memory |
-| `ast_json` | Parsed AST as JSON (line → statements → expressions tree) |
-| `semantic_json` | Semantic analysis results (variable types, const detection, flow analysis) |
-| `disk_image_id` | FK to the disk image the program was extracted from |
-| `origin_address` | Memory address ($0801 typically) where program was found |
-
-### Workflow
-
-```
-1. User loads a disk with BASIC programs
-2. "Extract AppleSoft Programs" scans disk image for tokenized BASIC
-3. For each program found:
-   a. Store tokenized_blob (raw bytes)
-   b. Detokenize → store source_text
-   c. Parse → store ast_json
-   d. Analyze → store semantic_json
-4. User edits source_text in built-in editor (future)
-5. Re-tokenize edited source → update tokenized_blob
-6. Re-parse/analyze → update ast_json / semantic_json
-```
-
-### Editor State
-
-Editor state (cursor position, fold regions, open tabs) is stored in `workspace_layout`
-as part of the `open_files_json` structure:
-
-```json
-{
-  "open_files": [
-    {
-      "type": "applesoft",
-      "source_id": 3,
-      "cursor_line": 42,
-      "cursor_col": 10,
-      "folded_regions": [100, 200],
-      "scroll_position": 35
-    }
-  ]
-}
-```
+*Deferred.* See `docs/Skillet_Deferred_Features_Reference.md` §5 for the full
+AppleSoft storage design (source text, tokenized blobs, AST, semantic analysis,
+editor state).
 
 ---
 
@@ -1120,69 +891,20 @@ Stored in `pandowdy-settings.json`:
 }
 ```
 
-### Skillet Layer (Project Overrides)
-
-Stored in `workspace_layout` and `emulator_overrides` / `display_overrides` tables.
-
-Example: A project that always uses monochrome display and shows the debugger panel:
-
-```
-workspace_layout:
-  ('panel_layout_json', '{"showDebugger":true,"showCpuStatus":true}')
-  ('emulator_visible', 'true')
-
-display_overrides:
-  ('force_monochrome', 'true')
-
-emulator_overrides:
-  ('throttle_enabled', 'false')
-```
-
-### Resolution at Runtime
-
-```
-User opens project "Karateka Debugging":
-  → Window geometry: from JSON (not project-specific)
-  → force_monochrome: project override = true (JSON default = false) → true
-  → throttle_enabled: project override = false (JSON default = true) → false
-  → showDebugger: project override = true (JSON default = absent) → true
-  → showDiskStatus: no project override → JSON default = true → true
-```
+Per-project overrides (via `emulator_overrides`, `display_overrides`, and future
+`workspace_layout` table) are described in
+`docs/Skillet_Deferred_Features_Reference.md` §6.
 
 ---
 
 ## 13. Project-Type Flexibility
 
-The spec defines three project styles. The `.skillet` schema handles all without branching:
+The `.skillet` schema supports multiple project styles (emulator-centric, editor-centric,
+multi-disk) without branching logic or a `project_type` discriminator. Tables that
+aren't used for a given project style are simply empty.
 
-### Emulator-Centric (Full Workstation)
-
-- Disk images mounted and actively used.
-- Debugger breakpoints and watches active.
-- CPU status panel visible.
-- All tables populated.
-
-### Editor-Centric (Little Emulator Usage)
-
-- AppleSoft sources are primary focus.
-- `workspace_layout`: `emulator_visible = false`, `editor_visible = true`.
-- `mount_configuration`: may be empty or have reference disks.
-- `breakpoints` / `watches`: may be empty.
-- `applesoft_sources`: heavily used.
-
-### Multi-Disk
-
-- Multiple entries in `disk_images` table.
-- Multiple `mount_configuration` entries across slots.
-- User swaps disks during session via UI.
-- Working copies tracked independently per disk.
-
-### No Branching Logic Needed
-
-The schema naturally supports all styles:
-- Tables that aren't used are simply empty.
-- `workspace_layout` controls which panels are visible.
-- No `project_type` column or discriminator needed.
+See `docs/Skillet_Deferred_Features_Reference.md` §7 for detailed project-style
+examples.
 
 ---
 
@@ -1218,48 +940,344 @@ The old `drive-state.json` and save-related menu items are simply removed.
 
 ## 15. SQLite Access Patterns & Concurrency
 
-### Connection Management
+### 15.1 Core Principle: Dedicated IO Thread
+
+SQLite is accessed by **exactly one dedicated IO thread**. No other thread —
+UI, emulator, background task, or otherwise — ever touches `SqliteConnection`,
+`SqliteCommand`, or `SqliteDataReader` directly. This eliminates all SQLite
+threading concerns at the architectural level.
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                    Request Queue (FIFO)                       │
+│                                                               │
+│ UI Thread ──────────► ┌──────────┐                            │
+│ Emulator Thread ────► │  Queue   │ ────► IO Thread ──► SQLite │
+│ Background Tasks ───► └──────────┘        (single)            │
+│                             │                                 │
+│                    TaskCompletionSource<T>                    │
+│                    returned to caller                         │
+└───────────────────────────────────────────────────────────────┘
+```
+
+### 15.2 Why a Dedicated IO Thread
+
+1. **`Microsoft.Data.Sqlite` async methods are not truly async.** The underlying
+   SQLite C library is synchronous. The `*Async()` methods are thin wrappers that
+   complete synchronously on the calling thread. Running them on the UI thread
+   blocks rendering; running them on the emulator thread introduces jitter.
+   A dedicated thread absorbs the blocking cost without affecting either.
+
+2. **Single-thread access eliminates locking.** SQLite's threading modes
+   (serialized, multi-thread) add overhead and complexity. With exactly one
+   thread touching the connection, no mutexes, reader-writer locks, or
+   `PRAGMA busy_timeout` tuning are needed.
+
+3. **Deterministic ordering.** A FIFO queue guarantees that requests are
+   processed in the order they are submitted. This simplifies reasoning about
+   state transitions — e.g., an import that completes before a mount is
+   guaranteed to have its data visible to the mount.
+
+4. **Frontend-agnostic persistence.** The persistence layer is project-centric.
+   It knows nothing about Avalonia, WinUI, MAUI, or any other UI framework.
+   The IO thread does not marshal results to a dispatcher, raise property-changed
+   notifications, or depend on any UI threading model. Callers are responsible
+   for dispatching results to their own context (e.g., `Dispatcher.UIThread`).
+
+### 15.3 Connection Management
 
 - One `SqliteConnection` per `SkilletProject` instance.
-- Connection opened on `OpenAsync()`, closed on `Dispose()`.
-- WAL mode enables concurrent reads from UI thread while emulator thread writes.
-
-### Thread Safety
-
-```
-UI Thread:       Reads (breakpoints, settings, layout)
-Emulator Thread: Does NOT access SQLite directly
-Save Operation:  Serializes in-memory state → writes to SQLite (UI thread or save-dedicated task)
-```
-
-The emulator thread never touches SQLite. Disk I/O during emulation happens against
-the in-memory `InternalDiskImage`. Persistence is a separate operation triggered by
-save events.
-
-### Blob Access
-
-Large blobs (disk images, ~230KB for 35-track disks) use streaming:
+- Opened on the IO thread during `OpenAsync()`.
+- Closed on the IO thread during `Dispose()`.
+- The connection object is **never** exposed outside the IO thread.
 
 ```csharp
-// Reading a blob
-using var cmd = connection.CreateCommand();
-cmd.CommandText = "SELECT working_blob FROM disk_images WHERE id = @id";
-cmd.Parameters.AddWithValue("@id", diskImageId);
-
-using var reader = await cmd.ExecuteReaderAsync();
-if (reader.Read())
+// Connection lifecycle — all calls execute on the IO thread
+internal sealed class ProjectIOThread : IDisposable
 {
-    using var blobStream = reader.GetStream(0);
-    return DiskBlobSerializer.Deserialize(blobStream);
+    private readonly Thread _thread;
+    private readonly BlockingCollection<IORequest> _queue = new();
+    private SqliteConnection? _connection;
+
+    public ProjectIOThread(string filePath)
+    {
+        _thread = new Thread(() => RunLoop(filePath))
+        {
+            Name = "Pandowdy.Project.IO",
+            IsBackground = true
+        };
+        _thread.Start();
+    }
+
+    private void RunLoop(string filePath)
+    {
+        _connection = new SqliteConnection($"Data Source={filePath}");
+        _connection.Open();
+        SetPragmas(_connection);
+
+        foreach (var request in _queue.GetConsumingEnumerable())
+        {
+            request.Execute(_connection);
+        }
+
+        _connection.Dispose();
+    }
+
+    // ...
 }
 ```
 
-### Transaction Boundaries
+### 15.4 Request Queue & Async Façade
+
+All threads interact with SQLite through a thread-safe request queue. Each
+request carries a `TaskCompletionSource<T>` that the caller `await`s.
+
+#### Request Structure
+
+```csharp
+internal abstract class IORequest
+{
+    public abstract void Execute(SqliteConnection connection);
+}
+
+internal sealed class IORequest<T>(
+    Func<SqliteConnection, T> operation,
+    TaskCompletionSource<T> tcs) : IORequest
+{
+    public override void Execute(SqliteConnection connection)
+    {
+        try
+        {
+            var result = operation(connection);
+            tcs.SetResult(result);
+        }
+        catch (Exception ex)
+        {
+            tcs.SetException(ex);
+        }
+    }
+}
+```
+
+#### Enqueue Pattern
+
+```csharp
+// Inside SkilletProject — available to any thread
+internal Task<T> EnqueueAsync<T>(Func<SqliteConnection, T> operation)
+{
+    var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+    _ioThread.Enqueue(new IORequest<T>(operation, tcs));
+    return tcs.Task;
+}
+
+internal Task EnqueueAsync(Action<SqliteConnection> operation)
+{
+    var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    _ioThread.Enqueue(new IORequest<bool>(conn =>
+    {
+        operation(conn);
+        return true;
+    }, tcs));
+    return tcs.Task;
+}
+```
+
+#### Caller Usage (Any Thread)
+
+```csharp
+// UI thread — reading settings
+var throttle = await project.GetSettingAsync("emulator_overrides", "throttle_enabled");
+
+// Emulator thread — requesting a disk snapshot load
+var diskImage = await project.LoadWorkingCopyAsync(diskImageId);
+
+// Background task — saving project state
+await project.SaveAsync();
+```
+
+All three calls enqueue a request and return a `Task`. The IO thread processes
+each request in FIFO order. The caller resumes on whatever context the
+`TaskCompletionSource` continuation runs on (typically the thread pool, unless
+the caller uses `ConfigureAwait` or a `SynchronizationContext`).
+
+### 15.5 Emulator Thread Access
+
+The emulator thread runs at ~1 MHz cycle accuracy. It **never** calls SQLite
+directly. However, it **can and does** request project-state operations through
+the queue. These requests are non-blocking from the emulator's perspective —
+the emulator enqueues and continues; results arrive asynchronously.
+
+#### Operations the Emulator Thread May Request
+
+| Operation | Direction | Example |
+|-----------|-----------|---------|
+| Load disk snapshot | Read | Mount a disk image from blob on project open |
+| Save disk snapshot | Write | Persist dirty `InternalDiskImage` working copy |
+| Read symbols | Read | Symbol lookup for disassembly overlay |
+| Read breakpoints | Read | Load breakpoint set on debug session start |
+| Read watchpoints | Read | Load watch expressions for debugger panel |
+| Read annotations | Read | Fetch address annotations for disassembly view |
+| Query project state | Read | Check `persist_working` flag, project metadata |
+
+#### Emulator Timing Considerations
+
+During cycle-accurate emulation, the emulator thread operates on in-memory data
+structures (`InternalDiskImage`, `CircularBitBuffer[]`, breakpoint sets, etc.).
+IO requests are for **bulk operations** at lifecycle boundaries — not per-cycle
+lookups:
+
+- **Disk mount:** Enqueue blob read → IO thread deserializes → emulator receives
+  `InternalDiskImage` via `Task` completion.
+- **Disk save:** Emulator serializes in-memory disk to `byte[]` (on its own thread),
+  then enqueues the blob write to the IO thread.
+- **Debug session start:** Enqueue breakpoint/symbol reads → IO thread fetches
+  from SQLite → debugger receives collections via `Task` completion.
+
+The emulator does **not** make per-instruction SQLite queries. Real-time disk I/O
+during emulation operates against in-memory `InternalDiskImage` objects — SQLite
+is only involved when loading or persisting those objects.
+
+### 15.6 Ordering Guarantees
+
+The request queue provides **strict FIFO ordering**. Requests are processed in
+the order they are enqueued. This means:
+
+- An import request that completes before a mount request is guaranteed to have
+  written its blob to SQLite before the mount reads it.
+- A save request enqueued after a settings change will see the updated settings.
+- Multiple save requests from different sources (auto-save timer, explicit Ctrl+S,
+  emulator snapshot) are serialized — no concurrent writes, no transaction conflicts.
+
+If priority scheduling is needed in the future (e.g., expediting a breakpoint
+read during a debug pause), the queue can be extended with priority levels.
+For Phase 1, FIFO is sufficient.
+
+### 15.7 UI Framework Isolation
+
+The persistence layer is **frontend-agnostic**. Key rules:
+
+1. **No UI dispatcher references** in `Pandowdy.Project`. The IO thread does not
+   post results to `Dispatcher.UIThread`, `SynchronizationContext.Current`, or
+   any framework-specific marshaling mechanism.
+
+2. **Callers marshal their own results.** A ViewModel that `await`s a project
+   query is responsible for dispatching the result to the UI thread if needed:
+
+   ```csharp
+   // In a ViewModel (Avalonia/ReactiveUI context)
+   var metadata = await _projectManager.CurrentProject!.GetMetadataAsync();
+   // If already on UI thread (e.g., command handler), no marshaling needed.
+   // If on a background thread, use Dispatcher:
+   await Dispatcher.UIThread.InvokeAsync(() => ProjectName = metadata.Name);
+   ```
+
+3. **`TaskCompletionSource` uses `RunContinuationsAsynchronously`.** This prevents
+   the IO thread from accidentally running caller continuations on itself, which
+   would block the queue. Continuations always run on the thread pool.
+
+4. **No Avalonia, ReactiveUI, or WinUI references** in `Pandowdy.Project.csproj`.
+   The project depends only on `Microsoft.Data.Sqlite` and `System.Reactive`.
+
+### 15.8 Blob Access
+
+Large blobs (disk images, ~230KB for 35-track disks) are read on the IO thread
+using `SqliteDataReader.GetStream()` for streaming access:
+
+```csharp
+// Executed ON the IO thread via the request queue
+internal InternalDiskImage ReadWorkingBlob(SqliteConnection connection, long diskImageId)
+{
+    using var cmd = connection.CreateCommand();
+    cmd.CommandText = """
+        SELECT COALESCE(working_blob, original_blob)
+        FROM disk_images WHERE id = @id
+        """;
+    cmd.Parameters.AddWithValue("@id", diskImageId);
+
+    using var reader = cmd.ExecuteReader();
+    if (reader.Read())
+    {
+        using var blobStream = reader.GetStream(0);
+        return DiskBlobSerializer.Deserialize(blobStream);
+    }
+
+    throw new InvalidOperationException($"Disk image {diskImageId} not found.");
+}
+```
+
+Note: synchronous `ExecuteReader()` is used intentionally — this code runs on the
+dedicated IO thread where blocking is expected and acceptable. The caller sees
+an async `Task<InternalDiskImage>` via the queue façade.
+
+### 15.9 Transaction Boundaries
+
+All transactions execute on the IO thread. A request may span multiple SQL
+statements within a single transaction:
 
 - **Project save**: Single transaction wrapping all dirty disk writes + metadata updates.
-- **Disk import**: Single transaction for INSERT.
+- **Disk import**: Single transaction for INSERT (blob + metadata).
 - **Settings changes**: Individual UPSERTs (no transaction needed for single-row ops).
 - **Breakpoint/watch changes**: Batched within project save transaction.
+- **Bulk symbol import**: Single transaction for batch INSERT.
+
+Because the IO thread processes requests sequentially, transactions are inherently
+serialized. There is no risk of concurrent transactions or deadlocks.
+
+### 15.10 WAL Mode
+
+WAL (Write-Ahead Logging) journal mode **may** be enabled as a performance
+optimization but is **not** central to the concurrency model. The single-thread
+access pattern works correctly with any SQLite journal mode (DELETE, WAL,
+TRUNCATE, etc.).
+
+WAL benefits in this architecture:
+
+- Faster writes for small transactions (settings changes, single-row UPSERTs).
+- Reduced fsync overhead on project save.
+- No benefit for concurrent reader/writer scenarios — there is only one thread.
+
+WAL is set as a default but can be overridden per-project if needed:
+
+```sql
+PRAGMA journal_mode = WAL;  -- Default; performance optimization only
+```
+
+### 15.11 Shutdown & Drain
+
+On project close, the queue is marked as complete (`BlockingCollection.CompleteAdding()`).
+The IO thread processes all remaining enqueued requests, then closes the
+`SqliteConnection` and exits. Any requests enqueued after `CompleteAdding()` are
+rejected with an `ObjectDisposedException` set on their `TaskCompletionSource`.
+
+```csharp
+public async Task CloseAsync()
+{
+    _queue.CompleteAdding();
+    await Task.Run(() => _thread.Join());  // Wait for IO thread to drain and exit
+}
+```
+
+This ensures:
+- All pending writes complete before the connection closes.
+- No data loss on shutdown.
+- Callers that `await` pending requests receive either results or exceptions.
+
+### 15.12 Summary
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Principle                │  Design Choice                      │
+├───────────────────────────┼─────────────────────────────────────┤
+│  SQLite thread ownership  │  Single dedicated IO thread         │
+│  Cross-thread access      │  FIFO request queue + TCS<T>        │
+│  Emulator access          │  Enqueue requests; never direct SQL │
+│  UI framework coupling    │  None — callers marshal own results │
+│  Ordering                 │  Deterministic FIFO                 │
+│  Async model              │  Task-based façade over sync SQLite │
+│  WAL mode                 │  Optional perf tuning, not required │
+│  Shutdown                 │  Drain queue, complete all pending  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1369,13 +1387,13 @@ Pandowdy.Project.Tests/
 
 ### Key Test Scenarios
 
-1. **Schema creation**: New `.skillet` file has all tables and correct pragmas.
+1. **Schema creation**: New `.skillet` file has all V1 tables (6) and correct pragmas.
 2. **Blob round-trip**: Serialize `InternalDiskImage` → blob → deserialize → binary-identical.
 3. **Working copy regeneration**: Set `working_blob = NULL`, re-read → gets original.
 4. **Persist policy**: `persist_working = false` → working_blob not updated on save.
 5. **Settings resolution**: JSON default overridden by skillet, hardcoded fallback works.
 6. **Mount configuration**: Slot/drive mapping persists and restores correctly.
-7. **Breakpoint persistence**: Add/remove/toggle breakpoints survive project close/reopen.
+7. **Schema migration**: Future schema version adds tables correctly via migration.
 8. **Project validation**: Opening a non-skillet SQLite file fails gracefully.
 9. **Schema migration**: Opening a v1 skillet with v2 code runs migration.
 10. **Concurrent access**: WAL mode allows reads during write transaction.
@@ -1391,86 +1409,454 @@ Pandowdy.Project.Tests/
 
 ## 18. Implementation Phases
 
-### Phase 1: Foundation (Core Infrastructure)
+### Priority Rationale
 
-**Goal:** Create `Pandowdy.Project`, implement schema, basic CRUD, blob store.
+The phases below are ordered to achieve a **working .skillet-based workflow as
+quickly as possible**, prioritizing the transition from loose files to
+project-based disk management. Features that depend on subsystems not yet
+implemented (debugger breakpoints/watches, AppleSoft processing, advanced
+workspace layout) are deferred to later phases; their schema tables will be
+created by future migrations when those features are designed and implemented.
 
-1. Create `Pandowdy.Project` class library project.
-2. Create `Pandowdy.Project.Tests` test project.
-3. Implement `SkilletConstants` (application_id, schema version, table names).
-4. Implement `SkilletSchemaManager` (create all tables, set pragmas).
-5. Implement `DiskBlobStore` (serialize/deserialize `InternalDiskImage` ↔ blob).
-6. Implement `ProjectSettingsStore` (generic key-value CRUD).
-7. Implement `SkilletProject` (ISkilletProject — all table operations).
-8. Implement `SkilletProjectManager` (create/open/close lifecycle).
-9. Write comprehensive unit tests for all of the above.
-10. Add project references from `Pandowdy` and `Pandowdy.UI` to `Pandowdy.Project`.
+**Priority order:**
+1. Core infrastructure (project + schema + blob store) — everything depends on this.
+2. Disk lifecycle migration — the primary user-facing change; replaces filesystem save/load.
+3. Settings & project overrides — enables project-specific emulator/display configuration.
+4. UI — Start Page & project dialogs — makes the project system user-accessible.
+5. Legacy cleanup — removes dead code paths after new paths are proven.
+6. Integration testing — end-to-end validation of the full workflow.
+7. Deferred features — debugger storage, AppleSoft, workspace layout (when those subsystems exist).
 
-### Phase 2: Settings Resolution
+---
 
-**Goal:** Implement the four-layer settings resolution model.
+### Phase 1: Foundation — Project & Schema Infrastructure
 
-1. Implement `ISettingsResolver` and `SettingsResolver`.
-2. Define setting classification (which settings live where).
-3. Modify `GuiSettings` / `GuiSettingsService` to add `recentProjects` and `activeProjectPath`.
-4. Remove `DriveStateSettings` from `GuiSettings` (replaced by mount_configuration).
-5. Wire `SettingsResolver` into DI.
-6. Write tests for resolution logic.
+**Goal:** Stand up `Pandowdy.Project`, implement the SQLite schema, the blob
+serializer, and the project lifecycle manager. At the end of this phase, code
+can create, open, and close `.skillet` files with correct pragmas and V1 tables,
+and round-trip `InternalDiskImage` through the PIDI blob format.
 
-### Phase 3: UI — Start Page & Project Dialogs
+**Branch:** `skillet`
 
-**Goal:** Implement the Start Page and project creation/opening UI.
+#### Steps
 
-1. Create `StartPage.axaml` / `StartPageViewModel`.
-2. Create `NewProjectDialog.axaml` / `NewProjectDialogViewModel`.
-3. Modify `MainWindow` to show Start Page when no project is open.
-4. Implement recent projects list persistence.
-5. Implement auto-open of last active project.
-6. Update `App.axaml.cs` / `Program.cs` for new startup flow.
+1. **Create `Pandowdy.Project` class library project.**
+   - `dotnet new classlib -n Pandowdy.Project --framework net8.0` (Completed)
+   - Add to solution: `dotnet sln add Pandowdy.Project/Pandowdy.Project.csproj` (Completed)
+   - Configure `.csproj` per §2 (nullable, doc generation, `InternalsVisibleTo`). (Completed)
+   - Add `PackageReference`: `Microsoft.Data.Sqlite` 9.0.7, `System.Reactive` 6.1.0. (Completed)
+   - Add `ProjectReference` to `Pandowdy.EmuCore` (for `InternalDiskImage`, `DiskFormat`). (Completed)
 
-### Phase 4: Disk Lifecycle Migration
+2. **Create `Pandowdy.Project.Tests` xUnit test project.**
+   - `dotnet new xunit -n Pandowdy.Project.Tests --framework net8.0` (Completed)
+   - Add to solution: `dotnet sln add Pandowdy.Project.Tests/Pandowdy.Project.Tests.csproj` (Completed)
+   - Match existing test project packages (xUnit 2.9.3, `Microsoft.NET.Test.Sdk` 18.0.1, 
+     `xunit.runner.visualstudio` 3.1.5, `coverlet.collector` 6.0.4). (Completed)
+   - Add `ProjectReference` to `Pandowdy.Project`. (Completed)
 
-**Goal:** Replace legacy save/open with import/export through `.skillet`.
+3. **Implement `SkilletConstants`.** (Completed)
+   - `Pandowdy.Project/Constants/SkilletConstants.cs` (Completed)
+   - `ApplicationId = 0x534B494C` ("SKIL") (Completed)
+   - `SchemaVersion = 1` (Completed)
+   - table name constants.
 
-1. Implement disk import flow (file → blob → `disk_images` table).
-2. Implement disk mount flow (blob → `InternalDiskImage` → emulator).
-3. Implement disk export flow (`InternalDiskImage` → file via `IDiskImageExporter`).
-4. Implement working copy regeneration.
-5. Remove legacy `SaveDiskMessage`, `SaveDiskAsMessage`.
-6. Remove `DestinationFilePath` / `DestinationFormat` from `InternalDiskImage`.
-7. Remove `DriveStateService`, `DriveStateConfig`, `DriveStateEntry`.
-8. Update `MainWindowViewModel` menus (Save → Export, Open → Import).
-9. Update `InsertDiskMessage` to accept `InternalDiskImage` directly.
+4. **Implement `ISchemaMigration` interface and `V1_InitialSchema`.**
+   - `Pandowdy.Project/Migrations/ISchemaMigration.cs` — `FromVersion`, `ToVersion`, `Apply()`.
+   - `Pandowdy.Project/Migrations/V1_InitialSchema.cs` — DDL for the 6 V1 tables:
+     `project_metadata`, `disk_images`, `mount_configuration`, `emulator_overrides`,
+     `display_overrides`, `project_settings`.
+   - Deferred tables (breakpoints, watches, symbols, disassembly_cache, applesoft_sources,
+     execution_history, workspace_layout, user_annotations) are **not** created in V1.
+     They will be added by future migrations when their features are implemented.
 
-### Phase 5: Debugger Storage Integration
+5. **Implement `SkilletSchemaManager`.**
+   - `Pandowdy.Project/Services/SkilletSchemaManager.cs`
+   - `InitializeSchemaAsync(SqliteConnection)` — sets pragmas, runs V1 migration.
+   - `MigrateAsync(SqliteConnection, int currentVersion)` — sequential migration runner.
+   - Seeds `project_metadata` rows (name, timestamps, schema version, Pandowdy version).
+   - Seeds default `mount_configuration` (slot 6, drives 1 & 2, empty).
 
-**Goal:** Wire debugger state persistence into `.skillet`.
+6. **Implement PIDI blob serializer (`DiskBlobStore`).**
+   - `Pandowdy.Project/Services/DiskBlobStore.cs`
+   - `Serialize(InternalDiskImage) → byte[]` — PIDI header (10 bytes, uncompressed) +
+     Deflate-compressed per-track payload + CRC-32 footer.
+   - `Deserialize(byte[]) → InternalDiskImage` — validates magic and CRC-32,
+     decompresses Deflate payload, reconstructs tracks.
+   - `Deserialize(Stream) → InternalDiskImage` — streaming variant for SQLite blob reads.
+   - Compression: `DeflateStream` with `CompressionLevel.Optimal` (`System.IO.Compression`,
+     built into .NET runtime — no new package).
+   - Uses `System.IO.Hashing.Crc32` (already in `Pandowdy.EmuCore`'s dependency graph).
 
-1. Implement breakpoint CRUD in `SkilletProject`.
-2. Implement watch CRUD in `SkilletProject`.
-3. Implement symbol CRUD in `SkilletProject`.
-4. On project open: load debugger state → feed into debugger subsystem.
-5. On project save: persist debugger state from in-memory to `.skillet`.
-6. Wire into Task 19 debugger implementation when breakpoints are built.
+7. **Implement `ProjectSettingsStore`.**
+   - `Pandowdy.Project/Services/ProjectSettingsStore.cs`
+   - Generic key-value CRUD against any `(key TEXT, value TEXT)` table.
+   - `GetAsync(connection, tableName, key) → string?`
+   - `SetAsync(connection, tableName, key, value)` — UPSERT via `INSERT OR REPLACE`.
+   - `GetAllAsync(connection, tableName) → Dictionary<string, string>`
+   - `RemoveAsync(connection, tableName, key)`
 
-### Phase 6: Workspace Layout Persistence
+8. **Implement `ISkilletProject` / `SkilletProject`.**
+   - `Pandowdy.Project/Interfaces/ISkilletProject.cs` — interface per §5.5.
+   - `Pandowdy.Project/Services/SkilletProject.cs` — implementation.
+   - Phase 1 scope: metadata queries, settings CRUD, disk image CRUD (metadata rows +
+     blob read/write), mount configuration CRUD.
+   - Debugger, AppleSoft, and workspace layout methods are not included in the Phase 1
+     interface. They will be added to `ISkilletProject` when their features and schema
+     tables are implemented in deferred phases.
 
-**Goal:** Save/restore per-project UI layout.
+9. **Implement `ISkilletProjectManager` / `SkilletProjectManager`.**
+   - `Pandowdy.Project/Interfaces/ISkilletProjectManager.cs` — interface per §5.6.
+   - `Pandowdy.Project/Services/SkilletProjectManager.cs` — implementation.
+   - `CreateAsync(filePath, projectName)` — creates file, runs schema init, returns handle.
+   - `OpenAsync(filePath)` — validates application_id, runs migrations if needed, returns handle.
+   - `CloseAsync()` — disposes current project.
 
-1. Implement `WorkspaceLayout` load/save in `SkilletProject`.
-2. On project open: restore panel visibility, docking state.
-3. On project close: capture current UI state → save to `.skillet`.
-4. Handle missing layout gracefully (fall back to JSON defaults).
+10. **Add project references from host and UI projects.**
+    - `Pandowdy.csproj` → `<ProjectReference>` to `Pandowdy.Project`.
+    - `Pandowdy.UI.csproj` → `<ProjectReference>` to `Pandowdy.Project`.
 
-### Phase 7: Polish & Integration Testing
+11. **Write unit tests for all Phase 1 deliverables.**
+    - `SkilletSchemaManagerTests.cs` — schema creation, pragma verification, table existence.
+    - `DiskBlobStoreTests.cs` — serialize/deserialize round-trip, CRC validation, corrupt data.
+    - `ProjectSettingsStoreTests.cs` — get/set/remove/upsert across key-value tables.
+    - `SkilletProjectTests.cs` — disk image CRUD (metadata), mount config CRUD.
+    - `SkilletProjectManagerTests.cs` — create/open/close lifecycle, invalid file rejection.
+    - Use in-memory SQLite (`Data Source=:memory:`) for unit tests.
+    - Use temp files for lifecycle tests (create → close → reopen → verify).
 
-**Goal:** End-to-end workflows, edge cases, cross-platform validation.
+#### Deliverables
 
-1. Full round-trip integration tests (create → import → mount → modify → save → reopen → verify).
-2. Cross-platform testing (Windows, macOS, Linux).
-3. Error handling for corrupt `.skillet` files.
-4. Large disk image performance testing.
-5. Update `Development-Roadmap.md` with Task 32 progress.
+| Artifact | State |
+|----------|-------|
+| `Pandowdy.Project/` class library | New project, compiles, in solution |
+| `Pandowdy.Project.Tests/` test project | New project, compiles, all tests green |
+| Schema creation | 6 V1 tables created, pragmas verified |
+| PIDI blob round-trip | `InternalDiskImage` → blob → `InternalDiskImage`, binary-identical |
+| Project lifecycle | Create → open → close → reopen cycle works |
+
+#### Test Gate
+
+All unit tests pass. Solution builds cleanly. No regressions in existing tests.
+
+---
+
+### Phase 2: Disk Lifecycle Migration
+
+**Goal:** Replace the legacy filesystem-based disk open/save workflow with the
+`.skillet`-based import/mount/export lifecycle. At the end of this phase, disk
+images are ingested into the `.skillet` file, mounted from blobs, and exported
+on demand — the emulator never reads from or writes to external disk files during
+normal operation.
+
+**Depends on:** Phase 1 (project infrastructure, blob store).
+
+#### Steps
+
+1. **Implement disk import flow in `SkilletProject`.**
+   - `ImportDiskImageAsync(filePath, name)` — uses existing `IDiskImageImporter` to load
+     the file, serializes via `DiskBlobStore.Serialize()`, inserts both `original_blob` and
+     initial `working_blob` into `disk_images` table.
+   - Detects format via `DiskFormatHelper.FromExtension()`.
+   - Records `original_filename`, `original_format`, `import_source_path`.
+
+2. **Implement disk mount flow (blob → emulator).**
+   - `SkilletProject.OpenWorkingBlobRead(diskImageId)` — streams `working_blob` (falls
+     back to `original_blob` if null).
+   - Deserializes blob → `InternalDiskImage` via `DiskBlobStore.Deserialize()`.
+   - Add `MountDiskMessage(int DriveNumber, InternalDiskImage DiskImage)` to
+     `Pandowdy.EmuCore/DiskII/Messages/`.
+   - Implement `MountDiskMessage` handling in `DiskIIControllerCard` (both 13- and 16-sector
+     variants) — same logic as `InsertDiskMessage` but receives `InternalDiskImage` directly
+     instead of a file path.
+
+3. **Implement disk export flow.**
+   - Add `ExportDiskMessage(int DriveNumber, string FilePath, DiskFormat Format)` to
+     `Pandowdy.EmuCore/DiskII/Messages/`.
+   - Implement handler: retrieves in-memory `InternalDiskImage` from drive, uses existing
+     `IDiskImageExporter` to write to filesystem.
+   - No project state changes — export is non-destructive.
+
+4. **Implement working copy persistence in `SkilletProject.SaveAsync()`.**
+   - For each disk with `persist_working = true` AND `working_dirty = true`:
+     serialize current in-memory `InternalDiskImage` → `UPDATE disk_images SET working_blob = ?`.
+   - Clear `working_dirty` flag after successful write.
+   - Wrap in transaction with metadata timestamp update.
+
+5. **Implement working copy regeneration.**
+   - `RegenerateWorkingCopyAsync(diskImageId)` — sets `working_blob = NULL`,
+     `working_dirty = 0`.
+   - Next mount reads from `original_blob` instead.
+
+6. **Write tests for disk lifecycle.**
+   - `DiskImportTests.cs` — import WOZ/nibble format/DSK files, verify blob stored correctly.
+   - `DiskMountTests.cs` — mount from blob, verify `InternalDiskImage` is usable.
+   - `DiskExportTests.cs` — export in-memory disk to file, verify output format.
+   - `DiskPersistenceTests.cs` — modify disk, save project, reopen, verify working copy.
+   - `DiskRegenerationTests.cs` — regenerate working copy, verify reverts to original.
+   - `DiskImportExportRoundTripTests.cs` — full import → mount → modify → save → reopen
+     → export cycle.
+
+#### Deliverables
+
+| Artifact | State |
+|----------|-------|
+| `MountDiskMessage` | New message type in EmuCore |
+| `ExportDiskMessage` | New message type in EmuCore |
+| Disk import into `.skillet` | External file → blob, metadata recorded |
+| Disk mount from `.skillet` | Blob → `InternalDiskImage` → emulator drive |
+| Working copy save/restore | Dirty disks persist across sessions |
+| Export to filesystem | In-memory disk → external file format |
+
+#### Test Gate
+
+All disk lifecycle tests pass. Blob round-trip is binary-identical. Import/export
+works for all supported formats (WOZ, nibble format, DSK/DO/PO).
+
+---
+
+### Phase 3: Settings Resolution & Project Overrides
+
+**Goal:** Implement the four-layer settings resolution model so that emulator
+and display settings can be overridden per-project. Add `RecentProjects` and
+`ActiveProjectPath` to `GuiSettings`.
+
+**Depends on:** Phase 1 (project settings store).
+
+#### Steps
+
+1. **Implement `ISettingsResolver` / `SettingsResolver`.**
+   - `Pandowdy.Project/Interfaces/ISettingsResolver.cs` — interface per §8.
+   - `Pandowdy.Project/Services/SettingsResolver.cs` — implementation.
+   - Resolution order: hardcoded → JSON (`GuiSettings`) → `.skillet` (`emulator_overrides`
+     / `display_overrides`) → runtime.
+
+2. **Add `RecentProjects` and `ActiveProjectPath` to `GuiSettings`.**
+   - Add `RecentProject` model class to `Pandowdy.UI/Models/`.
+   - Add `List<RecentProject>? RecentProjects` and `string? ActiveProjectPath` to `GuiSettings`.
+   - Update `GuiSettingsService` serialization to handle new properties.
+
+3. **Wire `SettingsResolver` into DI.**
+   - Register `ISettingsResolver` as singleton in `Program.cs`.
+   - Inject into `MainWindowViewModel` (replaces direct `GuiSettings` reads for
+     overridable settings).
+
+4. **Write tests for resolution logic.**
+   - `SettingsResolverTests.cs` — hardcoded fallback, JSON override, skillet override,
+     correct precedence order.
+
+#### Deliverables
+
+| Artifact | State |
+|----------|-------|
+| `ISettingsResolver` / `SettingsResolver` | New service, DI-registered |
+| `GuiSettings` additions | `RecentProjects`, `ActiveProjectPath` |
+| Resolution tests | All 4 layers verified |
+
+#### Test Gate
+
+All resolution tests pass. Existing `GuiSettingsService` tests still pass.
+
+---
+
+### Phase 4: UI — Start Page & Project Dialogs
+
+**Goal:** Give users a way to create, open, and switch `.skillet` projects through
+the UI. The Start Page replaces the current "empty launch" state. The File menu
+gains project-oriented commands.
+
+**Depends on:** Phases 1–3 (project manager, settings, recent projects).
+
+#### Steps
+
+1. **Create `StartPageViewModel`.**
+   - `Pandowdy.UI/ViewModels/StartPageViewModel.cs`
+   - Exposes `RecentProjects` collection, `CreateProjectCommand`, `OpenProjectCommand`.
+   - Receives `ISkilletProjectManager` and `GuiSettingsService` via DI.
+
+2. **Create `StartPage.axaml`.**
+   - `Pandowdy.UI/Views/StartPage.axaml` + code-behind.
+   - Layout per §9.1: "Create New Project" panel + "Recent Projects" list.
+
+3. **Create `NewProjectDialogViewModel` and dialog.**
+   - `Pandowdy.UI/ViewModels/NewProjectDialogViewModel.cs`
+   - `Pandowdy.UI/Views/NewProjectDialog.axaml` + code-behind.
+   - Fields: project name, folder location, file name.
+
+4. **Modify `MainWindow` to show Start Page when no project is open.**
+   - Add a `ContentControl` that switches between Start Page and the main workspace.
+   - When `ISkilletProjectManager.CurrentProject` is null → show Start Page.
+
+5. **Implement startup flow.**
+   - On launch: read `ActiveProjectPath` from `GuiSettings`.
+   - If file exists → auto-open project, skip Start Page.
+   - If not → show Start Page.
+
+6. **Update File menu.**
+   - Add: New Project, Open Project, Save Project, Import Disk Image, Export Disk Image,
+     Close Project, Recent Projects submenu.
+   - Wire commands to `ISkilletProjectManager` and `ISkilletProject`.
+
+7. **Update `DiskStatusWidgetViewModel` commands.**
+   - "Insert Disk" → opens file dialog, calls `ISkilletProject.ImportDiskImageAsync()`,
+     then mounts via `MountDiskMessage`.
+   - "Save" → `ISkilletProject.SaveAsync()` (persists working copy to `.skillet`).
+   - "Save As" → becomes "Export Disk" → `ExportDiskMessage`.
+   - "Insert Blank Disk" → creates blank `InternalDiskImage`, inserts into project, mounts.
+
+8. **Write tests for Start Page and project commands.**
+   - `StartPageViewModelTests.cs` — recent projects list, create/open commands.
+   - `NewProjectDialogViewModelTests.cs` — validation, path generation.
+
+#### Deliverables
+
+| Artifact | State |
+|----------|-------|
+| Start Page | New view + view model, shown on launch |
+| New Project Dialog | New dialog for creating `.skillet` files |
+| File menu | Project-oriented commands |
+| Disk widget commands | Updated for import/mount/export workflow |
+
+#### Test Gate
+
+Start Page renders. Project creation flow works end-to-end. File menu commands
+function. Existing UI tests still pass.
+
+---
+
+### Phase 5: Legacy Cleanup
+
+**Goal:** Remove dead code paths that are fully superseded by the `.skillet`
+workflow. This phase runs after Phases 2–4 are proven working.
+
+**Depends on:** Phases 2 and 4 (disk lifecycle and UI are fully wired).
+
+#### Steps
+
+1. **Remove `SaveDiskMessage`.**
+   - Delete `Pandowdy.EmuCore/DiskII/Messages/SaveDiskMessage.cs`.
+   - Remove handler in `DiskIIControllerCard` (both variants).
+   - Remove all references.
+
+2. **Remove `SaveDiskAsMessage`.**
+   - Delete `Pandowdy.EmuCore/DiskII/Messages/SaveDiskAsMessage.cs`.
+   - Remove handler in `DiskIIControllerCard` (both variants).
+   - Remove all references (replaced by `ExportDiskMessage`).
+
+3. **Remove `DestinationFilePath` and `DestinationFormat` from `InternalDiskImage`.**
+   - Remove properties (lines 100–121 of current `InternalDiskImage.cs`).
+   - Fix all compilation errors from removed properties.
+
+4. **Remove `DriveStateService` and related types.**
+   - Delete `Pandowdy.UI/Services/DriveStateService.cs`.
+   - Delete `Pandowdy.UI/Interfaces/IDriveStateService.cs`.
+   - Delete `Pandowdy.UI/Models/DriveStateConfig.cs`.
+   - Delete `Pandowdy.UI.Tests/Services/DriveStateServiceTests.cs`.
+   - Remove `DriveStateSettings`, `DiskControllerEntry`, `DriveEntry` from `GuiSettings.cs`.
+   - Remove `DriveState` property from `GuiSettings`.
+   - Remove DI registration for `IDriveStateService` from `Program.cs`.
+
+5. **Remove legacy `InsertDiskMessage` (file-path variant).**
+   - Evaluate whether `InsertDiskMessage(DriveNumber, DiskImagePath)` is still needed.
+   - If all insertion now flows through `MountDiskMessage` → remove it.
+   - If retained for future loose-disk mode → mark with `[Obsolete]` and document intent.
+
+6. **Clean up `MainWindowViewModel` exit flow.**
+   - `HandleExitAsync()` currently checks `dirtyDisks` via `DiskStatusWidgetViewModel`.
+   - Migrate to check `ISkilletProject.HasUnsavedChanges` instead.
+   - Prompt: "Save project before exiting?" → calls `SaveAsync()`.
+
+7. **Build and fix all compilation errors.**
+   - `dotnet build` the full solution.
+   - Fix all remaining references to removed types.
+
+#### Deliverables
+
+| Artifact | State |
+|----------|-------|
+| `SaveDiskMessage` | Deleted |
+| `SaveDiskAsMessage` | Deleted |
+| `InternalDiskImage.DestinationFilePath` | Removed |
+| `InternalDiskImage.DestinationFormat` | Removed |
+| `DriveStateService` + interfaces + models | Deleted |
+| `DriveStateSettings` in `GuiSettings` | Removed |
+
+#### Test Gate
+
+Solution builds cleanly with zero references to removed types. All existing tests
+pass (tests for deleted types are also deleted). No regressions.
+
+---
+
+### Phase 6: Integration Testing & Polish
+
+**Goal:** End-to-end validation of the full `.skillet` workflow. Verify the
+complete user journey from project creation through disk management to project
+reopen.
+
+**Depends on:** Phases 1–5 (all core functionality in place).
+
+#### Steps
+
+1. **Write full round-trip integration tests.**
+   - Create project → import disk → mount → modify (write to disk in emulator) →
+     save project → close → reopen → verify working copy has modifications →
+     export to filesystem → verify exported file.
+
+2. **Write project validation tests.**
+   - Opening a non-SQLite file → graceful error.
+   - Opening a SQLite file without correct `application_id` → graceful error.
+   - Opening a corrupted `.skillet` → graceful error.
+   - Opening a future-version `.skillet` (higher `user_version`) → informative error.
+
+3. **Write multi-disk project tests.**
+   - Import multiple disk images.
+   - Mount to different slots/drives.
+   - Verify mount configuration persists across sessions.
+   - Swap disks between drives, verify state.
+
+4. **Write settings override integration tests.**
+   - Create project with throttle override → close → reopen → verify override applied.
+   - Delete override → verify falls back to JSON default.
+
+5. **Performance baseline for blob operations.**
+   - Time serialize/deserialize for a 35-track disk (~230KB).
+   - Time full project save with 2 dirty disks.
+   - Log results; flag if >500ms for either operation.
+
+6. **Update `Development-Roadmap.md`.**
+   - Mark Task 32 phases complete with dates and notes.
+
+#### Deliverables
+
+| Artifact | State |
+|----------|-------|
+| Integration test suite | All scenarios pass |
+| Error handling | Corrupt/invalid files handled gracefully |
+| Performance baseline | Documented, within acceptable range |
+
+#### Test Gate
+
+All integration tests pass. No regressions in any existing test project.
+
+---
+
+### Deferred Phases
+
+Deferred phases (Debugger Storage, AppleSoft Storage, Workspace Layout) are
+documented in `docs/Skillet_Deferred_Features_Reference.md` §9.
+
+---
+
+### Phase Summary
+
+| Phase | Priority | Depends On | Core Deliverable |
+|-------|----------|------------|------------------|
+| 1. Foundation | **P0** | — | Project + schema + blob store + lifecycle |
+| 2. Disk Lifecycle | **P0** | Phase 1 | Import / mount / export / persist |
+| 3. Settings | **P1** | Phase 1 | Four-layer resolution + recent projects |
+| 4. UI | **P1** | Phases 1–3 | Start Page + project dialogs + updated menus |
+| 5. Legacy Cleanup | **P2** | Phases 2, 4 | Remove dead code (SaveDisk*, DriveState*) |
+| 6. Integration Testing | **P2** | Phases 1–5 | End-to-end validation |
 
 ---
 
