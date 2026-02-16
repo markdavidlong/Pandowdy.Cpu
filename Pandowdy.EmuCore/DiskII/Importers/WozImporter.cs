@@ -110,65 +110,63 @@ public class WozImporter : IDiskImageImporter
                     $"Only 5.25\" GCR disks are supported. Found: {wozImage.DiskKind}");
             }
 
-            // Extract track data - for now, only import main track positions (quarter = 0)
-            // WOZ can store quarter-track data, but InternalDiskImage uses full tracks
-            var tracks = new CircularBitBuffer[MaxTracks];
-            var trackBitCounts = new int[MaxTracks];
+            // Extract all quarter-track data from WOZ file
+            // WOZ format supports quarter-track resolution for copy-protected disks
+            int quarterTrackCount = InternalDiskImage.CalculateQuarterTrackCount(MaxTracks);
+            var quarterTracks = new CircularBitBuffer?[quarterTrackCount];
+            var quarterTrackBitCounts = new int[quarterTrackCount];
             int tracksFound = 0;
 
+            // Iterate through all quarter-track positions
             for (int track = 0; track < MaxTracks; track++)
             {
-                // Try to get the main track (quarter position 0)
-                if (wozImage.GetTrackBits((uint)track, 0, out CircularBitBuffer? cbb) && cbb != null)
-                {
-                    // DiskArc returns read-only buffers; copy into writable buffers
-                    // so the emulator can write to disk
-                    int bitCount = cbb.BitCount;
-                    int byteCount = (bitCount + 7) / 8;
-                    byte[] trackData = new byte[byteCount];
+                // For each physical track, check all quarter positions (0, 1, 2, 3)
+                // But the last track (34) has no quarter positions beyond it
+                int maxQuarter = (track < MaxTracks - 1) ? 4 : 1;
 
-                    cbb.BitPosition = 0;
-                    for (int i = 0; i < byteCount; i++)
+                for (int quarter = 0; quarter < maxQuarter; quarter++)
+                {
+                    int quarterIndex = InternalDiskImage.TrackAndQuarterToIndex(track, quarter);
+
+                    // Try to get this quarter-track from the WOZ image
+                    if (wozImage.GetTrackBits((uint)track, (uint)quarter, out CircularBitBuffer? cbb) && cbb != null)
                     {
-                        trackData[i] = cbb.ReadOctet();
-                    }
+                        // DiskArc returns read-only buffers; copy into writable buffers
+                        // so the emulator can write to disk
+                        int bitCount = cbb.BitCount;
+                        int byteCount = (bitCount + 7) / 8;
+                        byte[] trackData = new byte[byteCount];
 
-                    tracks[track] = new CircularBitBuffer(
-                        trackData,
-                        byteOffset: 0,
-                        bitOffset: 0,
-                        bitCount: bitCount,
-                        new GroupBool(),
-                        isReadOnly: false
-                    );
-                    trackBitCounts[track] = bitCount;
-                    tracksFound++;
-                }
-                else
-                {
-                    // Track not found - create empty track with standard size
-                    int standardBitCount = DiskIIConstants.BitsPerTrack;
-                    byte[] emptyTrackData = new byte[(standardBitCount + 7) / 8];
-                    tracks[track] = new CircularBitBuffer(
-                        emptyTrackData,
-                        byteOffset: 0,
-                        bitOffset: 0,
-                        bitCount: standardBitCount,
-                        new GroupBool(),
-                        isReadOnly: false
-                    );
-                    trackBitCounts[track] = standardBitCount;
+                        cbb.BitPosition = 0;
+                        for (int i = 0; i < byteCount; i++)
+                        {
+                            trackData[i] = cbb.ReadOctet();
+                        }
+
+                        quarterTracks[quarterIndex] = new CircularBitBuffer(
+                            trackData,
+                            byteOffset: 0,
+                            bitOffset: 0,
+                            bitCount: bitCount,
+                            new GroupBool(),
+                            isReadOnly: false
+                        );
+                        quarterTrackBitCounts[quarterIndex] = bitCount;
+                        tracksFound++;
+                    }
+                    // If no data for this quarter-track, leave it null (unwritten)
+                    // The emulator will return MC3470 random noise when reading
                 }
             }
 
-            Debug.WriteLine($"WozImporter: Imported .woz disk image from {sourcePath ?? "(stream)"} ({tracksFound}/{MaxTracks} tracks found)");
+            Debug.WriteLine($"WozImporter: Imported .woz disk image from {sourcePath ?? "(stream)"} ({tracksFound}/{quarterTrackCount} quarter-tracks found)");
 
             // Get optimal bit timing from WOZ metadata (default to 32 if not available)
             byte optimalTiming = 32; // Default standard timing
             // Note: CiderPress2's Woz class doesn't expose optimal timing directly
             // For full timing accuracy, would need to parse WOZ INFO chunk manually
 
-            return new InternalDiskImage(tracks, trackBitCounts)
+            return new InternalDiskImage(MaxTracks, quarterTracks, quarterTrackBitCounts)
             {
                 SourceFilePath = sourcePath,
                 OriginalFormat = DiskFormat.Woz,

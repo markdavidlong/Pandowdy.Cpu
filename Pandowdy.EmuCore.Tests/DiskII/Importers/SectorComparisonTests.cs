@@ -50,7 +50,7 @@ public class SectorComparisonTests(ITestOutputHelper output)
         // Load with legacy SectorDiskImageProvider
         using var legacyProvider = new SectorDiskImageProvider(sourceCopy.FilePath);
 
-        _output.WriteLine($"SectorImporter: {newImage.Tracks.Length} tracks");
+        _output.WriteLine($"SectorImporter: {newImage.PhysicalTrackCount} tracks");
         _output.WriteLine($"Legacy provider: Ready");
         _output.WriteLine("");
 
@@ -61,12 +61,12 @@ public class SectorComparisonTests(ITestOutputHelper output)
         int totalSectorsChecked = 0;
 
         // Compare each track
-        for (int track = 0; track < newImage.Tracks.Length && track < 35; track++)
+        for (int track = 0; track < newImage.PhysicalTrackCount && track < 35; track++)
         {
             _output.WriteLine($"--- Track {track} ---");
 
             // Decode sectors from new importer
-            var newSectors = DecodeSectorsFromTrack(newImage.Tracks[track], track, codec);
+            var newSectors = DecodeSectorsFromTrack(newImage.QuarterTracks[InternalDiskImage.TrackToQuarterTrackIndex(track)]!, track, codec);
 
             // Get legacy track by triggering synthesis
             legacyProvider.SetQuarterTrack(track * 4);
@@ -220,7 +220,7 @@ public class SectorComparisonTests(ITestOutputHelper output)
 
         InternalDiskImage doImage = importer.Import(sourceCopy.FilePath);
 
-        CircularBitBuffer track = doImage.Tracks[17];
+        CircularBitBuffer track = doImage.QuarterTracks[InternalDiskImage.TrackToQuarterTrackIndex(17)]!;
         SectorCodec codec = StdSectorCodec.GetCodec(StdSectorCodec.CodecIndex525.Std_525_16);
 
         // Reset to start
@@ -287,7 +287,7 @@ public class SectorComparisonTests(ITestOutputHelper output)
         var legacyTrackCache = (CircularBitBuffer?[])legacyTrackCacheField!.GetValue(legacyProvider)!;
         CircularBitBuffer legacyTrack = legacyTrackCache[0]!;
 
-        CircularBitBuffer newTrack = newImage.Tracks[0];
+        CircularBitBuffer newTrack = newImage.QuarterTracks[0]!;
 
         // Get raw buffer bytes via reflection
         var dataField = typeof(CircularBitBuffer)
@@ -298,7 +298,7 @@ public class SectorComparisonTests(ITestOutputHelper output)
 
         _output.WriteLine($"New buffer length: {newData.Length} bytes");
         _output.WriteLine($"Legacy buffer length: {legacyData.Length} bytes");
-        _output.WriteLine($"New bit count: {newImage.TrackBitCounts[0]}");
+        _output.WriteLine($"New bit count: {newImage.QuarterTrackBitCounts[0]}");
 
         // Get legacy bit count
         var bitCountsField = typeof(SectorDiskImageProvider)

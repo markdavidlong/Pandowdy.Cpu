@@ -76,7 +76,7 @@ public class DiskImageFactory : IDiskImageFactory
         System.Diagnostics.Debug.Write($"Calling importer with {filePath}");
         InternalDiskImage diskImage = importer.Import(filePath);
 
-        System.Diagnostics.Debug.WriteLine($"DiskImageFactory: Imported {diskImage.TrackCount} tracks, format={diskImage.OriginalFormat}");
+        System.Diagnostics.Debug.WriteLine($"DiskImageFactory: Imported {diskImage.PhysicalTrackCount} physical tracks ({diskImage.QuarterTrackCount} quarter-tracks), format={diskImage.OriginalFormat}");
 
         // Wrap with unified provider
         var provider = new UnifiedDiskImageProvider(diskImage);

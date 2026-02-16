@@ -102,9 +102,11 @@ public class NibImporter : IDiskImageImporter
         }
 
 
-        // Create tracks, each with its own independent byte array
-        var tracks = new CircularBitBuffer[DiskIIConstants.TrackCount];
-        var trackBitCounts = new int[DiskIIConstants.TrackCount];
+        // Create quarter-track arrays for the internal disk image
+        // NIB format only has whole-track data, so we populate indices 0, 4, 8, 12...
+        int quarterTrackCount = InternalDiskImage.CalculateQuarterTrackCount(DiskIIConstants.TrackCount);
+        var quarterTracks = new CircularBitBuffer?[quarterTrackCount];
+        var quarterTrackBitCounts = new int[quarterTrackCount];
 
         for (int track = 0; track < DiskIIConstants.TrackCount; track++)
         {
@@ -112,9 +114,11 @@ public class NibImporter : IDiskImageImporter
             byte[] trackData = new byte[DiskIIConstants.BytesPerNibTrack];
             Array.Copy(diskData, byteOffset, trackData, 0, DiskIIConstants.BytesPerNibTrack);
 
-            trackBitCounts[track] = DiskIIConstants.BitsPerTrack;
+            // Store at quarter-track index (track * 4)
+            int quarterIndex = InternalDiskImage.TrackToQuarterTrackIndex(track);
+            quarterTrackBitCounts[quarterIndex] = DiskIIConstants.BitsPerTrack;
 
-            tracks[track] = new CircularBitBuffer(
+            quarterTracks[quarterIndex] = new CircularBitBuffer(
                 trackData,
                 byteOffset: 0,
                 bitOffset: 0,
@@ -126,7 +130,7 @@ public class NibImporter : IDiskImageImporter
 
         Debug.WriteLine($"NibImporter: Imported .nib disk image from {sourcePath ?? "(stream)"} ({DiskIIConstants.TrackCount} tracks, {DiskIIConstants.BytesPerNibTrack} bytes per track)");
 
-        return new InternalDiskImage(tracks, trackBitCounts)
+        return new InternalDiskImage(DiskIIConstants.TrackCount, quarterTracks, quarterTrackBitCounts)
         {
             SourceFilePath = sourcePath,
             OriginalFormat = DiskFormat.Nib,

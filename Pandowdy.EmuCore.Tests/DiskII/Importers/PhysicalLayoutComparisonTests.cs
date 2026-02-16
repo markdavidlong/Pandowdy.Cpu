@@ -39,7 +39,7 @@ public class PhysicalLayoutComparisonTests(ITestOutputHelper output)
         // New importer (using temp copy)
         var importer = new SectorImporter();
         InternalDiskImage newImage = importer.Import(sourceCopy.FilePath);
-        CircularBitBuffer newTrack = newImage.Tracks[track];
+        CircularBitBuffer newTrack = newImage.QuarterTracks[InternalDiskImage.TrackToQuarterTrackIndex(track)]!;
 
         // Legacy provider (using temp copy)
         using var legacyProvider = new SectorDiskImageProvider(sourceCopy.FilePath);

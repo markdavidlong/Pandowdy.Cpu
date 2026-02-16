@@ -166,17 +166,24 @@ public class SectorImporter : IDiskImageImporter
             SectorCodec codec = StdSectorCodec.GetCodec(StdSectorCodec.CodecIndex525.Std_525_16);
 
             // Synthesize GCR tracks from sectors
-            var tracks = new CircularBitBuffer[NumTracks];
-            var trackBitCounts = new int[NumTracks];
+            // Sector formats only have whole-track data, so we populate quarter-track indices 0, 4, 8, 12...
+            int quarterTrackCount = InternalDiskImage.CalculateQuarterTrackCount(NumTracks);
+            var quarterTracks = new CircularBitBuffer?[quarterTrackCount];
+            var quarterTrackBitCounts = new int[quarterTrackCount];
 
             for (int track = 0; track < NumTracks; track++)
             {
-                (tracks[track], trackBitCounts[track]) = SynthesizeTrack(track, chunkAccess, codec, format);
+                var (trackBuffer, bitCount) = SynthesizeTrack(track, chunkAccess, codec, format);
+
+                // Store at quarter-track index (track * 4)
+                int quarterIndex = InternalDiskImage.TrackToQuarterTrackIndex(track);
+                quarterTracks[quarterIndex] = trackBuffer;
+                quarterTrackBitCounts[quarterIndex] = bitCount;
             }
 
             Debug.WriteLine($"SectorImporter: Imported {format} disk image from {sourcePath ?? "(stream)"} ({NumTracks} tracks, {SectorsPerTrack} sectors/track)");
 
-            return new InternalDiskImage(tracks, trackBitCounts)
+            return new InternalDiskImage(NumTracks, quarterTracks, quarterTrackBitCounts)
             {
                 SourceFilePath = sourcePath,
                 OriginalFormat = format,

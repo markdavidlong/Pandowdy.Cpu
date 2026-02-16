@@ -87,34 +87,32 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
     public byte OptimalBitTiming => _diskImage.OptimalBitTiming;
 
     /// <summary>
-    /// Gets the number of bits on the current track.
+    /// Gets the number of bits on the current quarter-track.
     /// </summary>
     public int CurrentTrackBitCount
     {
         get
         {
-            int track = _currentQuarterTrack / 4;
-            if (track < 0 || track >= _diskImage.TrackCount)
+            if (_currentQuarterTrack < 0 || _currentQuarterTrack >= _diskImage.QuarterTrackCount)
             {
                 return 51200; // Default standard track length
             }
-            return _diskImage.TrackBitCounts[track];
+            return _diskImage.QuarterTrackBitCounts[_currentQuarterTrack];
         }
     }
 
     /// <summary>
-    /// Gets the current bit position within the track.
+    /// Gets the current bit position within the quarter-track.
     /// </summary>
     public int TrackBitPosition
     {
         get
         {
-            int track = _currentQuarterTrack / 4;
-            if (track < 0 || track >= _diskImage.TrackCount)
+            if (_currentQuarterTrack < 0 || _currentQuarterTrack >= _diskImage.QuarterTrackCount)
             {
                 return 0;
             }
-            return _diskImage.Tracks[track].BitPosition;
+            return _diskImage.QuarterTracks[_currentQuarterTrack]?.BitPosition ?? 0;
         }
     }
 
@@ -130,7 +128,7 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
     public UnifiedDiskImageProvider(InternalDiskImage diskImage)
     {
         _diskImage = diskImage ?? throw new ArgumentNullException(nameof(diskImage));
-        Debug.WriteLine($"UnifiedDiskImageProvider: Created for {FilePath} ({_diskImage.TrackCount} tracks, format: {_diskImage.OriginalFormat})");
+        Debug.WriteLine($"UnifiedDiskImageProvider: Created for {FilePath} ({_diskImage.PhysicalTrackCount} physical tracks, {_diskImage.QuarterTrackCount} quarter-tracks, format: {_diskImage.OriginalFormat})");
     }
 
     /// <summary>
@@ -158,44 +156,56 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
     }
 
     /// <summary>
-    /// Sets the current track position based on the quarter-track value.
+    /// Sets the current quarter-track position.
     /// </summary>
-    /// <param name="qTrack">Quarter-track position (0-139 for 35 tracks, 0-159 for 40 tracks).</param>
+    /// <param name="qTrack">Quarter-track position (0-136 for 35 tracks, 0-156 for 40 tracks).</param>
+    /// <remarks>
+    /// Quarter-track positions are now accessed directly without quantization.
+    /// Cross-track bit position scaling uses the Applesauce formula when moving
+    /// between tracks with different bit counts.
+    /// </remarks>
     public void SetQuarterTrack(int qTrack)
     {
         if (_currentQuarterTrack != qTrack)
         {
-            int oldTrack = _currentQuarterTrack / 4;
-            int newTrack = qTrack / 4;
+            int oldQuarterTrack = _currentQuarterTrack;
 
-            // Apply Applesauce cross-track scaling formula when changing tracks
-            if (oldTrack != newTrack &&
-                oldTrack >= 0 && oldTrack < _diskImage.TrackCount &&
-                newTrack >= 0 && newTrack < _diskImage.TrackCount)
+            // Apply Applesauce cross-track scaling formula when changing quarter-tracks
+            // Only scale if both positions have data and different bit counts
+            if (oldQuarterTrack >= 0 && oldQuarterTrack < _diskImage.QuarterTrackCount &&
+                qTrack >= 0 && qTrack < _diskImage.QuarterTrackCount)
             {
-                int oldBitCount = _diskImage.TrackBitCounts[oldTrack];
-                int newBitCount = _diskImage.TrackBitCounts[newTrack];
-                int oldPosition = _diskImage.Tracks[oldTrack].BitPosition;
+                var oldBuffer = _diskImage.QuarterTracks[oldQuarterTrack];
+                var newBuffer = _diskImage.QuarterTracks[qTrack];
 
-                if (oldBitCount != newBitCount)
+                if (oldBuffer != null && newBuffer != null)
                 {
-                    // Scale position: newPos = oldPos × (newBitCount / oldBitCount)
-                    int newPosition = (int)((long)oldPosition * newBitCount / oldBitCount);
-                    _diskImage.Tracks[newTrack].BitPosition = newPosition;
-                    Debug.WriteLine($"UnifiedDiskImageProvider: Track {oldTrack}→{newTrack}, position scaled {oldPosition}→{newPosition} (bits {oldBitCount}→{newBitCount})");
+                    int oldBitCount = _diskImage.QuarterTrackBitCounts[oldQuarterTrack];
+                    int newBitCount = _diskImage.QuarterTrackBitCounts[qTrack];
+                    int oldPosition = oldBuffer.BitPosition;
+
+                    if (oldBitCount != newBitCount && oldBitCount > 0)
+                    {
+                        // Scale position: newPos = oldPos × (newBitCount / oldBitCount)
+                        int newPosition = (int)((long)oldPosition * newBitCount / oldBitCount);
+                        newBuffer.BitPosition = newPosition;
+                        Debug.WriteLine($"UnifiedDiskImageProvider: QTrack {oldQuarterTrack}→{qTrack}, position scaled {oldPosition}→{newPosition} (bits {oldBitCount}→{newBitCount})");
+                    }
                 }
             }
 
             _currentQuarterTrack = qTrack;
-            Debug.WriteLine($"UnifiedDiskImageProvider: Disk head moved to track {newTrack} (quarter-track {qTrack})");
+            int physicalTrack = InternalDiskImage.QuarterTrackIndexToTrack(qTrack);
+            int quarter = InternalDiskImage.QuarterTrackIndexToQuarter(qTrack);
+            Debug.WriteLine($"UnifiedDiskImageProvider: Disk head moved to track {physicalTrack}.{quarter * 25} (quarter-track {qTrack})");
         }
     }
 
     /// <summary>
-    /// Reads the next bit from the current track.
+    /// Reads the next bit from the current quarter-track.
     /// </summary>
     /// <param name="cycleCount">Current CPU cycle count used to calculate rotational position.</param>
-    /// <returns>The next bit (true or false) at the current rotational position.</returns>
+    /// <returns>The next bit (true or false) at the current rotational position, or random noise if no data.</returns>
     public bool? GetBit(ulong cycleCount)
     {
         // Initialize cycle offset on first access
@@ -213,26 +223,30 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
             _cycleOffsetAtFirstAccess = cycleCount;
         }
 
-        // Convert quarter-track to full track
-        int track = _currentQuarterTrack / 4;
-
-        // Check if we've already determined this quarter-track is out of bounds
+        // Check if we've already determined this quarter-track is out of bounds or empty
         if (_missingTracks.Contains(_currentQuarterTrack))
         {
-            return RandBit(); // Silently return random noise for known out-of-bounds tracks
+            return RandBit(); // Silently return random noise for known missing quarter-tracks
         }
 
-        // Clamp to valid track range and mark as missing if out of bounds
-        if (track < 0 || track >= _diskImage.TrackCount)
+        // Clamp to valid quarter-track range
+        if (_currentQuarterTrack < 0 || _currentQuarterTrack >= _diskImage.QuarterTrackCount)
         {
-            Debug.WriteLine($"UnifiedDiskImageProvider: Quarter-track {_currentQuarterTrack} (track {track}) is out of bounds");
+            Debug.WriteLine($"UnifiedDiskImageProvider: Quarter-track {_currentQuarterTrack} is out of bounds");
             _missingTracks.Add(_currentQuarterTrack);
             return RandBit(); // Return random noise (matches MC3470 hardware behavior)
         }
 
-        // Get current track buffer
-        CircularBitBuffer currentTrackBuffer = _diskImage.Tracks[track];
-        int trackBitCount = _diskImage.TrackBitCounts[track];
+        // Get current quarter-track buffer (may be null for unwritten quarter-tracks)
+        CircularBitBuffer? currentTrackBuffer = _diskImage.QuarterTracks[_currentQuarterTrack];
+        if (currentTrackBuffer == null)
+        {
+            // Unwritten quarter-track - return random noise (MC3470 behavior)
+            // Don't add to _missingTracks since this is expected for fractional positions
+            return RandBit();
+        }
+
+        int trackBitCount = _diskImage.QuarterTrackBitCounts[_currentQuarterTrack];
 
         // Cycle-based position: disk continuously spinning tied to system clock
         ulong relativeCycles = cycleCount - _cycleOffsetAtFirstAccess;
@@ -256,8 +270,7 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
         int bitsToRead = (int)(elapsedCycles / cyclesPerBit);
         bitsToRead = Math.Min(bitsToRead, bits.Length);
 
-        int track = _currentQuarterTrack / 4;
-        if (track < 0 || track >= _diskImage.TrackCount)
+        if (_currentQuarterTrack < 0 || _currentQuarterTrack >= _diskImage.QuarterTrackCount)
         {
             // Out of bounds - return random bits
             for (int i = 0; i < bitsToRead; i++)
@@ -267,7 +280,17 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
             return bitsToRead;
         }
 
-        CircularBitBuffer currentTrackBuffer = _diskImage.Tracks[track];
+        CircularBitBuffer? currentTrackBuffer = _diskImage.QuarterTracks[_currentQuarterTrack];
+        if (currentTrackBuffer == null)
+        {
+            // Unwritten quarter-track - return random bits
+            for (int i = 0; i < bitsToRead; i++)
+            {
+                bits[i] = RandBit();
+            }
+            return bitsToRead;
+        }
+
         for (int i = 0; i < bitsToRead; i++)
         {
             byte bitValue = currentTrackBuffer.ReadNextBit();
@@ -278,11 +301,15 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
     }
 
     /// <summary>
-    /// Writes a bit to the current track position.
+    /// Writes a bit to the current quarter-track position.
     /// </summary>
     /// <param name="bit">Bit value to write (true = 1, false = 0).</param>
     /// <param name="cycleCount">Current CPU cycle count (for timing).</param>
     /// <returns>True if write succeeded, false if write-protected or out of bounds.</returns>
+    /// <remarks>
+    /// If writing to an unwritten quarter-track, a new track buffer is created.
+    /// This allows the emulator to write to any quarter-track position at runtime.
+    /// </remarks>
     public bool WriteBit(bool bit, ulong cycleCount)
     {
         if (IsWriteProtected)
@@ -290,13 +317,32 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
             return false; // Write-protected
         }
 
-        int track = _currentQuarterTrack / 4;
-        if (track < 0 || track >= _diskImage.TrackCount)
+        if (_currentQuarterTrack < 0 || _currentQuarterTrack >= _diskImage.QuarterTrackCount)
         {
             return false; // Out of bounds
         }
 
-        CircularBitBuffer currentTrackBuffer = _diskImage.Tracks[track];
+        CircularBitBuffer? currentTrackBuffer = _diskImage.QuarterTracks[_currentQuarterTrack];
+
+        // If this quarter-track doesn't exist yet, create it with standard size
+        if (currentTrackBuffer == null)
+        {
+            int standardBitCount = DiskIIConstants.BitsPerTrack;
+            int byteCount = (standardBitCount + 7) / 8;
+            byte[] trackData = new byte[byteCount];
+            currentTrackBuffer = new CircularBitBuffer(
+                trackData,
+                byteOffset: 0,
+                bitOffset: 0,
+                bitCount: standardBitCount,
+                new GroupBool(),
+                isReadOnly: false
+            );
+            _diskImage.QuarterTracks[_currentQuarterTrack] = currentTrackBuffer;
+            _diskImage.QuarterTrackBitCounts[_currentQuarterTrack] = standardBitCount;
+            Debug.WriteLine($"UnifiedDiskImageProvider: Created new quarter-track {_currentQuarterTrack} for write");
+        }
+
         currentTrackBuffer.WriteBit(bit ? 1 : 0);
         _diskImage.MarkDirty();
         return true;

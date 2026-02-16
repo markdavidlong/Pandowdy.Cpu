@@ -202,7 +202,7 @@ public class NibImporterTests
 
         // Assert
         Assert.NotNull(diskImage);
-        Assert.Equal(35, diskImage.TrackCount);
+        Assert.Equal(35, diskImage.PhysicalTrackCount);
         Assert.Equal(DiskFormat.Nib, diskImage.OriginalFormat);
         Assert.Null(diskImage.SourceFilePath); // Stream import has no file path
         Assert.Equal(32, diskImage.OptimalBitTiming);
@@ -242,7 +242,7 @@ public class NibImporterTests
 
         // Assert - Images should be independent
         Assert.NotSame(diskImage1, diskImage2);
-        Assert.NotSame(diskImage1.Tracks, diskImage2.Tracks);
+        Assert.NotSame(diskImage1.QuarterTracks, diskImage2.QuarterTracks);
         Assert.NotEqual(diskImage1.SourceFilePath, diskImage2.SourceFilePath);
     }
 
@@ -264,7 +264,7 @@ public class NibImporterTests
 
         // Assert - Images should be independent (separate memory)
         Assert.NotSame(diskImage1, diskImage2);
-        Assert.NotSame(diskImage1.Tracks, diskImage2.Tracks);
+        Assert.NotSame(diskImage1.QuarterTracks, diskImage2.QuarterTracks);
         Assert.Equal(diskImage1.SourceFilePath, diskImage2.SourceFilePath);
     }
 

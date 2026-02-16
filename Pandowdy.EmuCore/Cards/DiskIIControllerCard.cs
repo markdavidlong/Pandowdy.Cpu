@@ -1467,7 +1467,7 @@ public abstract class DiskIIControllerCard : ICard
 
             // Create a blank internal disk image (35 tracks, unformatted)
             var blankImage = new InternalDiskImage(
-                trackCount: 35,
+                physicalTrackCount: 35,
                 standardTrackBitCount: 51200) // Standard NIB bit count
             {
                 // Set source and destination paths (blank disk is its own source)

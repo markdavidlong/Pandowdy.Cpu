@@ -16,81 +16,107 @@ public class InternalDiskImageTests
     #region Constructor Tests
 
     [Fact]
-    public void Constructor_DefaultParameters_Creates35TrackDisk()
+    public void Constructor_DefaultParameters_Creates35TrackDiskWith137QuarterTracks()
     {
         // Act
         var disk = new InternalDiskImage();
 
         // Assert
-        Assert.Equal(35, disk.TrackCount);
-        Assert.NotNull(disk.Tracks);
-        Assert.NotNull(disk.TrackBitCounts);
-        Assert.Equal(35, disk.Tracks.Length);
-        Assert.Equal(35, disk.TrackBitCounts.Length);
+        Assert.Equal(35, disk.PhysicalTrackCount);
+        Assert.Equal(137, disk.QuarterTrackCount); // (35-1)*4+1 = 137
+        Assert.NotNull(disk.QuarterTracks);
+        Assert.NotNull(disk.QuarterTrackBitCounts);
+        Assert.Equal(137, disk.QuarterTracks.Length);
+        Assert.Equal(137, disk.QuarterTrackBitCounts.Length);
     }
 
     [Fact]
-    public void Constructor_DefaultParameters_SetsStandardBitCount()
+    public void Constructor_DefaultParameters_InitializesOnlyWholeTrackPositions()
     {
         // Act
         var disk = new InternalDiskImage();
 
-        // Assert
-        Assert.All(disk.TrackBitCounts, bitCount => Assert.Equal(51200, bitCount));
+        // Assert - Only whole-track positions (0, 4, 8, 12...) should be populated
+        for (int qTrack = 0; qTrack < disk.QuarterTrackCount; qTrack++)
+        {
+            int quarter = InternalDiskImage.QuarterTrackIndexToQuarter(qTrack);
+            if (quarter == 0)
+            {
+                // Whole-track position - should have data
+                Assert.NotNull(disk.QuarterTracks[qTrack]);
+                Assert.Equal(51200, disk.QuarterTrackBitCounts[qTrack]);
+            }
+            else
+            {
+                // Fractional position - should be null
+                Assert.Null(disk.QuarterTracks[qTrack]);
+                Assert.Equal(0, disk.QuarterTrackBitCounts[qTrack]);
+            }
+        }
     }
 
     [Fact]
-    public void Constructor_CustomTrackCount_CreatesCorrectNumberOfTracks()
+    public void Constructor_CustomTrackCount_CreatesCorrectQuarterTrackCount()
     {
         // Act
-        var disk = new InternalDiskImage(trackCount: 40);
+        var disk = new InternalDiskImage(physicalTrackCount: 40);
 
         // Assert
-        Assert.Equal(40, disk.TrackCount);
-        Assert.Equal(40, disk.Tracks.Length);
-        Assert.Equal(40, disk.TrackBitCounts.Length);
+        Assert.Equal(40, disk.PhysicalTrackCount);
+        Assert.Equal(157, disk.QuarterTrackCount); // (40-1)*4+1 = 157
+        Assert.Equal(157, disk.QuarterTracks.Length);
+        Assert.Equal(157, disk.QuarterTrackBitCounts.Length);
     }
 
     [Fact]
-    public void Constructor_CustomBitCount_SetsAllTracksToCustomBitCount()
+    public void Constructor_CustomBitCount_SetsWholeTrackPositionsToCustomBitCount()
     {
         // Arrange
         const int customBitCount = 50000;
 
         // Act
-        var disk = new InternalDiskImage(trackCount: 35, standardTrackBitCount: customBitCount);
+        var disk = new InternalDiskImage(physicalTrackCount: 35, standardTrackBitCount: customBitCount);
 
-        // Assert
-        Assert.All(disk.TrackBitCounts, bitCount => Assert.Equal(customBitCount, bitCount));
+        // Assert - Check whole-track positions (0, 4, 8, 12...)
+        for (int track = 0; track < 35; track++)
+        {
+            int quarterIndex = InternalDiskImage.TrackToQuarterTrackIndex(track);
+            Assert.Equal(customBitCount, disk.QuarterTrackBitCounts[quarterIndex]);
+        }
     }
 
     [Fact]
     public void Constructor_InvalidTrackCount_ThrowsArgumentOutOfRangeException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentOutOfRangeException>(() => new InternalDiskImage(trackCount: 0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new InternalDiskImage(trackCount: -1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new InternalDiskImage(trackCount: 41));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new InternalDiskImage(physicalTrackCount: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new InternalDiskImage(physicalTrackCount: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new InternalDiskImage(physicalTrackCount: 41));
     }
 
     [Fact]
     public void Constructor_InvalidBitCount_ThrowsArgumentOutOfRangeException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentOutOfRangeException>(() => new InternalDiskImage(trackCount: 35, standardTrackBitCount: 0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new InternalDiskImage(trackCount: 35, standardTrackBitCount: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new InternalDiskImage(physicalTrackCount: 35, standardTrackBitCount: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new InternalDiskImage(physicalTrackCount: 35, standardTrackBitCount: -1));
     }
 
     [Fact]
-    public void Constructor_WithPreAllocatedTracks_StoresTracksAndBitCounts()
+    public void Constructor_WithPreAllocatedQuarterTracks_StoresArrays()
     {
         // Arrange
-        var tracks = new CircularBitBuffer[35];
-        var bitCounts = new int[35];
-        for (int i = 0; i < 35; i++)
+        int physicalTrackCount = 35;
+        int quarterTrackCount = InternalDiskImage.CalculateQuarterTrackCount(physicalTrackCount);
+        var quarterTracks = new CircularBitBuffer?[quarterTrackCount];
+        var bitCounts = new int[quarterTrackCount];
+
+        // Populate only whole-track positions
+        for (int track = 0; track < physicalTrackCount; track++)
         {
+            int qIndex = InternalDiskImage.TrackToQuarterTrackIndex(track);
             byte[] trackData = new byte[6400]; // 51200 bits = 6400 bytes
-            tracks[i] = new CircularBitBuffer(
+            quarterTracks[qIndex] = new CircularBitBuffer(
                 trackData,
                 byteOffset: 0,
                 bitOffset: 0,
@@ -98,38 +124,39 @@ public class InternalDiskImageTests
                 new GroupBool(),
                 isReadOnly: false
             );
-            bitCounts[i] = 51200;
+            bitCounts[qIndex] = 51200;
         }
 
         // Act
-        var disk = new InternalDiskImage(tracks, bitCounts);
+        var disk = new InternalDiskImage(physicalTrackCount, quarterTracks, bitCounts);
 
         // Assert
-        Assert.Same(tracks, disk.Tracks);
-        Assert.Same(bitCounts, disk.TrackBitCounts);
-        Assert.Equal(35, disk.TrackCount);
+        Assert.Same(quarterTracks, disk.QuarterTracks);
+        Assert.Same(bitCounts, disk.QuarterTrackBitCounts);
+        Assert.Equal(35, disk.PhysicalTrackCount);
+        Assert.Equal(137, disk.QuarterTrackCount);
     }
 
     [Fact]
     public void Constructor_WithMismatchedArrayLengths_ThrowsArgumentException()
     {
         // Arrange
-        var tracks = new CircularBitBuffer[35];
-        var bitCounts = new int[36]; // Mismatched length
+        var quarterTracks = new CircularBitBuffer?[137]; // Correct for 35 tracks
+        var bitCounts = new int[140]; // Wrong length
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => new InternalDiskImage(tracks, bitCounts));
+        Assert.Throws<ArgumentException>(() => new InternalDiskImage(35, quarterTracks, bitCounts));
     }
 
     [Fact]
-    public void Constructor_WithEmptyArrays_ThrowsArgumentException()
+    public void Constructor_WithWrongQuarterTrackArrayLength_ThrowsArgumentException()
     {
         // Arrange
-        var tracks = Array.Empty<CircularBitBuffer>();
-        var bitCounts = Array.Empty<int>();
+        var quarterTracks = new CircularBitBuffer?[35]; // Wrong - should be 137 for 35 physical tracks
+        var bitCounts = new int[35];
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => new InternalDiskImage(tracks, bitCounts));
+        Assert.Throws<ArgumentException>(() => new InternalDiskImage(35, quarterTracks, bitCounts));
     }
 
     #endregion
@@ -321,17 +348,19 @@ public class InternalDiskImageTests
 
     #endregion
 
-    #region Track Access Tests
+    #region Quarter-Track Access Tests
 
     [Fact]
-    public void Tracks_CanBeAccessedByIndex()
+    public void QuarterTracks_WholeTrackPosition_CanBeAccessed()
     {
         // Arrange
         var disk = new InternalDiskImage();
 
-        // Act
-        var track0 = disk.Tracks[0];
-        var track34 = disk.Tracks[34];
+        // Act - Access whole-track positions (0, 4, 8, 12...)
+        int qTrack0 = InternalDiskImage.TrackToQuarterTrackIndex(0);
+        int qTrack34 = InternalDiskImage.TrackToQuarterTrackIndex(34);
+        var track0 = disk.QuarterTracks[qTrack0];
+        var track34 = disk.QuarterTracks[qTrack34];
 
         // Assert
         Assert.NotNull(track0);
@@ -339,41 +368,59 @@ public class InternalDiskImageTests
     }
 
     [Fact]
-    public void TrackBitCounts_CanBeAccessedByIndex()
+    public void QuarterTracks_FractionalPosition_IsNull()
+    {
+        // Arrange
+        var disk = new InternalDiskImage();
+
+        // Act - Access fractional quarter-track position
+        int qTrack1 = InternalDiskImage.TrackAndQuarterToIndex(0, 1); // Track 0.25
+        int qTrack2 = InternalDiskImage.TrackAndQuarterToIndex(0, 2); // Track 0.50
+        int qTrack3 = InternalDiskImage.TrackAndQuarterToIndex(0, 3); // Track 0.75
+
+        // Assert - Fractional positions should be null
+        Assert.Null(disk.QuarterTracks[qTrack1]);
+        Assert.Null(disk.QuarterTracks[qTrack2]);
+        Assert.Null(disk.QuarterTracks[qTrack3]);
+    }
+
+    [Fact]
+    public void QuarterTrackBitCounts_WholeTrackPosition_HasStandardBitCount()
     {
         // Arrange
         var disk = new InternalDiskImage();
 
         // Act
-        var bitCount0 = disk.TrackBitCounts[0];
-        var bitCount34 = disk.TrackBitCounts[34];
+        int qTrack0 = InternalDiskImage.TrackToQuarterTrackIndex(0);
+        int qTrack34 = InternalDiskImage.TrackToQuarterTrackIndex(34);
 
         // Assert
-        Assert.Equal(51200, bitCount0);
-        Assert.Equal(51200, bitCount34);
+        Assert.Equal(51200, disk.QuarterTrackBitCounts[qTrack0]);
+        Assert.Equal(51200, disk.QuarterTrackBitCounts[qTrack34]);
     }
 
     [Fact]
-    public void TrackBitCounts_CanBeModified()
+    public void QuarterTrackBitCounts_CanBeModified()
     {
         // Arrange
         var disk = new InternalDiskImage();
+        int qTrack0 = InternalDiskImage.TrackToQuarterTrackIndex(0);
 
         // Act
-        disk.TrackBitCounts[0] = 50000;
-        disk.TrackBitCounts[34] = 52000;
+        disk.QuarterTrackBitCounts[qTrack0] = 50000;
 
         // Assert
-        Assert.Equal(50000, disk.TrackBitCounts[0]);
-        Assert.Equal(52000, disk.TrackBitCounts[34]);
+        Assert.Equal(50000, disk.QuarterTrackBitCounts[qTrack0]);
     }
 
     [Fact]
-    public void Tracks_CircularBitBuffers_CanReadAndWriteBits()
+    public void QuarterTracks_CircularBitBuffers_CanReadAndWriteBits()
     {
         // Arrange
         var disk = new InternalDiskImage();
-        var track0 = disk.Tracks[0];
+        int qTrack0 = InternalDiskImage.TrackToQuarterTrackIndex(0);
+        var track0 = disk.QuarterTracks[qTrack0];
+        Assert.NotNull(track0);
 
         // Act - Write pattern to track 0
         track0.BitPosition = 0;
@@ -399,6 +446,84 @@ public class InternalDiskImageTests
 
     #endregion
 
+    #region Static Helper Method Tests
+
+    [Theory]
+    [InlineData(35, 137)]
+    [InlineData(40, 157)]
+    [InlineData(1, 1)]
+    public void CalculateQuarterTrackCount_ReturnsCorrectCount(int physicalTracks, int expectedQuarterTracks)
+    {
+        // Act
+        int result = InternalDiskImage.CalculateQuarterTrackCount(physicalTracks);
+
+        // Assert
+        Assert.Equal(expectedQuarterTracks, result);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 4)]
+    [InlineData(34, 136)]
+    public void TrackToQuarterTrackIndex_ReturnsCorrectIndex(int track, int expectedQuarterIndex)
+    {
+        // Act
+        int result = InternalDiskImage.TrackToQuarterTrackIndex(track);
+
+        // Assert
+        Assert.Equal(expectedQuarterIndex, result);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0)]
+    [InlineData(0, 1, 1)]
+    [InlineData(0, 2, 2)]
+    [InlineData(0, 3, 3)]
+    [InlineData(1, 0, 4)]
+    [InlineData(1, 1, 5)]
+    [InlineData(34, 0, 136)]
+    public void TrackAndQuarterToIndex_ReturnsCorrectIndex(int track, int quarter, int expectedIndex)
+    {
+        // Act
+        int result = InternalDiskImage.TrackAndQuarterToIndex(track, quarter);
+
+        // Assert
+        Assert.Equal(expectedIndex, result);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(3, 0)]
+    [InlineData(4, 1)]
+    [InlineData(5, 1)]
+    [InlineData(136, 34)]
+    public void QuarterTrackIndexToTrack_ReturnsCorrectTrack(int quarterIndex, int expectedTrack)
+    {
+        // Act
+        int result = InternalDiskImage.QuarterTrackIndexToTrack(quarterIndex);
+
+        // Assert
+        Assert.Equal(expectedTrack, result);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]
+    [InlineData(2, 2)]
+    [InlineData(3, 3)]
+    [InlineData(4, 0)]
+    [InlineData(5, 1)]
+    public void QuarterTrackIndexToQuarter_ReturnsCorrectQuarter(int quarterIndex, int expectedQuarter)
+    {
+        // Act
+        int result = InternalDiskImage.QuarterTrackIndexToQuarter(quarterIndex);
+
+        // Assert
+        Assert.Equal(expectedQuarter, result);
+    }
+
+    #endregion
+
     #region Integration Tests
 
     [Fact]
@@ -414,8 +539,11 @@ public class InternalDiskImageTests
         };
 
         // Act - Modify disk
-        originalDisk.Tracks[0].BitPosition = 0;
-        originalDisk.Tracks[0].WriteBit(1);
+        int qTrack0 = InternalDiskImage.TrackToQuarterTrackIndex(0);
+        var track0 = originalDisk.QuarterTracks[qTrack0];
+        Assert.NotNull(track0);
+        track0.BitPosition = 0;
+        track0.WriteBit(1);
         originalDisk.MarkDirty();
 
         // Assert - Verify state
@@ -435,36 +563,44 @@ public class InternalDiskImageTests
     public void VariableTrackLengths_WozStyle_WorksCorrectly()
     {
         // Arrange - Create disk with variable track lengths (like WOZ format)
-        var tracks = new CircularBitBuffer[35];
-        var bitCounts = new int[35];
-        for (int i = 0; i < 35; i++)
+        int physicalTrackCount = 35;
+        int quarterTrackCount = InternalDiskImage.CalculateQuarterTrackCount(physicalTrackCount);
+        var quarterTracks = new CircularBitBuffer?[quarterTrackCount];
+        var bitCounts = new int[quarterTrackCount];
+
+        for (int track = 0; track < physicalTrackCount; track++)
         {
             // Vary bit counts slightly (50000-52000 bits, typical for WOZ)
-            bitCounts[i] = 50000 + (i * 50);
-            int byteCount = (bitCounts[i] + 7) / 8; // Round up to nearest byte
+            int trackBitCount = 50000 + (track * 50);
+            int byteCount = (trackBitCount + 7) / 8; // Round up to nearest byte
             byte[] trackData = new byte[byteCount];
-            tracks[i] = new CircularBitBuffer(
+
+            int qIndex = InternalDiskImage.TrackToQuarterTrackIndex(track);
+            quarterTracks[qIndex] = new CircularBitBuffer(
                 trackData,
                 byteOffset: 0,
                 bitOffset: 0,
-                bitCount: bitCounts[i],
+                bitCount: trackBitCount,
                 new GroupBool(),
                 isReadOnly: false
             );
+            bitCounts[qIndex] = trackBitCount;
         }
 
         // Act
-        var disk = new InternalDiskImage(tracks, bitCounts)
+        var disk = new InternalDiskImage(physicalTrackCount, quarterTracks, bitCounts)
         {
             OriginalFormat = DiskFormat.Woz,
             OptimalBitTiming = 32
         };
 
         // Assert
-        Assert.Equal(35, disk.TrackCount);
-        for (int i = 0; i < 35; i++)
+        Assert.Equal(35, disk.PhysicalTrackCount);
+        Assert.Equal(137, disk.QuarterTrackCount);
+        for (int track = 0; track < physicalTrackCount; track++)
         {
-            Assert.Equal(50000 + (i * 50), disk.TrackBitCounts[i]);
+            int qIndex = InternalDiskImage.TrackToQuarterTrackIndex(track);
+            Assert.Equal(50000 + (track * 50), disk.QuarterTrackBitCounts[qIndex]);
         }
     }
 

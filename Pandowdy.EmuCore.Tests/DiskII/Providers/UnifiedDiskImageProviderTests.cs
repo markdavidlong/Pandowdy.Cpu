@@ -97,8 +97,8 @@ public class UnifiedDiskImageProviderTests
     {
         // Arrange
         var diskImage = new InternalDiskImage();
-        diskImage.TrackBitCounts[0] = 51200;
-        diskImage.TrackBitCounts[1] = 50000;
+        diskImage.QuarterTrackBitCounts[0] = 51200;
+        diskImage.QuarterTrackBitCounts[4] = 50000;  // Track 1 = quarter-track 4
         var provider = new UnifiedDiskImageProvider(diskImage);
 
         // Act & Assert - Track 0 (quarter-tracks 0-3)
@@ -113,7 +113,7 @@ public class UnifiedDiskImageProviderTests
     public void CurrentTrackBitCount_OutOfBounds_ReturnsDefaultValue()
     {
         // Arrange
-        var diskImage = new InternalDiskImage(trackCount: 35);
+        var diskImage = new InternalDiskImage(physicalTrackCount: 35);
         var provider = new UnifiedDiskImageProvider(diskImage);
 
         // Act - Move to invalid track
@@ -131,7 +131,7 @@ public class UnifiedDiskImageProviderTests
         var provider = new UnifiedDiskImageProvider(diskImage);
 
         // Act - Set position manually on track 0
-        diskImage.Tracks[0].BitPosition = 1000;
+        diskImage.QuarterTracks[0]!.BitPosition = 1000;
 
         // Assert
         Assert.Equal(1000, provider.TrackBitPosition);
@@ -195,9 +195,9 @@ public class UnifiedDiskImageProviderTests
     {
         // Arrange - Create disk with different track lengths
         var diskImage = new InternalDiskImage();
-        diskImage.TrackBitCounts[0] = 50000;
-        diskImage.TrackBitCounts[1] = 52000;
-        diskImage.Tracks[0].BitPosition = 25000; // Halfway through track 0
+        diskImage.QuarterTrackBitCounts[0] = 50000;
+        diskImage.QuarterTrackBitCounts[4] = 52000;  // Track 1 = quarter-track 4
+        diskImage.QuarterTracks[0]!.BitPosition = 25000; // Halfway through track 0
         var provider = new UnifiedDiskImageProvider(diskImage);
 
         // Act - Move from track 0 to track 1
@@ -205,7 +205,7 @@ public class UnifiedDiskImageProviderTests
         provider.SetQuarterTrack(4);  // Move to track 1
 
         // Assert - Position should scale: 25000 * (52000 / 50000) = 26000
-        Assert.Equal(26000, diskImage.Tracks[1].BitPosition);
+        Assert.Equal(26000, diskImage.QuarterTracks[4]!.BitPosition);
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public class UnifiedDiskImageProviderTests
     {
         // Arrange
         var diskImage = new InternalDiskImage();
-        diskImage.Tracks[0].BitPosition = 1000;
+        diskImage.QuarterTracks[0]!.BitPosition = 1000;
         var provider = new UnifiedDiskImageProvider(diskImage);
 
         // Act - Stay on track 0
@@ -222,7 +222,7 @@ public class UnifiedDiskImageProviderTests
         provider.SetQuarterTrack(2);  // Still track 0
 
         // Assert - Position unchanged
-        Assert.Equal(1000, diskImage.Tracks[0].BitPosition);
+        Assert.Equal(1000, diskImage.QuarterTracks[0]!.BitPosition);
     }
 
     #endregion
@@ -249,10 +249,10 @@ public class UnifiedDiskImageProviderTests
         // Arrange
         var diskImage = new InternalDiskImage();
         // Write pattern to track 0
-        diskImage.Tracks[0].BitPosition = 0;
+        diskImage.QuarterTracks[0]!.BitPosition = 0;
         for (int i = 0; i < 100; i++)
         {
-            diskImage.Tracks[0].WriteBit(i % 2);
+            diskImage.QuarterTracks[0]!.WriteBit(i % 2);
         }
         var provider = new UnifiedDiskImageProvider(diskImage);
         provider.NotifyMotorStateChanged(true, 0);
@@ -276,7 +276,7 @@ public class UnifiedDiskImageProviderTests
     public void GetBit_OutOfBoundsTrack_ReturnsRandomBits()
     {
         // Arrange
-        var diskImage = new InternalDiskImage(trackCount: 35);
+        var diskImage = new InternalDiskImage(physicalTrackCount: 35);
         var provider = new UnifiedDiskImageProvider(diskImage);
         provider.NotifyMotorStateChanged(true, 0);
 
@@ -331,7 +331,7 @@ public class UnifiedDiskImageProviderTests
         // Arrange
         var diskImage = new InternalDiskImage();
         var provider = new UnifiedDiskImageProvider(diskImage);
-        diskImage.Tracks[0].BitPosition = 100;
+        diskImage.QuarterTracks[0]!.BitPosition = 100;
 
         // Act
         provider.WriteBit(true, cycleCount: 0);
@@ -339,10 +339,10 @@ public class UnifiedDiskImageProviderTests
         provider.WriteBit(true, cycleCount: 8);
 
         // Assert - Read back written bits
-        diskImage.Tracks[0].BitPosition = 100;
-        Assert.Equal(1, diskImage.Tracks[0].ReadNextBit());
-        Assert.Equal(0, diskImage.Tracks[0].ReadNextBit());
-        Assert.Equal(1, diskImage.Tracks[0].ReadNextBit());
+        diskImage.QuarterTracks[0]!.BitPosition = 100;
+        Assert.Equal(1, diskImage.QuarterTracks[0]!.ReadNextBit());
+        Assert.Equal(0, diskImage.QuarterTracks[0]!.ReadNextBit());
+        Assert.Equal(1, diskImage.QuarterTracks[0]!.ReadNextBit());
     }
 
     [Fact]
@@ -366,17 +366,17 @@ public class UnifiedDiskImageProviderTests
         // Arrange
         var diskImage = new InternalDiskImage { IsWriteProtected = true };
         var provider = new UnifiedDiskImageProvider(diskImage);
-        diskImage.Tracks[0].BitPosition = 100;
-        diskImage.Tracks[0].WriteBit(0); // Write known value
+        diskImage.QuarterTracks[0]!.BitPosition = 100;
+        diskImage.QuarterTracks[0]!.WriteBit(0); // Write known value
 
         // Act - Try to write
-        diskImage.Tracks[0].BitPosition = 100;
+        diskImage.QuarterTracks[0]!.BitPosition = 100;
         bool writeResult = provider.WriteBit(true, cycleCount: 0);
 
         // Assert - Value should be unchanged
         Assert.False(writeResult); // Write should fail
-        diskImage.Tracks[0].BitPosition = 100;
-        Assert.Equal(0, diskImage.Tracks[0].ReadNextBit());
+        diskImage.QuarterTracks[0]!.BitPosition = 100;
+        Assert.Equal(0, diskImage.QuarterTracks[0]!.ReadNextBit());
         Assert.False(diskImage.IsDirty); // Should not be marked dirty
     }
 
@@ -384,7 +384,7 @@ public class UnifiedDiskImageProviderTests
     public void WriteBit_OutOfBoundsTrack_DoesNotThrow()
     {
         // Arrange
-        var diskImage = new InternalDiskImage(trackCount: 35);
+        var diskImage = new InternalDiskImage(physicalTrackCount: 35);
         var provider = new UnifiedDiskImageProvider(diskImage);
 
         // Act - Move to invalid track and try to write
@@ -435,7 +435,7 @@ public class UnifiedDiskImageProviderTests
     public void AdvanceAndReadBits_OutOfBoundsTrack_ReturnsRandomBits()
     {
         // Arrange
-        var diskImage = new InternalDiskImage(trackCount: 35);
+        var diskImage = new InternalDiskImage(physicalTrackCount: 35);
         var provider = new UnifiedDiskImageProvider(diskImage);
         provider.SetQuarterTrack(200); // Out of bounds
         Span<bool> buffer = stackalloc bool[10];
@@ -482,7 +482,7 @@ public class UnifiedDiskImageProviderTests
         provider.NotifyMotorStateChanged(true, 0);
 
         // Act - Write pattern to track 0 using provider
-        diskImage.Tracks[0].BitPosition = 0;
+        diskImage.QuarterTracks[0]!.BitPosition = 0;
         for (int i = 0; i < 100; i++)
         {
             provider.WriteBit(i % 2 == 1, cycleCount: (ulong)(i * 4));
@@ -490,10 +490,10 @@ public class UnifiedDiskImageProviderTests
 
         // Read back pattern using GetBit
         var readBits = new List<bool?>();
-        diskImage.Tracks[0].BitPosition = 0; // Reset position for reading
+        diskImage.QuarterTracks[0]!.BitPosition = 0; // Reset position for reading
         for (int i = 0; i < 100; i++)
         {
-            readBits.Add(diskImage.Tracks[0].ReadNextBit() == 1);
+            readBits.Add(diskImage.QuarterTracks[0]!.ReadNextBit() == 1);
         }
 
         // Assert - Verify pattern
@@ -510,9 +510,9 @@ public class UnifiedDiskImageProviderTests
     {
         // Arrange - Create disk with variable track lengths
         var diskImage = new InternalDiskImage();
-        diskImage.TrackBitCounts[0] = 50000;
-        diskImage.TrackBitCounts[1] = 52000;
-        diskImage.Tracks[0].BitPosition = 10000; // 20% through track 0
+        diskImage.QuarterTrackBitCounts[0] = 50000;
+        diskImage.QuarterTrackBitCounts[4] = 52000;  // Track 1 = quarter-track 4
+        diskImage.QuarterTracks[0]!.BitPosition = 10000; // 20% through track 0
         var provider = new UnifiedDiskImageProvider(diskImage);
 
         // Act - Switch to track 1
@@ -521,7 +521,7 @@ public class UnifiedDiskImageProviderTests
 
         // Assert - Should be approximately 20% through track 1
         // 10000 * (52000 / 50000) = 10400
-        Assert.Equal(10400, diskImage.Tracks[1].BitPosition);
+        Assert.Equal(10400, diskImage.QuarterTracks[4]!.BitPosition);
     }
 
     #endregion

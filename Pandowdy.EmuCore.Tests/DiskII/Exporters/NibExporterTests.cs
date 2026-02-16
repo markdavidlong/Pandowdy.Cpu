@@ -188,7 +188,7 @@ public class NibExporterTests
     public void Export_EmptyDisk_CreatesValidNibFile()
     {
         // Create an empty disk
-        var disk = new InternalDiskImage(trackCount: 35, standardTrackBitCount: 51200);
+        var disk = new InternalDiskImage(physicalTrackCount: 35, standardTrackBitCount: 51200);
 
         // Export to temp output file - automatically cleaned up on dispose
         var exporter = new NibExporter();

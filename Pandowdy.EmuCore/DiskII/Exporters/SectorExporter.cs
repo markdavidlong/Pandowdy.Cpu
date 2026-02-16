@@ -159,9 +159,13 @@ public class SectorExporter : IDiskImageExporter
     /// Decodes the entire disk to sector data.
     /// </summary>
     /// <returns>Byte array containing all sectors in the target format's order.</returns>
+    /// <remarks>
+    /// Sector formats only use whole-track data, so we read from quarter-track
+    /// indices 0, 4, 8, 12... (the whole-track positions).
+    /// </remarks>
     private byte[] DecodeDiskToSectors(InternalDiskImage disk)
     {
-        int trackCount = Math.Min(disk.TrackCount, NumTracks);
+        int trackCount = Math.Min(disk.PhysicalTrackCount, NumTracks);
         byte[] outputData = new byte[ExpectedFileSize];
 
         // Get DiskArc's standard 16-sector codec for GCR decoding
@@ -181,7 +185,17 @@ public class SectorExporter : IDiskImageExporter
     /// </summary>
     private void DecodeTrack(InternalDiskImage disk, int track, SectorCodec codec, byte[] outputData)
     {
-        CircularBitBuffer trackBuffer = disk.Tracks[track];
+        // Get the whole-track quarter-track index
+        int quarterIndex = InternalDiskImage.TrackToQuarterTrackIndex(track);
+        CircularBitBuffer? trackBuffer = disk.QuarterTracks[quarterIndex];
+
+        if (trackBuffer == null)
+        {
+            // Unwritten track - leave output data as zeros
+            Debug.WriteLine($"SectorExporter: Track {track} is unwritten, exporting as zeros");
+            return;
+        }
+
         trackBuffer.BitPosition = 0; // Start from beginning
 
         // Decode all 16 sectors from this track

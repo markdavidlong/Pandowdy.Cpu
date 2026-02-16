@@ -64,7 +64,7 @@ public class WozExporter : IDiskImageExporter
         {
             byte[] wozData = BuildWoz2File(disk);
             File.WriteAllBytes(filePath, wozData);
-            Debug.WriteLine($"WozExporter: Exported to {filePath} ({wozData.Length} bytes, {disk.TrackCount} tracks)");
+            Debug.WriteLine($"WozExporter: Exported to {filePath} ({wozData.Length} bytes, {disk.PhysicalTrackCount} physical tracks)");
         }
         catch (Exception ex)
         {
@@ -91,7 +91,7 @@ public class WozExporter : IDiskImageExporter
         {
             byte[] wozData = BuildWoz2File(disk);
             stream.Write(wozData, 0, wozData.Length);
-            Debug.WriteLine($"WozExporter: Exported to stream ({wozData.Length} bytes, {disk.TrackCount} tracks)");
+            Debug.WriteLine($"WozExporter: Exported to stream ({wozData.Length} bytes, {disk.PhysicalTrackCount} physical tracks)");
         }
         catch (Exception ex)
         {
@@ -102,18 +102,36 @@ public class WozExporter : IDiskImageExporter
     /// <summary>
     /// Builds a complete WOZ 2.0 file from internal disk image.
     /// </summary>
+    /// <remarks>
+    /// WOZ format supports quarter-track data. This exporter writes all non-null
+    /// quarter tracks from the internal image. The TMAP chunk maps quarter-track
+    /// positions to track indices.
+    /// </remarks>
     private byte[] BuildWoz2File(InternalDiskImage disk)
     {
-        int trackCount = Math.Min(disk.TrackCount, MaxTracks);
+        int physicalTrackCount = Math.Min(disk.PhysicalTrackCount, MaxTracks);
+
+        // Build list of quarter-tracks that have data (non-null buffers)
+        var quarterTracksWithData = new List<int>();
+        for (int qTrack = 0; qTrack < disk.QuarterTrackCount; qTrack++)
+        {
+            if (disk.QuarterTracks[qTrack] != null)
+            {
+                quarterTracksWithData.Add(qTrack);
+            }
+        }
+
+        int dataTrackCount = quarterTracksWithData.Count;
 
         // Calculate track data size (each track padded to 512-byte blocks)
-        int[] trackByteLengths = new int[trackCount];
-        int[] trackBlockCounts = new int[trackCount];
+        int[] trackByteLengths = new int[dataTrackCount];
+        int[] trackBlockCounts = new int[dataTrackCount];
         int totalTrackBlocks = 0;
 
-        for (int i = 0; i < trackCount; i++)
+        for (int i = 0; i < dataTrackCount; i++)
         {
-            int bitCount = disk.TrackBitCounts[i];
+            int qTrack = quarterTracksWithData[i];
+            int bitCount = disk.QuarterTrackBitCounts[qTrack];
             int byteCount = (bitCount + 7) / 8; // Round up to bytes
             trackByteLengths[i] = byteCount;
             trackBlockCounts[i] = (byteCount + BlockSize - 1) / BlockSize; // Round up to blocks
@@ -146,11 +164,11 @@ public class WozExporter : IDiskImageExporter
         // Write INFO chunk
         offset = WriteInfoChunk(wozData, offset, disk);
 
-        // Write TMAP chunk
-        offset = WriteTmapChunk(wozData, offset, trackCount);
+        // Write TMAP chunk - maps quarter-track positions to track indices
+        offset = WriteTmapChunk(wozData, offset, disk, quarterTracksWithData);
 
-        // Write TRKS chunk
-        offset = WriteTrksChunk(wozData, offset, disk, trackCount, trackByteLengths, trackBlockCounts, totalTrackBlocks);
+        // Write TRKS chunk - actual track data
+        offset = WriteTrksChunk(wozData, offset, disk, quarterTracksWithData, trackByteLengths, trackBlockCounts, totalTrackBlocks);
 
         // Compute file-level CRC-32 over everything after the 12-byte header
         uint crc = Crc32.HashToUInt32(new ReadOnlySpan<byte>(wozData, 12, fileSize - 12));
@@ -214,15 +232,18 @@ public class WozExporter : IDiskImageExporter
         data[offset++] = 0;     // Required RAM: 0 (low byte)
         data[offset++] = 0;     // Required RAM: 0 (high byte)
 
-        // Largest track: calculate max blocks needed
+        // Largest track: calculate max blocks needed from quarter-tracks with data
         int maxBlocks = 0;
-        for (int i = 0; i < disk.TrackCount && i < MaxTracks; i++)
+        for (int qTrack = 0; qTrack < disk.QuarterTrackCount; qTrack++)
         {
-            int byteCount = (disk.TrackBitCounts[i] + 7) / 8;
-            int blocks = (byteCount + BlockSize - 1) / BlockSize;
-            if (blocks > maxBlocks)
+            if (disk.QuarterTracks[qTrack] != null)
             {
-                maxBlocks = blocks;
+                int byteCount = (disk.QuarterTrackBitCounts[qTrack] + 7) / 8;
+                int blocks = (byteCount + BlockSize - 1) / BlockSize;
+                if (blocks > maxBlocks)
+                {
+                    maxBlocks = blocks;
+                }
             }
         }
         data[offset++] = (byte)(maxBlocks & 0xFF);  // Largest track (low byte)
@@ -237,7 +258,11 @@ public class WozExporter : IDiskImageExporter
     /// <summary>
     /// Writes TMAP chunk (168 bytes total: 4 ID + 4 size + 160 payload).
     /// </summary>
-    private int WriteTmapChunk(byte[] data, int offset, int trackCount)
+    /// <remarks>
+    /// The TMAP maps 160 quarter-track positions (0-159) to track indices in the TRKS chunk.
+    /// Each quarter-track position points to the index of the track data in TRKS, or 0xFF if no data.
+    /// </remarks>
+    private int WriteTmapChunk(byte[] data, int offset, InternalDiskImage disk, List<int> quarterTracksWithData)
     {
         // Chunk ID: "TMAP" (4 bytes)
         WriteAscii(data, ref offset, "TMAP");
@@ -254,27 +279,35 @@ public class WozExporter : IDiskImageExporter
             data[offset++] = 0xFF;
         }
 
-        // Map quarter-tracks around each whole track, matching DiskArc layout:
-        // For track N:
-        //   - Quarter N*4-1 (if N>0): points to track N (bridge from previous)
-        //   - Quarter N*4:   points to track N (whole track)
-        //   - Quarter N*4+1: points to track N (adjacent quarter)
-        //   - Quarter N*4+2: 0xFF (half-track not present)
-        for (int track = 0; track < trackCount; track++)
+        // Map each quarter-track position to its track index in TRKS
+        // quarterTracksWithData contains the quarter-track indices that have data
+        for (int trackIndex = 0; trackIndex < quarterTracksWithData.Count; trackIndex++)
         {
-            int quarterBase = track * QuarterTracksPerTrack;
-
-            // Bridge quarter from previous track
-            if (track > 0)
+            int qTrack = quarterTracksWithData[trackIndex];
+            if (qTrack < 160) // TMAP only supports 160 positions
             {
-                data[payloadStart + quarterBase - 1] = (byte)track;
+                data[payloadStart + qTrack] = (byte)trackIndex;
+
+                // Also map adjacent quarter-tracks to this data for smooth head movement
+                // This matches DiskArc's behavior
+                int physicalTrack = InternalDiskImage.QuarterTrackIndexToTrack(qTrack);
+                int quarter = InternalDiskImage.QuarterTrackIndexToQuarter(qTrack);
+
+                // If this is a whole-track position (quarter = 0), also map adjacent quarters
+                if (quarter == 0)
+                {
+                    // Map quarter-1 (previous track's .75 position) if not already mapped
+                    if (qTrack > 0 && data[payloadStart + qTrack - 1] == 0xFF)
+                    {
+                        data[payloadStart + qTrack - 1] = (byte)trackIndex;
+                    }
+                    // Map quarter+1 (.25 position) if not already mapped
+                    if (qTrack + 1 < 160 && data[payloadStart + qTrack + 1] == 0xFF)
+                    {
+                        data[payloadStart + qTrack + 1] = (byte)trackIndex;
+                    }
+                }
             }
-
-            // Whole track and adjacent quarter
-            data[payloadStart + quarterBase] = (byte)track;
-            data[payloadStart + quarterBase + 1] = (byte)track;
-
-            // Quarter N*4+2 stays 0xFF (half-track not present)
         }
 
         return offset;
@@ -283,7 +316,7 @@ public class WozExporter : IDiskImageExporter
     /// <summary>
     /// Writes TRKS chunk (variable size: descriptors + track data).
     /// </summary>
-    private int WriteTrksChunk(byte[] data, int offset, InternalDiskImage disk, int trackCount, 
+    private int WriteTrksChunk(byte[] data, int offset, InternalDiskImage disk, List<int> quarterTracksWithData,
         int[] trackByteLengths, int[] trackBlockCounts, int totalTrackBlocks)
     {
         // Chunk ID: "TRKS" (4 bytes)
@@ -303,33 +336,45 @@ public class WozExporter : IDiskImageExporter
         // Per spec: "The actual bit data begins at byte 1536 (block 3) of the WOZ file"
         int currentBlock = TrackDataStartByte / BlockSize; // Block 3 for standard layout
 
-        for (int track = 0; track < trackCount; track++)
+        for (int trackIndex = 0; trackIndex < quarterTracksWithData.Count; trackIndex++)
         {
+            int qTrack = quarterTracksWithData[trackIndex];
+
             // Starting block (2 bytes, little-endian) - FILE-RELATIVE
             WriteUInt16LE(data, ref offset, (ushort)currentBlock);
 
             // Block count (2 bytes, little-endian)
-            WriteUInt16LE(data, ref offset, (ushort)trackBlockCounts[track]);
+            WriteUInt16LE(data, ref offset, (ushort)trackBlockCounts[trackIndex]);
 
             // Bit count (4 bytes, little-endian)
-            WriteUInt32LE(data, ref offset, (uint)disk.TrackBitCounts[track]);
+            WriteUInt32LE(data, ref offset, (uint)disk.QuarterTrackBitCounts[qTrack]);
 
-            currentBlock += trackBlockCounts[track];
+            currentBlock += trackBlockCounts[trackIndex];
         }
 
         // Pad track table to ensure track data starts at byte 1536
-        int tableActualSize = trackCount * 8;
+        int tableActualSize = quarterTracksWithData.Count * 8;
         int tablePadding = TrackDataStartByte - payloadStartByte - tableActualSize;
         offset += tablePadding;
 
-        // Write track data
-        for (int track = 0; track < trackCount; track++)
+        // Write track data for each quarter-track with data
+        for (int trackIndex = 0; trackIndex < quarterTracksWithData.Count; trackIndex++)
         {
-            CircularBitBuffer trackBuffer = disk.Tracks[track];
+            int qTrack = quarterTracksWithData[trackIndex];
+            CircularBitBuffer? trackBuffer = disk.QuarterTracks[qTrack];
+
+            if (trackBuffer == null)
+            {
+                // This shouldn't happen since we only added non-null quarter-tracks to the list
+                Debug.WriteLine($"WozExporter: WARNING - Unexpected null quarter-track {qTrack}");
+                offset += trackBlockCounts[trackIndex] * BlockSize;
+                continue;
+            }
+
             trackBuffer.BitPosition = 0;
 
-            int bytesToWrite = trackByteLengths[track];
-            int blocksToWrite = trackBlockCounts[track];
+            int bytesToWrite = trackByteLengths[trackIndex];
+            int blocksToWrite = trackBlockCounts[trackIndex];
 
             // Write track bytes using ReadOctet (raw 8-bit read).
             // LatchNextByte must NOT be used here — it applies Apple II hardware

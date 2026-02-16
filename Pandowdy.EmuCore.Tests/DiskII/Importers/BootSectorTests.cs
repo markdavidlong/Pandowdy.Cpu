@@ -76,7 +76,7 @@ public class BootSectorTests(ITestOutputHelper output)
 
         var importer = new SectorImporter();
         InternalDiskImage image = importer.Import(TestDiskImages.TestDo);
-        CircularBitBuffer track = image.Tracks[0];
+        CircularBitBuffer track = image.QuarterTracks[0]!;
 
         SectorCodec codec = StdSectorCodec.GetCodec(StdSectorCodec.CodecIndex525.Std_525_16);
         track.BitPosition = 0;

@@ -105,19 +105,33 @@ public class NibExporter : IDiskImageExporter
     /// <summary>
     /// Converts internal disk image to NIB format.
     /// </summary>
+    /// <remarks>
+    /// NIB format only stores whole-track data, so we export from quarter-track
+    /// indices 0, 4, 8, 12... (the whole-track positions).
+    /// </remarks>
     private byte[] ConvertToNibFormat(InternalDiskImage disk)
     {
         byte[] output = new byte[ExpectedFileSize];
-        int trackCount = Math.Min(disk.TrackCount, NumTracks);
+        int trackCount = Math.Min(disk.PhysicalTrackCount, NumTracks);
 
         for (int track = 0; track < trackCount; track++)
         {
-            CircularBitBuffer trackBuffer = disk.Tracks[track];
-            int trackBitCount = disk.TrackBitCounts[track];
-            int trackByteCount = trackBitCount / 8; // Only full bytes
+            // Get the whole-track quarter-track index
+            int quarterIndex = InternalDiskImage.TrackToQuarterTrackIndex(track);
+            CircularBitBuffer? trackBuffer = disk.QuarterTracks[quarterIndex];
 
             // Calculate output offset for this track
             int outputOffset = track * TrackTotalLength;
+
+            if (trackBuffer == null)
+            {
+                // Unwritten track - leave as zeros (padding)
+                Debug.WriteLine($"NibExporter: Track {track} is unwritten, exporting as zeros");
+                continue;
+            }
+
+            int trackBitCount = disk.QuarterTrackBitCounts[quarterIndex];
+            int trackByteCount = trackBitCount / 8; // Only full bytes
 
             // Reset track position to beginning
             trackBuffer.BitPosition = 0;

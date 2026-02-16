@@ -1167,7 +1167,7 @@ public class DiskSwapMetadataTests
         // Arrange: Create two disk images with different metadata
         // Note: Paths are test placeholders - no actual files are accessed
         var image1 = new InternalDiskImage(
-            trackCount: TestConstants.DiskParameters.StandardTrackCount,
+            physicalTrackCount: TestConstants.DiskParameters.StandardTrackCount,
             standardTrackBitCount: TestConstants.DiskParameters.StandardTrackBitCount)
         {
             SourceFilePath = TestConstants.DiskImagePaths.TestDisk1Woz,
@@ -1178,7 +1178,7 @@ public class DiskSwapMetadataTests
         image1.MarkDirty(); // Drive 1 has modifications
 
         var image2 = new InternalDiskImage(
-            trackCount: TestConstants.DiskParameters.StandardTrackCount,
+            physicalTrackCount: TestConstants.DiskParameters.StandardTrackCount,
             standardTrackBitCount: TestConstants.DiskParameters.StandardTrackBitCount)
         {
             SourceFilePath = TestConstants.DiskImagePaths.TestDisk2Dsk,
@@ -1232,7 +1232,7 @@ public class DiskSwapMetadataTests
         // Arrange: One drive with dirty data, one empty
         // Note: Paths are test placeholders - no actual files are accessed
         var image1 = new InternalDiskImage(
-            trackCount: TestConstants.DiskParameters.StandardTrackCount,
+            physicalTrackCount: TestConstants.DiskParameters.StandardTrackCount,
             standardTrackBitCount: TestConstants.DiskParameters.StandardTrackBitCount)
         {
             SourceFilePath = TestConstants.DiskImagePaths.GameWoz,
@@ -1272,7 +1272,7 @@ public class DiskSwapMetadataTests
         // Arrange: Create a disk with track data
         // Note: Paths are test placeholders - no actual files are accessed
         var image1 = new InternalDiskImage(
-            trackCount: TestConstants.DiskParameters.StandardTrackCount,
+            physicalTrackCount: TestConstants.DiskParameters.StandardTrackCount,
             standardTrackBitCount: TestConstants.DiskParameters.StandardTrackBitCount)
         {
             SourceFilePath = TestConstants.DiskImagePaths.OriginalWoz,
@@ -1285,7 +1285,7 @@ public class DiskSwapMetadataTests
         var drive2 = new DiskIIDrive(TestConstants.DriveNames.Drive2);
 
         // Capture reference to track data before swap
-        var trackBeforeSwap = image1.Tracks[0];
+        var trackBeforeSwap = image1.QuarterTracks[0];
 
         // Act: Swap providers (simulating what Swap Drives does)
         (drive2.ImageProvider, drive1.ImageProvider) = (drive1.ImageProvider, drive2.ImageProvider);
@@ -1293,8 +1293,8 @@ public class DiskSwapMetadataTests
         // Assert: The same track object is still accessible from the swapped location
         Assert.NotNull(drive2.InternalImage);
         Assert.True(drive2.InternalImage.IsDirty);
-        Assert.Same(trackBeforeSwap, drive2.InternalImage.Tracks[0]); // Same object reference
-        Assert.Equal(TestConstants.DiskParameters.StandardTrackCount, drive2.InternalImage.TrackCount); // All track data preserved
+        Assert.Same(trackBeforeSwap, drive2.InternalImage.QuarterTracks[0]); // Same object reference
+        Assert.Equal(TestConstants.DiskParameters.StandardTrackCount, drive2.InternalImage.PhysicalTrackCount); // All track data preserved
     }
 }
 
