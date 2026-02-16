@@ -1481,74 +1481,81 @@ and round-trip `InternalDiskImage` through the PIDI blob format.
    - `Pandowdy.Project/Constants/SkilletConstants.cs` (Completed)
    - `ApplicationId = 0x534B494C` ("SKIL") (Completed)
    - `SchemaVersion = 1` (Completed)
-   - table name constants.
+   - table name constants. (Completed)
 
-4. **Implement `ISchemaMigration` interface and `V1_InitialSchema`.**
-   - `Pandowdy.Project/Migrations/ISchemaMigration.cs` — `FromVersion`, `ToVersion`, `Apply()`.
-   - `Pandowdy.Project/Migrations/V1_InitialSchema.cs` — DDL for the 6 V1 tables:
+4. **Implement `ISchemaMigration` interface and `V1_InitialSchema`.** (Completed)
+   - `Pandowdy.Project/Migrations/ISchemaMigration.cs` — `FromVersion`, `ToVersion`, `Apply()`. (Completed)
+   - `Pandowdy.Project/Migrations/V1_InitialSchema.cs` — DDL for the 6 V1 tables: (Completed)
      `project_metadata`, `disk_images`, `mount_configuration`, `emulator_overrides`,
      `display_overrides`, `project_settings`.
    - Deferred tables (breakpoints, watches, symbols, disassembly_cache, applesoft_sources,
      execution_history, workspace_layout, user_annotations) are **not** created in V1.
      They will be added by future migrations when their features are implemented.
 
-5. **Implement `SkilletSchemaManager`.**
-   - `Pandowdy.Project/Services/SkilletSchemaManager.cs`
-   - `InitializeSchemaAsync(SqliteConnection)` — sets pragmas, runs V1 migration.
-   - `MigrateAsync(SqliteConnection, int currentVersion)` — sequential migration runner.
-   - Seeds `project_metadata` rows (name, timestamps, schema version, Pandowdy version).
-   - Seeds default `mount_configuration` (slot 6, drives 1 & 2, empty).
+5. **Implement `SkilletSchemaManager`.** (Completed)
+   - `Pandowdy.Project/Services/SkilletSchemaManager.cs` (Completed)
+   - `InitializeSchema(SqliteConnection)` — sets pragmas, runs V1 migration. (Completed)
+   - `Migrate(SqliteConnection, int currentVersion)` — sequential migration runner. (Completed)
+   - Seeds `project_metadata` rows (name, timestamps, schema version, Pandowdy version). (Completed)
+   - Seeds default `mount_configuration` (slot 6, drives 1 & 2, empty). (Completed)
 
-6. **Implement PIDI blob serializer (`DiskBlobStore`).**
-   - `Pandowdy.Project/Services/DiskBlobStore.cs`
+6. **Implement PIDI blob serializer (`DiskBlobStore`).** (Partial — Serialize blocked on Phase 2)
+   - `Pandowdy.Project/Services/DiskBlobStore.cs` (Completed)
    - `Serialize(InternalDiskImage) → byte[]` — PIDI header (12 bytes, uncompressed) +
      presence bitmap (ceil(quarter_track_count/8) bytes) +
      Deflate-compressed per-quarter-track payload (non-null entries only) + CRC-32 footer.
+     (Partial — structure implemented but throws `NotImplementedException`;
+     `CircularBitBuffer.mBuffer` is private, blocking byte array extraction.
+     Will be completed in Phase 2 when disk import is implemented.)
    - `Deserialize(byte[]) → InternalDiskImage` — validates magic and CRC-32,
      reads presence bitmap, decompresses Deflate payload, reconstructs quarter-tracks
-     (null for positions with bit = 0 in bitmap).
-   - `Deserialize(Stream) → InternalDiskImage` — streaming variant for SQLite blob reads.
+     (null for positions with bit = 0 in bitmap). (Completed)
+   - `Deserialize(Stream) → InternalDiskImage` — streaming variant for SQLite blob reads. (Completed)
    - Compression: `DeflateStream` with `CompressionLevel.Optimal` (`System.IO.Compression`,
-     built into .NET runtime — no new package).
-   - Uses `System.IO.Hashing.Crc32` (already in `Pandowdy.EmuCore`'s dependency graph).
+     built into .NET runtime — no new package). (Completed)
+   - Uses `System.IO.Hashing.Crc32` (already in `Pandowdy.EmuCore`'s dependency graph). (Completed)
 
-7. **Implement `ProjectSettingsStore`.**
-   - `Pandowdy.Project/Services/ProjectSettingsStore.cs`
-   - Generic key-value CRUD against any `(key TEXT, value TEXT)` table.
-   - `GetAsync(connection, tableName, key) → string?`
-   - `SetAsync(connection, tableName, key, value)` — UPSERT via `INSERT OR REPLACE`.
-   - `GetAllAsync(connection, tableName) → Dictionary<string, string>`
-   - `RemoveAsync(connection, tableName, key)`
+7. **Implement `ProjectSettingsStore`.** (Completed)
+   - `Pandowdy.Project/Services/ProjectSettingsStore.cs` (Completed)
+   - Generic key-value CRUD against any `(key TEXT, value TEXT)` table. (Completed)
+   - `Get(connection, tableName, key) → string?` (Completed)
+   - `Set(connection, tableName, key, value)` — UPSERT via `INSERT OR REPLACE`. (Completed)
+   - `GetAll(connection, tableName) → Dictionary<string, string>` (Completed)
+   - `Remove(connection, tableName, key)` (Completed)
 
-8. **Implement `ISkilletProject` / `SkilletProject`.**
-   - `Pandowdy.Project/Interfaces/ISkilletProject.cs` — interface per §5.5.
-   - `Pandowdy.Project/Services/SkilletProject.cs` — implementation.
+8. **Implement `ISkilletProject` / `SkilletProject`.** (Completed — ImportDiskImageAsync is placeholder for Phase 2)
+   - `Pandowdy.Project/Interfaces/ISkilletProject.cs` — interface per §5.5. (Completed)
+   - `Pandowdy.Project/Services/SkilletProject.cs` — implementation. (Completed)
    - Phase 1 scope: metadata queries, settings CRUD, disk image CRUD (metadata rows +
-     blob read/write), mount configuration CRUD.
+     blob read/write), mount configuration CRUD. (Completed)
+   - `ImportDiskImageAsync()` is a placeholder returning `0L` — full implementation
+     requires `IDiskImageImporter` + working `DiskBlobStore.Serialize()` (Phase 2).
+   - Includes dedicated `ProjectIOThread` with FIFO `BlockingCollection` queue,
+     `IORequest<T>` with `TaskCompletionSource`, and async façade per §15. (Completed)
    - Debugger, AppleSoft, and workspace layout methods are not included in the Phase 1
      interface. They will be added to `ISkilletProject` when their features and schema
      tables are implemented in deferred phases.
 
-9. **Implement `ISkilletProjectManager` / `SkilletProjectManager`.**
-   - `Pandowdy.Project/Interfaces/ISkilletProjectManager.cs` — interface per §5.6.
-   - `Pandowdy.Project/Services/SkilletProjectManager.cs` — implementation.
-   - `CreateAsync(filePath, projectName)` — creates file, runs schema init, returns handle.
-   - `OpenAsync(filePath)` — validates application_id, runs migrations if needed, returns handle.
-   - `CloseAsync()` — disposes current project.
+9. **Implement `ISkilletProjectManager` / `SkilletProjectManager`.** (Completed)
+   - `Pandowdy.Project/Interfaces/ISkilletProjectManager.cs` — interface per §5.6. (Completed)
+   - `Pandowdy.Project/Services/SkilletProjectManager.cs` — implementation. (Completed)
+   - `CreateAsync(filePath, projectName)` — creates file, runs schema init, returns handle. (Completed)
+   - `OpenAsync(filePath)` — validates application_id, runs migrations if needed, returns handle. (Completed)
+   - `CloseAsync()` — disposes current project. (Completed)
 
-10. **Add project references from host and UI projects.**
-    - `Pandowdy.csproj` → `<ProjectReference>` to `Pandowdy.Project`.
-    - `Pandowdy.UI.csproj` → `<ProjectReference>` to `Pandowdy.Project`.
+10. **Add project references from host and UI projects.** (Completed)
+    - `Pandowdy.csproj` → `<ProjectReference>` to `Pandowdy.Project`. (Completed)
+    - `Pandowdy.UI.csproj` → `<ProjectReference>` to `Pandowdy.Project`. (Completed)
 
-11. **Write unit tests for all Phase 1 deliverables.**
-    - `SkilletSchemaManagerTests.cs` — schema creation, pragma verification, table existence.
+11. **Write unit tests for all Phase 1 deliverables.** (Partial — 2 of 5 test files not yet created)
+    - `SkilletSchemaManagerTests.cs` — schema creation, pragma verification, table existence. (Completed — 8 tests)
     - `DiskBlobStoreTests.cs` — serialize/deserialize round-trip (including sparse quarter-track
-      images with presence bitmap), CRC validation, corrupt data.
-    - `ProjectSettingsStoreTests.cs` — get/set/remove/upsert across key-value tables.
-    - `SkilletProjectTests.cs` — disk image CRUD (metadata), mount config CRUD.
-    - `SkilletProjectManagerTests.cs` — create/open/close lifecycle, invalid file rejection.
-    - Use in-memory SQLite (`Data Source=:memory:`) for unit tests.
-    - Use temp files for lifecycle tests (create → close → reopen → verify).
+      images with presence bitmap), CRC validation, corrupt data. (Not started — blocked on `Serialize()` completing in Phase 2)
+    - `ProjectSettingsStoreTests.cs` — get/set/remove/upsert across key-value tables. (Completed — 7 tests)
+    - `SkilletProjectTests.cs` — disk image CRUD (metadata), mount config CRUD. (Not started)
+    - `SkilletProjectManagerTests.cs` — create/open/close lifecycle, invalid file rejection. (Completed — 8 tests)
+    - Use in-memory SQLite (`Data Source=:memory:`) for unit tests. (Completed)
+    - Use temp files for lifecycle tests (create → close → reopen → verify). (Completed)
 
 #### Deliverables
 
@@ -1575,6 +1582,32 @@ on demand — the emulator never reads from or writes to external disk files dur
 normal operation.
 
 **Depends on:** Phase 1 (project infrastructure, blob store).
+
+#### Phase 1 Backfill Items
+
+The following items were deferred from Phase 1 because they are blocked on
+work that Phase 2 enables. They must be completed as part of Phase 2 before
+or alongside the Phase 2 steps below.
+
+- **Complete `DiskBlobStore.Serialize()`** (Phase 1 Step 6 backfill)
+  `Serialize()` currently throws `NotImplementedException` because
+  `CircularBitBuffer.mBuffer` is private, blocking byte array extraction.
+  Resolve the access issue (e.g., add a public accessor to `CircularBitBuffer`
+  or use reflection for tests) and complete the serialization logic.
+
+- **Create `DiskBlobStoreTests.cs`** (Phase 1 Step 11 backfill)
+  Serialize/deserialize round-trip tests (including sparse quarter-track
+  images with presence bitmap), CRC validation, and corrupt data tests.
+  Blocked on `Serialize()` above.
+
+- **Complete `ImportDiskImageAsync()` in `SkilletProject`** (Phase 1 Step 8 backfill)
+  Currently a placeholder returning `0L`. Requires working `DiskBlobStore.Serialize()`
+  and `IDiskImageImporter`. Covered by Phase 2 Step 1 below.
+
+- **Create `SkilletProjectTests.cs`** (Phase 1 Step 11 backfill — not blocked on Phase 2)
+  Disk image metadata CRUD and mount configuration CRUD tests. Can be written
+  independently of `Serialize()` since metadata operations don't require blob
+  round-trip.
 
 #### Steps
 
@@ -1652,7 +1685,12 @@ and display settings can be overridden per-project. Add `RecentProjects` and
 
 1. **Implement `ISettingsResolver` / `SettingsResolver`.**
    - `Pandowdy.Project/Interfaces/ISettingsResolver.cs` — interface per §8.
+     (Scaffolded in Phase 1 — complete interface with `Resolve<T>()`, `GetPersistLayer()`,
+     and `SettingsLayer` enum. No changes expected.)
    - `Pandowdy.Project/Services/SettingsResolver.cs` — implementation.
+     (Scaffolded in Phase 1 as explicit stub — `Resolve<T>()` returns `hardcodedDefault`,
+     `GetPersistLayer()` returns `SettingsLayer.Json`. Must be replaced with full
+     four-layer resolution logic.)
    - Resolution order: hardcoded → JSON (`GuiSettings`) → `.skillet` (`emulator_overrides`
      / `display_overrides`) → runtime.
 
@@ -1725,9 +1763,13 @@ gains project-oriented commands.
 7. **Update `DiskStatusWidgetViewModel` commands.**
    - "Insert Disk" → opens file dialog, calls `ISkilletProject.ImportDiskImageAsync()`,
      then mounts via `MountDiskMessage`.
+     (Depends on Phase 2 Steps 1–2: `ImportDiskImageAsync()` and `MountDiskMessage`.)
    - "Save" → `ISkilletProject.SaveAsync()` (persists working copy to `.skillet`).
+     (Depends on Phase 2 Step 4: working copy persistence.)
    - "Save As" → becomes "Export Disk" → `ExportDiskMessage`.
+     (Depends on Phase 2 Step 3: `ExportDiskMessage`.)
    - "Insert Blank Disk" → creates blank `InternalDiskImage`, inserts into project, mounts.
+     (Depends on Phase 2 Steps 1–2: import + mount flow.)
 
 8. **Write tests for Start Page and project commands.**
    - `StartPageViewModelTests.cs` — recent projects list, create/open commands.
