@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Pandowdy.UI\Pandowdy.UI.csproj" />
     <ProjectReference Include="..\Pandowdy.EmuCore\Pandowdy.EmuCore.csproj" />
+    <ProjectReference Include="..\Pandowdy.Project\Pandowdy.Project.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\CommonUtil\CommonUtil.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\DiskArc\DiskArc.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\FileConv\FileConv.csproj" />

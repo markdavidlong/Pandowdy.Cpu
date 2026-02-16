@@ -49,7 +49,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docs", "Docs", "{BABE080F-8
 		Debugger Notes.md = Debugger Notes.md
 		docs\Development-Roadmap.md = docs\Development-Roadmap.md
 		docs\RenderRefactor.md = docs\RenderRefactor.md
-		docs\Task5-Gui-Disk-Management-Implementation.md = docs\Task5-Gui-Disk-Management-Implementation.md
+		docs\Skillet_Deferred_Features_Reference.md = docs\Skillet_Deferred_Features_Reference.md
+		docs\Skillet_Development_Blueprint.md = docs\Skillet_Development_Blueprint.md
+		docs\Skillet_Project_File_Development.md = docs\Skillet_Project_File_Development.md
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiskArc", "legacy\CiderPress2\DiskArc\DiskArc.csproj", "{F5E74FE8-2A77-4E18-9BAC-3F0245F96DEE}"
@@ -69,6 +71,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy.Disassembler", "Pandowdy.Disassembler\Pandowdy.Disassembler.csproj", "{C98F7F5B-BDAA-437D-BE9B-5E384D0D1CF0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy.Disassembler.Tests", "Pandowdy.Disassembler.Tests\Pandowdy.Disassembler.Tests.csproj", "{D542BE44-EC10-8454-3A87-0B44CD860BBF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy.Project", "Pandowdy.Project\Pandowdy.Project.csproj", "{9D7D3738-784A-E381-896A-C6A50666AF44}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pandowdy.Project.Tests", "Pandowdy.Project.Tests\Pandowdy.Project.Tests.csproj", "{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -350,6 +356,54 @@ Global
 		{D542BE44-EC10-8454-3A87-0B44CD860BBF}.RelWithDebInfo|x64.Build.0 = Debug|Any CPU
 		{D542BE44-EC10-8454-3A87-0B44CD860BBF}.RelWithDebInfo|x86.ActiveCfg = Debug|Any CPU
 		{D542BE44-EC10-8454-3A87-0B44CD860BBF}.RelWithDebInfo|x86.Build.0 = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Debug|x64.Build.0 = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Debug|x86.Build.0 = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.MinSizeRel|Any CPU.ActiveCfg = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.MinSizeRel|Any CPU.Build.0 = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.MinSizeRel|x64.ActiveCfg = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.MinSizeRel|x64.Build.0 = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.MinSizeRel|x86.ActiveCfg = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.MinSizeRel|x86.Build.0 = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Release|x64.ActiveCfg = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Release|x64.Build.0 = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Release|x86.ActiveCfg = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.Release|x86.Build.0 = Release|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.RelWithDebInfo|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.RelWithDebInfo|Any CPU.Build.0 = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.RelWithDebInfo|x64.ActiveCfg = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.RelWithDebInfo|x64.Build.0 = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.RelWithDebInfo|x86.ActiveCfg = Debug|Any CPU
+		{9D7D3738-784A-E381-896A-C6A50666AF44}.RelWithDebInfo|x86.Build.0 = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Debug|x64.Build.0 = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Debug|x86.Build.0 = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.MinSizeRel|Any CPU.ActiveCfg = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.MinSizeRel|Any CPU.Build.0 = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.MinSizeRel|x64.ActiveCfg = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.MinSizeRel|x64.Build.0 = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.MinSizeRel|x86.ActiveCfg = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.MinSizeRel|x86.Build.0 = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Release|x64.ActiveCfg = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Release|x64.Build.0 = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Release|x86.ActiveCfg = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.Release|x86.Build.0 = Release|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.RelWithDebInfo|Any CPU.ActiveCfg = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.RelWithDebInfo|Any CPU.Build.0 = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.RelWithDebInfo|x64.ActiveCfg = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.RelWithDebInfo|x64.Build.0 = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.RelWithDebInfo|x86.ActiveCfg = Debug|Any CPU
+		{9CAA87E6-3DC1-C52B-50FC-1505E8E9FA94}.RelWithDebInfo|x86.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
