@@ -3,6 +3,7 @@
 // See LICENSE file for details
 
 using System.Threading.Tasks;
+using Pandowdy.Project.Models;
 
 namespace Pandowdy.UI.Interfaces;
 
@@ -26,4 +27,13 @@ public interface IMessageBoxService
     /// <param name="message">The confirmation message to display.</param>
     /// <returns>True if user clicked Yes, false if No.</returns>
     Task<bool> ShowConfirmationAsync(string title, string message);
+
+    /// <summary>
+    /// Shows the Mount from Library dialog and returns the selected disk image.
+    /// </summary>
+    /// <returns>
+    /// The selected <see cref="DiskImageRecord"/> if the user clicked Mount,
+    /// or null if the user clicked Cancel.
+    /// </returns>
+    Task<DiskImageRecord?> ShowMountFromLibraryDialogAsync();
 }

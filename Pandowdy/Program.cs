@@ -85,12 +85,19 @@ namespace Pandowdy
                     // Project management - ad hoc project always exists (Phase 2a)
                     services.AddSingleton<ISkilletProjectManager, SkilletProjectManager>();
 
+                    // IDiskImageStore - resolves from current project
+                    // This allows cards to receive IDiskImageStore via constructor injection
+                    services.AddSingleton<IDiskImageStore>(sp =>
+                    {
+                        var projectManager = sp.GetRequiredService<ISkilletProjectManager>();
+                        return projectManager.CurrentProject ?? throw new InvalidOperationException("No project loaded (ad hoc project initialization failed)");
+                    });
+
                     // Card factory - receives IDiskImageStore from current project
                     services.AddSingleton<ICardFactory>(sp =>
                     {
                         var cards = sp.GetServices<ICard>();
-                        var projectManager = sp.GetRequiredService<ISkilletProjectManager>();
-                        var diskImageStore = projectManager.CurrentProject ?? throw new InvalidOperationException("No project loaded (ad hoc project initialization failed)");
+                        var diskImageStore = sp.GetRequiredService<IDiskImageStore>();
                         return new CardFactory(cards, diskImageStore);
                     });
                     services.AddSingleton<ISlots, Slots>();

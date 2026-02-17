@@ -101,9 +101,17 @@ public partial class DiskStatusWidget : UserControl
 
     private async void OnDoubleTapped(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
     {
-        // Double-click triggers Insert Disk command
+        // Double-click triggers Insert Disk command (only if enabled)
         if (DataContext is DiskStatusWidgetViewModel vm)
         {
+            // Check if command can execute before attempting
+            var canExecute = await vm.InsertDiskCommand.CanExecute.FirstAsync();
+            if (!canExecute)
+            {
+                e.Handled = true;
+                return;
+            }
+
             // Execute the command asynchronously
             try
             {

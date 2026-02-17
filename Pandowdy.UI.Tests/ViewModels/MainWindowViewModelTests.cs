@@ -7,6 +7,7 @@ using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Messages;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.Project.Interfaces;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.ViewModels;
 using System.Reactive.Subjects;
@@ -123,9 +124,16 @@ public class MainWindowViewModelTests
             MockMessageBoxService = new Mock<IMessageBoxService>();
             MockDriveStateService = new Mock<IDriveStateService>();
 
+            // Mock project manager with empty library
+            var mockProjectManager = new Mock<ISkilletProjectManager>();
+            var mockProject = new Mock<ISkilletProject>();
+            mockProject.Setup(p => p.GetAllDiskImagesAsync())
+                .ReturnsAsync(new List<Pandowdy.Project.Models.DiskImageRecord>());
+            mockProjectManager.Setup(pm => pm.CurrentProject).Returns(mockProject.Object);
+
             EmulatorStateViewModel = new EmulatorStateViewModel(emulatorCoreInterface, refreshTicker);
             SystemStatusViewModel = new SystemStatusViewModel(statusProvider);
-            DiskStatusViewModel = new DiskStatusPanelViewModel(emulatorCoreInterface, diskStatusProvider, mockFileDialogService.Object, MockMessageBoxService.Object);
+            DiskStatusViewModel = new DiskStatusPanelViewModel(emulatorCoreInterface, diskStatusProvider, mockFileDialogService.Object, MockMessageBoxService.Object, mockProjectManager.Object);
             CpuStatusViewModel = new CpuStatusPanelViewModel(emulatorCoreInterface, refreshTicker);
             StatusBarViewModel = new StatusBarViewModel(CpuStatusViewModel, SystemStatusViewModel);
             PeripheralsMenuViewModel = new PeripheralsMenuViewModel(emulatorCoreInterface, cardResponseProvider, diskStatusProvider);
@@ -675,11 +683,18 @@ public class MainWindowViewModelTests
         });
 
         // Recreate DiskStatusViewModel with the provider that has a dirty disk
+        var mockProjectManager = new Mock<ISkilletProjectManager>();
+        var mockProject = new Mock<ISkilletProject>();
+        mockProject.Setup(p => p.GetAllDiskImagesAsync())
+            .ReturnsAsync(new List<Pandowdy.Project.Models.DiskImageRecord>());
+        mockProjectManager.Setup(pm => pm.CurrentProject).Returns(mockProject.Object);
+        
         var diskStatusViewModel = new DiskStatusPanelViewModel(
             new TestEmulatorCoreInterface(),
             diskStatusProvider,
             new Mock<IDiskFileDialogService>().Object,
-            fixture.MockMessageBoxService.Object);
+            fixture.MockMessageBoxService.Object,
+            mockProjectManager.Object);
 
         // Recreate MainWindowViewModel with the new disk status
         var viewModelWithDirtyDisk = new MainWindowViewModel(
@@ -729,11 +744,18 @@ public class MainWindowViewModelTests
         });
 
         // Recreate DiskStatusViewModel with the provider that has a dirty disk
+        var mockProjectManager = new Mock<ISkilletProjectManager>();
+        var mockProject = new Mock<ISkilletProject>();
+        mockProject.Setup(p => p.GetAllDiskImagesAsync())
+            .ReturnsAsync(new List<Pandowdy.Project.Models.DiskImageRecord>());
+        mockProjectManager.Setup(pm => pm.CurrentProject).Returns(mockProject.Object);
+        
         var diskStatusViewModel = new DiskStatusPanelViewModel(
             new TestEmulatorCoreInterface(),
             diskStatusProvider,
             new Mock<IDiskFileDialogService>().Object,
-            fixture.MockMessageBoxService.Object);
+            fixture.MockMessageBoxService.Object,
+            mockProjectManager.Object);
 
         // Recreate MainWindowViewModel with the new disk status
         var viewModelWithDirtyDisk = new MainWindowViewModel(
@@ -790,11 +812,18 @@ public class MainWindowViewModelTests
         });
 
         // Recreate DiskStatusViewModel with the provider that has dirty disks
+        var mockProjectManager = new Mock<ISkilletProjectManager>();
+        var mockProject = new Mock<ISkilletProject>();
+        mockProject.Setup(p => p.GetAllDiskImagesAsync())
+            .ReturnsAsync(new List<Pandowdy.Project.Models.DiskImageRecord>());
+        mockProjectManager.Setup(pm => pm.CurrentProject).Returns(mockProject.Object);
+        
         var diskStatusViewModel = new DiskStatusPanelViewModel(
             new TestEmulatorCoreInterface(),
             diskStatusProvider,
             new Mock<IDiskFileDialogService>().Object,
-            fixture.MockMessageBoxService.Object);
+            fixture.MockMessageBoxService.Object,
+            mockProjectManager.Object);
 
         // Recreate MainWindowViewModel with the new disk status
         var viewModelWithDirtyDisks = new MainWindowViewModel(

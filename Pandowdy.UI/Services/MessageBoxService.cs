@@ -6,7 +6,11 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Pandowdy.Project.Interfaces;
+using Pandowdy.Project.Models;
+using Pandowdy.UI.Controls;
 using Pandowdy.UI.Interfaces;
+using Pandowdy.UI.ViewModels;
 
 namespace Pandowdy.UI.Services;
 
@@ -20,11 +24,13 @@ namespace Pandowdy.UI.Services;
 /// the main window is created.
 /// </para>
 /// </remarks>
-public class MessageBoxService : IMessageBoxService
+public class MessageBoxService(ISkilletProjectManager projectManager) : IMessageBoxService
 {
+    private readonly ISkilletProjectManager _projectManager = projectManager;
+
     /// <summary>
     /// Gets the current active main window, or null if none is available.
-    /// </summary>
+    /// </summary> 
     private static Window? GetMainWindow()
     {
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -168,5 +174,29 @@ public class MessageBoxService : IMessageBoxService
 
         await dialog.ShowDialog(ownerWindow);
         return result;
+    }
+
+    /// <summary>
+    /// Shows the Mount from Library dialog and returns the selected disk image.
+    /// </summary>
+    /// <returns>
+    /// The selected <see cref="DiskImageRecord"/> if the user clicked Mount,
+    /// or null if the user clicked Cancel.
+    /// </returns>
+    public async Task<DiskImageRecord?> ShowMountFromLibraryDialogAsync()
+    {
+        var ownerWindow = GetMainWindow();
+        if (ownerWindow == null)
+        {
+            return null; // No window available
+        }
+
+        var viewModel = new MountFromLibraryDialogViewModel(_projectManager);
+        var dialog = new MountFromLibraryDialog(viewModel);
+
+        await dialog.ShowDialog(ownerWindow);
+
+        // Return the selected disk image if user clicked Mount
+        return dialog.DialogResult == true ? viewModel.SelectedDiskImage : null;
     }
 }

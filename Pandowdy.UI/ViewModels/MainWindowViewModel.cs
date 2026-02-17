@@ -11,6 +11,7 @@ using ReactiveUI;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 using Pandowdy.UI.Interfaces;
+using Pandowdy.Project.Interfaces;
 
 namespace Pandowdy.UI.ViewModels;
 
@@ -633,6 +634,122 @@ public sealed class MainWindowViewModel : ReactiveObject
 
     #endregion
 
+    #region Project Lifecycle Commands
+
+    /// <summary>
+    /// Gets the command to create a new Skillet project.
+    /// </summary>
+    /// <value>Command that prompts for location and creates a new .skillet file.</value>
+    /// <remarks>
+    /// If a project is already open with unsaved changes, prompts to save first.
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> NewProjectCommand { get; }
+
+    /// <summary>
+    /// Gets the command to open an existing Skillet project.
+    /// </summary>
+    /// <value>Command that prompts for .skillet file and opens it.</value>
+    /// <remarks>
+    /// If a project is already open with unsaved changes, prompts to save first.
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> OpenProjectCommand { get; }
+
+    /// <summary>
+    /// Gets the command to save the current project.
+    /// </summary>
+    /// <value>Command that saves the current project to its file path.</value>
+    /// <remarks>
+    /// Only enabled when a project is open. Saves all mounted disk working copies.
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> SaveProjectCommand { get; }
+
+    /// <summary>
+    /// Gets the command to save the current project to a new location.
+    /// </summary>
+    /// <value>Command that prompts for new location and saves project.</value>
+    /// <remarks>
+    /// Only enabled when a project is open. Creates a copy at the new location.
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> SaveProjectAsCommand { get; }
+
+    /// <summary>
+    /// Gets the command to close the current project.
+    /// </summary>
+    /// <value>Command that closes the current project after checking for unsaved changes.</value>
+    /// <remarks>
+    /// If project has unsaved changes, prompts to save first. Ejects all mounted disks.
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> CloseProjectCommand { get; }
+
+    /// <summary>
+    /// Gets the command to import a disk image into the current project.
+    /// </summary>
+    /// <value>Command that prompts for disk image file and imports it.</value>
+    /// <remarks>
+    /// Only enabled when a project is open. Supports .woz, .nib, .dsk, .do, .po formats.
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> ImportDiskImageCommand { get; }
+
+    /// <summary>
+    /// Gets the command to export a disk image from the current project.
+    /// </summary>
+    /// <value>Command that prompts for disk image and export location.</value>
+    /// <remarks>
+    /// Only enabled when a project is open with disk images. Exports to filesystem.
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> ExportDiskImageCommand { get; }
+
+    #endregion
+
+    #region Project State Properties
+
+    /// <summary>
+    /// Backing field for HasProject property.
+    /// </summary>
+    private bool _hasProject;
+
+    /// <summary>
+    /// Gets whether a Skillet project is currently open.
+    /// </summary>
+    /// <value>True if a project is open, false otherwise.</value>
+    public bool HasProject
+    {
+        get => _hasProject;
+        private set => this.RaiseAndSetIfChanged(ref _hasProject, value);
+    }
+
+    /// <summary>
+    /// Backing field for ProjectFilePath property.
+    /// </summary>
+    private string _projectFilePath = string.Empty;
+
+    /// <summary>
+    /// Gets the file path of the currently open project.
+    /// </summary>
+    /// <value>Full path to .skillet file, or empty string if no project open.</value>
+    public string ProjectFilePath
+    {
+        get => _projectFilePath;
+        private set => this.RaiseAndSetIfChanged(ref _projectFilePath, value);
+    }
+
+    /// <summary>
+    /// Backing field for HasUnsavedChanges property.
+    /// </summary>
+    private bool _hasUnsavedChanges;
+
+    /// <summary>
+    /// Gets whether the current project has unsaved changes.
+    /// </summary>
+    /// <value>True if project needs saving, false otherwise.</value>
+    public bool HasUnsavedChanges
+    {
+        get => _hasUnsavedChanges;
+        private set => this.RaiseAndSetIfChanged(ref _hasUnsavedChanges, value);
+    }
+
+    #endregion
+
     #region Private Fields
 
     /// <summary>
@@ -650,6 +767,11 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     private readonly IMessageBoxService _messageBoxService;
 
+    /// <summary>
+    /// Skillet project instance for project lifecycle management (nullable - no project open initially).
+    /// </summary>
+    private ISkilletProject? _project;
+
     #endregion
 
     #region Constructor
@@ -666,6 +788,7 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <param name="peripheralsMenu">View model for the Peripherals menu (dynamic card/drive discovery).</param>
     /// <param name="driveStateService">Drive state service for saving disk state on exit.</param>
     /// <param name="messageBoxService">Message box service for showing exit confirmation dialogs.</param>
+    /// <param name="project">Optional Skillet project instance (null if no project open).</param>
     /// <remarks>
     /// <para>
     /// <strong>Dependency Injection:</strong> All dependencies are injected via constructor,
@@ -697,7 +820,8 @@ public sealed class MainWindowViewModel : ReactiveObject
                                StatusBarViewModel statusBar,
                                PeripheralsMenuViewModel peripheralsMenu,
                                IDriveStateService driveStateService,
-                               IMessageBoxService messageBoxService)
+                               IMessageBoxService messageBoxService,
+                               ISkilletProject? project = null)
     {
         EmulatorState = emulatorState;
         //ErrorLog = errorLog;
@@ -710,6 +834,15 @@ public sealed class MainWindowViewModel : ReactiveObject
         PeripheralsMenu = peripheralsMenu;
         _driveStateService = driveStateService;
         _messageBoxService = messageBoxService;
+        _project = project;
+
+        // Update project state properties if project is provided
+        if (_project != null)
+        {
+            HasProject = true;
+            ProjectFilePath = _project.FilePath;
+            HasUnsavedChanges = _project.HasUnsavedChanges;
+        }
 
         // Initialize emulator control commands
         PauseCommand = ReactiveCommand.Create(() => _emuState.RequestPause());
@@ -734,6 +867,243 @@ public sealed class MainWindowViewModel : ReactiveObject
         ResetEmu = ReactiveCommand.Create(() => { });
         StepOnce = ReactiveCommand.Create(() => { });
         TogglePauseOrContinue = ReactiveCommand.Create(() => { });
+
+        // Initialize project lifecycle commands
+        // Commands are enabled/disabled based on HasProject property
+        var hasProject = this.WhenAnyValue(x => x.HasProject);
+
+        NewProjectCommand = ReactiveCommand.CreateFromTask(NewProjectAsync);
+        OpenProjectCommand = ReactiveCommand.CreateFromTask(OpenProjectAsync);
+        SaveProjectCommand = ReactiveCommand.CreateFromTask(SaveProjectAsync, hasProject);
+        SaveProjectAsCommand = ReactiveCommand.CreateFromTask(SaveProjectAsAsync, hasProject);
+        CloseProjectCommand = ReactiveCommand.CreateFromTask(CloseProjectAsync, hasProject);
+        ImportDiskImageCommand = ReactiveCommand.CreateFromTask(ImportDiskImageAsync, hasProject);
+        ExportDiskImageCommand = ReactiveCommand.CreateFromTask(ExportDiskImageAsync, hasProject);
+    }
+
+    #endregion
+
+    #region Project Lifecycle Methods
+
+    /// <summary>
+    /// Creates a new Skillet project.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
+    /// Actual implementation will be added in Step 14 to show file picker dialog
+    /// and create a new .skillet project file via SkilletProject.CreateAsync().
+    /// </para>
+    /// </remarks>
+    private async Task NewProjectAsync()
+    {
+        // Check for unsaved changes in current project
+        if (_project != null && _project.HasUnsavedChanges)
+        {
+            var confirmed = await _messageBoxService.ShowConfirmationAsync(
+                "Unsaved Changes",
+                "Current project has unsaved changes. Continue without saving?");
+
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
+        // TODO: Step 14 - Show save file dialog and create new project
+        // For now, just close current project
+        if (_project != null)
+        {
+            await CloseProjectInternalAsync();
+        }
+
+        await _messageBoxService.ShowErrorAsync(
+            "New Project",
+            "New Project dialog will be implemented in Step 14.");
+    }
+
+    /// <summary>
+    /// Opens an existing Skillet project.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
+    /// Actual implementation will be added in Step 14 to show file picker dialog
+    /// and open an existing .skillet project file via SkilletProject.OpenAsync().
+    /// </para>
+    /// </remarks>
+    private async Task OpenProjectAsync()
+    {
+        // Check for unsaved changes in current project
+        if (_project != null && _project.HasUnsavedChanges)
+        {
+            var confirmed = await _messageBoxService.ShowConfirmationAsync(
+                "Unsaved Changes",
+                "Current project has unsaved changes. Continue without saving?");
+
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
+        // TODO: Step 14 - Show open file dialog and load project
+        // For now, just close current project
+        if (_project != null)
+        {
+            await CloseProjectInternalAsync();
+        }
+
+        await _messageBoxService.ShowErrorAsync(
+            "Open Project",
+            "Open Project dialog will be implemented in Step 14.");
+    }
+
+    /// <summary>
+    /// Saves the current project.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
+    /// Actual implementation will flush all mounted disk working copies back to the store
+    /// and mark the project as clean.
+    /// </para>
+    /// </remarks>
+    private async Task SaveProjectAsync()
+    {
+        if (_project == null)
+        {
+            return;
+        }
+
+        // TODO: Flush all mounted disks back to store
+        // TODO: Mark project as clean
+
+        await _messageBoxService.ShowErrorAsync(
+            "Save Project",
+            $"Saved project: {System.IO.Path.GetFileName(_project.FilePath)}");
+
+        HasUnsavedChanges = false;
+    }
+
+    /// <summary>
+    /// Saves the current project to a new location.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
+    /// Actual implementation will be added in Step 14 to show save file dialog
+    /// and create a copy of the project at the new location.
+    /// </para>
+    /// </remarks>
+    private async Task SaveProjectAsAsync()
+    {
+        if (_project == null)
+        {
+            return;
+        }
+
+        // TODO: Step 14 - Show save file dialog and copy project
+        await _messageBoxService.ShowErrorAsync(
+            "Save Project As",
+            "Save Project As dialog will be implemented in Step 14.");
+    }
+
+    /// <summary>
+    /// Closes the current project.
+    /// </summary>
+    /// <remarks>
+    /// Checks for unsaved changes before closing. Ejects all mounted disks.
+    /// </remarks>
+    private async Task CloseProjectAsync()
+    {
+        if (_project == null)
+        {
+            return;
+        }
+
+        // Check for unsaved changes
+        if (_project.HasUnsavedChanges)
+        {
+            var confirmed = await _messageBoxService.ShowConfirmationAsync(
+                "Unsaved Changes",
+                "Project has unsaved changes. Close without saving?");
+
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
+        await CloseProjectInternalAsync();
+    }
+
+    /// <summary>
+    /// Internal helper to close project without unsaved changes check.
+    /// </summary>
+    private async Task CloseProjectInternalAsync()
+    {
+        if (_project == null)
+        {
+            return;
+        }
+
+        // TODO: Eject all mounted disks (send EjectAllDisksMessage to controller)
+
+        _project.Dispose();
+        _project = null;
+
+        HasProject = false;
+        ProjectFilePath = string.Empty;
+        HasUnsavedChanges = false;
+
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Imports a disk image into the current project.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
+    /// Actual implementation will be added in Step 14 to show file picker dialog
+    /// and import the disk image via ISkilletProject.ImportDiskImageAsync().
+    /// </para>
+    /// </remarks>
+    private async Task ImportDiskImageAsync()
+    {
+        if (_project == null)
+        {
+            return;
+        }
+
+        // TODO: Step 14 - Show open file dialog and import disk image
+        await _messageBoxService.ShowErrorAsync(
+            "Import Disk Image",
+            "Import Disk Image dialog will be implemented in Step 14.");
+    }
+
+    /// <summary>
+    /// Exports a disk image from the current project.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
+    /// Actual implementation will be added in Step 14 to show disk picker dialog
+    /// and save file dialog, then export via ISkilletProject streaming.
+    /// </para>
+    /// </remarks>
+    private async Task ExportDiskImageAsync()
+    {
+        if (_project == null)
+        {
+            return;
+        }
+
+        // TODO: Step 14 - Show disk picker and save file dialog, then export
+        await _messageBoxService.ShowErrorAsync(
+            "Export Disk Image",
+            "Export Disk Image dialog will be implemented in Step 14.");
     }
 
     #endregion
@@ -746,6 +1116,10 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <returns>True to allow exit, false to cancel.</returns>
     /// <remarks>
     /// <para>
+    /// <strong>Project Unsaved Changes:</strong> If the current project has unsaved changes,
+    /// shows a confirmation dialog before exiting. User can cancel exit to save project.
+    /// </para>
+    /// <para>
     /// <strong>Dirty Disk Confirmation:</strong> If any disk has unsaved changes,
     /// shows a confirmation dialog before exiting. User can cancel exit to save disks.
     /// </para>
@@ -756,13 +1130,26 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </remarks>
     public async Task<bool> OnClosingAsync()
     {
+        // Check for project unsaved changes first
+        if (_project != null && _project.HasUnsavedChanges)
+        {
+            var confirmed = await _messageBoxService.ShowConfirmationAsync(
+                "Unsaved Project Changes",
+                $"Project '{System.IO.Path.GetFileName(_project.FilePath)}' has unsaved changes.\n\nExit anyway?");
+
+            if (!confirmed)
+            {
+                return false; // Cancel exit
+            }
+        }
+
         // Check for dirty disks
         var dirtyDisks = DiskStatus.Cards
             .SelectMany(card => card.Drives)
             .Where(drive => drive.IsDirty)
             .ToList();
 
-        if (dirtyDisks.Any())
+        if (dirtyDisks.Count != 0)
         {
             var diskList = string.Join("\n", dirtyDisks.Select(d => $"  • {d.DiskId}: {d.Filename}"));
             var message = $"The following disks have unsaved changes:\n\n{diskList}\n\nExit anyway?";

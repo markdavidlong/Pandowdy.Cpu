@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Pandowdy.UI.ViewModels"
+        xmlns:models="clr-namespace:Pandowdy.Project.Models;assembly=Pandowdy.Project"
+        x:Class="Pandowdy.UI.Controls.MountFromLibraryDialog"
+        x:DataType="vm:MountFromLibraryDialogViewModel"
+        Title="Mount Disk from Library"
+        Width="600" Height="400"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Icon="/Assets/avalonia-logo.ico">
+
+  <Window.Styles>
+    <Style Selector="ListBoxItem">
+      <Setter Property="Padding" Value="8,4" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="*,Auto" Margin="12">
+    <!-- Disk image list -->
+    <ListBox Grid.Row="0"
+             ItemsSource="{Binding DiskImages}"
+             SelectedItem="{Binding SelectedDiskImage}"
+             SelectionMode="Single"
+             BorderThickness="1"
+             BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+      <ListBox.ItemTemplate>
+        <DataTemplate DataType="models:DiskImageRecord">
+          <StackPanel Spacing="2">
+            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="{Binding OriginalFormat, StringFormat='Format: {0}'}"
+                         FontSize="11"
+                         Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+              <TextBlock Text="{Binding WholeTrackCount, StringFormat='Tracks: {0}'}"
+                         FontSize="11"
+                         Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+              <TextBlock Text="Write Protected"
+                         FontSize="11"
+                         Foreground="Red"
+                         IsVisible="{Binding IsWriteProtected}" />
+              <TextBlock Text="DIRTY"
+                         FontSize="11"
+                         FontWeight="Bold"
+                         Foreground="Orange"
+                         IsVisible="{Binding WorkingDirty}" />
+            </StackPanel>
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+    <!-- Button panel -->
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,12,0,0">
+      <Button Content="Mount"
+              Command="{Binding SelectDiskCommand}"
+              IsDefault="True"
+              Width="100" />
+      <Button Content="Cancel"
+              Command="{Binding CancelCommand}"
+              IsCancel="True"
+              Width="100" />
+    </StackPanel>
+  </Grid>
+</Window>

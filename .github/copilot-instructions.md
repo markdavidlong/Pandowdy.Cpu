@@ -221,7 +221,7 @@ The Disk II controller emulation reflects hardware-accurate motor control:
 ## Keyboard Shortcuts
 
 ### Apple IIe Keyboard Emulation
-- EmuCore captures Ctrl+A through Ctrl+Z (ASCII 1-26) for Apple IIe keyboard emulation.
+- EmuCore captures Ctrl-@ and Ctrl+A through Ctrl+/ (ASCII 0-31) for Apple IIe keyboard emulation.
 - GUI keyboard shortcuts must avoid bare Ctrl+letter combinations.
 - Preferred patterns: 
   - Ctrl+Shift+letter

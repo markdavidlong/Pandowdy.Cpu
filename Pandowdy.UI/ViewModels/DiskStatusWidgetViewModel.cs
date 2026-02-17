@@ -11,6 +11,7 @@ using Pandowdy.EmuCore.DiskII.Messages;
 using Pandowdy.EmuCore.Exceptions;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
+using Pandowdy.Project.Interfaces;
 using Pandowdy.UI.Interfaces;
 using ReactiveUI;
 
@@ -38,6 +39,7 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     private readonly IEmulatorCoreInterface _emulator;
     private readonly IDiskFileDialogService _fileDialogService;
     private readonly IMessageBoxService _messageBoxService;
+    private readonly ISkilletProjectManager _projectManager;
     private DiskDriveStatusSnapshot _snapshot;
 
     /// <summary>
@@ -46,16 +48,19 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     /// <param name="emulator">Emulator core interface for sending card messages.</param>
     /// <param name="fileDialogService">Service for displaying file picker dialogs.</param>
     /// <param name="messageBoxService">Service for displaying error and confirmation dialogs.</param>
+    /// <param name="projectManager">Project manager for checking library state.</param>
     /// <param name="initialSnapshot">Initial drive status snapshot.</param>
     public DiskStatusWidgetViewModel(
         IEmulatorCoreInterface emulator,
         IDiskFileDialogService fileDialogService,
         IMessageBoxService messageBoxService,
+        ISkilletProjectManager projectManager,
         DiskDriveStatusSnapshot initialSnapshot)
     {
         _emulator = emulator;
         _fileDialogService = fileDialogService;
         _messageBoxService = messageBoxService;
+        _projectManager = projectManager;
         _snapshot = initialSnapshot;
 
         // Create observables for command enablement
@@ -66,8 +71,15 @@ public class DiskStatusWidgetViewModel : ReactiveObject
             x => x.IsDirty,
             (hasDisk, hasDest, isDirty) => hasDisk && hasDest && isDirty);
 
+        // Check if project library has disk images (disable Insert when empty)
+        var diskImages = _projectManager.CurrentProject?.GetAllDiskImagesAsync().GetAwaiter().GetResult();
+        var hasLibraryImages = diskImages != null && diskImages.Count > 0;
+        var canInsertObservable = System.Reactive.Linq.Observable.Return(hasLibraryImages);
+
         // Commands that show file dialogs
-        InsertDiskCommand = ReactiveCommand.CreateFromTask(async () => await InsertDiskWithDialogAsync());
+        InsertDiskCommand = ReactiveCommand.CreateFromTask(
+            async () => await InsertDiskWithDialogAsync(),
+            canInsertObservable);
         InsertBlankDiskCommand = ReactiveCommand.CreateFromTask(async () => await InsertBlankDiskAsync());
 
         EjectDiskCommand = ReactiveCommand.CreateFromTask(
@@ -132,13 +144,22 @@ public class DiskStatusWidgetViewModel : ReactiveObject
 
     private async Task InsertDiskWithDialogAsync()
     {
-        // PHASE 2a: Temporarily disabled during transition to project-based workflow.
-        // Will be replaced with "Mount from Library" dialog in Step 14.
-        await Task.CompletedTask; // Silence async warning
-        throw new NotSupportedException(
-            "Direct filesystem disk insertion is no longer supported. " +
-            "Use 'Import Disk Image' to add the disk to the project, " +
-            "then mount it from the library.");
+        // Show Mount from Library dialog
+        var selectedDisk = await _messageBoxService.ShowMountFromLibraryDialogAsync();
+
+        if (selectedDisk != null)
+        {
+            try
+            {
+                await _emulator.SendCardMessageAsync(
+                    (SlotNumber)_snapshot.SlotNumber,
+                    new MountDiskMessage(_snapshot.DriveNumber, selectedDisk.Id));
+            }
+            catch (CardMessageException ex)
+            {
+                await _messageBoxService.ShowErrorAsync("Mount Disk Failed", ex.Message);
+            }
+        }
     }
 
     private async Task InsertBlankDiskAsync()
