@@ -14,7 +14,7 @@
 		xmlns:controls="clr-namespace:Pandowdy.UI.Controls"
 		mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="480"
 		x:Class="Pandowdy.UI.MainWindow"
-		Title="Pandowdy"
+		Title="{Binding WindowTitle}"
 		MinWidth="800" MinHeight="600"
 		WindowStartupLocation="Manual"
 		Icon="assets/ico/pandowdy.ico"

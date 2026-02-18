@@ -749,6 +749,24 @@ public sealed class MainWindowViewModel : ReactiveObject
         private set => this.RaiseAndSetIfChanged(ref _hasUnsavedChanges, value);
     }
 
+    /// <summary>
+    /// Backing field for WindowTitle property.
+    /// </summary>
+    private string _windowTitle = "Pandowdy — untitled";
+
+    /// <summary>
+    /// Gets the window title showing the application name and current project.
+    /// </summary>
+    /// <value>
+    /// Format: "Pandowdy — {ProjectName}" for file-based projects,
+    /// "Pandowdy — untitled" for ad hoc projects.
+    /// </value>
+    public string WindowTitle
+    {
+        get => _windowTitle;
+        private set => this.RaiseAndSetIfChanged(ref _windowTitle, value);
+    }
+
     #endregion
 
     #region Private Fields
@@ -853,6 +871,7 @@ public sealed class MainWindowViewModel : ReactiveObject
             HasProject = true;
             ProjectFilePath = _project.FilePath;
             HasUnsavedChanges = _project.HasUnsavedChanges;
+            UpdateWindowTitle();
         }
 
         // Initialize emulator control commands
@@ -895,6 +914,21 @@ public sealed class MainWindowViewModel : ReactiveObject
     #endregion
 
     #region Project Lifecycle Methods
+
+    /// <summary>
+    /// Updates the window title based on the current project state.
+    /// </summary>
+    private void UpdateWindowTitle()
+    {
+        if (_project == null)
+        {
+            WindowTitle = "Pandowdy — untitled";
+        }
+        else
+        {
+            WindowTitle = $"Pandowdy — {_project.Metadata.Name}";
+        }
+    }
 
     /// <summary>
     /// Creates a new Skillet project.
@@ -1067,6 +1101,7 @@ public sealed class MainWindowViewModel : ReactiveObject
         HasProject = false;
         ProjectFilePath = string.Empty;
         HasUnsavedChanges = false;
+        UpdateWindowTitle();
 
         await Task.CompletedTask;
     }

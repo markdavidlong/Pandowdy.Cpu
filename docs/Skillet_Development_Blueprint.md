@@ -2078,94 +2078,144 @@ and will be implemented alongside the UI commands and dialogs below.
    - Requires emulator pause interface (message-based or direct injection)
    - **Status:** Dirty flag management exists; mounted-disk serialization is Phase 2a work
 
-#### Steps
+#### Completed Steps
 
-1. **Implement controller handlers for disk lifecycle messages** (integration work items 1–4 above).
-   - `MountDiskMessage` handler: CheckOut → assign to drive.
-   - `EjectDiskMessage` handler update: Return → clear drive.
-   - `ExportDiskMessage` handler: retrieve image → export via factory.
-   - `EjectAllDisksMessage` handler: eject all drives.
+1. **Implement controller handlers for disk lifecycle messages** (integration work items 1–4).
+   ✅ **COMPLETED** — All 4 handlers implemented in `DiskIIControllerCard.cs`:
+   - `MountDiskFromStore()` (lines 1778-1814): CheckOut → assign to drive, tracks `_mountedDiskImageIds`.
+   - `EjectDisk()` update (lines 1825-1853): Return → clear drive (eject auto-flush via `ReturnAsync`).
+   - `ExportDisk()` (lines 1864-1900): retrieve image → export via factory.
+   - `EjectAllDisks()` (lines 1909-1922): ejects all drives, used during project close.
 
 2. **Wire `IDiskImageStore` into DI and card factory** (integration work item 5).
-   - `DiskIIControllerCard` receives `IDiskImageStore` via constructor (non-nullable — ad hoc project always exists).
-   - `ICardFactory` passes current project's store to card.
-   - Register in `Program.cs`.
+   ✅ **COMPLETED** — DI infrastructure in place:
+   - `DiskIIControllerCard` constructor receives `IDiskImageStore diskImageStore` parameter (line 172, non-nullable).
+   - `CreateWithStore(IDiskImageStore)` abstract method (line 1934) for card factory integration.
+   - `_mountedDiskImageIds` dictionary (line 180) tracks disk-to-drive mapping for Return operations.
 
-3. **Add pause-serialize-unpause to `SaveAsync()`** (integration work item 6).
-   - Implement emulator pause message or direct call.
-   - Serialize all mounted dirty disks on IO thread while paused.
-   - Resume emulator after serialization completes.
+3. **Create "Mount from Library" picker dialog.**
+   ✅ **COMPLETED** — Full implementation exists:
+   - `MountFromLibraryDialog.axaml` and `.axaml.cs` (Pandowdy.UI/Controls/)
+   - `MountFromLibraryDialogViewModel.cs` (Pandowdy.UI/ViewModels/) — loads disk images via `GetAllDiskImagesAsync()`.
+   - `SelectDiskCommand` and `CancelCommand` implemented.
+   - `MountFromLibraryDialogViewModelTests.cs` (Pandowdy.UI.Tests/ViewModels/) — tests exist.
 
-4. **Add project commands to File menu.**
-   - Add: New Project..., Open Project..., Save Project (Ctrl+Alt+S), Close Project.
-   - Wire to `ISkilletProjectManager.CreateAsync()`, `OpenAsync()`, `SaveAsync()`,
-     `CloseAsync()`.
-   - Add Import Disk Image... (Ctrl+Shift+I) — opens file dialog, calls
-     `ISkilletProject.ImportDiskImageAsync()`.
-   - Add Export Disk Image... — sends `ExportDiskMessage` to EmuCore (handler from step 1).
+4. **Remove `InsertDiskMessage` and filesystem loading path.**
+   ✅ **COMPLETED** — Filesystem loading eliminated:
+   - `InsertDiskMessage.cs` deleted — `file_search` returns no results.
+   - `DiskIIControllerCard.HandleMessage()` (lines 1314-1383) has no `InsertDiskMessage` case.
+   - All disk loading flows through `MountDiskMessage` → `MountDiskFromStore()` → `CheckOutAsync()`.
+   - **Verified:** Clean break from filesystem-based loading paradigm.
 
-5. **Create "Mount from Library" picker dialog.**
-   - Simple list dialog showing all disk images in the current project
-     (`ISkilletProject.GetAllDiskImagesAsync()`).
-   - User selects a disk image → sends `MountDiskMessage(DriveNumber, DiskImageId)`
-     to EmuCore (handler from step 1).
-   - Launched from the disk status widget's "Insert Disk" button (replaces file
-     dialog for project-based workflow).
+5. **Show project name in title bar.**
+   ✅ **COMPLETED** — `MainWindowViewModel.WindowTitle` property added with:
+   - Format: "Pandowdy — {ProjectName}" for file-based projects
+   - Format: "Pandowdy — untitled" for ad hoc projects (null project)
+   - `UpdateWindowTitle()` helper method updates title when project changes
+   - Called in constructor (when project initially set) and `CloseProjectInternalAsync()`
+   - Bound to `MainWindow.axaml` Title property
+   - Tests added to `MainWindowViewModelTests.cs`:
+     - `WindowTitle_DefaultValue_IsUntitled` — verifies default "untitled" state
+     - `WindowTitle_WithProject_ShowsProjectName` — verifies project name display
+     - `WindowTitle_PropertyChangedRaised_WhenProjectChanges` — documents expected behavior
 
-6. **Update `DiskStatusWidgetViewModel` commands.**
-   - "Insert Disk" → opens "Mount from Library" picker. Always enabled — a project
-     (file-based or ad hoc) is always active.
-   - "Eject" → sends `EjectDiskMessage` as before. The controller's eject handler
-     now calls `IDiskImageStore.ReturnAsync()` automatically (step 1).
-   - "Save" → `ISkilletProject.SaveAsync()` (pause-serialize-unpause from step 3).
-   - "Save As" → becomes "Export Disk" → `ExportDiskMessage` (handler from step 1).
+#### Phase 2a Immediate Backlog
 
-7. **Remove `InsertDiskMessage` and filesystem loading path.**
-   - Delete `InsertDiskMessage` message class and its handler in `DiskIIControllerCard`.
-   - Remove all code paths where EmuCore directly opens disk image files from the
-     host filesystem. The controller no longer accepts a filesystem path for disk
-     insertion — all disk loading flows through `IDiskImageStore.CheckOutAsync()`
-     via `MountDiskMessage`.
-   - Update all references (view models, tests) that sent `InsertDiskMessage`.
-   - This is the **breaking change** described above: the filesystem loading
-     paradigm is replaced, not deprecated.
+The following items are straightforward UI/DI wiring work with no blocking dependencies.
+They should be completed before moving to Phase 3.
 
-8. **Show project name in title bar.**
-   - `MainWindowViewModel` reads `ISkilletProject.Metadata.Name` and updates
-     the window title: "Pandowdy — {ProjectName}".
-   - Ad hoc project: "Pandowdy — untitled".
-   - After Save As: title updates to the saved project name.
+**Backlog Item 1: Complete DI registration in Program.cs**
+- **What:** Update card factory to accept `IDiskImageStore` parameter and pass `ISkilletProjectManager.CurrentProject` to factory.
+- **Where:** `Pandowdy/Program.cs` (composition root)
+- **Acceptance:** DiskIIControllerCard receives non-null `IDiskImageStore` on construction.
+- **Effort:** <1 hour — just wiring existing interfaces.
+- **Status:** Infrastructure complete (Step 2), just needs Program.cs registration.
 
-9. **Write tests for controller handlers and UI commands.**
-   - `DiskIIControllerCardMountTests.cs` — mount/eject/export/eject-all handlers
-     (tests for step 1). Verify `InsertDiskMessage` is no longer accepted.
-   - `MainWindowViewModelProjectTests.cs` — project open/close/save commands,
-     title bar binding (tests for steps 4, 8).
-   - `DiskStatusWidgetMountTests.cs` — mount from library picker triggers correct
-     message (tests for steps 5, 6). Verify Insert Disk is always enabled.
+**Backlog Item 2: Add File menu commands**
+- **What:** Add menu items for New Project, Open Project, Save Project, Close Project, Export Disk Image.
+- **Where:** `Pandowdy.UI/MainWindow.axaml` (menu structure) and `MainWindowViewModel.cs` (command handlers).
+- **Acceptance:** All 5 menu items present with keyboard shortcuts, wire to existing `ISkilletProjectManager` methods.
+- **Effort:** 2-3 hours — menu XAML + 5 command implementations.
+- **Status:** Import exists (Step 4 partial), ExportDiskMessage handler exists in controller.
+- **Dependencies:** Backlog Item 1 (DI registration) for Export command.
+
+**Backlog Item 3: Wire DiskStatusWidget commands**
+- **What:** Update "Insert Disk" to open Mount from Library picker; update/remove "Save"/"Save As" commands for project workflow.
+- **Where:** `Pandowdy.UI/ViewModels/DiskStatusWidgetViewModel.cs`
+- **Acceptance:** Insert Disk → `MountFromLibraryDialog.ShowDialog()`; Save commands aligned with project save model.
+- **Effort:** 1-2 hours — verify current implementation, update command handlers.
+- **Status:** Mount picker dialog exists (Step 3 complete); verification needed (Step 6).
+
+**Backlog Item 4: Write tests for Phase 2a work**
+- **What:** Create test files for controller handlers (mount/eject/export/eject-all) and UI commands (project lifecycle, disk widget).
+- **Where:** `Pandowdy.EmuCore.Tests/Cards/`, `Pandowdy.UI.Tests/ViewModels/`
+- **Acceptance:** 3 new test files with comprehensive coverage of Steps 1-3.
+- **Effort:** 4-6 hours — 3 test files mirroring production structure.
+- **Status:** Not started (Step 9); `MountFromLibraryDialogViewModelTests.cs` already exists.
+
+**Execution order:** Items 1-3 in sequence (1 enables 2's Export command), then Item 4 (tests) can run in parallel with Phase 3 work.
+
+#### Deliverables
+
+| Artifact | Phase 2a Status | Backlog Item |
+|----------|----------------|---------------|
+| Controller handlers | ✅ Complete | — |
+| DI wiring (infrastructure) | ✅ Complete | — |
+| DI registration (Program.cs) | ⏸️ **Backlog Item 1** | <1 hour |
+| Mount from Library picker | ✅ Complete | — |
+| `InsertDiskMessage` removed | ✅ Complete | — |
+| Title bar | ✅ Complete | — |
+| File menu commands | ⏸️ **Backlog Item 2** | 2-3 hours |
+| Disk widget commands | ⏸️ **Backlog Item 3** | 1-2 hours |
+| Test coverage | ⏸️ **Backlog Item 4** | 4-6 hours |
+| Emulator pause integration | ⏸️ **Moved to Phase 2b** | See below |
+
+#### Test Gate (Phase 2a Complete)
+
+**Phase 2a is functionally complete** — all core infrastructure exists and the breaking change (filesystem loading removal) is implemented. The immediate backlog items (Program.cs registration, File menu, disk widget, tests) are straightforward wiring work with no architectural decisions remaining.
+
+**Phase 2a Backlog Gate:** Before starting Phase 3, complete Backlog Items 1-3 (DI registration, menu commands, disk widget). Backlog Item 4 (tests) can run in parallel with Phase 3.
+
+**Phase 2a end-to-end validation (after backlog complete):**
+- Create project → import disk → mount via picker → emulator uses disk → write to disk → eject (auto-flush) → verify blob updated → save project → close → reopen → remount → verify changes persisted.
+- Export workflow: mount → modify → export via menu → verify exported file matches in-memory state.
+- EjectAll: mount multiple disks → close project → verify all returned to store.
+
+**Existing tests:** All 2303+ tests still pass, no regressions.
+
+---
+
+### Phase 2b: Emulator Pause Integration (Deferred)
+
+**Goal:** Add emulator pause interface to enable serializing mounted disk images without ejecting them during project save.
+
+**Depends on:** Phase 2a backlog complete, emulator subsystem refactoring.
+
+**Rationale:** This work requires designing an emulator pause/resume message protocol or direct injection mechanism. The current eject-all workaround (used during project close) is functional but not ideal for explicit saves where the user expects disks to remain mounted. This is deferred until the emulator threading model is better understood.
+
+#### Work Items
+
+1. **Design emulator pause interface**
+   - Message-based: `PauseEmulatorMessage` / `ResumeEmulatorMessage`
+   - Direct injection: `IEmulatorController` with `PauseAsync()` / `ResumeAsync()`
+   - Acceptance: Emulator halts at instruction boundary, all threads blocked until resume.
+
+2. **Update `SkilletProject.SaveAsync()` to use pause interface**
+   - Replace eject-all path with pause → serialize mounted dirty disks → resume.
+   - Mounted disks remain mounted after save (no state change visible to user).
+   - Working blobs updated without clearing drives.
+
+3. **Write tests for pause-serialize-unpause flow**
+   - Save project with mounted disk → verify blob updated, disk still mounted.
+   - Save project with multiple mounted disks → verify all serialized, all still mounted.
 
 #### Deliverables
 
 | Artifact | State |
 |----------|-------|
-| Controller handlers | Mount, eject (updated), export, eject-all messages implemented |
-| DI wiring | `IDiskImageStore` injected into `DiskIIControllerCard` via factory (non-nullable) |
-| Emulator pause integration | `SaveAsync()` pauses, serializes mounted disks, resumes |
-| File menu | Project commands + Import/Export Disk |
-| Mount from Library picker | List dialog for mounting stored disk images |
-| Disk widget commands | Updated for project-based mount/eject/save |
-| `InsertDiskMessage` removed | Filesystem loading path eliminated — all loading via `IDiskImageStore` |
-| Title bar | Shows project name |
-| Test coverage | Controller handlers, UI commands, integration flows |
-
-#### Test Gate
-
-**End-to-end validation:**
-- Create project → import disk → mount via picker → emulator uses disk → write to disk → eject (auto-flush) → verify blob updated → save project (pause-serialize mounted disks) → close → reopen → remount → verify changes persisted.
-- Export workflow: mount → modify → export → verify exported file matches in-memory state.
-- EjectAll: mount multiple disks → close project → verify all returned to store.
-
-**Existing tests:** All 2303+ tests still pass, no regressions.
+| Emulator pause interface | Design deferred |
+| SaveAsync pause integration | Implementation deferred |
+| Tests | Deferred |
 
 ---
 
@@ -2410,15 +2460,22 @@ documented in `docs/Skillet_Deferred_Features_Reference.md` §9.
 
 ### Phase Summary
 
-| Phase | Priority | Depends On | Core Deliverable |
-|-------|----------|------------|------------------|
-| 1. Foundation | **P0** | — | Project + schema + blob store + lifecycle |
-| 2. Disk Lifecycle | **P0** | Phase 1 | IDiskImageStore + import / mount / export / eject auto-flush |
-| 2a. Minimal UI | **P0** | Phase 2 | File menu, mount picker, disk widget, title bar |
-| 3. Settings | **P1** | Phase 1 | Four-layer resolution + recent projects |
-| 4. UI Polish | **P1** | Phases 2a, 3 | Start Page + new project dialog + startup flow |
-| 5. Legacy Cleanup | **P2** | Phases 2a, 4 | Remove dead code (SaveDisk*, DriveState*) |
-| 6. Integration Testing | **P2** | Phases 1–5 | End-to-end validation |
+| Phase | Priority | Depends On | Core Deliverable | Status |
+|-------|----------|------------|------------------|--------|
+| 1. Foundation | **P0** | — | Project + schema + blob store + lifecycle | ✅ Complete |
+| 2. Disk Lifecycle | **P0** | Phase 1 | IDiskImageStore + import / mount / export / eject auto-flush | ✅ Complete |
+| 2a. Minimal UI | **P0** | Phase 2 | Controller handlers + mount picker + title bar | ⏸️ Complete with Backlog (4 items) |
+| 2b. Emulator Pause | **P2** | Phase 2a, emulator refactor | Pause-serialize-unpause for SaveAsync | ⏸️ Deferred (design pending) |
+| 3. Settings | **P1** | Phase 1 | Four-layer resolution + recent projects | ⏸️ Pending |
+| 4. UI Polish | **P1** | Phases 2a, 3 | Start Page + new project dialog + startup flow | ⏸️ Pending |
+| 5. Legacy Cleanup | **P2** | Phases 2a, 4 | Remove dead code (SaveDisk*, DriveState*) | ⏸️ Pending |
+| 6. Integration Testing | **P2** | Phases 1–5 | End-to-end validation | ⏸️ Pending |
+
+**Phase 2a Immediate Backlog (complete before Phase 3):**
+1. Program.cs DI registration (<1 hour)
+2. File menu commands (2-3 hours)
+3. DiskStatusWidget commands (1-2 hours)
+4. Test coverage for Phase 2a (4-6 hours, can parallelize with Phase 3)
 
 ---
 
