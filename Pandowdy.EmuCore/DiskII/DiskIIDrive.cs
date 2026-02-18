@@ -285,7 +285,14 @@ public class DiskIIDrive : IDiskIIDrive
         {
             if (_imageProvider is UnifiedDiskImageProvider unifiedProvider)
             {
-                return unifiedProvider.InternalImage?.SourceFilePath;
+                var image = unifiedProvider.InternalImage;
+                if (image == null)
+                {
+                    return null;
+                }
+
+                // Prefer DiskImageName (project-based) over SourceFilePath (filesystem-based)
+                return image.DiskImageName ?? image.SourceFilePath;
             }
             return null;
         }

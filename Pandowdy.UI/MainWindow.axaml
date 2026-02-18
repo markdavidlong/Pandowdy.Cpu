@@ -22,6 +22,8 @@
 	<DockPanel>
 		<Menu x:Name="MainMenu" DockPanel.Dock="Top" DataContext="{Binding}">
 			<MenuItem Header="_File">
+				<MenuItem Header="_Import Disk Image..." Click="OnImportDiskImageClicked" InputGesture="Ctrl+Shift+I" />
+				<Separator />
 				<MenuItem Header="_Quit" Click="OnQuitClicked" InputGesture="Alt+F4" />
 			</MenuItem>
 

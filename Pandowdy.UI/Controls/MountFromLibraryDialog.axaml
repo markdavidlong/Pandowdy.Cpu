@@ -8,7 +8,7 @@
         Width="600" Height="400"
         CanResize="True"
         WindowStartupLocation="CenterOwner"
-        Icon="/Assets/avalonia-logo.ico">
+        Icon="/assets/ico/pandowdy.ico">
 
   <Window.Styles>
     <Style Selector="ListBoxItem">
@@ -27,7 +27,12 @@
       <ListBox.ItemTemplate>
         <DataTemplate DataType="models:DiskImageRecord">
           <StackPanel Spacing="2">
-            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+              <TextBlock Text="✏️"
+                         IsVisible="{Binding WorkingDirty}"
+                         ToolTip.Tip="Disk has unsaved changes" />
+            </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBlock Text="{Binding OriginalFormat, StringFormat='Format: {0}'}"
                          FontSize="11"
@@ -39,11 +44,6 @@
                          FontSize="11"
                          Foreground="Red"
                          IsVisible="{Binding IsWriteProtected}" />
-              <TextBlock Text="DIRTY"
-                         FontSize="11"
-                         FontWeight="Bold"
-                         Foreground="Orange"
-                         IsVisible="{Binding WorkingDirty}" />
             </StackPanel>
           </StackPanel>
         </DataTemplate>

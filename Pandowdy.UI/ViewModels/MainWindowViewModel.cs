@@ -3,6 +3,7 @@
 // See LICENSE file for details
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Reactive;
 using System.Threading.Tasks;
@@ -768,6 +769,16 @@ public sealed class MainWindowViewModel : ReactiveObject
     private readonly IMessageBoxService _messageBoxService;
 
     /// <summary>
+    /// File dialog service for showing disk image open/save dialogs.
+    /// </summary>
+    private readonly IDiskFileDialogService _diskFileDialogService;
+
+    /// <summary>
+    /// Project manager for accessing the current project and lifecycle operations.
+    /// </summary>
+    private readonly ISkilletProjectManager _projectManager;
+
+    /// <summary>
     /// Skillet project instance for project lifecycle management (nullable - no project open initially).
     /// </summary>
     private ISkilletProject? _project;
@@ -788,7 +799,8 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <param name="peripheralsMenu">View model for the Peripherals menu (dynamic card/drive discovery).</param>
     /// <param name="driveStateService">Drive state service for saving disk state on exit.</param>
     /// <param name="messageBoxService">Message box service for showing exit confirmation dialogs.</param>
-    /// <param name="project">Optional Skillet project instance (null if no project open).</param>
+    /// <param name="diskFileDialogService">File dialog service for showing disk image open/save dialogs.</param>
+    /// <param name="projectManager">Project manager for accessing the current project.</param>
     /// <remarks>
     /// <para>
     /// <strong>Dependency Injection:</strong> All dependencies are injected via constructor,
@@ -811,8 +823,6 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </para>
     /// </remarks>
     public MainWindowViewModel(EmulatorStateViewModel emulatorState,
-                               //ErrorLogViewModel errorLog,
-                               //DisassemblyViewModel disassembly,
                                IEmulatorState emuState,
                                SystemStatusViewModel systemStatus,
                                DiskStatusPanelViewModel diskStatus,
@@ -821,11 +831,10 @@ public sealed class MainWindowViewModel : ReactiveObject
                                PeripheralsMenuViewModel peripheralsMenu,
                                IDriveStateService driveStateService,
                                IMessageBoxService messageBoxService,
-                               ISkilletProject? project = null)
+                               IDiskFileDialogService diskFileDialogService,
+                               ISkilletProjectManager projectManager)
     {
         EmulatorState = emulatorState;
-        //ErrorLog = errorLog;
-        //Disassembly = disassembly;
         _emuState = emuState;
         SystemStatus = systemStatus;
         DiskStatus = diskStatus;
@@ -834,7 +843,9 @@ public sealed class MainWindowViewModel : ReactiveObject
         PeripheralsMenu = peripheralsMenu;
         _driveStateService = driveStateService;
         _messageBoxService = messageBoxService;
-        _project = project;
+        _diskFileDialogService = diskFileDialogService;
+        _projectManager = projectManager;
+        _project = projectManager.CurrentProject;
 
         // Update project state properties if project is provided
         if (_project != null)
@@ -1065,9 +1076,13 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
-    /// Actual implementation will be added in Step 14 to show file picker dialog
-    /// and import the disk image via ISkilletProject.ImportDiskImageAsync().
+    /// Shows a file picker dialog to select a disk image file (.woz, .nib, .dsk, .do, .po),
+    /// then imports it into the current project's disk image library via
+    /// <see cref="ISkilletProject.ImportDiskImageAsync"/>.
+    /// </para>
+    /// <para>
+    /// After successful import, the disk image appears in the Mount from Library dialog
+    /// and can be mounted into any drive.
     /// </para>
     /// </remarks>
     private async Task ImportDiskImageAsync()
@@ -1077,10 +1092,41 @@ public sealed class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        // TODO: Step 14 - Show open file dialog and import disk image
-        await _messageBoxService.ShowErrorAsync(
-            "Import Disk Image",
-            "Import Disk Image dialog will be implemented in Step 14.");
+        // Show file picker dialog with disk image filters
+        var filePath = await _diskFileDialogService.ShowOpenFileDialogAsync();
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return; // User canceled
+        }
+
+        try
+        {
+            // Extract filename without extension as default name
+            var defaultName = Path.GetFileNameWithoutExtension(filePath);
+
+            // Import the disk image into the project
+            var diskImageId = await _project.ImportDiskImageAsync(filePath, defaultName);
+
+            // Refresh library state in all drive widgets so "Mount from Library" gets re-enabled
+            foreach (var card in DiskStatus.Cards)
+            {
+                foreach (var drive in card.Drives)
+                {
+                    await drive.RefreshLibraryStateAsync();
+                }
+            }
+
+            // Show success message
+            await _messageBoxService.ShowErrorAsync(
+                "Import Successful",
+                $"Disk image '{defaultName}' has been imported.\n\nDisk ID: {diskImageId}\n\nYou can now mount it from the Mount from Library dialog.");
+        }
+        catch (Exception ex)
+        {
+            await _messageBoxService.ShowErrorAsync(
+                "Import Failed",
+                $"Failed to import disk image:\n\n{ex.Message}");
+        }
     }
 
     /// <summary>

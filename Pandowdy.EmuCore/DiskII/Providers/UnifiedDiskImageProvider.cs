@@ -60,9 +60,9 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
     internal InternalDiskImage InternalImage => _diskImage;
 
     /// <summary>
-    /// Gets the file path of the disk image.
+    /// Gets a display identifier for this disk image (name, source path, or "(internal)").
     /// </summary>
-    public string FilePath => _diskImage.SourceFilePath ?? "(internal)";
+    public string FilePath => _diskImage.DiskImageName ?? _diskImage.SourceFilePath ?? "(internal)";
 
     /// <summary>
     /// Gets whether this image supports write operations.

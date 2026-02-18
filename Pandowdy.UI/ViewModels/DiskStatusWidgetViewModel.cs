@@ -43,6 +43,11 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     private DiskDriveStatusSnapshot _snapshot;
 
     /// <summary>
+    /// Subject for library state changes (used to refresh InsertDiskCommand enablement).
+    /// </summary>
+    private readonly System.Reactive.Subjects.BehaviorSubject<bool> _hasLibraryImages;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="DiskStatusWidgetViewModel"/> class.
     /// </summary>
     /// <param name="emulator">Emulator core interface for sending card messages.</param>
@@ -74,12 +79,12 @@ public class DiskStatusWidgetViewModel : ReactiveObject
         // Check if project library has disk images (disable Insert when empty)
         var diskImages = _projectManager.CurrentProject?.GetAllDiskImagesAsync().GetAwaiter().GetResult();
         var hasLibraryImages = diskImages != null && diskImages.Count > 0;
-        var canInsertObservable = System.Reactive.Linq.Observable.Return(hasLibraryImages);
+        _hasLibraryImages = new System.Reactive.Subjects.BehaviorSubject<bool>(hasLibraryImages);
 
         // Commands that show file dialogs
         InsertDiskCommand = ReactiveCommand.CreateFromTask(
             async () => await InsertDiskWithDialogAsync(),
-            canInsertObservable);
+            _hasLibraryImages);
         InsertBlankDiskCommand = ReactiveCommand.CreateFromTask(async () => await InsertBlankDiskAsync());
 
         EjectDiskCommand = ReactiveCommand.CreateFromTask(
@@ -236,6 +241,24 @@ public class DiskStatusWidgetViewModel : ReactiveObject
         this.RaisePropertyChanged(nameof(TrackSectorForeground));
         this.RaisePropertyChanged(nameof(PhaseText));
         this.RaisePropertyChanged(nameof(MotorText));
+    }
+
+    /// <summary>
+    /// Refreshes the library state to update InsertDiskCommand enablement.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This method should be called after importing a new disk image to the project
+    /// library to re-enable the "Mount from Library" command if it was previously disabled.
+    /// </para>
+    /// </remarks>
+    public async Task RefreshLibraryStateAsync()
+    {
+        var diskImages = _projectManager.CurrentProject != null
+            ? await _projectManager.CurrentProject.GetAllDiskImagesAsync()
+            : new System.Collections.Generic.List<Project.Models.DiskImageRecord>();
+        var hasLibraryImages = diskImages.Count > 0;
+        _hasLibraryImages.OnNext(hasLibraryImages);
     }
 
     /// <summary>

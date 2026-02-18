@@ -137,6 +137,17 @@ public class InternalDiskImage
     public bool IsDirty { get; private set; }
 
     /// <summary>
+    /// Display name for this disk image (e.g., "DOS 3.3 System Master").
+    /// </summary>
+    /// <remarks>
+    /// Set when a disk is checked out from the project store. This is the primary
+    /// user-visible identifier for project-based disks and does not depend on
+    /// any filesystem path. Null for legacy filesystem-loaded disks (which use
+    /// <see cref="SourceFilePath"/> instead).
+    /// </remarks>
+    public string? DiskImageName { get; set; }
+
+    /// <summary>
     /// Original source file path (null for new/embedded disks).
     /// </summary>
     public string? SourceFilePath { get; init; }

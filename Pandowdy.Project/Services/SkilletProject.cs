@@ -277,9 +277,37 @@ internal sealed class SkilletProject : ISkilletProject
     /// <summary>
     /// Checks out a disk image for use by the emulator (IDiskImageStore.CheckOutAsync).
     /// </summary>
+    /// <remarks>
+    /// Deserializes the disk image from the project store and sets
+    /// <see cref="InternalDiskImage.DiskImageName"/> from the database record.
+    /// No filesystem paths are needed — the disk data lives entirely in the project.
+    /// </remarks>
     public Task<InternalDiskImage> CheckOutAsync(long diskImageId)
     {
-        return LoadDiskImageAsync(diskImageId);
+        return EnqueueAsync(conn =>
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"""
+                SELECT COALESCE(working_blob, original_blob), name
+                FROM {SkilletConstants.TableDiskImages}
+                WHERE id = @id;
+                """;
+            cmd.Parameters.AddWithValue("@id", diskImageId);
+
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+            {
+                throw new InvalidOperationException($"Disk image {diskImageId} not found.");
+            }
+
+            using var blobStream = reader.GetStream(0);
+            var diskImage = DiskBlobStore.Deserialize(blobStream);
+
+            // Set display name from project record (no filesystem paths needed)
+            diskImage.DiskImageName = reader.GetString(1);
+
+            return diskImage;
+        });
     }
 
     /// <summary>

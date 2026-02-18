@@ -1671,6 +1671,40 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     private void OnQuitClicked(object? sender, RoutedEventArgs e) => Close();
 
     /// <summary>
+    /// Handles the File > Import Disk Image menu command.
+    /// </summary>
+    /// <param name="sender">Event sender (menu item).</param>
+    /// <param name="e">Routed event arguments.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Operation:</strong> Shows a file picker dialog to select a disk image file
+    /// (.woz, .nib, .dsk, .do, .po, .2mg), then imports it into the current Skillet project's
+    /// disk image library via ImportDiskImageAsync.
+    /// </para>
+    /// <para>
+    /// <strong>Import Process:</strong>
+    /// <list type="number">
+    /// <item>User selects disk image file from file picker</item>
+    /// <item>File is copied into project's .skillet SQLite database</item>
+    /// <item>Both original and working copies are stored</item>
+    /// <item>Disk image appears in Mount from Library dialog</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Keyboard Shortcut:</strong> Accessible via Ctrl+Shift+I. Note that Ctrl+I alone
+    /// is reserved for sending to the emulator (Ctrl+I = ASCII 0x09, TAB character).
+    /// </para>
+    /// <para>
+    /// <strong>Requirements:</strong> Only enabled when a Skillet project is open
+    /// (HasProject = true in view model).
+    /// </para>
+    /// </remarks>
+    private void OnImportDiskImageClicked(object? sender, RoutedEventArgs e)
+    {
+        ViewModel?.ImportDiskImageCommand.Execute().Subscribe();
+    }
+
+    /// <summary>
     /// Handles the Edit > Paste menu command.
     /// </summary>
     /// <param name="sender">Event sender (menu item).</param>
@@ -1816,6 +1850,13 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <returns>True if accelerator was handled, false to continue processing.</returns>
     /// <remarks>
     /// <para>
+    /// <strong>Ctrl+Shift + Key Accelerators:</strong>
+    /// <list type="bullet">
+    /// <item>Ctrl+Shift+I: Import disk image (File menu)</item>
+    /// <item>Ctrl+Shift+V: Paste from clipboard (Edit menu)</item>
+    /// </list>
+    /// </para>
+    /// <para>
     /// <strong>Ctrl+Alt + Key Accelerators:</strong>
     /// <list type="bullet">
     /// <item>Ctrl+Alt+S: Toggle scanlines</item>
@@ -1848,6 +1889,19 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// </remarks>
     private bool HandleAccelerator(KeyEventArgs e)
     {
+        if ((e.KeyModifiers & KeyModifiers.Control) != 0 && (e.KeyModifiers & KeyModifiers.Shift) != 0)
+        {
+            switch (e.Key)
+            {
+                case Key.I:
+                    ViewModel?.ImportDiskImageCommand.Execute().Subscribe();
+                    return true;
+                case Key.V:
+                    var display = GetScreenDisplay();
+                    display?.PasteFromClipboard();
+                    return true;
+            }
+        }
         if ((e.KeyModifiers & KeyModifiers.Control) != 0 && (e.KeyModifiers & KeyModifiers.Alt) != 0)
         {
             switch (e.Key)

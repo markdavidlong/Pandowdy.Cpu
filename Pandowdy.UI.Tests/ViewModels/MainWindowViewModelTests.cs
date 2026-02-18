@@ -110,6 +110,7 @@ public class MainWindowViewModelTests
         public PeripheralsMenuViewModel PeripheralsMenuViewModel { get; }
         public Mock<IDriveStateService> MockDriveStateService { get; }
         public Mock<IMessageBoxService> MockMessageBoxService { get; }
+        public Mock<IDiskFileDialogService> MockDiskFileDialogService { get; }
         public MainWindowViewModel ViewModel { get; }
 
         public MainWindowViewModelFixture()
@@ -123,6 +124,7 @@ public class MainWindowViewModelTests
             var mockFileDialogService = new Mock<IDiskFileDialogService>();
             MockMessageBoxService = new Mock<IMessageBoxService>();
             MockDriveStateService = new Mock<IDriveStateService>();
+            MockDiskFileDialogService = new Mock<IDiskFileDialogService>();
 
             // Mock project manager with empty library
             var mockProjectManager = new Mock<ISkilletProjectManager>();
@@ -146,7 +148,9 @@ public class MainWindowViewModelTests
                 StatusBarViewModel,
                 PeripheralsMenuViewModel,
                 MockDriveStateService.Object,
-                MockMessageBoxService.Object);
+                MockMessageBoxService.Object,
+                MockDiskFileDialogService.Object,
+                mockProjectManager.Object);
         }
     }
 
@@ -706,7 +710,9 @@ public class MainWindowViewModelTests
             fixture.StatusBarViewModel,
             fixture.PeripheralsMenuViewModel,
             fixture.MockDriveStateService.Object,
-            fixture.MockMessageBoxService.Object);
+            fixture.MockMessageBoxService.Object,
+            fixture.MockDiskFileDialogService.Object,
+            mockProjectManager.Object);
 
         // Setup mock: user confirms exit
         fixture.MockMessageBoxService
@@ -767,7 +773,9 @@ public class MainWindowViewModelTests
             fixture.StatusBarViewModel,
             fixture.PeripheralsMenuViewModel,
             fixture.MockDriveStateService.Object,
-            fixture.MockMessageBoxService.Object);
+            fixture.MockMessageBoxService.Object,
+            fixture.MockDiskFileDialogService.Object,
+            mockProjectManager.Object);
 
         // Setup mock: user cancels exit
         fixture.MockMessageBoxService
@@ -835,7 +843,9 @@ public class MainWindowViewModelTests
             fixture.StatusBarViewModel,
             fixture.PeripheralsMenuViewModel,
             fixture.MockDriveStateService.Object,
-            fixture.MockMessageBoxService.Object);
+            fixture.MockMessageBoxService.Object,
+            fixture.MockDiskFileDialogService.Object,
+            mockProjectManager.Object);
 
         // Capture the message shown to user
         string? capturedMessage = null;
