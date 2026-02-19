@@ -29,6 +29,7 @@ internal sealed class SkilletProject : ISkilletProject
     }
 
     public string FilePath => _filePath;
+    public bool IsAdHoc => string.IsNullOrEmpty(_filePath) || _filePath == ":memory:";
     public ProjectMetadata Metadata => _metadata;
     public bool HasUnsavedChanges => EnqueueSync(conn => CheckForUnsavedChanges(conn));
 

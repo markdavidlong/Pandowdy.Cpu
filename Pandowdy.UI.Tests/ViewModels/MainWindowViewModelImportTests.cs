@@ -105,6 +105,7 @@ public class MainWindowViewModelImportTests
         public Mock<IDriveStateService> MockDriveStateService { get; }
         public Mock<IMessageBoxService> MockMessageBoxService { get; }
         public Mock<IDiskFileDialogService> MockDiskFileDialogService { get; }
+        public Mock<IProjectFileDialogService> MockProjectFileDialogService { get; }
         public Mock<ISkilletProject> MockProject { get; }
         public MainWindowViewModel ViewModel { get; }
 
@@ -119,6 +120,7 @@ public class MainWindowViewModelImportTests
             MockDiskFileDialogService = new Mock<IDiskFileDialogService>();
             MockMessageBoxService = new Mock<IMessageBoxService>();
             MockDriveStateService = new Mock<IDriveStateService>();
+            MockProjectFileDialogService = new Mock<IProjectFileDialogService>();
             MockProject = new Mock<ISkilletProject>();
 
             // Mock project with empty library by default
@@ -153,6 +155,7 @@ public class MainWindowViewModelImportTests
                 MockDriveStateService.Object,
                 MockMessageBoxService.Object,
                 MockDiskFileDialogService.Object,
+                MockProjectFileDialogService.Object,
                 mockProjectManager.Object);
         }
     }

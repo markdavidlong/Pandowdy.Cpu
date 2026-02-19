@@ -24,6 +24,15 @@ public interface ISkilletProject : IDiskImageStore, IDisposable
     string FilePath { get; }
 
     /// <summary>
+    /// Gets a value indicating whether this is an ad hoc (in-memory) project.
+    /// </summary>
+    /// <remarks>
+    /// Ad hoc projects have no file path and exist only in memory.
+    /// They must be persisted via Save As before they can be saved normally.
+    /// </remarks>
+    bool IsAdHoc { get; }
+
+    /// <summary>
     /// Gets the project metadata.
     /// </summary>
     ProjectMetadata Metadata { get; }

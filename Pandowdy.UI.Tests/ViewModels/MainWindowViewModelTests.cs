@@ -111,6 +111,7 @@ public class MainWindowViewModelTests
         public Mock<IDriveStateService> MockDriveStateService { get; }
         public Mock<IMessageBoxService> MockMessageBoxService { get; }
         public Mock<IDiskFileDialogService> MockDiskFileDialogService { get; }
+        public Mock<IProjectFileDialogService> MockProjectFileDialogService { get; }
         public MainWindowViewModel ViewModel { get; }
 
         public MainWindowViewModelFixture()
@@ -125,6 +126,7 @@ public class MainWindowViewModelTests
             MockMessageBoxService = new Mock<IMessageBoxService>();
             MockDriveStateService = new Mock<IDriveStateService>();
             MockDiskFileDialogService = new Mock<IDiskFileDialogService>();
+            MockProjectFileDialogService = new Mock<IProjectFileDialogService>();
 
             // Mock project manager with empty library
             var mockProjectManager = new Mock<ISkilletProjectManager>();
@@ -150,6 +152,7 @@ public class MainWindowViewModelTests
                 MockDriveStateService.Object,
                 MockMessageBoxService.Object,
                 MockDiskFileDialogService.Object,
+                MockProjectFileDialogService.Object,
                 mockProjectManager.Object);
         }
     }
@@ -712,6 +715,7 @@ public class MainWindowViewModelTests
             fixture.MockDriveStateService.Object,
             fixture.MockMessageBoxService.Object,
             fixture.MockDiskFileDialogService.Object,
+            fixture.MockProjectFileDialogService.Object,
             mockProjectManager.Object);
 
         // Setup mock: user confirms exit
@@ -775,6 +779,7 @@ public class MainWindowViewModelTests
             fixture.MockDriveStateService.Object,
             fixture.MockMessageBoxService.Object,
             fixture.MockDiskFileDialogService.Object,
+            fixture.MockProjectFileDialogService.Object,
             mockProjectManager.Object);
 
         // Setup mock: user cancels exit
@@ -845,6 +850,7 @@ public class MainWindowViewModelTests
             fixture.MockDriveStateService.Object,
             fixture.MockMessageBoxService.Object,
             fixture.MockDiskFileDialogService.Object,
+            fixture.MockProjectFileDialogService.Object,
             mockProjectManager.Object);
 
         // Capture the message shown to user
@@ -1097,6 +1103,7 @@ public class MainWindowViewModelTests
         var mockFileDialogService = new Mock<IDiskFileDialogService>();
         var mockMessageBoxService = new Mock<IMessageBoxService>();
         var mockDriveStateService = new Mock<IDriveStateService>();
+        var mockProjectFileDialogService = new Mock<IProjectFileDialogService>();
 
         var emulatorStateViewModel = new EmulatorStateViewModel(emulatorCoreInterface, refreshTicker);
         var systemStatusViewModel = new SystemStatusViewModel(statusProvider);
@@ -1117,6 +1124,7 @@ public class MainWindowViewModelTests
             mockDriveStateService.Object,
             mockMessageBoxService.Object,
             mockFileDialogService.Object,
+            mockProjectFileDialogService.Object,
             mockProjectManager.Object);
 
         // Assert

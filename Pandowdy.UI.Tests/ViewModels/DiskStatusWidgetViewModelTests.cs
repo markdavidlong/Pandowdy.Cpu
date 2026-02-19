@@ -197,8 +197,7 @@ public class DiskStatusWidgetViewModelTests
         Assert.NotNull(viewModel.InsertDiskCommand);
         Assert.NotNull(viewModel.InsertBlankDiskCommand);
         Assert.NotNull(viewModel.EjectDiskCommand);
-        Assert.NotNull(viewModel.SaveCommand);
-        Assert.NotNull(viewModel.SaveAsCommand);
+        Assert.NotNull(viewModel.ExportDiskCommand);
         Assert.NotNull(viewModel.ToggleWriteProtectCommand);
     }
 

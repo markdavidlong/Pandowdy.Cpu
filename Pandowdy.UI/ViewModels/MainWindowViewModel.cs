@@ -792,6 +792,11 @@ public sealed class MainWindowViewModel : ReactiveObject
     private readonly IDiskFileDialogService _diskFileDialogService;
 
     /// <summary>
+    /// File dialog service for showing project file open/save dialogs.
+    /// </summary>
+    private readonly IProjectFileDialogService _projectFileDialogService;
+
+    /// <summary>
     /// Project manager for accessing the current project and lifecycle operations.
     /// </summary>
     private readonly ISkilletProjectManager _projectManager;
@@ -818,6 +823,7 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <param name="driveStateService">Drive state service for saving disk state on exit.</param>
     /// <param name="messageBoxService">Message box service for showing exit confirmation dialogs.</param>
     /// <param name="diskFileDialogService">File dialog service for showing disk image open/save dialogs.</param>
+    /// <param name="projectFileDialogService">File dialog service for showing project file open/save dialogs.</param>
     /// <param name="projectManager">Project manager for accessing the current project.</param>
     /// <remarks>
     /// <para>
@@ -850,6 +856,7 @@ public sealed class MainWindowViewModel : ReactiveObject
                                IDriveStateService driveStateService,
                                IMessageBoxService messageBoxService,
                                IDiskFileDialogService diskFileDialogService,
+                               IProjectFileDialogService projectFileDialogService,
                                ISkilletProjectManager projectManager)
     {
         EmulatorState = emulatorState;
@@ -862,6 +869,7 @@ public sealed class MainWindowViewModel : ReactiveObject
         _driveStateService = driveStateService;
         _messageBoxService = messageBoxService;
         _diskFileDialogService = diskFileDialogService;
+        _projectFileDialogService = projectFileDialogService;
         _projectManager = projectManager;
         _project = projectManager.CurrentProject;
 
@@ -920,7 +928,7 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     private void UpdateWindowTitle()
     {
-        if (_project == null)
+        if (_project == null || _project.Metadata == null)
         {
             WindowTitle = "Pandowdy — untitled";
         }
@@ -933,113 +941,152 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <summary>
     /// Creates a new Skillet project.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
-    /// Actual implementation will be added in Step 14 to show file picker dialog
-    /// and create a new .skillet project file via SkilletProject.CreateAsync().
-    /// </para>
-    /// </remarks>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     private async Task NewProjectAsync()
     {
         // Check for unsaved changes in current project
         if (_project != null && _project.HasUnsavedChanges)
         {
-            var confirmed = await _messageBoxService.ShowConfirmationAsync(
+            var save = await _messageBoxService.ShowConfirmationAsync(
                 "Unsaved Changes",
-                "Current project has unsaved changes. Continue without saving?");
+                "You have unsaved changes. Save before creating a new project?");
 
-            if (!confirmed)
+            if (save)
             {
-                return;
+                await SaveProjectAsync();
             }
         }
 
-        // TODO: Step 14 - Show save file dialog and create new project
-        // For now, just close current project
-        if (_project != null)
+        // Show new project dialog (Save As dialog with suggested name)
+        var suggestedName = "untitled";
+        var filePath = await _projectFileDialogService.ShowSaveProjectDialogAsync(suggestedName);
+
+        if (filePath is null)
         {
-            await CloseProjectInternalAsync();
+            return;
         }
 
-        await _messageBoxService.ShowErrorAsync(
-            "New Project",
-            "New Project dialog will be implemented in Step 14.");
+        // Extract project name from file name (without extension)
+        var projectName = Path.GetFileNameWithoutExtension(filePath);
+
+        try
+        {
+            // Close current project before creating new one
+            if (_project != null)
+            {
+                await CloseProjectInternalAsync();
+            }
+
+            // Create new project via project manager
+            var newProject = await _projectManager.CreateAsync(filePath, projectName);
+
+            // Update UI state
+            _project = newProject;
+            HasProject = true;
+            ProjectFilePath = newProject.FilePath;
+            HasUnsavedChanges = false;
+            UpdateWindowTitle();
+
+            // TODO: Notify child view models of project change
+            // await DiskStatus.RefreshDriveLibraryStateAsync();
+        }
+        catch (Exception ex)
+        {
+            await _messageBoxService.ShowErrorAsync(
+                "Error Creating Project",
+                $"Failed to create project: {ex.Message}");
+        }
     }
 
     /// <summary>
     /// Opens an existing Skillet project.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
-    /// Actual implementation will be added in Step 14 to show file picker dialog
-    /// and open an existing .skillet project file via SkilletProject.OpenAsync().
-    /// </para>
-    /// </remarks>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     private async Task OpenProjectAsync()
     {
         // Check for unsaved changes in current project
         if (_project != null && _project.HasUnsavedChanges)
         {
-            var confirmed = await _messageBoxService.ShowConfirmationAsync(
+            var save = await _messageBoxService.ShowConfirmationAsync(
                 "Unsaved Changes",
-                "Current project has unsaved changes. Continue without saving?");
+                "You have unsaved changes. Save before opening another project?");
 
-            if (!confirmed)
+            if (save)
             {
-                return;
+                await SaveProjectAsync();
             }
         }
 
-        // TODO: Step 14 - Show open file dialog and load project
-        // For now, just close current project
-        if (_project != null)
+        // Show open project dialog
+        var filePath = await _projectFileDialogService.ShowOpenProjectDialogAsync();
+
+        if (filePath is null)
         {
-            await CloseProjectInternalAsync();
+            return;
         }
 
-        await _messageBoxService.ShowErrorAsync(
-            "Open Project",
-            "Open Project dialog will be implemented in Step 14.");
+        try
+        {
+            // Close current project before opening new one
+            if (_project != null)
+            {
+                await CloseProjectInternalAsync();
+            }
+
+            // Open project via project manager
+            var openedProject = await _projectManager.OpenAsync(filePath);
+
+            // Update UI state
+            _project = openedProject;
+            HasProject = true;
+            ProjectFilePath = openedProject.FilePath;
+            HasUnsavedChanges = openedProject.HasUnsavedChanges;
+            UpdateWindowTitle();
+
+            // TODO: Notify child view models of project change
+            // await DiskStatus.RefreshDriveLibraryStateAsync();
+        }
+        catch (Exception ex)
+        {
+            await _messageBoxService.ShowErrorAsync(
+                "Error Opening Project",
+                $"Failed to open project: {ex.Message}");
+        }
     }
 
     /// <summary>
     /// Saves the current project.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
-    /// Actual implementation will flush all mounted disk working copies back to the store
-    /// and mark the project as clean.
-    /// </para>
+    /// Only available for file-based projects (ad hoc projects must use Save As).
+    /// Command is disabled via observable guard when project is ad hoc.
     /// </remarks>
     private async Task SaveProjectAsync()
     {
-        if (_project == null)
+        if (_project == null || _project.IsAdHoc)
         {
             return;
         }
 
-        // TODO: Flush all mounted disks back to store
-        // TODO: Mark project as clean
-
-        await _messageBoxService.ShowErrorAsync(
-            "Save Project",
-            $"Saved project: {System.IO.Path.GetFileName(_project.FilePath)}");
-
-        HasUnsavedChanges = false;
+        try
+        {
+            await _project.SaveAsync();
+            HasUnsavedChanges = false;
+        }
+        catch (Exception ex)
+        {
+            await _messageBoxService.ShowErrorAsync(
+                "Error Saving Project",
+                $"Failed to save project: {ex.Message}");
+        }
     }
 
     /// <summary>
     /// Saves the current project to a new location.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
-    /// Actual implementation will be added in Step 14 to show save file dialog
-    /// and create a copy of the project at the new location.
-    /// </para>
+    /// This command is used both for saving ad hoc projects to a file for the first time
+    /// and for creating a copy of an existing project.
     /// </remarks>
     private async Task SaveProjectAsAsync()
     {
@@ -1048,17 +1095,45 @@ public sealed class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        // TODO: Step 14 - Show save file dialog and copy project
-        await _messageBoxService.ShowErrorAsync(
-            "Save Project As",
-            "Save Project As dialog will be implemented in Step 14.");
+        // Suggest current file name or "untitled" for ad hoc projects
+        var suggestedName = _project.IsAdHoc
+            ? "untitled"
+            : Path.GetFileNameWithoutExtension(_project.FilePath!);
+
+        var filePath = await _projectFileDialogService.ShowSaveProjectDialogAsync(suggestedName);
+
+        if (filePath is null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Save project to new file via project manager
+            await _projectManager.SaveAsAsync(filePath);
+
+            // Update UI state (SaveAsAsync updates the project's FilePath and IsAdHoc internally)
+            _project = _projectManager.CurrentProject;
+            HasProject = true;
+            ProjectFilePath = _project.FilePath;
+            HasUnsavedChanges = false;
+            UpdateWindowTitle();
+        }
+        catch (Exception ex)
+        {
+            await _messageBoxService.ShowErrorAsync(
+                "Error Saving Project",
+                $"Failed to save project as: {ex.Message}");
+        }
     }
 
     /// <summary>
     /// Closes the current project.
     /// </summary>
     /// <remarks>
-    /// Checks for unsaved changes before closing. Ejects all mounted disks.
+    /// Prompts to save if there are unsaved changes. Ad hoc projects with data
+    /// prompt "Save As" instead of "Save". After closing, a new ad hoc project
+    /// is automatically created by the project manager.
     /// </remarks>
     private async Task CloseProjectAsync()
     {
@@ -1070,13 +1145,24 @@ public sealed class MainWindowViewModel : ReactiveObject
         // Check for unsaved changes
         if (_project.HasUnsavedChanges)
         {
-            var confirmed = await _messageBoxService.ShowConfirmationAsync(
-                "Unsaved Changes",
-                "Project has unsaved changes. Close without saving?");
+            var promptMessage = _project.IsAdHoc
+                ? "You have unsaved work in the current project. Save before closing?"
+                : "You have unsaved changes. Save before closing?";
 
-            if (!confirmed)
+            var save = await _messageBoxService.ShowConfirmationAsync(
+                "Unsaved Changes",
+                promptMessage);
+
+            if (save)
             {
-                return;
+                if (_project.IsAdHoc)
+                {
+                    await SaveProjectAsAsync();
+                }
+                else
+                {
+                    await SaveProjectAsync();
+                }
             }
         }
 
@@ -1168,11 +1254,12 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// Exports a disk image from the current project.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// <strong>Placeholder Implementation:</strong> This command is currently a stub.
-    /// Actual implementation will be added in Step 14 to show disk picker dialog
-    /// and save file dialog, then export via ISkilletProject streaming.
-    /// </para>
+    /// TODO: Implement disk export workflow:
+    /// 1. Show disk selection dialog (from project's disk images)
+    /// 2. Show export format selection
+    /// 3. Show file save dialog
+    /// 4. Send ExportDiskMessage to controller
+    /// This is complex UI work deferred until mount/eject workflow is fully validated.
     /// </remarks>
     private async Task ExportDiskImageAsync()
     {
@@ -1181,10 +1268,10 @@ public sealed class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        // TODO: Step 14 - Show disk picker and save file dialog, then export
+        // TODO: Full implementation requires disk selection UI and format picker
         await _messageBoxService.ShowErrorAsync(
             "Export Disk Image",
-            "Export Disk Image dialog will be implemented in Step 14.");
+            "Export Disk Image feature requires additional UI components.\nThis will be implemented after mount/eject validation.");
     }
 
     #endregion

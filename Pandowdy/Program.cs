@@ -191,6 +191,7 @@ namespace Pandowdy
                     services.AddSingleton<IRefreshTicker, AvaloniaRefreshTicker>();
                     services.AddSingleton<IMessageBoxService, MessageBoxService>();
                     services.AddSingleton<IDiskFileDialogService, DiskFileDialogService>();
+                    services.AddSingleton<IProjectFileDialogService, ProjectFileDialogService>();
                     services.AddSingleton<GuiSettingsService>(); // Master GUI settings service
                     services.AddSingleton<IDriveStateService, DriveStateService>();
 

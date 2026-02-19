@@ -7,6 +7,7 @@ using System.Reactive;
 using System.Threading.Tasks;
 using Avalonia.Media;
 using Pandowdy.EmuCore.Cards;
+using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.DiskII.Messages;
 using Pandowdy.EmuCore.Exceptions;
 using Pandowdy.EmuCore.Interfaces;
@@ -70,11 +71,6 @@ public class DiskStatusWidgetViewModel : ReactiveObject
 
         // Create observables for command enablement
         var hasDiskObservable = this.WhenAnyValue(x => x.HasDisk);
-        var canSaveObservable = this.WhenAnyValue(
-            x => x.HasDisk,
-            x => x.HasDestinationPath,
-            x => x.IsDirty,
-            (hasDisk, hasDest, isDirty) => hasDisk && hasDest && isDirty);
 
         // Check if project library has disk images (disable Insert when empty)
         var diskImages = _projectManager.CurrentProject?.GetAllDiskImagesAsync().GetAwaiter().GetResult();
@@ -108,13 +104,7 @@ public class DiskStatusWidgetViewModel : ReactiveObject
             },
             hasDiskObservable);
 
-        SaveCommand = ReactiveCommand.CreateFromTask(
-            async () => await _emulator.SendCardMessageAsync(
-                (SlotNumber)_snapshot.SlotNumber,
-                new SaveDiskMessage(_snapshot.DriveNumber)),
-            canSaveObservable);
-
-        SaveAsCommand = ReactiveCommand.CreateFromTask(async () => await SaveAsAsync(), hasDiskObservable);
+        ExportDiskCommand = ReactiveCommand.CreateFromTask(async () => await ExportDiskAsync(), hasDiskObservable);
 
         ToggleWriteProtectCommand = ReactiveCommand.CreateFromTask(
             async () =>
@@ -174,7 +164,7 @@ public class DiskStatusWidgetViewModel : ReactiveObject
             new InsertBlankDiskMessage(_snapshot.DriveNumber));
     }
 
-    private async Task SaveAsAsync()
+    private async Task ExportDiskAsync()
     {
         var suggestedName = _snapshot.DiskImageFilename;
         var filePath = await _fileDialogService.ShowSaveFileDialogAsync(suggestedName);
@@ -183,13 +173,15 @@ public class DiskStatusWidgetViewModel : ReactiveObject
         {
             try
             {
+                // Detect format from extension
+                var format = DiskFormatHelper.GetFormatFromPath(filePath);
                 await _emulator.SendCardMessageAsync(
                     (SlotNumber)_snapshot.SlotNumber,
-                    new SaveDiskAsMessage(_snapshot.DriveNumber, filePath));
+                    new ExportDiskMessage(_snapshot.DriveNumber, filePath, format));
             }
             catch (CardMessageException ex)
             {
-                await _messageBoxService.ShowErrorAsync("Save Disk Failed", ex.Message);
+                await _messageBoxService.ShowErrorAsync("Export Disk Failed", ex.Message);
             }
         }
     }
@@ -210,14 +202,17 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit> EjectDiskCommand { get; }
 
     /// <summary>
-    /// Gets the command for saving the disk to its attached destination path.
+    /// Gets the command for exporting the disk to the filesystem.
     /// </summary>
-    public ReactiveCommand<Unit, Unit> SaveCommand { get; }
-
-    /// <summary>
-    /// Gets the command for saving the disk to a user-chosen path (Save As).
-    /// </summary>
-    public ReactiveCommand<Unit, Unit> SaveAsCommand { get; }
+    /// <remarks>
+    /// <para>
+    /// Replaces the legacy Save/Save As commands. In the project-based workflow,
+    /// disk images are automatically persisted to the .skillet project on eject
+    /// (via ReturnAsync) and project save. Export is an explicit user action to
+    /// write a disk image to an external file for sharing or backup.
+    /// </para>
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> ExportDiskCommand { get; }
 
     /// <summary>
     /// Gets the command for toggling write-protect state.

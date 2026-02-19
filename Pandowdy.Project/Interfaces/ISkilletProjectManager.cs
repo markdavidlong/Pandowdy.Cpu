@@ -25,6 +25,16 @@ public interface ISkilletProjectManager
     Task<ISkilletProject> OpenAsync(string filePath);
 
     /// <summary>
+    /// Saves the current project to a new file path.
+    /// </summary>
+    /// <param name="filePath">The new file path for the project.</param>
+    /// <remarks>
+    /// This method is used both for persisting ad hoc projects to disk for the first time
+    /// and for creating a copy of an existing project. Updates CurrentProject after completion.
+    /// </remarks>
+    Task SaveAsAsync(string filePath);
+
+    /// <summary>
     /// Closes the currently open project.
     /// </summary>
     Task CloseAsync();

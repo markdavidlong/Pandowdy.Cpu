@@ -103,6 +103,102 @@ public sealed class SkilletProjectManager : ISkilletProjectManager
         }
     }
 
+    public async Task SaveAsAsync(string filePath)
+    {
+        if (_currentProject is null)
+        {
+            throw new InvalidOperationException("No project is currently open.");
+        }
+
+        if (File.Exists(filePath))
+        {
+            throw new InvalidOperationException($"File already exists: {filePath}");
+        }
+
+        // Cast to concrete type to access internal IO thread
+        var concreteProject = _currentProject as SkilletProject;
+        if (concreteProject is null)
+        {
+            throw new InvalidOperationException("Current project is not a SkilletProject instance.");
+        }
+
+        // Determine if current project is ad hoc (in-memory) or file-based
+        if (_currentProject.IsAdHoc)
+        {
+            // Ad hoc project: Use VACUUM INTO to persist in-memory DB to file
+            await concreteProject.EnqueueAsync<int>(conn =>
+            {
+                using var cmd = conn.CreateCommand();
+                // Escape single quotes in file path for SQL
+                var escapedPath = filePath.Replace("'", "''");
+                cmd.CommandText = $"VACUUM INTO '{escapedPath}';";
+                cmd.ExecuteNonQuery();
+                return 0; // Dummy return value
+            });
+
+            // Close the in-memory connection
+            _currentProject.Dispose();
+
+            // Open a new file-based connection to the persisted file
+            var ioThread = new ProjectIOThread(filePath);
+
+            try
+            {
+                // Set pragmas for file-based connection (including WAL mode)
+                await ioThread.EnqueueAsync(conn =>
+                {
+                    SkilletSchemaManager.SetPragmas(conn);
+                });
+
+                var metadata = await LoadMetadataAsync(ioThread);
+                _currentProject = new SkilletProject(filePath, metadata, ioThread);
+            }
+            catch
+            {
+                ioThread.Dispose();
+                throw;
+            }
+        }
+        else
+        {
+            // File-based project: Copy to new location, close old, open new
+            var sourceFilePath = _currentProject.FilePath;
+
+            // Ensure any pending writes are complete
+            await _currentProject.SaveAsync();
+
+            // Copy the file
+            File.Copy(sourceFilePath, filePath, overwrite: false);
+
+            // Close the old connection
+            _currentProject.Dispose();
+
+            // Open the new file
+            var ioThread = new ProjectIOThread(filePath);
+
+            try
+            {
+                await ioThread.EnqueueAsync(conn =>
+                {
+                    if (!SkilletSchemaManager.ValidateApplicationId(conn))
+                    {
+                        throw new InvalidDataException($"File is not a valid .skillet project: {filePath}");
+                    }
+
+                    SkilletSchemaManager.SetPragmas(conn);
+                });
+
+                var metadata = await LoadMetadataAsync(ioThread);
+                _currentProject = new SkilletProject(filePath, metadata, ioThread);
+            }
+            catch
+            {
+                ioThread.Dispose();
+                throw;
+            }
+        }
+    }
+
     public async Task CloseAsync()
     {
         if (_currentProject is null)
