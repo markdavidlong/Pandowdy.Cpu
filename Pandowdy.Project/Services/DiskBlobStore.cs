@@ -127,6 +127,95 @@ internal static class DiskBlobStore
     }
 
     /// <summary>
+    /// Serializes a mounted <see cref="InternalDiskImage"/> using a snapshot-under-lock strategy.
+    /// Acquires <see cref="InternalDiskImage.SerializationLock"/> briefly to copy raw quarter-track
+    /// byte arrays (~1ms for a 35-track disk), then releases the lock and compresses the snapshot
+    /// on the calling thread with no contention against the emulator write path.
+    /// </summary>
+    public static byte[] SerializeSnapshot(InternalDiskImage diskImage)
+    {
+        ArgumentNullException.ThrowIfNull(diskImage);
+
+        var quarterTrackCount = diskImage.QuarterTrackCount;
+
+        // Snapshot data under lock — fast memcpy, no compression
+        byte physicalTrackCount;
+        byte optimalBitTiming;
+        byte writeProtected;
+        var presenceBitmap = new byte[(quarterTrackCount + 7) / 8];
+        var snapshotBitCounts = new int[quarterTrackCount];
+        var snapshotData = new byte[quarterTrackCount][];
+
+        lock (diskImage.SerializationLock)
+        {
+            physicalTrackCount = (byte)diskImage.PhysicalTrackCount;
+            optimalBitTiming = diskImage.OptimalBitTiming;
+            writeProtected = diskImage.IsWriteProtected ? (byte)1 : (byte)0;
+
+            for (int i = 0; i < quarterTrackCount; i++)
+            {
+                var cbb = diskImage.QuarterTracks[i];
+                if (cbb is null)
+                {
+                    continue;
+                }
+
+                presenceBitmap[i / 8] |= (byte)(1 << (i % 8));  // LSB-first
+                snapshotBitCounts[i] = diskImage.QuarterTrackBitCounts[i];
+
+                // Copy raw bytes from CircularBitBuffer
+                var byteCount = (snapshotBitCounts[i] + 7) / 8;
+                var trackBytes = new byte[byteCount];
+                int savedPosition = cbb.BitPosition;
+                cbb.BitPosition = 0;
+                for (int j = 0; j < byteCount; j++)
+                {
+                    trackBytes[j] = cbb.ReadOctet();
+                }
+                cbb.BitPosition = savedPosition;
+                snapshotData[i] = trackBytes;
+            }
+        }
+
+        // Lock released — compress the snapshot at leisure
+        using var ms = new MemoryStream();
+
+        // Write uncompressed header (12 bytes)
+        ms.Write(s_magic);
+        ms.Write(BitConverter.GetBytes(FormatVersion));
+        ms.WriteByte(CompressionMethodDeflate);
+        ms.WriteByte(physicalTrackCount);
+        ms.WriteByte(optimalBitTiming);
+        ms.WriteByte(writeProtected);
+        ms.Write(BitConverter.GetBytes((ushort)quarterTrackCount));
+
+        // Write presence bitmap (uncompressed)
+        ms.Write(presenceBitmap);
+
+        // Compress payload from snapshot data
+        using (var deflateStream = new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true))
+        {
+            for (int i = 0; i < quarterTrackCount; i++)
+            {
+                if (snapshotData[i] is null)
+                {
+                    continue;
+                }
+
+                deflateStream.Write(BitConverter.GetBytes(snapshotBitCounts[i]));
+                deflateStream.Write(BitConverter.GetBytes(snapshotData[i].Length));
+                deflateStream.Write(snapshotData[i]);
+            }
+        }
+
+        var dataForCrc = ms.ToArray();
+        var crc = Crc32.Hash(dataForCrc);
+        ms.Write(crc);
+
+        return ms.ToArray();
+    }
+
+    /// <summary>
     /// Deserializes a PIDI blob to an <see cref="InternalDiskImage"/>.
     /// </summary>
     public static InternalDiskImage Deserialize(byte[] blob)

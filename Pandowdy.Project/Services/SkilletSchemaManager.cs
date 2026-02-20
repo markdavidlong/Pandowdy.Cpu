@@ -76,13 +76,20 @@ internal static class SkilletSchemaManager
     /// <summary>
     /// Sets the required pragmas for .skillet database files.
     /// </summary>
+    /// <remarks>
+    /// Uses DELETE journal mode instead of WAL to avoid .skillet-wal and .skillet-shm
+    /// sidecar files. Since all SQLite access is serialized on a single dedicated IO
+    /// thread, WAL's concurrent reader/writer benefit is irrelevant. DELETE mode keeps
+    /// the .skillet as a single portable file — the journal file only exists during
+    /// active write transactions and is automatically deleted on commit.
+    /// </remarks>
     public static void SetPragmas(SqliteConnection connection)
     {
         using var cmd = connection.CreateCommand();
         cmd.CommandText = $"""
             PRAGMA application_id = {SkilletConstants.ApplicationId};
             PRAGMA user_version = {SkilletConstants.SchemaVersion};
-            PRAGMA journal_mode = WAL;
+            PRAGMA journal_mode = DELETE;
             PRAGMA foreign_keys = ON;
             """;
         cmd.ExecuteNonQuery();

@@ -137,6 +137,13 @@ public class InternalDiskImage
     public bool IsDirty { get; private set; }
 
     /// <summary>
+    /// Lock object acquired by the emulator write path and by the serializer.
+    /// The emulator acquires this on every write bit; the serializer acquires it
+    /// briefly to snapshot quarter-track data before compressing outside the lock.
+    /// </summary>
+    public object SerializationLock { get; } = new object();
+
+    /// <summary>
     /// Display name for this disk image (e.g., "DOS 3.3 System Master").
     /// </summary>
     /// <remarks>

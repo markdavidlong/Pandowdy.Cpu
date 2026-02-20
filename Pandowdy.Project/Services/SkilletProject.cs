@@ -17,10 +17,37 @@ namespace Pandowdy.Project.Services;
 internal sealed class SkilletProject : ISkilletProject
 {
     private readonly ProjectIOThread _ioThread;
-    private readonly string _filePath;
-    private readonly ProjectMetadata _metadata;
+    private string? _filePath;
+    private ProjectMetadata _metadata;
     private bool _disposed;
 
+    /// <summary>
+    /// Tracks whether the project has been modified since it was created, opened, or last saved.
+    /// Set exclusively via <see cref="MarkDirty"/>. Cleared by <see cref="SaveAsync"/>.
+    /// Volatile for safe cross-thread reads from the UI thread.
+    /// </summary>
+    private volatile bool _projectDirty;
+
+    /// <summary>
+    /// Tracks disk images currently checked out to the emulator.
+    /// Populated by <see cref="CheckOutAsync"/>, cleared by <see cref="ReturnAsync"/>.
+    /// Used by <see cref="SaveAsync"/> to snapshot-serialize mounted disks.
+    /// </summary>
+    private readonly ConcurrentDictionary<long, InternalDiskImage> _checkedOutImages = new();
+
+    /// <summary>
+    /// Creates an ad hoc (in-memory) project.
+    /// </summary>
+    public SkilletProject(ProjectMetadata metadata, ProjectIOThread ioThread)
+    {
+        _filePath = null;
+        _metadata = metadata;
+        _ioThread = ioThread;
+    }
+
+    /// <summary>
+    /// Creates a file-based project.
+    /// </summary>
     public SkilletProject(string filePath, ProjectMetadata metadata, ProjectIOThread ioThread)
     {
         _filePath = filePath;
@@ -28,10 +55,11 @@ internal sealed class SkilletProject : ISkilletProject
         _ioThread = ioThread;
     }
 
-    public string FilePath => _filePath;
+    public string? FilePath => _filePath;
     public bool IsAdHoc => string.IsNullOrEmpty(_filePath) || _filePath == ":memory:";
     public ProjectMetadata Metadata => _metadata;
-    public bool HasUnsavedChanges => EnqueueSync(conn => CheckForUnsavedChanges(conn));
+    public bool HasUnsavedChanges => _projectDirty;
+    public bool HasDiskImages => EnqueueSync(conn => CheckForDiskImages(conn));
 
     // Disk image management
 
@@ -84,7 +112,9 @@ internal sealed class SkilletProject : ISkilletProject
             cmd.Parameters.AddWithValue("@modifiedUtc", now);
 
             var result = cmd.ExecuteScalar();
-            return Convert.ToInt64(result);
+            var id = Convert.ToInt64(result);
+            MarkDirty();
+            return id;
         });
     }
 
@@ -144,6 +174,7 @@ internal sealed class SkilletProject : ISkilletProject
             cmd.CommandText = $"DELETE FROM {SkilletConstants.TableDiskImages} WHERE id = @id;";
             cmd.Parameters.AddWithValue("@id", id);
             cmd.ExecuteNonQuery();
+            MarkDirty();
         });
     }
 
@@ -160,6 +191,7 @@ internal sealed class SkilletProject : ISkilletProject
             cmd.Parameters.AddWithValue("@id", id);
             cmd.Parameters.AddWithValue("@now", DateTime.UtcNow.ToString("o"));
             cmd.ExecuteNonQuery();
+            MarkDirty();
         });
     }
 
@@ -307,6 +339,9 @@ internal sealed class SkilletProject : ISkilletProject
             // Set display name from project record (no filesystem paths needed)
             diskImage.DiskImageName = reader.GetString(1);
 
+            // Track this image as checked out for snapshot-serialization in SaveAsync
+            _checkedOutImages[diskImageId] = diskImage;
+
             return diskImage;
         });
     }
@@ -316,6 +351,8 @@ internal sealed class SkilletProject : ISkilletProject
     /// </summary>
     public Task ReturnAsync(long diskImageId, InternalDiskImage image)
     {
+        _checkedOutImages.TryRemove(diskImageId, out _);
+        MarkDirty();
         return SaveDiskImageAsync(diskImageId, image);
     }
 
@@ -363,6 +400,7 @@ internal sealed class SkilletProject : ISkilletProject
             cmd.Parameters.AddWithValue("@drive", driveNumber);
             cmd.Parameters.AddWithValue("@diskId", (object?)diskImageId ?? DBNull.Value);
             cmd.ExecuteNonQuery();
+            MarkDirty();
         });
     }
 
@@ -375,49 +413,37 @@ internal sealed class SkilletProject : ISkilletProject
 
     public Task SetSettingAsync(string tableName, string key, string value)
     {
-        return EnqueueAsync(conn => ProjectSettingsStore.Set(conn, tableName, key, value));
+        return EnqueueAsync(conn =>
+        {
+            ProjectSettingsStore.Set(conn, tableName, key, value);
+            MarkDirty();
+        });
     }
 
     // Lifecycle
 
     /// <summary>
-    /// Saves the project, optionally ejecting all mounted disks first to ensure working copies are serialized.
+    /// Saves the project, serializing any currently checked-out (mounted) disk images.
     /// </summary>
-    /// <param name="ejectAllFirst">If true, sends EjectAllDisksMessage to ensure mounted disk changes are serialized before save.</param>
-    /// <param name="emulatorCore">Optional emulator core interface for sending eject message. Required if ejectAllFirst is true.</param>
-    /// <returns>A task that completes when the save operation is finished.</returns>
     /// <remarks>
     /// <para>
-    /// <strong>Phase 2a Implementation:</strong> This method clears the <c>working_dirty</c> flags for
-    /// all disks with <c>persist_working = 1</c>. If <paramref name="ejectAllFirst"/> is true, it first
-    /// sends <see cref="EjectAllDisksMessage"/> to the emulator core, which triggers
-    /// <see cref="IDiskImageStore.ReturnAsync"/> for each mounted disk, serializing their current state
-    /// to <c>working_blob</c> and setting <c>working_dirty = 1</c> before this method clears the flags.
-    /// </para>
-    /// <para>
-    /// <strong>Rationale:</strong> Mounted disks are modified in-memory by drive operations. The eject
-    /// flow (<c>ReturnAsync</c>) is responsible for serializing these changes back to the database.
-    /// By ejecting all disks before saving, we ensure all changes are committed to <c>working_blob</c>
-    /// before the dirty flags are cleared.
-    /// </para>
-    /// <para>
-    /// <strong>Future Enhancement:</strong> A future phase may implement pause-serialize-resume to avoid
-    /// the brief eject/re-mount disruption, but Phase 2a uses eject-then-clear for correctness and simplicity.
+    /// Checked-out disk images are serialized using <see cref="DiskBlobStore.SerializeSnapshot"/>,
+    /// which acquires <see cref="InternalDiskImage.SerializationLock"/> briefly (~1ms) to copy
+    /// raw quarter-track data, then compresses outside the lock. The emulator continues running
+    /// throughout — only the write path is blocked for the brief snapshot window.
     /// </para>
     /// </remarks>
-    public async Task SaveAsync(bool ejectAllFirst = true, Pandowdy.EmuCore.Interfaces.IEmulatorCoreInterface? emulatorCore = null)
+    public async Task SaveAsync()
     {
-        if (ejectAllFirst)
+        // Snapshot-serialize checked-out disk images BEFORE enqueuing to the IO thread.
+        // SerializeSnapshot acquires the lock briefly per disk, then compresses outside.
+        var serializedDisks = new Dictionary<long, byte[]>();
+        foreach (var (id, image) in _checkedOutImages)
         {
-            if (emulatorCore is null)
+            if (image.IsDirty)
             {
-                throw new ArgumentNullException(nameof(emulatorCore), "emulatorCore is required when ejectAllFirst is true");
+                serializedDisks[id] = DiskBlobStore.SerializeSnapshot(image);
             }
-
-            // Eject all mounted disks to ensure their working copies are serialized via ReturnAsync
-            await emulatorCore.SendCardMessageAsync(
-                slot: null, // Broadcast to all slots
-                message: new Pandowdy.EmuCore.DiskII.Messages.EjectAllDisksMessage());
         }
 
         await EnqueueAsync(conn =>
@@ -425,6 +451,21 @@ internal sealed class SkilletProject : ISkilletProject
             using var transaction = conn.BeginTransaction();
             try
             {
+                // Write serialized mounted disk blobs to working_blob
+                foreach (var (id, blob) in serializedDisks)
+                {
+                    using var blobCmd = conn.CreateCommand();
+                    blobCmd.CommandText = $"""
+                        UPDATE {SkilletConstants.TableDiskImages}
+                        SET working_blob = @blob, working_dirty = 0, modified_utc = @now
+                        WHERE id = @id AND persist_working = 1;
+                        """;
+                    blobCmd.Parameters.AddWithValue("@id", id);
+                    blobCmd.Parameters.AddWithValue("@blob", blob);
+                    blobCmd.Parameters.AddWithValue("@now", DateTime.UtcNow.ToString("o"));
+                    blobCmd.ExecuteNonQuery();
+                }
+
                 // Update project metadata modified timestamp
                 using var metaCmd = conn.CreateCommand();
                 metaCmd.CommandText = $"""
@@ -435,7 +476,8 @@ internal sealed class SkilletProject : ISkilletProject
                 metaCmd.Parameters.AddWithValue("@now", DateTime.UtcNow.ToString("o"));
                 metaCmd.ExecuteNonQuery();
 
-                // Clear working_dirty flag for all persisted disks
+                // Clear working_dirty flag for any remaining persisted disks
+                // (covers ejected disks whose blobs were already written via ReturnAsync)
                 using var dirtyCmd = conn.CreateCommand();
                 dirtyCmd.CommandText = $"""
                     UPDATE {SkilletConstants.TableDiskImages}
@@ -445,6 +487,7 @@ internal sealed class SkilletProject : ISkilletProject
                 dirtyCmd.ExecuteNonQuery();
 
                 transaction.Commit();
+                MarkClean();
             }
             catch
             {
@@ -463,6 +506,80 @@ internal sealed class SkilletProject : ISkilletProject
 
         _ioThread.Dispose();
         _disposed = true;
+    }
+
+    // Dirty tracking
+
+    /// <summary>
+    /// Marks the project as having unsaved changes.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the single centralized method for marking the project dirty. All mutation
+    /// methods (import, remove, settings change, mount configuration, eject auto-flush,
+    /// working copy regeneration) call this method rather than setting the flag directly.
+    /// </para>
+    /// <para>
+    /// This is distinct from the per-disk-image <c>working_dirty</c> SQL column, which
+    /// tracks whether a specific disk image's working blob has been modified via eject
+    /// auto-flush. The SQL column is used by <see cref="SaveAsync"/> to manage per-disk
+    /// persistence (which blobs to flush). <see cref="MarkDirty"/> tracks the project-level
+    /// dirty state used by <see cref="HasUnsavedChanges"/> for UI enablement.
+    /// </para>
+    /// </remarks>
+    private void MarkDirty()
+    {
+        _projectDirty = true;
+    }
+
+    /// <summary>
+    /// Marks the project as clean (no unsaved changes). Called after a successful save.
+    /// </summary>
+    private void MarkClean()
+    {
+        _projectDirty = false;
+    }
+
+    /// <summary>
+    /// Transitions this project from its current data source to a new file on disk.
+    /// The <see cref="SkilletProject"/> instance is preserved — checked-out images,
+    /// external references (<see cref="IDiskImageStore"/>), and dirty tracking all
+    /// survive the transition. Only the internal SQLite connection, <see cref="FilePath"/>,
+    /// and <see cref="Metadata"/> change.
+    /// </summary>
+    /// <param name="filePath">Destination file path for the new .skillet file.</param>
+    /// <param name="preSwapAction">
+    /// Action to run on the old connection before the swap (e.g., VACUUM INTO to create
+    /// the new file from the current database contents).
+    /// </param>
+    internal async Task TransitionToFileAsync(
+        string filePath,
+        Action<SqliteConnection>? preSwapAction)
+    {
+        var projectName = Path.GetFileNameWithoutExtension(filePath);
+
+        await _ioThread.SwapConnectionAsync(
+            preSwapAction,
+            filePath,
+            conn =>
+            {
+                SkilletSchemaManager.SetPragmas(conn);
+
+                // Update project name in metadata to match the new file name
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = $"""
+                    UPDATE {SkilletConstants.TableProjectMetadata}
+                    SET value = @name
+                    WHERE key = 'name';
+                    """;
+                cmd.Parameters.AddWithValue("@name", projectName);
+                cmd.ExecuteNonQuery();
+            });
+
+        // Update in-memory state to reflect the new file
+        _filePath = filePath;
+        _metadata = _metadata with { Name = projectName, ModifiedUtc = DateTime.UtcNow };
+        MarkClean();
     }
 
     // IO thread helpers
@@ -508,13 +625,10 @@ internal sealed class SkilletProject : ISkilletProject
         };
     }
 
-    private static bool CheckForUnsavedChanges(SqliteConnection conn)
+    private static bool CheckForDiskImages(SqliteConnection conn)
     {
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"""
-            SELECT COUNT(*) FROM {SkilletConstants.TableDiskImages}
-            WHERE persist_working = 1 AND working_dirty = 1;
-            """;
+        cmd.CommandText = $"SELECT COUNT(*) FROM {SkilletConstants.TableDiskImages};";
         var result = cmd.ExecuteScalar();
         return result is long count && count > 0;
     }
@@ -527,10 +641,27 @@ internal sealed class ProjectIOThread : IDisposable
 {
     private readonly Thread _thread;
     private readonly BlockingCollection<IORequest> _queue = new();
-    private readonly string _filePath;
+    private readonly string? _filePath;
     private SqliteConnection? _connection;
     private bool _disposed;
 
+    /// <summary>
+    /// Creates an ad hoc (in-memory) IO thread.
+    /// </summary>
+    public ProjectIOThread()
+    {
+        _filePath = null;
+        _thread = new Thread(RunLoop)
+        {
+            Name = "Pandowdy.Project.IO",
+            IsBackground = true
+        };
+        _thread.Start();
+    }
+
+    /// <summary>
+    /// Creates a file-based IO thread.
+    /// </summary>
     public ProjectIOThread(string filePath)
     {
         _filePath = filePath;
@@ -582,11 +713,59 @@ internal sealed class ProjectIOThread : IDisposable
         _disposed = true;
     }
 
+    /// <summary>
+    /// Swaps the underlying SQLite connection to a new data source.
+    /// Runs on the IO thread: all pending operations complete on the old connection first,
+    /// then the swap happens, then subsequent operations use the new connection.
+    /// </summary>
+    /// <param name="preSwapAction">
+    /// Optional action to run on the old connection before the swap (e.g., VACUUM INTO to
+    /// create the new file from the current database).
+    /// </param>
+    /// <param name="newDataSource">File path for the new connection.</param>
+    /// <param name="postSwapAction">
+    /// Action to initialize the new connection (e.g., set pragmas, update project name).
+    /// </param>
+    internal Task SwapConnectionAsync(
+        Action<SqliteConnection>? preSwapAction,
+        string newDataSource,
+        Action<SqliteConnection> postSwapAction)
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(ProjectIOThread));
+        }
+
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _queue.Add(new IORequest<bool>(conn =>
+        {
+            // Run pre-swap action on old connection (e.g., VACUUM INTO)
+            preSwapAction?.Invoke(conn);
+
+            // Close and dispose the old connection
+            conn.Close();
+            conn.Dispose();
+
+            // Open new connection to the target data source.
+            // Assign to _connection so subsequent requests (via RunLoop) use the new one.
+            _connection = new SqliteConnection($"Data Source={newDataSource}");
+            _connection.Open();
+
+            // Initialize new connection (pragmas, name update, etc.)
+            postSwapAction(_connection);
+
+            return true;
+        }, tcs));
+        return tcs.Task;
+    }
+
     private void RunLoop()
     {
         try
         {
-            _connection = new SqliteConnection($"Data Source={_filePath}");
+            // For ad hoc projects (null filePath), use in-memory database
+            var dataSource = _filePath ?? ":memory:";
+            _connection = new SqliteConnection($"Data Source={dataSource}");
             _connection.Open();
 
             foreach (var request in _queue.GetConsumingEnumerable())

@@ -15,6 +15,13 @@ public interface ISkilletProjectManager
     ISkilletProject? CurrentProject { get; }
 
     /// <summary>
+    /// Creates an ad hoc (in-memory) project. Used on startup when no project file
+    /// is specified, and after closing a project without opening another.
+    /// </summary>
+    /// <returns>The newly created ad hoc project.</returns>
+    Task<ISkilletProject> CreateAdHocAsync();
+
+    /// <summary>
     /// Creates a new .skillet project file at the specified path.
     /// </summary>
     Task<ISkilletProject> CreateAsync(string filePath, string projectName);

@@ -19,14 +19,6 @@ public class SkilletProjectDiskTests(ITestOutputHelper output)
 
     #region ImportDiskImageAsync
 
-    [Fact(Skip = "Requires test NIB/WOZ disk image files")]
-    public async Task ImportDiskImageAsync_ValidNibFile_StoresOriginalAndWorkingBlobs()
-    {
-        // This test is skipped because it requires actual disk image files
-        // The importer tests in EmuCore.Tests cover the import logic
-        // This test would verify end-to-end: file → import → serialize → store in DB
-        await Task.CompletedTask;
-    }
 
     [Fact]
     public async Task ImportDiskImageAsync_UnsupportedFormat_ThrowsArgumentException()

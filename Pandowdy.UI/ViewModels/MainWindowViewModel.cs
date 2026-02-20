@@ -9,6 +9,7 @@ using System.Reactive;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using ReactiveUI;
+using Pandowdy.EmuCore.DiskII.Messages;
 using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.EmuCore.Services;
 using Pandowdy.UI.Interfaces;
@@ -660,7 +661,8 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     /// <value>Command that saves the current project to its file path.</value>
     /// <remarks>
-    /// Only enabled when a project is open. Saves all mounted disk working copies.
+    /// Enabled when a file-based project is open and is not pristine (has disk images
+    /// or unsaved changes). Disabled for ad hoc projects and pristine file-based projects.
     /// </remarks>
     public ReactiveCommand<Unit, Unit> SaveProjectCommand { get; }
 
@@ -669,7 +671,8 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     /// <value>Command that prompts for new location and saves project.</value>
     /// <remarks>
-    /// Only enabled when a project is open. Creates a copy at the new location.
+    /// Enabled when the current project is not pristine (has disk images or unsaved changes).
+    /// Disabled for pristine projects that have no content worth persisting.
     /// </remarks>
     public ReactiveCommand<Unit, Unit> SaveProjectAsCommand { get; }
 
@@ -678,7 +681,8 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     /// <value>Command that closes the current project after checking for unsaved changes.</value>
     /// <remarks>
-    /// If project has unsaved changes, prompts to save first. Ejects all mounted disks.
+    /// Enabled for file-based projects (always closable) or ad hoc projects that are not
+    /// pristine (have imported disk images or unsaved changes). Disabled for pristine ad hoc projects.
     /// </remarks>
     public ReactiveCommand<Unit, Unit> CloseProjectCommand { get; }
 
@@ -696,7 +700,8 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     /// <value>Command that prompts for disk image and export location.</value>
     /// <remarks>
-    /// Only enabled when a project is open with disk images. Exports to filesystem.
+    /// Enabled when the project's disk image library contains at least one image.
+    /// Disabled when no disk images have been imported.
     /// </remarks>
     public ReactiveCommand<Unit, Unit> ExportDiskImageCommand { get; }
 
@@ -750,6 +755,62 @@ public sealed class MainWindowViewModel : ReactiveObject
     }
 
     /// <summary>
+    /// Backing field for IsFileBasedProject property.
+    /// </summary>
+    private bool _isFileBasedProject;
+
+    /// <summary>
+    /// Gets whether the current project is file-based (not ad hoc).
+    /// </summary>
+    /// <value>True if project has a file on disk, false for ad hoc in-memory projects.</value>
+    public bool IsFileBasedProject
+    {
+        get => _isFileBasedProject;
+        private set => this.RaiseAndSetIfChanged(ref _isFileBasedProject, value);
+    }
+
+    /// <summary>
+    /// Backing field for HasDiskImages property.
+    /// </summary>
+    private bool _hasDiskImages;
+
+    /// <summary>
+    /// Gets whether the current project's disk image library contains any images.
+    /// </summary>
+    /// <value>True if at least one disk image has been imported, false otherwise.</value>
+    public bool HasDiskImages
+    {
+        get => _hasDiskImages;
+        private set => this.RaiseAndSetIfChanged(ref _hasDiskImages, value);
+    }
+
+    /// <summary>
+    /// Backing field for IsProjectNotPristine property.
+    /// </summary>
+    private bool _isProjectNotPristine;
+
+    /// <summary>
+    /// Gets whether the current project has been modified (is not pristine).
+    /// </summary>
+    /// <value>
+    /// True if the project has imported disk images or unsaved changes (any mutation).
+    /// False for a freshly created or opened project with no modifications.
+    /// </value>
+    /// <remarks>
+    /// A pristine project has had no changes since creation or last save — no imported
+    /// disks, no settings overrides, no mount config changes. Any mutation marks the
+    /// project as dirty and makes it non-pristine. This applies to both ad hoc and
+    /// file-based projects: a newly created file-based project with no changes is
+    /// also pristine. Close is additionally enabled for file-based projects via
+    /// the <see cref="IsFileBasedProject"/> property in the Close command guard.
+    /// </remarks>
+    public bool IsProjectNotPristine
+    {
+        get => _isProjectNotPristine;
+        private set => this.RaiseAndSetIfChanged(ref _isProjectNotPristine, value);
+    }
+
+    /// <summary>
     /// Backing field for WindowTitle property.
     /// </summary>
     private string _windowTitle = "Pandowdy — untitled";
@@ -758,8 +819,9 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// Gets the window title showing the application name and current project.
     /// </summary>
     /// <value>
-    /// Format: "Pandowdy — {ProjectName}" for file-based projects,
-    /// "Pandowdy — untitled" for ad hoc projects.
+    /// Format: "Pandowdy — {ProjectName}" for clean projects,
+    /// "Pandowdy — {ProjectName} *" for dirty projects,
+    /// "Pandowdy — untitled" for ad hoc projects with no changes.
     /// </value>
     public string WindowTitle
     {
@@ -797,6 +859,11 @@ public sealed class MainWindowViewModel : ReactiveObject
     private readonly IProjectFileDialogService _projectFileDialogService;
 
     /// <summary>
+    /// Emulator core interface for sending card messages (eject-all on project close).
+    /// </summary>
+    private readonly IEmulatorCoreInterface _emulatorCore;
+
+    /// <summary>
     /// Project manager for accessing the current project and lifecycle operations.
     /// </summary>
     private readonly ISkilletProjectManager _projectManager;
@@ -824,6 +891,7 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <param name="messageBoxService">Message box service for showing exit confirmation dialogs.</param>
     /// <param name="diskFileDialogService">File dialog service for showing disk image open/save dialogs.</param>
     /// <param name="projectFileDialogService">File dialog service for showing project file open/save dialogs.</param>
+    /// <param name="emulatorCore">Emulator core interface for sending card messages (eject-all on project close).</param>
     /// <param name="projectManager">Project manager for accessing the current project.</param>
     /// <remarks>
     /// <para>
@@ -857,6 +925,7 @@ public sealed class MainWindowViewModel : ReactiveObject
                                IMessageBoxService messageBoxService,
                                IDiskFileDialogService diskFileDialogService,
                                IProjectFileDialogService projectFileDialogService,
+                               IEmulatorCoreInterface emulatorCore,
                                ISkilletProjectManager projectManager)
     {
         EmulatorState = emulatorState;
@@ -870,16 +939,14 @@ public sealed class MainWindowViewModel : ReactiveObject
         _messageBoxService = messageBoxService;
         _diskFileDialogService = diskFileDialogService;
         _projectFileDialogService = projectFileDialogService;
+        _emulatorCore = emulatorCore;
         _projectManager = projectManager;
         _project = projectManager.CurrentProject;
 
         // Update project state properties if project is provided
         if (_project != null)
         {
-            HasProject = true;
-            ProjectFilePath = _project.FilePath;
-            HasUnsavedChanges = _project.HasUnsavedChanges;
-            UpdateWindowTitle();
+            RefreshProjectStateProperties();
         }
 
         // Initialize emulator control commands
@@ -907,16 +974,32 @@ public sealed class MainWindowViewModel : ReactiveObject
         TogglePauseOrContinue = ReactiveCommand.Create(() => { });
 
         // Initialize project lifecycle commands
-        // Commands are enabled/disabled based on HasProject property
+        // Save Project: enabled for file-based projects that are not pristine
+        // (importing a disk image makes the project saveable)
+        var canSaveProject = this.WhenAnyValue(
+            x => x.IsFileBasedProject, x => x.IsProjectNotPristine,
+            (fileBased, notPristine) => fileBased && notPristine);
+
+        // Save Project As: enabled only when project has content (not pristine)
+        var canSaveProjectAs = this.WhenAnyValue(x => x.IsProjectNotPristine);
+
+        // Close Project: enabled for file-based projects (always closable) or ad hoc with data
+        var canCloseProject = this.WhenAnyValue(
+            x => x.IsFileBasedProject, x => x.IsProjectNotPristine,
+            (fileBased, notPristine) => fileBased || notPristine);
+
+        // Export Disk Image: enabled only when project has disk images in the library
+        var canExportDiskImage = this.WhenAnyValue(x => x.HasDiskImages);
+
         var hasProject = this.WhenAnyValue(x => x.HasProject);
 
         NewProjectCommand = ReactiveCommand.CreateFromTask(NewProjectAsync);
         OpenProjectCommand = ReactiveCommand.CreateFromTask(OpenProjectAsync);
-        SaveProjectCommand = ReactiveCommand.CreateFromTask(SaveProjectAsync, hasProject);
-        SaveProjectAsCommand = ReactiveCommand.CreateFromTask(SaveProjectAsAsync, hasProject);
-        CloseProjectCommand = ReactiveCommand.CreateFromTask(CloseProjectAsync, hasProject);
+        SaveProjectCommand = ReactiveCommand.CreateFromTask(SaveProjectAsync, canSaveProject);
+        SaveProjectAsCommand = ReactiveCommand.CreateFromTask(SaveProjectAsAsync, canSaveProjectAs);
+        CloseProjectCommand = ReactiveCommand.CreateFromTask(CloseProjectAsync, canCloseProject);
         ImportDiskImageCommand = ReactiveCommand.CreateFromTask(ImportDiskImageAsync, hasProject);
-        ExportDiskImageCommand = ReactiveCommand.CreateFromTask(ExportDiskImageAsync, hasProject);
+        ExportDiskImageCommand = ReactiveCommand.CreateFromTask(ExportDiskImageAsync, canExportDiskImage);
     }
 
     #endregion
@@ -926,6 +1009,14 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <summary>
     /// Updates the window title based on the current project state.
     /// </summary>
+    /// <remarks>
+    /// Title formats per blueprint Appendix E.7:
+    /// <list type="bullet">
+    /// <item>Ad hoc project (clean): "Pandowdy — untitled"</item>
+    /// <item>File-based project (clean): "Pandowdy — {ProjectName}"</item>
+    /// <item>Dirty project: "Pandowdy — {ProjectName} *"</item>
+    /// </list>
+    /// </remarks>
     private void UpdateWindowTitle()
     {
         if (_project == null || _project.Metadata == null)
@@ -934,8 +1025,43 @@ public sealed class MainWindowViewModel : ReactiveObject
         }
         else
         {
-            WindowTitle = $"Pandowdy — {_project.Metadata.Name}";
+            var dirtyIndicator = _project.HasUnsavedChanges ? " *" : string.Empty;
+            WindowTitle = $"Pandowdy — {_project.Metadata.Name}{dirtyIndicator}";
         }
+    }
+
+    /// <summary>
+    /// Refreshes all project state properties from the current <see cref="_project"/>.
+    /// </summary>
+    /// <remarks>
+    /// Call this after any project lifecycle change (create, open, close, save as, import).
+    /// Updates <see cref="HasProject"/>, <see cref="ProjectFilePath"/>,
+    /// <see cref="HasUnsavedChanges"/>, <see cref="IsFileBasedProject"/>,
+    /// <see cref="HasDiskImages"/>, <see cref="IsProjectNotPristine"/>,
+    /// and the window title.
+    /// </remarks>
+    private void RefreshProjectStateProperties()
+    {
+        if (_project != null)
+        {
+            HasProject = true;
+            ProjectFilePath = _project.FilePath;
+            HasUnsavedChanges = _project.HasUnsavedChanges;
+            IsFileBasedProject = !_project.IsAdHoc;
+            HasDiskImages = _project.HasDiskImages;
+            IsProjectNotPristine = _project.HasDiskImages || _project.HasUnsavedChanges;
+        }
+        else
+        {
+            HasProject = false;
+            ProjectFilePath = string.Empty;
+            HasUnsavedChanges = false;
+            IsFileBasedProject = false;
+            HasDiskImages = false;
+            IsProjectNotPristine = false;
+        }
+
+        UpdateWindowTitle();
     }
 
     /// <summary>
@@ -982,13 +1108,7 @@ public sealed class MainWindowViewModel : ReactiveObject
 
             // Update UI state
             _project = newProject;
-            HasProject = true;
-            ProjectFilePath = newProject.FilePath;
-            HasUnsavedChanges = false;
-            UpdateWindowTitle();
-
-            // TODO: Notify child view models of project change
-            // await DiskStatus.RefreshDriveLibraryStateAsync();
+            RefreshProjectStateProperties();
         }
         catch (Exception ex)
         {
@@ -1038,13 +1158,10 @@ public sealed class MainWindowViewModel : ReactiveObject
 
             // Update UI state
             _project = openedProject;
-            HasProject = true;
-            ProjectFilePath = openedProject.FilePath;
-            HasUnsavedChanges = openedProject.HasUnsavedChanges;
-            UpdateWindowTitle();
+            RefreshProjectStateProperties();
 
-            // TODO: Notify child view models of project change
-            // await DiskStatus.RefreshDriveLibraryStateAsync();
+            // Auto-mount disk images from saved mount configuration
+            await AutoMountFromConfigurationAsync();
         }
         catch (Exception ex)
         {
@@ -1071,7 +1188,7 @@ public sealed class MainWindowViewModel : ReactiveObject
         try
         {
             await _project.SaveAsync();
-            HasUnsavedChanges = false;
+            RefreshProjectStateProperties();
         }
         catch (Exception ex)
         {
@@ -1114,10 +1231,7 @@ public sealed class MainWindowViewModel : ReactiveObject
 
             // Update UI state (SaveAsAsync updates the project's FilePath and IsAdHoc internally)
             _project = _projectManager.CurrentProject;
-            HasProject = true;
-            ProjectFilePath = _project.FilePath;
-            HasUnsavedChanges = false;
-            UpdateWindowTitle();
+            RefreshProjectStateProperties();
         }
         catch (Exception ex)
         {
@@ -1172,6 +1286,13 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <summary>
     /// Internal helper to close project without unsaved changes check.
     /// </summary>
+    /// <remarks>
+    /// Broadcasts <see cref="EjectAllDisksMessage"/> to all slots so every mounted disk
+    /// is returned to the store via <see cref="IDiskImageStore.ReturnAsync"/> before the
+    /// SQLite connection is torn down. Then delegates to
+    /// <see cref="ISkilletProjectManager.CloseAsync"/> which disposes the current project
+    /// and creates a new ad hoc project.
+    /// </remarks>
     private async Task CloseProjectInternalAsync()
     {
         if (_project == null)
@@ -1179,17 +1300,85 @@ public sealed class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        // TODO: Eject all mounted disks (send EjectAllDisksMessage to controller)
+        // Persist current mount state from the disk status panel before ejecting.
+        // The status pipeline already carries DiskImageId for each drive.
+        await SaveMountConfigurationAsync();
 
-        _project.Dispose();
-        _project = null;
+        // Eject all mounted disks — returns each InternalDiskImage to the store
+        // via ReturnAsync before the project's SQLite connection is closed.
+        // Broadcast to all slots (null = all) so every controller card ejects its drives.
+        await _emulatorCore.SendCardMessageAsync(null, new EjectAllDisksMessage());
 
-        HasProject = false;
-        ProjectFilePath = string.Empty;
-        HasUnsavedChanges = false;
-        UpdateWindowTitle();
+        // Close the current project and create a new ad hoc project
+        await _projectManager.CloseAsync();
+        _project = _projectManager.CurrentProject;
 
-        await Task.CompletedTask;
+        RefreshProjectStateProperties();
+    }
+
+    /// <summary>
+    /// Reads the project's mount_configuration table and sends <see cref="MountDiskMessage"/>
+    /// for each entry with <c>auto_mount = true</c> and a non-null disk image ID.
+    /// </summary>
+    /// <remarks>
+    /// Called after opening or creating a project to restore the drive states that were
+    /// saved when the project was last closed. Errors mounting individual disks are logged
+    /// but do not prevent other disks from mounting.
+    /// </remarks>
+    private async Task AutoMountFromConfigurationAsync()
+    {
+        if (_project == null)
+        {
+            return;
+        }
+
+        var mountConfigs = await _project.GetMountConfigurationAsync();
+
+        foreach (var config in mountConfigs)
+        {
+            if (config.AutoMount && config.DiskImageId.HasValue)
+            {
+                try
+                {
+                    await _emulatorCore.SendCardMessageAsync(
+                        (SlotNumber)config.Slot,
+                        new MountDiskMessage(config.DriveNumber, config.DiskImageId.Value));
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[AutoMount] Failed to mount disk {config.DiskImageId} into slot {config.Slot} drive {config.DriveNumber}: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Persists the current drive mount state to the project's mount_configuration table.
+    /// </summary>
+    /// <remarks>
+    /// Reads <see cref="DiskDriveStatusSnapshot.DiskImageId"/> from each drive in the
+    /// disk status panel and writes slot/drive/diskImageId to mount_configuration.
+    /// Called before eject-all during project close so the mount state survives
+    /// the close/reopen cycle.
+    /// </remarks>
+    private async Task SaveMountConfigurationAsync()
+    {
+        if (_project == null)
+        {
+            return;
+        }
+
+        foreach (var card in DiskStatus.Cards)
+        {
+            foreach (var drive in card.Drives)
+            {
+                await _project.SetMountAsync(
+                    drive.SlotNumber,
+                    drive.DriveNumber,
+                    drive.DiskImageId);
+            }
+        }
     }
 
     /// <summary>
@@ -1227,6 +1416,10 @@ public sealed class MainWindowViewModel : ReactiveObject
 
             // Import the disk image into the project
             var diskImageId = await _project.ImportDiskImageAsync(filePath, defaultName);
+
+            // Refresh project state — importing a disk makes the project non-pristine,
+            // enabling Save, Save As, Close, and Export commands as appropriate
+            RefreshProjectStateProperties();
 
             // Refresh library state in all drive widgets so "Mount from Library" gets re-enabled
             foreach (var card in DiskStatus.Cards)
@@ -1292,8 +1485,11 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// shows a confirmation dialog before exiting. User can cancel exit to save disks.
     /// </para>
     /// <para>
-    /// <strong>Drive State Persistence:</strong> Always saves drive state before exit
-    /// (which disks are inserted in which drives) so they can be restored on next launch.
+    /// <strong>Project Shutdown:</strong> On confirmed exit, persists the current mount
+    /// configuration to the .skillet file, saves the project (if file-based), and ejects
+    /// all disks so <see cref="IDiskImageStore.ReturnAsync"/> flushes working copies back
+    /// to the store before the process terminates. This mirrors the legacy
+    /// <c>CaptureDriveStateSettings</c> path that saved drive state to JSON on exit.
     /// </para>
     /// </remarks>
     public async Task<bool> OnClosingAsync()
@@ -1332,8 +1528,28 @@ public sealed class MainWindowViewModel : ReactiveObject
             }
         }
 
-        // Drive state is now saved via GuiSettingsService in MainWindow.SaveWindowAndDisplaySettings()
-        // No need to call _driveStateService.CaptureDriveStateAsync() here
+        // Persist mount configuration and flush project before exit.
+        // This is the .skillet equivalent of the legacy CaptureDriveStateSettings()
+        // that was called from SaveWindowAndDisplaySettings() on exit.
+        if (_project != null)
+        {
+            try
+            {
+                await SaveMountConfigurationAsync();
+
+                if (!_project.IsAdHoc)
+                {
+                    await _project.SaveAsync();
+                }
+
+                await _emulatorCore.SendCardMessageAsync(null, new EjectAllDisksMessage());
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[OnClosingAsync] Error during project shutdown: {ex.Message}");
+            }
+        }
 
         return true; // Allow exit
     }

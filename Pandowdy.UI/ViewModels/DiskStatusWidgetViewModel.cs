@@ -262,6 +262,21 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     public string DiskId => _snapshot.DiskId;
 
     /// <summary>
+    /// Gets the slot number of the controller card (1-7).
+    /// </summary>
+    public int SlotNumber => _snapshot.SlotNumber;
+
+    /// <summary>
+    /// Gets the drive number on the controller (1 or 2).
+    /// </summary>
+    public int DriveNumber => _snapshot.DriveNumber;
+
+    /// <summary>
+    /// Gets the skillet database ID of the mounted disk image, or null if empty.
+    /// </summary>
+    public long? DiskImageId => _snapshot.DiskImageId;
+
+    /// <summary>
     /// Gets a value indicating whether a disk is inserted in this drive.
     /// </summary>
     public bool HasDisk => !string.IsNullOrEmpty(_snapshot.DiskImageFilename);

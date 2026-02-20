@@ -225,9 +225,8 @@ namespace Pandowdy
             // Create ad hoc project (Phase 2a - non-nullable IDiskImageStore requirement)
             // Ad hoc project is an in-memory .skillet used when no user project is open
             var projectManager = services.GetRequiredService<ISkilletProjectManager>();
-            var tempProjectPath = Path.Combine(Path.GetTempPath(), $"pandowdy-adhoc-{Guid.NewGuid()}.skillet");
-            await projectManager.CreateAsync(tempProjectPath, "Ad Hoc Session");
-            System.Diagnostics.Debug.WriteLine($"[Program] Created ad hoc project: {tempProjectPath}");
+            await projectManager.CreateAdHocAsync();
+            System.Diagnostics.Debug.WriteLine("[Program] Created ad hoc in-memory project");
 
             // Install Disk II controller in slot 6 (standard Apple II configuration)
             var slots = services.GetRequiredService<ISlots>();

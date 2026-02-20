@@ -64,7 +64,7 @@ public class SkilletProjectManagerTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public async Task CreateAsync_ProjectAlreadyOpen_ThrowsInvalidOperationException()
+    public async Task CreateAsync_ProjectAlreadyOpen_ClosesCurrentAndCreatesNew()
     {
         // Arrange
         var manager = new SkilletProjectManager();
@@ -73,15 +73,47 @@ public class SkilletProjectManagerTests(ITestOutputHelper output)
 
         try
         {
-            await manager.CreateAsync(testPath1, "Project 1");
+            var project1 = await manager.CreateAsync(testPath1, "Project 1");
+            Assert.NotNull(project1);
+            Assert.Equal(testPath1, manager.CurrentProject?.FilePath);
 
-            // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                manager.CreateAsync(testPath2, "Project 2"));
+            // Act - create another project while first is still open
+            var project2 = await manager.CreateAsync(testPath2, "Project 2");
+
+            // Assert - should have closed first and created second
+            Assert.NotNull(project2);
+            Assert.Equal(testPath2, manager.CurrentProject?.FilePath);
+            Assert.Equal("Project 2", manager.CurrentProject?.Metadata.Name);
         }
         finally
         {
             await manager.CloseAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CreateAdHocAsync_CreatesInMemoryProject()
+    {
+        // Arrange
+        var manager = new SkilletProjectManager();
+
+        try
+        {
+            // Act
+            var project = await manager.CreateAdHocAsync();
+
+            // Assert
+            Assert.NotNull(project);
+            Assert.Null(project.FilePath);
+            Assert.True(project.IsAdHoc);
+            Assert.Equal("untitled", project.Metadata.Name);
+            Assert.Equal(1, project.Metadata.SchemaVersion);
+
+            _output.WriteLine($"Created ad hoc project: {project.Metadata.Name}");
+        }
+        finally
+        {
+            manager.CurrentProject?.Dispose();
         }
     }
 
@@ -163,7 +195,7 @@ public class SkilletProjectManagerTests(ITestOutputHelper output)
     #region CloseAsync
 
     [Fact]
-    public async Task CloseAsync_ProjectOpen_ClosesSuccessfully()
+    public async Task CloseAsync_ProjectOpen_CreatesAdHocProject()
     {
         // Arrange
         var manager = new SkilletProjectManager();
@@ -171,12 +203,18 @@ public class SkilletProjectManagerTests(ITestOutputHelper output)
 
         await manager.CreateAsync(testPath, "Test Project");
         Assert.NotNull(manager.CurrentProject);
+        Assert.False(manager.CurrentProject.IsAdHoc);
 
         // Act
         await manager.CloseAsync();
 
-        // Assert
-        Assert.Null(manager.CurrentProject);
+        // Assert - should have created an ad hoc project (never null)
+        Assert.NotNull(manager.CurrentProject);
+        Assert.True(manager.CurrentProject.IsAdHoc);
+        Assert.Equal("untitled", manager.CurrentProject.Metadata.Name);
+
+        // Clean up ad hoc project
+        manager.CurrentProject?.Dispose();
     }
 
     [Fact]
@@ -187,7 +225,237 @@ public class SkilletProjectManagerTests(ITestOutputHelper output)
 
         // Act & Assert (should not throw)
         await manager.CloseAsync();
+
+        // When closing with no project open, it just returns - no ad hoc is created
         Assert.Null(manager.CurrentProject);
+    }
+
+    #endregion
+
+    #region SaveAsAsync
+
+    [Fact]
+    public async Task SaveAsAsync_AdHocProject_UpdatesProjectNameToFileName()
+    {
+        // Arrange
+        var manager = new SkilletProjectManager();
+        var testPath = GetTempSkilletPath();
+        var expectedName = Path.GetFileNameWithoutExtension(testPath);
+
+        try
+        {
+            await manager.CreateAdHocAsync();
+            Assert.Equal("untitled", manager.CurrentProject!.Metadata.Name);
+
+            // Act
+            await manager.SaveAsAsync(testPath);
+
+            // Assert — project name should now reflect the file name
+            Assert.NotNull(manager.CurrentProject);
+            Assert.False(manager.CurrentProject.IsAdHoc);
+            Assert.Equal(expectedName, manager.CurrentProject.Metadata.Name);
+            Assert.Equal(testPath, manager.CurrentProject.FilePath);
+
+            _output.WriteLine($"Save As updated project name to: {manager.CurrentProject.Metadata.Name}");
+        }
+        finally
+        {
+            await manager.CloseAsync();
+        }
+    }
+
+    [Fact]
+    public async Task SaveAsAsync_FileBasedProject_UpdatesProjectNameToNewFileName()
+    {
+        // Arrange
+        var manager = new SkilletProjectManager();
+        var originalPath = GetTempSkilletPath();
+        var newPath = GetTempSkilletPath();
+        var expectedName = Path.GetFileNameWithoutExtension(newPath);
+
+        try
+        {
+            await manager.CreateAsync(originalPath, "Original Name");
+            Assert.Equal("Original Name", manager.CurrentProject!.Metadata.Name);
+
+            // Act
+            await manager.SaveAsAsync(newPath);
+
+            // Assert — project name should now reflect the new file name
+            Assert.NotNull(manager.CurrentProject);
+            Assert.Equal(expectedName, manager.CurrentProject.Metadata.Name);
+            Assert.Equal(newPath, manager.CurrentProject.FilePath);
+
+            _output.WriteLine($"Save As updated project name from 'Original Name' to: {manager.CurrentProject.Metadata.Name}");
+        }
+        finally
+        {
+            await manager.CloseAsync();
+        }
+    }
+
+    [Fact]
+    public async Task SaveAsAsync_ReopenedProject_HasUpdatedName()
+    {
+        // Arrange — verify the name persists in the DB, not just in memory
+        var manager = new SkilletProjectManager();
+        var testPath = GetTempSkilletPath();
+        var expectedName = Path.GetFileNameWithoutExtension(testPath);
+
+        try
+        {
+            await manager.CreateAdHocAsync();
+            await manager.SaveAsAsync(testPath);
+            await manager.CloseAsync();
+
+            // Act — reopen the saved file
+            var reopened = await manager.OpenAsync(testPath);
+
+            // Assert — name should still be the file-derived name, not "untitled"
+            Assert.Equal(expectedName, reopened.Metadata.Name);
+
+            _output.WriteLine($"Reopened project has name: {reopened.Metadata.Name}");
+        }
+        finally
+        {
+            await manager.CloseAsync();
+        }
+    }
+
+    [Fact]
+    public async Task SaveAsAsync_AdHocProject_PreservesProjectInstance()
+    {
+        // Arrange — the SkilletProject instance must survive Save As so that
+        // external references (IDiskImageStore held by DiskIIControllerCard,
+        // checked-out images) remain valid.
+        var manager = new SkilletProjectManager();
+        var testPath = GetTempSkilletPath();
+
+        try
+        {
+            var adHocProject = await manager.CreateAdHocAsync();
+            var projectBefore = manager.CurrentProject;
+
+            // Act
+            await manager.SaveAsAsync(testPath);
+
+            // Assert — same object reference, not a new instance
+            Assert.Same(projectBefore, manager.CurrentProject);
+            Assert.False(manager.CurrentProject!.IsAdHoc);
+            Assert.Equal(testPath, manager.CurrentProject.FilePath);
+
+            _output.WriteLine("Project instance preserved across ad hoc → file transition");
+        }
+        finally
+        {
+            await manager.CloseAsync();
+        }
+    }
+
+    [Fact]
+    public async Task SaveAsAsync_FileBasedProject_PreservesProjectInstance()
+    {
+        // Arrange
+        var manager = new SkilletProjectManager();
+        var originalPath = GetTempSkilletPath();
+        var newPath = GetTempSkilletPath();
+
+        try
+        {
+            await manager.CreateAsync(originalPath, "Original");
+            var projectBefore = manager.CurrentProject;
+
+            // Act
+            await manager.SaveAsAsync(newPath);
+
+            // Assert — same object reference
+            Assert.Same(projectBefore, manager.CurrentProject);
+            Assert.Equal(newPath, manager.CurrentProject!.FilePath);
+
+            _output.WriteLine("Project instance preserved across file → file transition");
+        }
+        finally
+        {
+            await manager.CloseAsync();
+        }
+    }
+
+    [Fact]
+    public async Task SaveAsAsync_ProducesNoSidecarFiles()
+    {
+        // Arrange — .skillet should be a single portable file with no WAL or SHM
+        var manager = new SkilletProjectManager();
+        var testPath = GetTempSkilletPath();
+
+        try
+        {
+            await manager.CreateAdHocAsync();
+            await manager.SaveAsAsync(testPath);
+
+            // Assert — no sidecar files
+            Assert.True(File.Exists(testPath), ".skillet file should exist");
+            Assert.False(File.Exists(testPath + "-wal"), "WAL sidecar should not exist");
+            Assert.False(File.Exists(testPath + "-shm"), "SHM sidecar should not exist");
+
+            _output.WriteLine("No sidecar files created — single portable .skillet file");
+        }
+        finally
+        {
+            await manager.CloseAsync();
+        }
+    }
+
+    [Fact]
+    public async Task SaveAsAsync_ProjectRemainsOperationalAfterTransition()
+    {
+        // Arrange — verify the project can still perform IO after the connection swap
+        var manager = new SkilletProjectManager();
+        var testPath = GetTempSkilletPath();
+
+        try
+        {
+            await manager.CreateAdHocAsync();
+            await manager.SaveAsAsync(testPath);
+
+            // Act — perform operations on the transitioned project
+            var settings = await manager.CurrentProject!.GetSettingAsync("project_settings", "test_key");
+            await manager.CurrentProject.SetSettingAsync("project_settings", "test_key", "test_value");
+            var readBack = await manager.CurrentProject.GetSettingAsync("project_settings", "test_key");
+
+            // Assert
+            Assert.Null(settings);
+            Assert.Equal("test_value", readBack);
+
+            _output.WriteLine("Project IO operational after Save As transition");
+        }
+        finally
+        {
+            await manager.CloseAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CreateAsync_ProducesNoSidecarFiles()
+    {
+        // Arrange — new file-based projects should also use DELETE journal mode
+        var manager = new SkilletProjectManager();
+        var testPath = GetTempSkilletPath();
+
+        try
+        {
+            await manager.CreateAsync(testPath, "Test");
+
+            // Assert — no sidecar files
+            Assert.True(File.Exists(testPath), ".skillet file should exist");
+            Assert.False(File.Exists(testPath + "-wal"), "WAL sidecar should not exist");
+            Assert.False(File.Exists(testPath + "-shm"), "SHM sidecar should not exist");
+
+            _output.WriteLine("No sidecar files for newly created project");
+        }
+        finally
+        {
+            await manager.CloseAsync();
+        }
     }
 
     #endregion

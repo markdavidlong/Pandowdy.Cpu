@@ -322,29 +322,33 @@ public class UnifiedDiskImageProvider : IDiskImageProvider, IDisposable
             return false; // Out of bounds
         }
 
-        CircularBitBuffer? currentTrackBuffer = _diskImage.QuarterTracks[_currentQuarterTrack];
-
-        // If this quarter-track doesn't exist yet, create it with standard size
-        if (currentTrackBuffer == null)
+        lock (_diskImage.SerializationLock)
         {
-            int standardBitCount = DiskIIConstants.BitsPerTrack;
-            int byteCount = (standardBitCount + 7) / 8;
-            byte[] trackData = new byte[byteCount];
-            currentTrackBuffer = new CircularBitBuffer(
-                trackData,
-                byteOffset: 0,
-                bitOffset: 0,
-                bitCount: standardBitCount,
-                new GroupBool(),
-                isReadOnly: false
-            );
-            _diskImage.QuarterTracks[_currentQuarterTrack] = currentTrackBuffer;
-            _diskImage.QuarterTrackBitCounts[_currentQuarterTrack] = standardBitCount;
-            Debug.WriteLine($"UnifiedDiskImageProvider: Created new quarter-track {_currentQuarterTrack} for write");
+            CircularBitBuffer? currentTrackBuffer = _diskImage.QuarterTracks[_currentQuarterTrack];
+
+            // If this quarter-track doesn't exist yet, create it with standard size
+            if (currentTrackBuffer == null)
+            {
+                int standardBitCount = DiskIIConstants.BitsPerTrack;
+                int byteCount = (standardBitCount + 7) / 8;
+                byte[] trackData = new byte[byteCount];
+                currentTrackBuffer = new CircularBitBuffer(
+                    trackData,
+                    byteOffset: 0,
+                    bitOffset: 0,
+                    bitCount: standardBitCount,
+                    new GroupBool(),
+                    isReadOnly: false
+                );
+                _diskImage.QuarterTracks[_currentQuarterTrack] = currentTrackBuffer;
+                _diskImage.QuarterTrackBitCounts[_currentQuarterTrack] = standardBitCount;
+                Debug.WriteLine($"UnifiedDiskImageProvider: Created new quarter-track {_currentQuarterTrack} for write");
+            }
+
+            currentTrackBuffer.WriteBit(bit ? 1 : 0);
+            _diskImage.MarkDirty();
         }
 
-        currentTrackBuffer.WriteBit(bit ? 1 : 0);
-        _diskImage.MarkDirty();
         return true;
     }
 

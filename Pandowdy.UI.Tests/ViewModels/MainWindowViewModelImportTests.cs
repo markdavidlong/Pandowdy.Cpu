@@ -156,6 +156,7 @@ public class MainWindowViewModelImportTests
                 MockMessageBoxService.Object,
                 MockDiskFileDialogService.Object,
                 MockProjectFileDialogService.Object,
+                emulatorCoreInterface,
                 mockProjectManager.Object);
         }
     }

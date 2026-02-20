@@ -122,6 +122,7 @@ public class DiskIIStatusDecorator : IDiskIIDrive
             builder.HasValidTrackData = false;
             builder.IsDirty = false;
             builder.HasDestinationPath = false;
+            builder.DiskImageId = null;
         });
     }
 

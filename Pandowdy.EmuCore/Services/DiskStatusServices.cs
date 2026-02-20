@@ -39,6 +39,7 @@ namespace Pandowdy.EmuCore.Services;
 /// <param name="HasValidTrackData">True if the current track position has valid disk data.</param>
 /// <param name="IsDirty">True if the disk has been modified since load or last save.</param>
 /// <param name="HasDestinationPath">True if the disk has an attached destination path for Save operations.</param>
+/// <param name="DiskImageId">Skillet database ID of the mounted disk image, or null if no library disk is mounted.</param>
 public record DiskDriveStatusSnapshot(
     int SlotNumber,
     int DriveNumber,
@@ -52,7 +53,8 @@ public record DiskDriveStatusSnapshot(
     byte PhaseState,
     bool HasValidTrackData,
     bool IsDirty,
-    bool HasDestinationPath
+    bool HasDestinationPath,
+    long? DiskImageId = null
 )
 {
     /// <summary>
@@ -271,7 +273,8 @@ public sealed class DiskStatusProvider : IDiskStatusMutator
             PhaseState: 0,  // No phases active
             HasValidTrackData: false,
             IsDirty: false,
-            HasDestinationPath: false
+            HasDestinationPath: false,
+            DiskImageId: null
         );
 
         // Add to array and sort by slot, then drive
@@ -391,6 +394,9 @@ public sealed class DiskDriveStatusBuilder(DiskDriveStatusSnapshot snapshot)
     /// <summary>True if disk has an attached destination path for Save operations.</summary>
     public bool HasDestinationPath = snapshot.HasDestinationPath;
 
+    /// <summary>Skillet database ID of the mounted disk image, or null if no library disk is mounted.</summary>
+    public long? DiskImageId = snapshot.DiskImageId;
+
     /// <summary>
     /// Builds an immutable <see cref="DiskDriveStatusSnapshot"/>.
     /// </summary>
@@ -407,7 +413,8 @@ public sealed class DiskDriveStatusBuilder(DiskDriveStatusSnapshot snapshot)
         PhaseState,
         HasValidTrackData,
         IsDirty,
-        HasDestinationPath
+        HasDestinationPath,
+        DiskImageId
     );
 }
 

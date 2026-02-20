@@ -149,6 +149,11 @@ configuration will determine on a disk image-specific basis whether the working 
 is persisted or recreated periodically, as some projects might want to consider changes
 made during the session as "throwaway" changes.
 
+Mounted disk images (currently in use by the emulator) are serialized using a
+snapshot‑under‑lock strategy that does not require pausing or interrupting the
+emulator. The emulator continues running throughout the save operation.
+See `docs/Skillet_Development_Blueprint.md` §5.3 for implementation details.
+
 ### 6.4 Regeneration  
 The working copy can be regenerated from the original at any time.
 

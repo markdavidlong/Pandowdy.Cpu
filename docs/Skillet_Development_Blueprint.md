@@ -477,38 +477,43 @@ User selects project from recent list or file dialog
 
 ### 5.3 Saving a Project (Explicit & Periodic)
 
-**Save Project (Ctrl+Alt+S):** Available only when `ISkilletProject.IsAdHoc` is false
-(the project has a file path). Disabled in the UI when the project is ad hoc.
+**Save Project (Ctrl+Alt+S):** Available only when all of the following are true:
+(1) the project is file-based (`IsAdHoc` is false), and (2) the project is not
+pristine (it has imported disk images or unsaved changes). Disabled in the UI
+for ad hoc projects (no file path) and for pristine projects (nothing to save).
 
 ```
 User presses Ctrl+Alt+S or auto-save timer fires
-  → Guard: if ISkilletProject.IsAdHoc → no-op (Save is disabled)
+  → Guard: if ISkilletProject.IsAdHoc OR project is pristine → no-op (Save is disabled)
   → ISkilletProject.SaveAsync()
-    → Request emulator pause (waits for current instruction to complete)
-    → Emulator pauses at instruction boundary — no concurrent mutation
-    → BEGIN TRANSACTION
-    → For each mounted disk with persist_working = true AND working_dirty = true:
-      → Serialize InternalDiskImage to blob (safe — emulator is paused)
-      → UPDATE disk_images SET working_blob = ?, working_dirty = 0, modified_utc = ?
-    → Update project_metadata modified_utc
-    → COMMIT
-    → Resume emulator
+    → For each checked-out disk with IsDirty:
+      → DiskBlobStore.SerializeSnapshot(diskImage):
+        → Acquire InternalDiskImage.SerializationLock
+        → Copy raw quarter-track byte arrays (~1ms memcpy)
+        → Release lock
+        → Compress snapshot via Deflate (no lock held, ~50ms)
+    → Enqueue IO request:
+      → BEGIN TRANSACTION
+      → For each serialized disk with persist_working = true:
+        → UPDATE disk_images SET working_blob = ?, working_dirty = 0, modified_utc = ?
+      → Update project_metadata modified_utc
+      → COMMIT
 ```
 
-**Save Project As... (Ctrl+Shift+S):** Always available. Persists the current
-project (including ad hoc) to a new file on disk.
+**Save Project As... (Ctrl+Shift+S):** Available when the project is not pristine
+(has imported disk images or unsaved changes). Disabled for pristine projects
+that have no content worth persisting. Persists the current project (including
+ad hoc) to a new file on disk.
 
 ```
 User: File → Save Project As...
   → File dialog: choose location and filename
   → ISkilletProjectManager.SaveAsAsync(filePath)
-    → Request emulator pause
-    → Serialize all mounted dirty disks (same as SaveAsync)
+    → Serialize all checked-out dirty disks (same as SaveAsync)
     → VACUUM INTO 'filePath' — copies entire in-memory DB to new file
     → Close current in-memory connection
     → Open file-based connection to the new file
     → Update ISkilletProject: FilePath = filePath, IsAdHoc = false
-    → Resume emulator
   → Update pandowdy-settings.json: set active_project_path, add to recent list
   → Update title bar: "Pandowdy — {ProjectName}"
 ```
@@ -517,21 +522,49 @@ User: File → Save Project As...
 native library) supports `VACUUM INTO 'filepath'` which atomically copies the
 entire database to a new file. This is the cleanest way to persist an in-memory
 database: no manual table copying, no schema recreation, and the output file is
-optimally compacted. After the vacuum, the in-memory connection is closed and
-replaced with a file-based connection to the newly created file.
+optimally compacted. After the vacuum, the `SkilletProject` instance is preserved
+— only the internal `SqliteConnection` swaps. All external references
+(`IDiskImageStore`, checked-out images, dirty tracking) remain valid.
 
-**Why pause?** The emulator thread mutates `InternalDiskImage` at cycle speed.
-Serializing a disk image while the emulator writes to it would produce corrupted
-blobs. The pause approach eliminates this entirely: emulation halts at the current
-instruction boundary (sub-microsecond precision), serialization runs on the IO
-thread with no contention, then emulation resumes. Total pause duration is
-dominated by Deflate compression of dirty blobs — typically <50ms for two
-35-track disks. This adds zero overhead to the emulation hot path; the pause
-only occurs at explicit lifecycle boundaries (Ctrl+Alt+S, auto-save timer).
+**⚠️ Known race condition — Save As during active disk writes:**
+`SaveAsAsync()` calls `SaveAsync()` (which snapshot-serializes mounted disks under
+`SerializationLock`) and then enqueues a `VACUUM INTO` to the IO thread. Between
+the snapshot and the vacuum, the emulator may write additional bits to a mounted
+`InternalDiskImage`. Those writes exist in the live in-memory object but are **not**
+captured in the new file until the next explicit save or eject. This is the same
+staleness window that exists during any regular `SaveAsync()` — the in-memory
+`InternalDiskImage` is always the authoritative state, and the file is a
+point-in-time snapshot. No data is lost; the writes are captured by the next save
+or eject auto-flush. However, if the application crashes or is force-killed
+immediately after Save As (before the next save/eject), those in-flight writes
+would not be in the file. This edge case will be evaluated further in Phase 6
+(Integration Testing) and may warrant a "pause emulator during Save As" option
+or a post-swap re-snapshot for safety.
 
-**Alternative considered:** Locking individual `InternalDiskImage` objects during
-serialization. Rejected because it would add per-cycle lock acquisition overhead
-on the emulator thread's hot path, even when no save is in progress.
+**Serialization safety:** The emulator thread mutates `InternalDiskImage` at cycle
+speed. `SaveAsync()` uses a **snapshot-under-lock** strategy to serialize mounted
+disks without pausing the emulator:
+
+1. **Acquire lock** — `InternalDiskImage.SerializationLock` is acquired briefly.
+   The emulator's write path (`WriteBit()` in `UnifiedDiskImageProvider`) also
+   acquires this lock, so writes are blocked only during the snapshot window.
+2. **Snapshot** — Raw quarter-track byte arrays are copied via `ReadOctet()`
+   (~1ms for a 35-track disk, ~230KB memcpy). Read operations are not locked.
+3. **Release lock** — The emulator write path resumes immediately.
+4. **Compress** — The snapshot is Deflate-compressed on the calling thread
+   (~50ms). No lock is held during compression.
+
+The lock overhead on the emulator hot path is ~20ns per `WriteBit()` call
+(uncontended lock acquisition). At the Apple IIe's 1.023 MHz clock, disk write
+operations occur at ~4µs per bit (32 × 125ns), so the lock overhead is <0.5%
+of one bit time — negligible. The lock only contends during the brief snapshot
+window (~1ms per save), which occurs at explicit lifecycle boundaries
+(Ctrl+Alt+S, auto-save timer).
+
+`SkilletProject` tracks checked-out images internally: `CheckOutAsync()` adds
+the image to a `ConcurrentDictionary`, `ReturnAsync()` removes it. `SaveAsync()`
+iterates the dictionary to find dirty images — no external caller needs to
+provide the list of mounted disks.
 
 ### 5.4 Closing a Project
 
@@ -552,7 +585,7 @@ User closes project or opens another
   → If unsaved:
     → If ad hoc with disk images → prompt: Save As / Discard / Cancel
     → If file-based with dirty data → prompt: Save / Discard / Cancel
-  → If Save → ISkilletProject.SaveAsync() (includes pause-serialize-unpause)
+  → If Save → ISkilletProject.SaveAsync() (snapshot-serialize checked-out disks)
   → If Save As → ISkilletProjectManager.SaveAsAsync(filePath) (file dialog first)
   → GUI sends EjectAllDisksMessage to EmuCore (async, waits for confirmation)
     → EmuCore ejects each mounted drive:
@@ -591,7 +624,8 @@ public interface ISkilletProject : IDiskImageStore, IDisposable
     string? FilePath { get; }           // null for ad hoc in-memory projects
     bool IsAdHoc { get; }               // true when FilePath is null
     ProjectMetadata Metadata { get; }
-    bool HasUnsavedChanges { get; }
+    bool HasUnsavedChanges { get; }     // true if any mutation since create/open/save
+    bool HasDiskImages { get; }         // true if disk_images table has any rows
 
     // Disk image library management (GUI → Skillet directly)
     Task<long> ImportDiskImageAsync(string filePath, string name);
@@ -621,6 +655,27 @@ public interface ISkilletProject : IDiskImageStore, IDisposable
 disk. `IsAdHoc` is a convenience property equivalent to `FilePath is null`.
 The "Save Project" command is disabled when `IsAdHoc` is true; the user must
 use "Save Project As..." to persist an ad hoc project to a file.
+
+**Note:** `HasUnsavedChanges` is backed by a single volatile `_projectDirty` flag,
+set exclusively via the centralized `MarkDirty()` method and cleared by
+`MarkClean()` (called at the end of `SaveAsync()`). Every mutation method
+(import, remove, settings change, mount configuration, eject auto-flush, working
+copy regeneration) calls `MarkDirty()`. The property simply returns `_projectDirty`
+— no SQL queries are involved, making it safe to call from any thread without
+blocking on the IO thread.
+
+**Note:** `MarkDirty()` is distinct from the per-disk-image `working_dirty` SQL
+column. The SQL column tracks whether a specific disk image's `working_blob` has
+been modified via eject auto-flush — it is an internal persistence detail used by
+`SaveAsync()` to manage which blobs to flush and which `persist_working` policies
+to enforce. `MarkDirty()` tracks the project-level dirty state used by
+`HasUnsavedChanges` for UI enablement (Save, Save As, Close). As new mutation
+methods are added to the project, they should call `MarkDirty()` to ensure
+consistent dirty tracking.
+
+**Note:** `HasDiskImages` is a lightweight check against the `disk_images` table.
+Used for Export Disk Image enablement — the command is disabled when the library
+is empty.
 
 **Note:** `ISkilletProject` extends `IDiskImageStore` (defined in EmuCore).
 The `CheckOutAsync()` and `ReturnAsync()` methods are called by
@@ -793,9 +848,9 @@ blocks the emulator thread briefly (~50ms for decompression of a 35-track disk).
 This is acceptable — mount operations occur at lifecycle boundaries (user action),
 not during cycle-accurate emulation. CPU throttling easily accommodates this pause.
 
-All modifications happen in-memory (uncompressed). On project save, the emulator
-is paused and dirty `InternalDiskImage` objects are serialized back to `working_blob`
-(see §5.3). On eject, the image is returned to the store via `ReturnAsync()` (see §6.6).
+All modifications happen in-memory (uncompressed). On project save, dirty
+`InternalDiskImage` objects are snapshot-serialized under lock and written back to
+`working_blob` (see §5.3). On eject, the image is returned to the store via `ReturnAsync()` (see §6.6).
 
 ### 6.4 Export Flow
 
@@ -1090,11 +1145,11 @@ File
 ├── New Project...          Ctrl+Shift+N
 ├── Open Project...         Ctrl+Shift+O
 ├── ──────────────
-├── Save Project            Ctrl+Alt+S     (disabled when ad hoc)
-├── Save Project As...      Ctrl+Shift+S   (always available)
+├── Save Project            Ctrl+Alt+S     (disabled when ad hoc or pristine)
+├── Save Project As...      Ctrl+Shift+S   (disabled when pristine)
 ├── ──────────────
 ├── Import Disk Image...    Ctrl+Shift+I
-├── Export Disk Image...    Ctrl+Shift+E
+├── Export Disk Image...    Ctrl+Shift+E   (disabled when no disk images in library)
 ├── ──────────────
 ├── Close Project                          (disabled when ad hoc is pristine)
 ├── ──────────────
@@ -1428,9 +1483,10 @@ lookups:
 - **Disk eject:** `EjectDiskMessage` → controller calls `IDiskImageStore.ReturnAsync()`
   → IO thread serializes `InternalDiskImage` to `working_blob`. Blocks briefly for
   compression.
-- **Disk save:** `SaveAsync()` pauses the emulator at an instruction boundary,
-  serializes all mounted dirty disks on the IO thread, then resumes emulation.
-  No concurrent mutation — no locking needed on the emulation hot path.
+- **Disk save:** `SaveAsync()` snapshot-serializes all checked-out dirty disks
+  using `InternalDiskImage.SerializationLock` — acquires the lock briefly (~1ms)
+  to copy raw quarter-track data, then compresses outside the lock. The emulator
+  continues running throughout; only the write path is blocked during the snapshot.
 - **Debug session start:** Enqueue breakpoint/symbol reads → IO thread fetches
   from SQLite → debugger receives collections via `Task` completion.
 
@@ -1936,10 +1992,11 @@ or alongside the Phase 2 steps below.
    `DiskImageFactory.GetExporter()` exists for format selection.
 
 7. **Implement working copy persistence in `SkilletProject.SaveAsync()`.**
-   ✅ **COMPLETED** — `SaveAsync()` at lines 354-388 of SkilletProject.cs clears
-   `working_dirty` flags for disks with `persist_working = 1`. The eject-auto-flush
-   model (ReturnAsync) handles serialization. Pause-serialize-unpause workflow for
-   mounted disks will be added in Phase 2a when emulator interface is integrated.
+   ✅ **COMPLETED** — `SaveAsync()` snapshot-serializes all checked-out dirty disks
+   using `DiskBlobStore.SerializeSnapshot()` (lock-based snapshot, then Deflate outside
+   the lock). Clears `working_dirty` flags for disks with `persist_working = 1`.
+   `SkilletProject` tracks checked-out images via `ConcurrentDictionary` — populated
+   by `CheckOutAsync()`, cleared by `ReturnAsync()`.
 
 8. **Implement working copy regeneration.**
    ✅ **COMPLETED** — `RegenerateWorkingCopyAsync()` implemented in Phase 1 at
@@ -1977,7 +2034,7 @@ or alongside the Phase 2 steps below.
 | **Integration work (Phase 2a)** | |
 | Controller message handlers | ⏸️ Deferred — mount/eject/export/eject-all handlers in Phase 2a |
 | DI wiring | ⏸️ Deferred — `IDiskImageStore` injection in Phase 2a |
-| Mounted disk serialization | ⏸️ Deferred — pause-serialize-unpause in `SaveAsync()` in Phase 2a |
+| Mounted disk serialization | ✅ Complete — snapshot-under-lock via `SerializeSnapshot()` |
 
 #### Test Gate
 
@@ -2072,11 +2129,15 @@ and will be implemented alongside the UI commands and dialogs below.
    - Register in `Program.cs`: pass `ISkilletProjectManager.CurrentProject` to card factory
    - **Status:** Interface ready; DI wiring is Phase 2a work
 
-6. **Add pause-serialize-unpause to `SaveAsync()` for mounted disks** (Phase 2 Step 7)
-   - Currently `SaveAsync()` only clears `working_dirty` flags
-   - Must pause emulator, serialize all mounted dirty disks (via `DiskBlobStore`), resume emulator
-   - Requires emulator pause interface (message-based or direct injection)
-   - **Status:** Dirty flag management exists; mounted-disk serialization is Phase 2a work
+6. **Implement snapshot-serialize for mounted disks in `SaveAsync()`** (Phase 2 Step 7)
+   ✅ **COMPLETED** — `SaveAsync()` uses `DiskBlobStore.SerializeSnapshot()` to
+   snapshot-serialize checked-out dirty disks under `InternalDiskImage.SerializationLock`.
+   Lock held briefly (~1ms) for memcpy, Deflate compression runs outside the lock.
+   Emulator continues running — only the write path is blocked during snapshot.
+   `SkilletProject` tracks checked-out images via `ConcurrentDictionary`.
+   `UnifiedDiskImageProvider.WriteBit()` acquires the same lock to prevent mid-write
+   corruption during the snapshot window.
+   - **Status:** ✅ Complete
 
 #### Completed Steps
 
@@ -2142,12 +2203,13 @@ They should be completed before moving to Phase 3.
 - Registered in `Program.cs` line 194 as singleton
 
 **Command Implementations (MainWindowViewModel):**
-- `NewProjectAsync()` (lines 951-1006) — file dialog → `CreateAsync()` → update title → update recent list
-- `OpenProjectAsync()` (lines 1014-1067) — file dialog → `OpenAsync()` → update title → update recent list
-- `SaveProjectAsync()` (lines 1076-1092) — calls `SaveAsync()` (disabled when ad hoc via command guard)
-- `SaveProjectAsAsync()` (lines 1100-1142) — file dialog → `SaveAsAsync()` → update title (always available)
-- `CloseProjectAsync()` (lines 1158-1197) — handles ad hoc vs file-based with appropriate prompts
-- `ExportDiskImageAsync()` (lines 1217-1228) — command handler exists, needs disk picker UI (Backlog Item 3)
+- `NewProjectAsync()` — file dialog → `CreateAsync()` → `RefreshProjectStateProperties()`
+- `OpenProjectAsync()` — file dialog → `OpenAsync()` → `RefreshProjectStateProperties()`
+- `SaveProjectAsync()` — calls `SaveAsync()` (disabled when ad hoc or pristine via command guard)
+- `SaveProjectAsAsync()` — file dialog → `SaveAsAsync()` → `RefreshProjectStateProperties()` (disabled when pristine)
+- `CloseProjectAsync()` — handles ad hoc vs file-based with appropriate prompts
+- `ExportDiskImageAsync()` — command handler exists, disabled when no disk images in library
+- `ImportDiskImageAsync()` — calls `RefreshProjectStateProperties()` after import, enabling Save/Export
 
 **Interface Additions (per blueprint Appendix E):**
 - `ISkilletProject.IsAdHoc` property — convenience property for distinguishing in-memory from file-based projects
@@ -2163,10 +2225,10 @@ They should be completed before moving to Phase 3.
 **Menu XAML (MainWindow.axaml lines 25-37):**
 - New Project (Ctrl+Shift+N)
 - Open Project (Ctrl+Shift+O)
-- Save Project (Ctrl+Alt+S) — disabled when ad hoc
-- Save Project As (Ctrl+Shift+S) — always available
+- Save Project (Ctrl+Alt+S) — disabled when ad hoc or pristine
+- Save Project As (Ctrl+Shift+S) — disabled when pristine
 - Import Disk Image (Ctrl+Shift+I) — existing
-- Export Disk Image (Ctrl+Shift+E) — new binding
+- Export Disk Image (Ctrl+Shift+E) — disabled when no disk images in library
 - Close Project (no shortcut) — disabled when pristine ad hoc
 - Keyboard shortcut conflict resolved: Scan Lines changed to Ctrl+Alt+L
 
@@ -2231,7 +2293,7 @@ In the project-based workflow:
 | File menu commands | ✅ **Complete** | **Backlog Item 2** |
 | Disk widget commands | ✅ **Complete** | **Backlog Item 3** |
 | Test coverage | ⏸️ **Backlog Item 4** | 4-6 hours |
-| Emulator pause integration | ⏸️ **Moved to Phase 2b** | See below |
+| Mounted disk serialization | ✅ **Complete** | **Phase 2b** |
 
 #### Test Gate (Phase 2a Complete)
 
@@ -2248,37 +2310,93 @@ In the project-based workflow:
 
 ---
 
-### Phase 2b: Emulator Pause Integration (Deferred)
+### Phase 2b: Lock-Based Mounted Disk Serialization
 
-**Goal:** Add emulator pause interface to enable serializing mounted disk images without ejecting them during project save.
+**Goal:** Serialize mounted disk images during project save without ejecting them,
+using a snapshot-under-lock strategy that allows the emulator to continue running.
 
-**Depends on:** Phase 2a backlog complete, emulator subsystem refactoring.
+**Depends on:** Phase 2a backlog complete.
 
-**Rationale:** This work requires designing an emulator pause/resume message protocol or direct injection mechanism. The current eject-all workaround (used during project close) is functional but not ideal for explicit saves where the user expects disks to remain mounted. This is deferred until the emulator threading model is better understood.
+#### Design
 
-#### Work Items
+The emulator thread writes to `InternalDiskImage` at cycle speed (~250,000 bits/sec).
+Serializing a disk image while the emulator writes to it would produce corrupted
+blobs. Rather than pausing the entire emulator, the design uses a fine-grained
+lock on each `InternalDiskImage` that protects only the write path during the
+brief snapshot window.
 
-1. **Design emulator pause interface**
-   - Message-based: `PauseEmulatorMessage` / `ResumeEmulatorMessage`
-   - Direct injection: `IEmulatorController` with `PauseAsync()` / `ResumeAsync()`
-   - Acceptance: Emulator halts at instruction boundary, all threads blocked until resume.
+**Lock protocol:**
 
-2. **Update `SkilletProject.SaveAsync()` to use pause interface**
-   - Replace eject-all path with pause → serialize mounted dirty disks → resume.
-   - Mounted disks remain mounted after save (no state change visible to user).
-   - Working blobs updated without clearing drives.
+```
+InternalDiskImage.SerializationLock (object)
+  ├── Acquired by: UnifiedDiskImageProvider.WriteBit()  — emulator write path
+  └── Acquired by: DiskBlobStore.SerializeSnapshot()    — save path (snapshot only)
+```
 
-3. **Write tests for pause-serialize-unpause flow**
-   - Save project with mounted disk → verify blob updated, disk still mounted.
-   - Save project with multiple mounted disks → verify all serialized, all still mounted.
+**Snapshot-serialize flow (in `SaveAsync()`):**
+
+```
+For each checked-out dirty disk image:
+  1. Acquire InternalDiskImage.SerializationLock
+  2. Copy raw quarter-track byte arrays (~1ms memcpy, ~230KB for 35-track disk)
+  3. Release lock
+  4. Compress snapshot via Deflate (~50ms, no lock held)
+  5. Enqueue compressed blob write to IO thread
+```
+
+**Checked-out image tracking:**
+
+`SkilletProject` maintains a `ConcurrentDictionary<long, InternalDiskImage>`
+that tracks which images are currently lent to the emulator:
+- `CheckOutAsync()` adds the image after deserialization.
+- `ReturnAsync()` removes the image before serialization.
+- `SaveAsync()` iterates the dictionary to find dirty images.
+
+This eliminates the need for callers to pass mounted images as a parameter —
+the project knows what it has lent out.
+
+#### Completed Steps
+
+1. **Add `SerializationLock` to `InternalDiskImage`.**
+   ✅ **COMPLETED** — `public object SerializationLock { get; } = new object();`
+   Acquired by both the emulator write path and the serializer.
+
+2. **Wrap `WriteBit()` in `UnifiedDiskImageProvider` with lock.**
+   ✅ **COMPLETED** — `lock (_diskImage.SerializationLock)` around the write
+   operation including new-track creation. Read path (`ReadBit`) is not locked.
+
+3. **Add `DiskBlobStore.SerializeSnapshot()`.**
+   ✅ **COMPLETED** — Acquires lock briefly to copy raw byte arrays via
+   `ReadOctet()`, releases lock, then compresses the snapshot with Deflate.
+   Produces identical PIDI blobs to `Serialize()` but is safe for concurrent use.
+
+4. **Add checked-out image tracking to `SkilletProject`.**
+   ✅ **COMPLETED** — `ConcurrentDictionary<long, InternalDiskImage> _checkedOutImages`.
+   `CheckOutAsync()` populates, `ReturnAsync()` removes.
+
+5. **Update `SkilletProject.SaveAsync()` to use snapshot serialization.**
+   ✅ **COMPLETED** — Iterates `_checkedOutImages`, calls `SerializeSnapshot()`
+   for each dirty image, enqueues blob writes + dirty flag clears in a single
+   transaction. Disks remain mounted throughout — no eject/remount needed.
+
+6. **Write tests for snapshot-serialize flow.**
+   ⏸️ **Pending** — Will be added as part of Phase 2a Backlog Item 4 (test coverage).
 
 #### Deliverables
 
 | Artifact | State |
 |----------|-------|
-| Emulator pause interface | Design deferred |
-| SaveAsync pause integration | Implementation deferred |
-| Tests | Deferred |
+| `InternalDiskImage.SerializationLock` | ✅ Complete |
+| `UnifiedDiskImageProvider.WriteBit()` lock | ✅ Complete |
+| `DiskBlobStore.SerializeSnapshot()` | ✅ Complete |
+| Checked-out image tracking | ✅ Complete |
+| `SaveAsync()` snapshot integration | ✅ Complete |
+| Tests | ⏸️ Pending (Phase 2a Backlog Item 4) |
+
+#### Test Gate
+
+All 2,323 existing tests pass. No regressions. Snapshot-serialize specific tests
+will be added in Phase 2a Backlog Item 4.
 
 ---
 
@@ -2528,7 +2646,7 @@ documented in `docs/Skillet_Deferred_Features_Reference.md` §9.
 | 1. Foundation | **P0** | — | Project + schema + blob store + lifecycle | ✅ Complete |
 | 2. Disk Lifecycle | **P0** | Phase 1 | IDiskImageStore + import / mount / export / eject auto-flush | ✅ Complete |
 | 2a. Minimal UI | **P0** | Phase 2 | Controller handlers + mount picker + title bar | ⏸️ Complete with Backlog (3 items) |
-| 2b. Emulator Pause | **P2** | Phase 2a, emulator refactor | Pause-serialize-unpause for SaveAsync | ⏸️ Deferred (design pending) |
+| 2b. Mounted Disk Serialization | **P0** | Phase 2a | Snapshot-under-lock for SaveAsync | ✅ Complete |
 | 3. Settings | **P1** | Phase 1 | Four-layer resolution + recent projects | ⏸️ Pending |
 | 4. UI Polish | **P1** | Phases 2a, 3 | Start Page + new project dialog + startup flow | ⏸️ Pending |
 | 5. Legacy Cleanup | **P2** | Phases 2a, 4 | Remove dead code (SaveDisk*, DriveState*) | ⏸️ Pending |
@@ -3133,7 +3251,7 @@ models never need to check for a "no project" state.
 | SQLite connection | `Data Source=:memory:` |
 | Schema | Full V1 schema (6 tables, all pragmas except WAL) |
 | `mount_configuration` | Default: slot 6, drives 1 & 2, empty |
-| `HasUnsavedChanges` | `true` if any disk images imported or settings modified |
+| `HasUnsavedChanges` | `true` if any mutation since creation (import, settings, mount config, eject) |
 
 ### E.3 Lifecycle
 
@@ -3167,8 +3285,8 @@ models never need to check for a "no project" state.
 
 | Command | Ad Hoc Project | File-Based Project |
 |---------|---------------|--------------------|
-| **Save Project** (Ctrl+Alt+S) | Disabled — no file path | Saves to existing file |
-| **Save Project As...** (Ctrl+Shift+S) | Persists to new file via `VACUUM INTO` | Saves copy to new file |
+| **Save Project** (Ctrl+Alt+S) | Disabled — no file path | Enabled when not pristine; disabled for pristine |
+| **Save Project As...** (Ctrl+Shift+S) | Enabled when not pristine (has data) | Enabled when not pristine |
 | **Auto-save timer** | Skipped — nothing to auto-save to | Fires normally |
 | **Eject auto-flush** | Works normally — `ReturnAsync()` writes to in-memory `working_blob` | Works normally |
 | **Close Project** | Disabled when pristine; enabled when project has data | Always enabled |

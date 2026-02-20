@@ -1444,6 +1444,11 @@ public abstract class DiskIIControllerCard : ICard
                 builder.DiskImageFilename = !string.IsNullOrEmpty(currentPath) 
                     ? System.IO.Path.GetFileName(currentPath) 
                     : string.Empty;
+
+                // Publish the skillet disk image ID for mount configuration persistence
+                builder.DiskImageId = _mountedDiskImageIds.TryGetValue(i, out long diskImageId)
+                    ? diskImageId
+                    : null;
             });
         }
     }

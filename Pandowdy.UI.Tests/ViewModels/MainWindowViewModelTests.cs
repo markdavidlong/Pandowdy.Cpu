@@ -153,6 +153,7 @@ public class MainWindowViewModelTests
                 MockMessageBoxService.Object,
                 MockDiskFileDialogService.Object,
                 MockProjectFileDialogService.Object,
+                emulatorCoreInterface,
                 mockProjectManager.Object);
         }
     }
@@ -716,6 +717,7 @@ public class MainWindowViewModelTests
             fixture.MockMessageBoxService.Object,
             fixture.MockDiskFileDialogService.Object,
             fixture.MockProjectFileDialogService.Object,
+            new TestEmulatorCoreInterface(),
             mockProjectManager.Object);
 
         // Setup mock: user confirms exit
@@ -780,6 +782,7 @@ public class MainWindowViewModelTests
             fixture.MockMessageBoxService.Object,
             fixture.MockDiskFileDialogService.Object,
             fixture.MockProjectFileDialogService.Object,
+            new TestEmulatorCoreInterface(),
             mockProjectManager.Object);
 
         // Setup mock: user cancels exit
@@ -851,6 +854,7 @@ public class MainWindowViewModelTests
             fixture.MockMessageBoxService.Object,
             fixture.MockDiskFileDialogService.Object,
             fixture.MockProjectFileDialogService.Object,
+            new TestEmulatorCoreInterface(),
             mockProjectManager.Object);
 
         // Capture the message shown to user
@@ -1125,10 +1129,71 @@ public class MainWindowViewModelTests
             mockMessageBoxService.Object,
             mockFileDialogService.Object,
             mockProjectFileDialogService.Object,
+            emulatorCoreInterface,
             mockProjectManager.Object);
 
         // Assert
         Assert.Equal("Pandowdy — Test Project", viewModel.WindowTitle);
+    }
+
+    [Fact]
+    public void WindowTitle_WithDirtyProject_ShowsDirtyIndicator()
+    {
+        // Arrange
+        var mockProjectManager = new Mock<ISkilletProjectManager>();
+        var mockProject = new Mock<ISkilletProject>();
+        var metadata = new Pandowdy.Project.Models.ProjectMetadata(
+            Name: "Test Project",
+            CreatedUtc: DateTime.UtcNow,
+            ModifiedUtc: DateTime.UtcNow,
+            SchemaVersion: 1,
+            PandowdyVersion: "0.1.0");
+
+        mockProject.Setup(p => p.Metadata).Returns(metadata);
+        mockProject.Setup(p => p.FilePath).Returns("C:\\test\\project.skillet");
+        mockProject.Setup(p => p.HasUnsavedChanges).Returns(true);
+        mockProject.Setup(p => p.HasDiskImages).Returns(true);
+        mockProject.Setup(p => p.GetAllDiskImagesAsync())
+            .ReturnsAsync(new List<Pandowdy.Project.Models.DiskImageRecord>());
+        mockProjectManager.Setup(pm => pm.CurrentProject).Returns(mockProject.Object);
+
+        // Create view model with dirty project
+        var emuState = new TestEmulatorState();
+        var statusProvider = new SystemStatusProvider();
+        var diskStatusProvider = new DiskStatusProvider();
+        var emulatorCoreInterface = new TestEmulatorCoreInterface();
+        var cardResponseProvider = new CardResponseChannel();
+        var refreshTicker = new TestRefreshTicker();
+        var mockFileDialogService = new Mock<IDiskFileDialogService>();
+        var mockMessageBoxService = new Mock<IMessageBoxService>();
+        var mockDriveStateService = new Mock<IDriveStateService>();
+        var mockProjectFileDialogService = new Mock<IProjectFileDialogService>();
+
+        var emulatorStateViewModel = new EmulatorStateViewModel(emulatorCoreInterface, refreshTicker);
+        var systemStatusViewModel = new SystemStatusViewModel(statusProvider);
+        var diskStatusViewModel = new DiskStatusPanelViewModel(emulatorCoreInterface, diskStatusProvider, mockFileDialogService.Object, mockMessageBoxService.Object, mockProjectManager.Object);
+        var cpuStatusViewModel = new CpuStatusPanelViewModel(emulatorCoreInterface, refreshTicker);
+        var statusBarViewModel = new StatusBarViewModel(cpuStatusViewModel, systemStatusViewModel);
+        var peripheralsMenuViewModel = new PeripheralsMenuViewModel(emulatorCoreInterface, cardResponseProvider, diskStatusProvider);
+
+        // Act
+        var viewModel = new MainWindowViewModel(
+            emulatorStateViewModel,
+            emuState,
+            systemStatusViewModel,
+            diskStatusViewModel,
+            cpuStatusViewModel,
+            statusBarViewModel,
+            peripheralsMenuViewModel,
+            mockDriveStateService.Object,
+            mockMessageBoxService.Object,
+            mockFileDialogService.Object,
+            mockProjectFileDialogService.Object,
+            emulatorCoreInterface,
+            mockProjectManager.Object);
+
+        // Assert — dirty project shows " *" suffix per blueprint Appendix E.7
+        Assert.Equal("Pandowdy — Test Project *", viewModel.WindowTitle);
     }
 
     [Fact]
