@@ -84,8 +84,10 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
     /// </para>
     /// </remarks>
     void DoReset();
-    
-   
+
+
+    void DoRestart();
+
     /// <summary>
     /// Queues a pushbutton state change for game controller.
     /// </summary>

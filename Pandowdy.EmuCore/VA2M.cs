@@ -444,7 +444,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </remarks>
     private readonly CpuClockingCounters _clockCounters;
 
-    private readonly ResetCollection _resetters;
+    private readonly RestartCollection _restarters;
 
     /// <summary>
     /// Frame counter for snapshot debugging and diagnostics.
@@ -563,44 +563,44 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </para>
     /// </remarks>
     public VA2M(
-            IEmulatorState stateSink, 
-            IFrameProvider frameSink, 
-            ISystemStatusMutator statusProvider, 
-            IAppleIIBus bus, 
-            AddressSpaceController memoryPool, 
-            IFrameGenerator frameGenerator,
-            RenderingService renderingService,
-            VideoMemorySnapshotPool snapshotPool,
-            IKeyboardSetter keyboardSetter,
-            IGameControllerStatus gameController,
-            IDiskStatusProvider diskStatusProvider,
-            CpuClockingCounters clockCounters,
-            IMemoryInspector memoryInspector,
-            ISlots slots,
-            ResetCollection resetters)
-        {
-            ArgumentNullException.ThrowIfNull(stateSink);
-            ArgumentNullException.ThrowIfNull(frameSink);
-            ArgumentNullException.ThrowIfNull(statusProvider);
-            ArgumentNullException.ThrowIfNull(bus);
-            ArgumentNullException.ThrowIfNull(memoryPool);
-            ArgumentNullException.ThrowIfNull(frameGenerator);
-            ArgumentNullException.ThrowIfNull(renderingService);
-            ArgumentNullException.ThrowIfNull(snapshotPool);
-            ArgumentNullException.ThrowIfNull(keyboardSetter);
-            ArgumentNullException.ThrowIfNull(gameController);
-            ArgumentNullException.ThrowIfNull(diskStatusProvider);
-            ArgumentNullException.ThrowIfNull(clockCounters);
-            ArgumentNullException.ThrowIfNull(memoryInspector);
+        IEmulatorState stateSink, 
+        IFrameProvider frameSink, 
+        ISystemStatusMutator statusProvider, 
+        IAppleIIBus bus, 
+        AddressSpaceController memoryPool, 
+        IFrameGenerator frameGenerator,
+        RenderingService renderingService,
+        VideoMemorySnapshotPool snapshotPool,
+        IKeyboardSetter keyboardSetter,
+        IGameControllerStatus gameController,
+        IDiskStatusProvider diskStatusProvider,
+        CpuClockingCounters clockCounters,
+        IMemoryInspector memoryInspector,
+        ISlots slots,
+        RestartCollection restarters)
+    {
+        ArgumentNullException.ThrowIfNull(stateSink);
+        ArgumentNullException.ThrowIfNull(frameSink);
+        ArgumentNullException.ThrowIfNull(statusProvider);
+        ArgumentNullException.ThrowIfNull(bus);
+        ArgumentNullException.ThrowIfNull(memoryPool);
+        ArgumentNullException.ThrowIfNull(frameGenerator);
+        ArgumentNullException.ThrowIfNull(renderingService);
+        ArgumentNullException.ThrowIfNull(snapshotPool);
+        ArgumentNullException.ThrowIfNull(keyboardSetter);
+        ArgumentNullException.ThrowIfNull(gameController);
+        ArgumentNullException.ThrowIfNull(diskStatusProvider);
+        ArgumentNullException.ThrowIfNull(clockCounters);
+        ArgumentNullException.ThrowIfNull(memoryInspector);
         ArgumentNullException.ThrowIfNull(slots);
-        ArgumentNullException.ThrowIfNull(resetters);
+        ArgumentNullException.ThrowIfNull(restarters);
 
 
         _stateSink = stateSink;
-            _frameSink = frameSink;
-            _sysStatusSink = statusProvider;
-            _diskStatusProvider = diskStatusProvider;
-            _frameGenerator = frameGenerator;
+        _frameSink = frameSink;
+        _sysStatusSink = statusProvider;
+        _diskStatusProvider = diskStatusProvider;
+        _frameGenerator = frameGenerator;
         _renderingService = renderingService;
         _snapshotPool = snapshotPool;
         _keyboardSetter = keyboardSetter;
@@ -608,7 +608,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
         _clockCounters = clockCounters;
         _memoryInspector = memoryInspector;
         _slots = slots;
-        _resetters = resetters;
+        _restarters = restarters;
         Bus = bus;
         MemoryPool = memoryPool;
 
@@ -1102,9 +1102,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     {
         Enqueue(() =>
         {
-            // Perform full system reset (CPU, memory, soft switches, etc.) on anything
-            // implementing IResetable capability attribute `[Capability(typeof(IResetable))]`
-            _resetters.ResetAll();
+
 
             // Reset keyboard state (clear pending keystrokes and strobe)
             _keyboardSetter.ResetKeyboard();
@@ -1122,6 +1120,13 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
             _throttleLastError = 0;
             _adaptiveSpinWaitIterations = 100;        
         });
+    }
+
+    public void DoRestart()
+    {
+        // Perform full system reset (CPU, memory, soft switches, etc.) on anything
+        // implementing IResetable capability attribute `[Capability(typeof(IResetable))]`
+        _restarters.ResetAll();
     }
 
     /// <summary>
