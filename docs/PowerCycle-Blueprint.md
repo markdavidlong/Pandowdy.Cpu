@@ -230,7 +230,7 @@ public interface IRestartable
 }
 ```
 
-**Location:** `Pandowdy.EmuCore/Interfaces/IRestartable.cs`
+**Location:** `Pandowdy.EmuCore/Machine/IRestartable.cs`
 
 **Adoption:** Existing interfaces that gain `Restart()` should extend
 `IRestartable` rather than declaring `Restart()` independently:
@@ -1027,7 +1027,7 @@ project switching to work correctly.**
 
 ### Phase 1: Foundation (✅ Complete)
 
-1. `IRestartable` interface (`Pandowdy.EmuCore/Interfaces/IRestartable.cs`)
+1. `IRestartable` interface (`Pandowdy.EmuCore/Machine/IRestartable.cs`)
 2. `CapabilityAttribute` with `priority` parameter
 3. `RestartCollection` with priority-ordered `RestartAll()`
 4. `CapabilityAwareServiceCollection` auto-discovery of `[Capability]` attributes

@@ -90,51 +90,97 @@ public bool ThrottleEnabled { get => _throttleEnabled; set => this.RaiseAndSetIf
 - Use nullable reference types (`string?`, `object?`)
 - Follow naming conventions: PascalCase for public members, camelCase for private fields with `_` prefix
 - **Prefer using Primary Constructors (C# 12)** when class initialization is straightforward (i.e., no complicated tasks at construction aside from field assignments). This is especially important when generating Unit Tests, where this pattern is often forgotten.
+- **Use interface-based constructors** for decorator patterns; consider concrete-type constructors a workaround that should be documented as technical debt.
 
 ## Project Structure
 
 ### Pandowdy.EmuCore (Emulator Core)
 ```
 Pandowdy.EmuCore/
-??? Root (Core Domain)
-?   ??? VA2M.cs                    - Main emulator orchestrator
-?   ??? VA2MBus.cs                 - Central bus coordinator (~570 lines, well-tested)
-?   ??? MemoryPool.cs              - 128KB Apple IIe memory model
-?   ??? CPUAdapter.cs              - Adapter for 6502.NET CPU
-?   ??? SoftSwitch.cs              - Apple II soft switch model
-?   ??? BitField16.cs              - Utility data structure
-?   ??? BitmapDataArray.cs         - Core bitmap data type
-?   ??? RenderContext.cs           - Rendering data structure
-?
-??? Services/ (Cross-cutting Services)
-    ??? EmulatorStateServices.cs   - State management (EmulatorStateProvider)
-    ??? SystemStatusServices.cs    - Status provider (SystemStatusProvider + ISoftSwitchResponder)
-    ??? FrameProvider.cs           - Double-buffered frame management
-    ??? FrameGenerator.cs          - Frame generation coordinator
-    ??? CharacterRomProvider.cs    - Apple IIe character ROM provider
-    ??? LegacyBitmapRenderer.cs     - Bitmap rendering service
+├── Machine/ (Emulator orchestration)
+│   ├── VA2M.cs                    - Main emulator orchestrator
+│   ├── VA2MBus.cs                 - Central bus coordinator
+│   ├── IEmulatorCoreInterface.cs  - Top-level emulator interface
+│   ├── IEmulatorState.cs          - Emulator state contract
+│   ├── EmulatorStateServices.cs   - State management (EmulatorStateProvider)
+│   ├── IAppleIIBus.cs             - Bus interface
+│   ├── CpuClockingCounters.cs     - CPU cycle counting and timing
+│   ├── CpuStateSnapshot.cs        - Immutable CPU state for UI/debug
+│   ├── IRestartable.cs            - Cold-boot restart contract
+│   ├── RestartCollection.cs       - Priority-ordered batch restart
+│   └── CapabilityAttribute.cs     - DI auto-discovery attribute
+│
+├── Memory/ (RAM, ROM, address space)
+│   ├── AddressSpaceController.cs  - Address space routing
+│   ├── SystemRamSelector.cs       - Main/aux 48K RAM routing
+│   ├── LanguageCard.cs            - 16K Language Card banking
+│   ├── MemoryBlock.cs             - Raw memory storage
+│   ├── SystemRomProvider.cs       - ROM loading service
+│   ├── MemoryInspector.cs         - Memory inspection for debugger
+│   └── (interfaces: ISystemRam, ISystemRamSelector, ILanguageCard, etc.)
+│
+├── IO/ (Soft switches and I/O handling)
+│   ├── SoftSwitches.cs            - Apple II soft switch model
+│   ├── SystemIoHandler.cs         - I/O address space handler
+│   ├── NoSlotClockIoHandler.cs    - Dallas DS1216 No-Slot Clock
+│   ├── SystemStatusServices.cs    - Status provider (SystemStatusProvider)
+│   └── (interfaces: ISystemIoHandler, ISystemStatusProvider, etc.)
+│
+├── Input/ (Keyboard and game controller)
+│   ├── QueuedKeyHandler.cs        - Keyboard with key queue
+│   ├── SingularKeyHandler.cs      - Simple single-key handler
+│   ├── SimpleGameController.cs    - Game controller buttons
+│   └── (interfaces: IKeyboardSetter, IKeyboardReader, IGameControllerStatus)
+│
+├── Slots/ (Expansion card system)
+│   ├── Slots.cs                   - Slot manager (7 slots)
+│   ├── NullCard.cs                - Empty slot placeholder
+│   ├── CardFactory.cs             - Card creation and cloning
+│   ├── CardResponseChannel.cs     - Card message response bus
+│   └── (interfaces: ICard, ISlots, ICardMessage, ICardFactory, etc.)
+│
+├── DiskII/ (Disk II controller subsystem)
+│   ├── DiskIIControllerCard.cs    - Base controller card
+│   ├── DiskIIControllerCard13Sector.cs - 13-sector variant
+│   ├── DiskIIControllerCard16Sector.cs - 16-sector variant
+│   ├── DiskIIDrive.cs             - Physical drive emulation
+│   ├── DiskIIFactory.cs           - Drive creation factory
+│   ├── DiskStatusServices.cs      - Drive status provider/mutator
+│   ├── InternalDiskImage.cs       - In-memory disk image
+│   ├── Messages/                  - Disk-specific card messages
+│   ├── Providers/                 - Disk image format providers
+│   ├── Importers/                 - Disk image importers
+│   └── Exporters/                 - Disk image exporters
+│
+├── Video/ (Rendering pipeline)
+│   ├── RenderingService.cs        - Main rendering coordinator
+│   ├── FrameGenerator.cs          - Frame generation coordinator
+│   ├── FrameProvider.cs           - Double-buffered frame management
+│   ├── CharacterRomProvider.cs    - Apple IIe character ROM
+│   ├── LegacyBitmapRenderer.cs    - Bitmap rendering service
+│   ├── VideoMemorySnapshotPool.cs - Video memory snapshot pooling
+│   └── (interfaces: IFrameGenerator, IFrameProvider, etc.)
+│
+└── DataTypes/
+    └── BitField16.cs              - 16-bit field utility
 ```
 
 ### Pandowdy.EmuCore.Tests (Test Mirror)
 ```
 Pandowdy.EmuCore.Tests/
-??? Root (Core Domain Tests)
-?   ??? VA2MTests.cs
-?   ??? VA2MBusTests.cs            - 80+ comprehensive tests
-?   ??? MemoryPoolTests.cs
-?   ??? CPUAdapterTests.cs
-?   ??? SoftSwitchTests.cs
-?   ??? BitField16Tests.cs
-?   ??? BitmapDataArrayTests.cs
-?   ??? RenderingIntegrationTests.cs
-?
-??? Services/ (Service Tests - mirrors EmuCore/Services)
-    ??? EmulatorStateProviderTests.cs
-    ??? SystemStatusProviderTests.cs
-    ??? FrameProviderTests.cs
-    ??? FrameGeneratorTests.cs
-    ??? CharacterRomProviderTests.cs
-    ??? LegacyBitmapRendererTests.cs
+├── Machine/                       - VA2M, VA2MBus, CpuClockingCounters tests
+├── Memory/                        - AddressSpaceController, RAM, LanguageCard tests
+├── IO/                            - SoftSwitches, SystemIoHandler tests
+├── Input/                         - Keyboard, game controller tests
+├── Slots/                         - Slots, card messaging tests
+├── Cards/                         - DiskII controller card tests
+├── DiskII/                        - DiskII integration/specification tests
+├── DataTypes/                     - BitField16, RestartCollection tests
+├── Video/                         - Rendering tests
+├── Services/                      - Cross-cutting service tests
+├── Messages/                      - Card message tests
+├── Helpers/                       - Test builders and utilities
+└── IntegrationTests/              - Cross-subsystem integration tests
 ```
 
 ### Pandowdy.UI (Avalonia GUI)

@@ -126,7 +126,10 @@ namespace Pandowdy
 
             services.AddSingleton<IFrameGenerator, FrameGenerator>();
 
-            services.AddSingleton<ISystemIoHandler, SystemIoHandler>();
+            services.AddSingleton<SystemIoHandler>();
+            services.AddSingleton<NoSlotClockIoHandler>();
+            services.AddSingleton<ISystemIoHandler>(sp =>
+                sp.GetRequiredService<NoSlotClockIoHandler>());
 
             // Disk II subsystem
             services.AddSingleton<IDiskImageFactory, DiskImageFactory>();

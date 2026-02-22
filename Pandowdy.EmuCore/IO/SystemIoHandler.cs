@@ -30,7 +30,6 @@ namespace Pandowdy.EmuCore.IO;
 /// </para>
 /// </remarks>
 // Handles C000-C08F (System IO Area)
-[Capability(typeof(IRestartable))]
 public class SystemIoHandler : ISystemIoHandler
 {
     /// <summary>

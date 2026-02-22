@@ -40,6 +40,7 @@ namespace Pandowdy.EmuCore.IO;
 /// base ROM data, and this class modifies bit 0 when clock data is being read.
 /// </para>
 /// </remarks>
+[Capability(typeof(IRestartable))]
 public class NoSlotClockIoHandler : ISystemIoHandler
 {
     private readonly ISystemIoHandler _downstream;
@@ -76,10 +77,39 @@ public class NoSlotClockIoHandler : ISystemIoHandler
     /// <summary>
     /// Initializes a new No-Slot Clock handler wrapping the specified downstream handler.
     /// </summary>
-    /// <param name="downstream">The ROM or I/O handler to wrap.</param>
+    /// <param name="downstream">The system I/O handler to wrap.</param>
     /// <param name="clockingCounters">CPU clocking counters (currently unused but reserved for timing).</param>
-    public NoSlotClockIoHandler(ISystemIoHandler downstream, CpuClockingCounters clockingCounters)
-    {   
+    /// <remarks>
+    /// <para>
+    /// <strong>DI Workaround:</strong> This constructor takes <see cref="SystemIoHandler"/>
+    /// (concrete type) instead of <see cref="ISystemIoHandler"/> to work around a circular
+    /// DI resolution issue: <c>NoSlotClockIoHandler</c> is registered as
+    /// <c>ISystemIoHandler</c>, so a constructor taking <c>ISystemIoHandler</c> would resolve
+    /// back to itself. Using the concrete type lets DI auto-construct this class and allows
+    /// <c>[Capability]</c> attribute auto-discovery (which requires <c>ImplementationType</c>
+    /// on the service descriptor, unavailable with factory lambdas).
+    /// </para>
+    /// <para>
+    /// Ideally this would accept <see cref="ISystemIoHandler"/> for proper decorator-pattern
+    /// flexibility. The internal constructor preserves that capability for testing.
+    /// </para>
+    /// </remarks>
+    public NoSlotClockIoHandler(SystemIoHandler downstream, CpuClockingCounters clockingCounters)
+        : this((ISystemIoHandler)downstream, clockingCounters)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new No-Slot Clock handler wrapping an arbitrary <see cref="ISystemIoHandler"/>.
+    /// </summary>
+    /// <param name="downstream">The I/O handler to wrap.</param>
+    /// <param name="clockingCounters">CPU clocking counters.</param>
+    /// <remarks>
+    /// Internal constructor that accepts the interface type, preserving decorator-pattern
+    /// flexibility for unit tests with mock implementations.
+    /// </remarks>
+    internal NoSlotClockIoHandler(ISystemIoHandler downstream, CpuClockingCounters clockingCounters)
+    {
         ArgumentNullException.ThrowIfNull(downstream);
         ArgumentNullException.ThrowIfNull(clockingCounters);
         _downstream = downstream;
@@ -107,12 +137,13 @@ public class NoSlotClockIoHandler : ISystemIoHandler
     /// Restores the NSC to its initial power-on state (cold boot).
     /// </summary>
     /// <remarks>
-    /// Same behaviour as <see cref="Reset"/> — the time offset survives both warm reset
-    /// and power cycle, modelling battery-backed clock hardware.
+    /// Resets the NSC state machine only. Does not delegate to downstream —
+    /// RestartCollection uses a flat model where each component is independently
+    /// restartable. The time offset survives both warm reset and power cycle,
+    /// modelling battery-backed clock hardware.
     /// </remarks>
     public void Restart()
     {
-        _downstream.Restart();
         _state = NscState.Matching;
         _bitIndex = 0;
         _patternAccumulator = 0;
