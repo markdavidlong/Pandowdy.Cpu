@@ -56,4 +56,14 @@ public interface ISystemRam : IPandowdyMemory
     /// </para>
     /// </remarks>
     public void CopyIntoSpan(Span<byte> destination);
+
+    /// <summary>
+    /// Zeros all bytes in this RAM bank, restoring power-on state.
+    /// </summary>
+    /// <remarks>
+    /// Called during cold boot (<see cref="IRestartable.Restart"/>) to clear RAM
+    /// contents. This is a leaf operation — the caller (e.g., SystemRamSelector or
+    /// LanguageCard) is responsible for calling <c>Clear()</c> on each bank it owns.
+    /// </remarks>
+    void Clear();
 }

@@ -1,6 +1,6 @@
 # PowerCycle Blueprint — VA2M Power Lifecycle
 
-**Status:** Design  
+**Status:** Phases 1–6 complete (IRestartable + RestartCollection + flat priority ordering); Phases 7–9 TODO (PowerState, DI facade, integration)
 **Branch:** `CoreUpdates` (to be created from `skillet`)  
 **Date:** 2026-01  
 **Depends on:** Skillet project system (mount/eject/store already implemented)  
@@ -72,8 +72,15 @@ subsystem tree, with increasing scope:
    also gets `Restart()`. `Restart()` does everything `Reset()` does **plus**
    clears memory/state to power-on defaults.
 
-3. **The flow tree is identical.** `Restart()` follows the same call chain as
-   `Reset()` — `VA2M` → `Bus` → `AddressSpaceController` → subsystems.
+3. **Flat collection, not a tree.** Unlike `Reset()` which uses tree-based
+   dispatch (`VA2M` → `Bus` → `AddressSpaceController` → subsystems),
+   `Restart()` uses a flat `RestartCollection` that iterates all registered
+   `IRestartable` components ordered by `[Capability]` priority. Components
+   tagged with `[Capability(typeof(IRestartable))]` are auto-discovered by
+   `CapabilityAwareServiceCollection`; factory-created objects (e.g., cards)
+   are registered dynamically by `CardFactory`. Order-sensitive components
+   (e.g., `VA2MBus` which must read the reset vector after soft switches are
+   at power-on defaults) use `priority:` to run later.
 
 4. **Disk images are NOT ejected by Restart().** `Restart()` is a hardware
    power cycle — disks stay in drives. Eject is a project-level operation
@@ -97,27 +104,52 @@ subsystem tree, with increasing scope:
 
 ---
 
-## 3. Flow Tree
+## 3. Restart Flow
+
+### 3.1 RestartCollection — Flat Priority-Ordered Iteration
+
+`VA2M.DoRestart()` calls `RestartCollection.RestartAll()`, which iterates **all**
+registered `IRestartable` components ordered by the `priority` parameter of their
+`[Capability(typeof(IRestartable), priority: N)]` attribute. Lower numbers run
+first (negatives allowed). Components without the attribute default to priority 0.
 
 ```
-Startup (Program.cs / MainWindow)
-  └─ _isPoweredOn starts as false       // Machine is OFF until user/GUI triggers PowerOn()
-     (GUI has time to wire subscriptions before first PowerOn message)
+VA2M.DoRestart()                         // Enqueued on emulator thread
+  └─ _restarters.RestartAll()            // Flat iteration, ordered by priority
+       │
+       │  Priority 0 (default) — all run before VA2MBus:
+       ├─ SoftSwitches.Restart()         // All switches → false (ROM active)
+       ├─ SystemRamSelector.Restart()    // Clear main 48K + aux 48K
+       ├─ LanguageCard.Restart()         // Clear main 16K + aux 16K
+       ├─ QueuedKeyHandler.Restart()     // Clear latch + queue
+       ├─ SimpleGameController.Restart() // Release all buttons
+       ├─ CpuClockingCounters.Restart()  // Zero cycle counters + VBlank state
+       ├─ Slots.Restart()               // Cold-init each installed card
+       │   └─ each card.Restart()        // Card-specific cold init
+       ├─ AddressSpaceController.Restart()  // No-op (children are independent)
+       ├─ SystemIoHandler.Restart()      // No-op (SoftSwitches is independent)
+       ├─ (factory-registered cards)     // DiskIIControllerCard, etc.
+       │
+       │  Priority 100 — runs after soft switches ensure ROM is active:
+       └─ VA2MBus.Restart()             // _cpu.Reset(this) — reads reset vector
 
-VA2M.Restart()                          // Enqueued on emulator thread
-  ├─ _keyboardSetter.Restart()          // Clear latch + queue
-  ├─ Bus.Restart()
-  │   ├─ _addressSpace.Restart()
-  │   │   ├─ _systemRam.Restart()       // Clear main 48K + aux 48K
-  │   │   ├─ _io.Restart()              // Delegates to SoftSwitches.ResetAllSwitches()
-  │   │   ├─ _slots.Restart()           // Cold-init each installed card
-  │   │   │   └─ each card.Restart()    // Card-specific cold init
-  │   │   └─ _langCard.Restart()        // Clear main 16K + aux 16K, banking → ROM
-  │   ├─ _cpu.Reset(this)               // Load reset vector (same as warm reset)
-  │   └─ _clockCounters.Reset()         // Zero cycle counters + VBlank state
-  ├─ Reset throttle/perf state          // Same as current Reset()
-  └─ _gameController.Restart()          // Release all buttons
+  └─ Reset throttle/perf state           // VA2M-internal, not IRestartable
+```
 
+### 3.2 Discovery and Registration
+
+- **DI auto-discovery:** Classes tagged with `[Capability(typeof(IRestartable))]`
+  are automatically registered as `IRestartable` services by
+  `CapabilityAwareServiceCollection`. The `RestartCollection` constructor
+  receives `IEnumerable<IRestartable>` from DI.
+- **Factory registration:** `CardFactory` accepts `RestartCollection` and calls
+  `Register()` for each card instance it creates (since DI only knows about
+  prototype instances, not the cloned/installed instances).
+- **Dynamic unregistration:** `Unregister()` is available for card removal.
+
+### 3.3 PowerOff / PowerOn (Unchanged)
+
+```
 VA2M.PowerOff()                         // Effectively Pause + publish
   ├─ _emuState.RequestPause()           // Reuse existing pause mechanism
   ├─ _isPoweredOn = false               // Private flag
@@ -128,17 +160,44 @@ VA2M.PowerOn()                          // Restart + publish + resume
   ├─ _isPoweredOn = true                // Private flag
   ├─ _powerState.SetPoweredOn(true)     // Publish via BehaviorSubject → GUI reacts
   └─ _emuState.RequestContinue()        // Resume execution via existing mechanism
+
+Startup (Program.cs / MainWindow)
+  └─ _isPoweredOn starts as false       // Machine is OFF until user/GUI triggers PowerOn()
+     (GUI has time to wire subscriptions before first PowerOn message)
 ```
 
 ---
 
 ## 4. Subsystem Changes
 
-### 4.0 IRestartable (New Interface)
+### 4.0 IRestartable, CapabilityAttribute, and RestartCollection
 
-All subsystems that participate in the cold-boot `Restart()` tree implement a
-common `IRestartable` interface. This provides a uniform contract and enables
-batch restart operations (e.g., `Slots` iterating over cards without casting).
+All subsystems that participate in cold-boot `Restart()` implement a common
+`IRestartable` interface. Components are discovered via DI using the
+`[Capability(typeof(IRestartable))]` attribute and collected into a
+`RestartCollection` that provides priority-ordered batch restart.
+
+The `CapabilityAttribute` accepts an optional `priority` parameter (default 0).
+`RestartCollection.RestartAll()` sorts by ascending priority — lower numbers
+first, negatives allowed. This replaces tree-based dispatch with declarative
+ordering: order-sensitive components simply declare a higher priority.
+
+```csharp
+// CapabilityAttribute — drives DI auto-discovery and restart ordering
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+public sealed class CapabilityAttribute(Type interfaceType, int priority = 0) : Attribute
+{
+    public int Priority { get; } = priority;
+    public Type InterfaceType { get; } = interfaceType;
+}
+```
+
+**Priority assignments:**
+
+| Priority | Components | Rationale |
+|----------|-----------|----------|
+| 0 (default) | SoftSwitches, SystemRamSelector, LanguageCard, Slots, QueuedKeyHandler, SimpleGameController, CpuClockingCounters, AddressSpaceController, SystemIoHandler | No ordering dependencies among themselves |
+| 100 | VA2MBus | Must run after SoftSwitches (HighRead=false → ROM active) so `_cpu.Reset(this)` reads the correct reset vector |
 
 ```csharp
 /// <summary>
@@ -259,28 +318,43 @@ HighRead=false → ROM active, which is the correct power-on default.
 **Current state:** Already has `ResetAllSwitches()` that clears all switches to
 false and flows through `SystemStatusProvider`. This IS the power-on default.
 
-**Change:** None needed. `ResetAllSwitches()` is already the correct cold boot
-behavior. `SystemIoHandler.Reset()` already calls it, and `Restart()` will too.
+**Change:** Implements `IRestartable` directly with
+`[Capability(typeof(IRestartable))]`. `Restart()` delegates to
+`ResetAllSwitches()`. SoftSwitches is a first-class citizen in the flat
+`RestartCollection` — it is not called through `SystemIoHandler`'s tree:
+
+```csharp
+[Capability(typeof(IRestartable))]
+public sealed class SoftSwitches : IRestartable
+{
+    public void Restart() => ResetAllSwitches();
+}
+```
+
+This ensures ROM is active (HighRead=false) before `VA2MBus` (priority 100)
+resets the CPU and reads the reset vector.
 
 ### 4.5 SystemIoHandler
 
 **Current state:** Has `Reset()` that calls `_softSwitches.ResetAllSwitches()`.
 
-**Change:** Add `Restart()`:
+**Change:** `Restart()` is a **no-op**. `SoftSwitches` is independently
+restartable via `RestartCollection`, so `SystemIoHandler` does not need to
+delegate to it during cold boot. The handler is stateless beyond the soft
+switches it wraps. Keyboard and game controller are also independently
+restartable.
 
 ```csharp
 public void Restart()
 {
-    // Soft switches to power-on defaults (same as Reset)
-    Reset();
-    // SystemIoHandler has no additional state to clear —
-    // keyboard and game controller are reset by their owners.
+    // No-op: SoftSwitches is independently restartable via RestartCollection.
+    // SystemIoHandler has no additional state to clear.
 }
 ```
 
-For `SystemIoHandler`, `Restart()` and `Reset()` are equivalent because the
-handler is stateless beyond the soft switches. The keyboard and game controller
-state is managed by VA2M (which calls their `Restart()` separately).
+**Note:** `Reset()` still calls `SoftSwitches.ResetAllSwitches()` for warm-reset
+(Ctrl+Reset) which uses the tree-based call path. Cold boot uses the flat
+`RestartCollection` path instead.
 
 ### 4.6 ISystemIoHandler Interface
 
@@ -300,15 +374,15 @@ public interface ISystemIoHandler : IRestartable
 **Current state:** Has `Reset()` that calls `_slots.Reset()` + `_io.Reset()`.
 Does NOT clear RAM or language card.
 
-**Change:** Add `Restart()` that does everything:
+**Change:** `Restart()` is a **no-op**. All subsystems (SystemRamSelector,
+SoftSwitches, Slots, LanguageCard) are independently restartable via
+`RestartCollection`. AddressSpaceController is stateless beyond references to
+its children.
 
 ```csharp
 public void Restart()
 {
-    _systemRam.Restart();    // Clear 48K main + 48K aux
-    _io.Restart();           // Soft switches → power-on defaults
-    _slots.Restart();        // Cold-init each card
-    _langCard.Restart();     // Clear 16K main + 16K aux
+    // No-op: children are independently restartable via RestartCollection.
 }
 ```
 
@@ -498,60 +572,110 @@ public void Restart()
 }
 ```
 
+### 4.14a CpuClockingCounters
+
+**Current state:** Has `Reset()` that zeros cycle counters and VBlank state.
+
+**Change:** Implements `IRestartable` with `[Capability(typeof(IRestartable))]`.
+`Restart()` delegates to `Reset()` — the counter state is identical for warm
+and cold boot:
+
+```csharp
+[Capability(typeof(IRestartable))]
+public sealed class CpuClockingCounters : IRestartable
+{
+    public void Restart() => Reset();
+}
+```
+
+### 4.14b CardFactory + RestartCollection
+
+**Problem:** DI auto-discovers `IRestartable` on **prototype** card instances
+(registered at startup). But `CardFactory.GetCardWithId()` clones prototypes
+to create the **installed** instances — DI never sees those clones.
+
+**Solution:** `CardFactory` accepts `RestartCollection` and calls `Register()`
+for each factory-created card that implements `IRestartable`:
+
+```csharp
+public class CardFactory(
+    IEnumerable<ICard> cards,
+    IDiskImageStore diskImageStore,
+    RestartCollection restartCollection) : ICardFactory
+{
+    private ICard CreateCardInstance(ICard prototype)
+    {
+        var card = prototype switch
+        {
+            DiskIIControllerCard diskCard => diskCard.CreateWithStore(_diskImageStore),
+            _ => prototype.Clone()
+        };
+
+        if (card is IRestartable restartable)
+        {
+            _restartCollection.Register(restartable);
+        }
+
+        return card;
+    }
+}
+```
+
+This ensures factory-created cards participate in `RestartCollection.RestartAll()`
+without manual registration in `Program.cs`.
+
 ### 4.15 VA2MBus
 
 **Current state:** Has `Reset()` that calls `_addressSpace.Reset()` +
 `_cpu.Reset()` + `_clockCounters.Reset()`.
 
-**Change:** Add `Restart()`:
+**Change:** `Restart()` **only resets the CPU**. All other subsystems
+(AddressSpaceController, CpuClockingCounters) are independently restartable
+via `RestartCollection`. The bus uses `priority: 100` to ensure it runs after
+all default-priority components (especially SoftSwitches, which must set
+HighRead=false so ROM is active for the reset vector read):
 
 ```csharp
-public void Restart()
+[Capability(typeof(IRestartable), priority: 100)]
+public sealed class VA2MBus : IAppleIIBus, IDisposable
 {
-    ThrowIfDisposed();
-    _addressSpace.Restart();    // RAM + switches + cards + lang card
-    _cpu.Reset(this);           // CPU always uses same reset mechanism
-    _clockCounters.Reset();     // Zero counters (same as warm reset)
+    public void Restart()
+    {
+        ThrowIfDisposed();
+        _cpu.Reset(this);  // Load reset vector from ROM ($FFFC/$FFFD)
+    }
 }
 ```
 
-Note: The CPU doesn't need a separate `Restart()` — `_cpu.Reset()` loads the
-reset vector, which is the correct behavior for both warm and cold boot. The ROM
-initialization code handles the rest.
+The CPU is not an `IRestartable` participant — it is an external dependency
+that uses the same `Reset(bus)` call for both warm and cold boot. The bus must
+perform this step because the CPU needs a bus reference to read the reset
+vector.
 
 ### 4.16 VA2M
 
 **Current state:** Has `Reset()` that enqueues keyboard reset + `Bus.Reset()` +
 throttle/perf counter reset. Starts running immediately when `RunAsync` is called.
 
-**Change:** Add `Restart()`, `PowerOff()`, `PowerOn()`. Start powered-off.
-Publish power state via `IPowerStateMutator` (never polled by GUI):
+**Change:** Add `DoRestart()`, `PowerOff()`, `PowerOn()`. Start powered-off.
+Publish power state via `IPowerStateMutator` (never polled by GUI).
+
+`DoRestart()` delegates to `RestartCollection.RestartAll()`, which iterates
+all registered `IRestartable` components in priority order. VA2M itself
+implements `IRestartable.Restart()` as an explicit interface implementation
+that delegates to `DoRestart()` (needed because `IKeyboardSetter : IRestartable`
+propagates up through `IEmulatorCoreInterface`).
 
 ```csharp
-// Private flag — NOT polled by GUI. Read-only accessor for utility/debug use only.
-private volatile bool _isPoweredOn = false; // Starts OFF
+private readonly RestartCollection _restarters;
 
-/// <summary>
-/// Gets whether the emulator is in the powered-on state.
-/// </summary>
-/// <remarks>
-/// This is a read-only utility accessor for internal use and tests.
-/// The GUI must NOT poll this property — it subscribes to
-/// <see cref="IPowerStateProvider.Stream"/> for push-based notification.
-/// </remarks>
-internal bool IsPoweredOn => Volatile.Read(ref _isPoweredOn);
-
-private readonly IPowerStateMutator _powerState;
-
-public void Restart()
+public void DoRestart()
 {
     Enqueue(() =>
     {
-        _keyboardSetter.Restart();
-        _gameController.Restart();
-        Bus.Restart();
+        _restarters.RestartAll();  // Flat iteration, priority-ordered
 
-        // Reset throttle and performance state (same as Reset)
+        // Reset throttle and performance state (VA2M-internal, not IRestartable)
         _throttleCycles = 0;
         _throttleSw.Restart();
         _perfLastCycles = 0;
@@ -562,45 +686,47 @@ public void Restart()
     });
 }
 
+void IRestartable.Restart() => DoRestart();
+```
+
+`IEmulatorCoreInterface` exposes `DoRestart()` (not `Restart()` directly)
+to avoid ambiguity with the `IRestartable.Restart()` inherited through the
+interface chain.
+
+**PowerOff / PowerOn / Startup:**
+
+```csharp
+private volatile bool _isPoweredOn = false; // Starts OFF
+
+internal bool IsPoweredOn => Volatile.Read(ref _isPoweredOn);
+
 public void PowerOff()
 {
     _emuState.RequestPause();                // Reuse existing pause mechanism
-    Volatile.Write(ref _isPoweredOn, false); // Private flag
+    Volatile.Write(ref _isPoweredOn, false);
     _powerState.SetPoweredOn(false);         // Push notification → GUI reacts
 }
 
 public void PowerOn()
 {
-    Restart();                               // Full cold boot
-    Volatile.Write(ref _isPoweredOn, true);  // Private flag
+    DoRestart();                             // Full cold boot via RestartCollection
+    Volatile.Write(ref _isPoweredOn, true);
     _powerState.SetPoweredOn(true);          // Push notification → GUI reacts
     _emuState.RequestContinue();             // Resume via existing mechanism
 }
 ```
 
-**Startup sequence:** The emulator starts powered-off (`_isPoweredOn = false`).
-The `PowerStateProvider` is initialized with `false`. The GUI subscribes to
+The emulator starts powered-off (`_isPoweredOn = false`). The GUI subscribes to
 `IPowerStateProvider.Stream` during construction and immediately receives `false`
 via the `BehaviorSubject`. When the user (or `InitialStartup()`) calls
-`PowerOn()`, the provider publishes `true` and the GUI reacts — starts showing
-the display, enables status panels, etc.
-
-This solves a startup ordering problem: previously `RunAsync` started immediately
-in `MainWindow.InitialStartup()` before the GUI might be fully wired. Now the
-GUI is guaranteed to be subscribed before the first `PowerOn` message.
+`PowerOn()`, the provider publishes `true` and the GUI reacts.
 
 **No RunAsync/Clock gate changes needed.** PowerOff reuses the existing
-pause mechanism (`IEmulatorState.RequestPause()`), which already causes
-`RunAsync` to exit its execution loop. PowerOn reuses `RequestContinue()`.
+pause mechanism. PowerOn reuses `RequestContinue()`.
 
 **GUI receives push notifications** via `IPowerStateProvider.Stream`:
-- `false` → blank/dim the Apple II display, suppress motor indicators, show "Power Off"
+- `false` → blank/dim the Apple II display, suppress motor indicators
 - `true` → restore normal display, enable status panels
-
-The GUI never polls `IsPoweredOn`. The only exits from powered-off state are:
-1. `PowerOn()` — calls `Restart()` which clears all stale state
-2. New/Open project — calls `PowerOn()` after project setup
-3. Application exit — no state matters
 
 ### 4.17 PowerStateProvider (New Service)
 
@@ -694,20 +820,25 @@ _powerState.Stream
 
 ### 4.18 IEmulatorCoreInterface
 
-**Change:** Add `Restart()`, `PowerOff()`, `PowerOn()` to the interface.
+**Change:** Add `DoRestart()`, `PowerOff()`, `PowerOn()` to the interface.
+`DoRestart()` is used instead of `Restart()` because the interface inherits
+`IRestartable.Restart()` through `IKeyboardSetter`, and the two have different
+semantics (`DoRestart` enqueues a full `RestartCollection.RestartAll()` batch;
+`IRestartable.Restart()` is the per-component callback).
 Remove `IsPoweredOn` property — the GUI subscribes to `IPowerStateProvider`
 instead of reading from the core interface:
 
 ```csharp
-public interface IEmulatorCoreInterface
+public interface IEmulatorCoreInterface : IKeyboardSetter
 {
     // ... existing members ...
 
     /// <summary>
-    /// Cold boot: clears all RAM, resets soft switches, cold-inits cards,
-    /// and loads the CPU reset vector. Equivalent to a power cycle.
+    /// Cold boot: iterates RestartCollection in priority order, clearing all
+    /// RAM, resetting soft switches, cold-initing cards, and loading the CPU
+    /// reset vector. Equivalent to a power cycle.
     /// </summary>
-    void Restart();
+    void DoRestart();
 
     /// <summary>
     /// Pauses emulation and publishes PoweredOff via IPowerStateProvider.
@@ -716,7 +847,7 @@ public interface IEmulatorCoreInterface
     void PowerOff();
 
     /// <summary>
-    /// Triggers Restart(), publishes PoweredOn via IPowerStateProvider,
+    /// Triggers DoRestart(), publishes PoweredOn via IPowerStateProvider,
     /// then resumes emulation. Reuses existing continue mechanism.
     /// </summary>
     void PowerOn();
@@ -741,8 +872,8 @@ Existing interfaces that now extend `IRestartable`:
 |-----------|-------|
 | `ICard` | `ICard : IConfigurable, IRestartable` — card-specific cold init |
 | `ISlots` | `ISlots : IPandowdyMemory, IConfigurable, IRestartable` — iterates cards |
-| `ISystemIoHandler` | `ISystemIoHandler : IRestartable` — delegates to SoftSwitches |
-| `IAppleIIBus` | `IAppleIIBus : IRestartable` — flows to AddressSpace + CPU + counters |
+| `ISystemIoHandler` | `ISystemIoHandler : IRestartable` — no-op (SoftSwitches is independent) |
+| `IAppleIIBus` | `IAppleIIBus : IRestartable` — CPU reset only (priority 100) |
 | `IDiskIIDrive` | `IDiskIIDrive : IRestartable` — mechanical state reset (track 0, phases) |
 | `ISystemRamSelector` | Extends `IRestartable` — clears both 48K banks |
 | `ILanguageCard` | Extends `IRestartable` — clears both 16K banks |
@@ -754,35 +885,37 @@ Other existing interface changes (not via `IRestartable`):
 | Interface | New Method | Notes |
 |-----------|-----------|-------|
 | `ISystemRam` | `Clear()` | Zero the backing array (leaf operation, not `IRestartable`) |
-| `IEmulatorCoreInterface` | `Restart()`, `PowerOff()`, `PowerOn()` | Top-level API (not `IRestartable` — different contract) |
+| `IEmulatorCoreInterface` | `DoRestart()`, `PowerOff()`, `PowerOn()` | Top-level API (`DoRestart` not `Restart` due to interface chain) |
 
 Classes that implement `IRestartable` directly (no interface indirection):
 
-| Class | Notes |
-|-------|-------|
-| `AddressSpaceController` | `IRestartable` on class — not exposed via a restartable interface |
+| Class | Priority | Notes |
+|-------|----------|-------|
+| `AddressSpaceController` | 0 | No-op — children independently restartable |
+| `SoftSwitches` | 0 | First-class participant; delegates to `ResetAllSwitches()` |
+| `CpuClockingCounters` | 0 | Zeros cycle counters + VBlank state |
 
 Classes that implement `IRestartable` through their interface:
 
-| Class | Notes |
-|-------|-------|
-| `MemoryBlock` | Implements `ISystemRam.Clear()` (leaf — no `IRestartable`) |
-| `SystemRamSelector` | Via `ISystemRamSelector : IRestartable` |
-| `LanguageCard` | Via `ILanguageCard : IRestartable` |
-| `SystemIoHandler` | Via `ISystemIoHandler : IRestartable` |
-| `NoSlotClockIoHandler` | Via `ISystemIoHandler : IRestartable` — same as `Reset()`; `_timeOffsetTicks` preserved (battery-backed) |
-| `Slots` | Via `ISlots : IRestartable` |
-| `NullCard` | Via `ICard : IRestartable` — no-op |
-| `DiskIIControllerCard` (both variants) | Via `ICard : IRestartable` — full cold init |
-| `DiskIIDrive` | Via `IDiskIIDrive : IRestartable` — resets track 0, phase magnets |
-| `NullDiskIIDrive` | Via `IDiskIIDrive : IRestartable` — no-op |
-| `DiskIIStatusDecorator` | Via `IDiskIIDrive : IRestartable` — delegates + `SyncStatus()` |
-| `DiskIIDebugDecorator` | Via `IDiskIIDrive : IRestartable` — transparent delegation |
-| `QueuedKeyHandler` | Via `IKeyboardSetter : IRestartable` |
-| `SimpleGameController` | Via `IGameControllerStatus : IRestartable` |
-| `VA2MBus` | Via `IAppleIIBus : IRestartable` |
-| `VA2M` | `Restart()` + `PowerOff()` + `PowerOn()` (publishes via `IPowerStateMutator`) |
-| `PowerStateProvider` | Implements `IPowerStateMutator` (NEW class) |
+| Class | Priority | Notes |
+|-------|----------|-------|
+| `MemoryBlock` | — | Implements `ISystemRam.Clear()` (leaf — no `IRestartable`) |
+| `SystemRamSelector` | 0 | Via `ISystemRamSelector : IRestartable` |
+| `LanguageCard` | 0 | Via `ILanguageCard : IRestartable` |
+| `SystemIoHandler` | 0 | Via `ISystemIoHandler : IRestartable` — no-op |
+| `NoSlotClockIoHandler` | 0 | Via `ISystemIoHandler : IRestartable` — same as `Reset()`; `_timeOffsetTicks` preserved |
+| `Slots` | 0 | Via `ISlots : IRestartable` |
+| `NullCard` | — | Via `ICard : IRestartable` — no-op (factory-registered) |
+| `DiskIIControllerCard` (both) | — | Via `ICard : IRestartable` — full cold init (factory-registered) |
+| `DiskIIDrive` | — | Via `IDiskIIDrive : IRestartable` — resets track 0, phase magnets |
+| `NullDiskIIDrive` | — | Via `IDiskIIDrive : IRestartable` — no-op |
+| `DiskIIStatusDecorator` | — | Via `IDiskIIDrive : IRestartable` — delegates + `SyncStatus()` |
+| `DiskIIDebugDecorator` | — | Via `IDiskIIDrive : IRestartable` — transparent delegation |
+| `QueuedKeyHandler` | 0 | Via `IKeyboardSetter : IRestartable` |
+| `SimpleGameController` | 0 | Via `IGameControllerStatus : IRestartable` |
+| `VA2MBus` | **100** | Via `IAppleIIBus : IRestartable` — CPU reset only, runs last |
+| `VA2M` | — | `DoRestart()` + `PowerOff()` + `PowerOn()` (orchestrator, not in collection) |
+| `PowerStateProvider` | — | Implements `IPowerStateMutator` (NEW class) |
 
 ---
 
@@ -892,65 +1025,79 @@ project switching to work correctly.**
 
 ## 8. Implementation Order
 
-### Phase 1: Foundation + Leaf Subsystems (no dependencies)
+### Phase 1: Foundation (✅ Complete)
 
 1. `IRestartable` interface (`Pandowdy.EmuCore/Interfaces/IRestartable.cs`)
-2. `ISystemRam.Clear()` + `MemoryBlock.Clear()`
-3. `IKeyboardSetter : IRestartable` + `QueuedKeyHandler.Restart()`
-4. `IGameControllerStatus : IRestartable` + `SimpleGameController.Restart()`
+2. `CapabilityAttribute` with `priority` parameter
+3. `RestartCollection` with priority-ordered `RestartAll()`
+4. `CapabilityAwareServiceCollection` auto-discovery of `[Capability]` attributes
+5. `ISystemRam.Clear()` + `MemoryBlock.Clear()`
 
-### Phase 2: Memory Subsystems
+### Phase 2: Leaf Subsystems (✅ Complete)
 
-5. `ISystemRamSelector : IRestartable` + `SystemRamSelector.Restart()`  
-6. `ILanguageCard : IRestartable` + `LanguageCard.Restart()`
+6. `IKeyboardSetter : IRestartable` + `QueuedKeyHandler.Restart()` + `SingularKeyHandler.Restart()`
+7. `IGameControllerStatus : IRestartable` + `SimpleGameController.Restart()`
+8. `SoftSwitches : IRestartable` with `[Capability(typeof(IRestartable))]`
+9. `CpuClockingCounters : IRestartable` with `[Capability(typeof(IRestartable))]`
 
-### Phase 3: I/O and Cards
+### Phase 3: Memory Subsystems (✅ Complete)
 
-7. `ISystemIoHandler : IRestartable` + `SystemIoHandler.Restart()`
-8. `NoSlotClockIoHandler.Restart()` (same as `Reset()`; `_timeOffsetTicks` preserved)
-9. `ICard : IRestartable` + `NullCard.Restart()`
-10. `IDiskIIDrive : IRestartable` + `DiskIIDrive.Restart()` + `NullDiskIIDrive.Restart()`
-11. `DiskIIStatusDecorator.Restart()` (delegate + `SyncStatus()`)
-12. `DiskIIDebugDecorator.Restart()` (transparent delegation)
-13. `DiskIIControllerCard.Restart()` (both 13-sector and 16-sector)
-14. `ISlots : IRestartable` + `Slots.Restart()`
+10. `ISystemRamSelector : IRestartable` + `SystemRamSelector.Restart()` with `[Capability]`
+11. `ILanguageCard : IRestartable` + `LanguageCard.Restart()` with `[Capability]`
 
-### Phase 4: Bus and Controller
+### Phase 4: I/O, Cards, and Factory (✅ Complete)
 
-15. `AddressSpaceController : IRestartable`
-16. `IAppleIIBus : IRestartable` + `VA2MBus.Restart()`
+12. `ISystemIoHandler : IRestartable` + `SystemIoHandler.Restart()` (no-op) with `[Capability]`
+13. `NoSlotClockIoHandler.Restart()` (same as `Reset()`; `_timeOffsetTicks` preserved)
+14. `ICard : IRestartable` + `NullCard.Restart()`
+15. `IDiskIIDrive : IRestartable` + `DiskIIDrive.Restart()` + `NullDiskIIDrive.Restart()`
+16. `DiskIIStatusDecorator.Restart()` + `DiskIIDebugDecorator.Restart()`
+17. `DiskIIControllerCard.Restart()` (both 13-sector and 16-sector)
+18. `ISlots : IRestartable` + `Slots.Restart()` with `[Capability]`
+19. `CardFactory` accepts `RestartCollection`, registers factory-created cards
 
-### Phase 5: Power State Service + Top Level
+### Phase 5: Bus and Controller (✅ Complete)
 
-17. `IPowerStateProvider` + `IPowerStateMutator` + `PowerStateProvider` (NEW)
-18. DI registration for `PowerStateProvider` (split read/write interfaces)
-19. `VA2M.Restart()` + `PowerOff()` + `PowerOn()` (publishes via `IPowerStateMutator`)
-20. `VA2M._isPoweredOn` starts as `false` (machine OFF at construction)
-21. `IEmulatorCoreInterface` additions (`Restart`, `PowerOff`, `PowerOn`)
+20. `AddressSpaceController : IRestartable` with `[Capability]` (no-op)
+21. `IAppleIIBus : IRestartable` + `VA2MBus.Restart()` with `[Capability(priority: 100)]`
 
-### Phase 6: DI Wiring Fix
+### Phase 6: Top Level (✅ Complete)
 
-22. `DiskImageStoreFacade` + DI registration change
+22. `VA2M.DoRestart()` using `RestartCollection.RestartAll()`
+23. `IEmulatorCoreInterface.DoRestart()`
+24. `RestartCollection` DI registration in `Program.cs`
 
-### Phase 7: Integration
+### Phase 7: Power State Service (TODO)
 
-23. Update `MainWindow.InitialStartup()`: subscribe to `IPowerStateProvider.Stream`, then call `PowerOn()` instead of `Reset()` + `OnEmuStartClicked()`
-24. Update `CloseProjectInternalAsync()` to call `PowerOff()`
-25. Update `OpenProjectAsync()` / `NewProjectAsync()` to call `PowerOn()`
-26. Update `OnClosingAsync()` exit path
-27. GUI cosmetic handling: subscribe `Apple2Display` / `MainWindowViewModel` to `IPowerStateProvider.Stream`
+25. `IPowerStateProvider` + `IPowerStateMutator` + `PowerStateProvider` (NEW)
+26. DI registration for `PowerStateProvider` (split read/write interfaces)
+27. `VA2M.PowerOff()` + `PowerOn()` (publishes via `IPowerStateMutator`)
+28. `VA2M._isPoweredOn` starts as `false` (machine OFF at construction)
+29. `IEmulatorCoreInterface` additions (`PowerOff`, `PowerOn`)
 
-### Phase 8: Testing
+### Phase 8: DI Wiring Fix (TODO)
 
-Each phase should include unit tests:
+30. `DiskImageStoreFacade` + DI registration change
 
-- Phase 1: Verify `IRestartable` contract, `Clear()` zeros memory, `Restart()` clears keyboard/buttons
-- Phase 2: Verify `Restart()` zeros both banks (48K + 48K, 16K + 16K)
-- Phase 3: Verify soft switches at power-on defaults, card cold init
-- Phase 4: Verify full bus restart clears everything
-- Phase 5: Verify `PowerStateProvider` publishes correctly, `PowerOff` pauses + publishes `false`, `PowerOn` triggers `Restart` + publishes `true` + continues
-- Phase 6: Verify facade delegates to current project
-- Phase 7: Integration tests for startup sequence (machine starts off, `PowerOn` triggers first `true`), project switching (off → swap → on)
+### Phase 9: Integration (TODO)
+
+31. Update `MainWindow.InitialStartup()`: subscribe to `IPowerStateProvider.Stream`, then call `PowerOn()` instead of `Reset()` + `OnEmuStartClicked()`
+32. Update `CloseProjectInternalAsync()` to call `PowerOff()`
+33. Update `OpenProjectAsync()` / `NewProjectAsync()` to call `PowerOn()`
+34. Update `OnClosingAsync()` exit path
+35. GUI cosmetic handling: subscribe `Apple2Display` / `MainWindowViewModel` to `IPowerStateProvider.Stream`
+
+### Phase 10: Testing (✅ RestartCollection tests complete; others per-phase)
+
+- `RestartCollectionTests` — 21 tests covering priority ordering, registration,
+  unregistration, production component priorities (VA2MBus > SoftSwitches)
+- Phase 2–6 tests: Verify `IRestartable` contract, `Clear()` zeros memory,
+  `Restart()` clears keyboard/buttons, zeros both banks, soft switches at
+  power-on defaults, card cold init, bus restart order
+- Phase 7: Verify `PowerStateProvider` publishes correctly, `PowerOff` pauses +
+  publishes `false`, `PowerOn` triggers `DoRestart` + publishes `true` + continues
+- Phase 8: Verify facade delegates to current project
+- Phase 9: Integration tests for startup sequence, project switching
 
 ---
 

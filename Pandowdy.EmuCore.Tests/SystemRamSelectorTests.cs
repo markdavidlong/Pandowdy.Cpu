@@ -56,6 +56,8 @@ public class SystemRamSelectorTests
         }
 
         public byte FillPattern => _fillPattern;
+
+        public void Clear() => Array.Clear(_memory);
     }
 
     /// <summary>

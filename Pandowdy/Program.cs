@@ -211,7 +211,7 @@ namespace Pandowdy
             services.AddTransient<PeripheralsMenuViewModel>();
             services.AddTransient<MainWindowViewModel>();
 
-            services.AddSingleton<ResetCollection>();
+            services.AddSingleton<RestartCollection>();
 
             services.AddSingleton<VA2M>();
 
@@ -235,8 +235,15 @@ namespace Pandowdy
             await projectManager.CreateAdHocAsync();
             System.Diagnostics.Debug.WriteLine("[Program] Created ad hoc in-memory project");
 
+            // Wire RestartCollection into Slots for automatic card registration.
+            // Done here (not in DI) to avoid circular dependency:
+            // RestartCollection → IRestartable singletons → VA2MBus → AddressSpaceController → ISlots → RestartCollection
+            var slots = (Slots)services.GetRequiredService<ISlots>();
+            var restartCollection = services.GetRequiredService<RestartCollection>();
+            slots.SetRestartCollection(restartCollection);
+
             // Install Disk II controller in slot 6 (standard Apple II configuration)
-            var slots = services.GetRequiredService<ISlots>();
+            // Cards implementing IRestartable are automatically registered in RestartCollection
             slots.InstallCard(10, SlotNumber.Slot6); // 10 = DiskIIControllerCard16Sector
             slots.InstallCard(10, SlotNumber.Slot5); // 10 = DiskIIControllerCard16Sector
 

@@ -31,7 +31,14 @@ internal class CapabilityAwareServiceCollection(IServiceCollection inner) : ISer
 
         foreach (var cap in implType.GetCustomAttributes<CapabilityAttribute>())
         {
-            _inner.Add(ServiceDescriptor.Describe(cap.InterfaceType, implType, descriptor.Lifetime));
+            // Forward to the existing registration so DI resolves the SAME singleton
+            // instance, not a duplicate. Without this, each capability registration
+            // would create a separate singleton with its own dependency graph.
+            var serviceType = descriptor.ServiceType;
+            _inner.Add(new ServiceDescriptor(
+                cap.InterfaceType,
+                sp => sp.GetRequiredService(serviceType),
+                descriptor.Lifetime));
         }
     }
 

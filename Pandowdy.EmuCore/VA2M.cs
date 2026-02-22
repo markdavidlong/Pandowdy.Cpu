@@ -1077,20 +1077,10 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <strong>Full System Reset (Power Cycle):</strong> This method performs a complete
-    /// hardware reset equivalent to powering off and on the Apple IIe.
-    /// </para>
-    /// <para>
-    /// <strong>Operations Performed:</strong>
-    /// <list type="bullet">
-    /// <item>Clear keyboard latch and pending keystrokes</item>
-    /// <item>Reset CPU registers (PC loaded from $FFFC/$FFFD, SP = $FF)</item>
-    /// <item>Reset all soft switches to power-on state</item>
-    /// <item>Reset memory bank mappings</item>
-    /// <item>Reset cycle counter to zero</item>
-    /// <item>Restart throttle stopwatch</item>
-    /// <item>Reset performance measurement counters</item>
-    /// </list>
+    /// <strong>Warm Reset (Ctrl+Reset):</strong> Enqueues a warm reset via
+    /// <see cref="InternalReset"/> on the emulator thread. This clears the keyboard,
+    /// resets the CPU (loading the reset vector), and resets throttle/performance state
+    /// — but does <strong>not</strong> clear RAM, soft switches, or card state.
     /// </para>
     /// <para>
     /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread.
@@ -1102,31 +1092,101 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     {
         Enqueue(() =>
         {
-
-
-            // Reset keyboard state (clear pending keystrokes and strobe)
-            _keyboardSetter.ResetKeyboard();
-
-            Bus.Reset();
-            _throttleCycles = 0;
-            _throttleSw.Restart();
-
-            // Reset performance tracking
-            _perfLastCycles = 0;
-            _perfLastReportTicks = _perfSw.ElapsedTicks;
-
-            // Reset adaptive throttling state
-            _throttleErrorAccumulator = 0;
-            _throttleLastError = 0;
-            _adaptiveSpinWaitIterations = 100;        
+            InternalReset();      
         });
     }
 
+    /// <summary>
+    /// Performs the core warm-reset sequence on the emulator thread.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Shared by DoReset and DoRestart:</strong> This private method contains the
+    /// warm-reset operations common to both <see cref="DoReset"/> (warm reset) and
+    /// <see cref="DoRestart"/> (cold boot). <c>DoRestart</c> calls <c>InternalReset()</c>
+    /// first, then follows with <see cref="RestartCollection.RestartAll"/> to clear RAM,
+    /// soft switches, and card state.
+    /// </para>
+    /// <para>
+    /// <strong>Overlap Note:</strong> Some operations performed here (e.g., keyboard reset)
+    /// are also performed by individual <see cref="IRestartable"/> components during
+    /// <c>RestartAll()</c>. This duplication is intentional and harmless — <c>InternalReset</c>
+    /// ensures the warm-reset baseline is established before the cold-boot pass runs.
+    /// </para>
+    /// <para>
+    /// <strong>Operations Performed:</strong>
+    /// <list type="bullet">
+    /// <item>Clear keyboard latch and pending keystrokes</item>
+    /// <item>Reset bus (CPU reset vector, address space, cycle counters)</item>
+    /// <item>Reset throttle cycle counter and stopwatch</item>
+    /// <item>Reset performance measurement counters</item>
+    /// <item>Reset adaptive throttling state (error accumulator, SpinWait iterations)</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Thread Context:</strong> Must be called on the emulator thread only
+    /// (always invoked inside an <see cref="Enqueue"/> action).
+    /// </para>
+    /// </remarks>
+    private void InternalReset()
+    {
+        // Reset keyboard state (clear pending keystrokes and strobe)
+        _keyboardSetter.ResetKeyboard();
+
+        Bus.Reset();
+        _throttleCycles = 0;
+        _throttleSw.Restart();
+
+        // Reset performance tracking
+        _perfLastCycles = 0;
+        _perfLastReportTicks = _perfSw.ElapsedTicks;
+
+        // Reset adaptive throttling state
+        _throttleErrorAccumulator = 0;
+        _throttleLastError = 0;
+        _adaptiveSpinWaitIterations = 100;
+    }
+
+    /// <summary>
+    /// Queues a full cold boot (power cycle) that restores every registered
+    /// <see cref="IRestartable"/> component to its initial power-on state.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Execution Sequence:</strong> First calls <see cref="InternalReset"/> to
+    /// establish the warm-reset baseline (keyboard clear, CPU reset vector, throttle state),
+    /// then calls <see cref="RestartCollection.RestartAll"/> to iterate all registered
+    /// <see cref="IRestartable"/> components in priority order — clearing RAM, resetting
+    /// soft switches to power-on defaults, cold-initializing cards, and finally resetting
+    /// the CPU (via <see cref="VA2MBus"/> at priority 100).
+    /// </para>
+    /// <para>
+    /// <strong>Overlap:</strong> Some operations in <c>InternalReset()</c> (e.g., keyboard
+    /// reset via <see cref="IKeyboardSetter.ResetKeyboard"/>) overlap with individual
+    /// <c>IRestartable.Restart()</c> implementations. This is intentional — the warm-reset
+    /// baseline is established first, then the cold-boot pass ensures all components reach
+    /// their power-on default state regardless of <c>InternalReset</c>'s coverage.
+    /// </para>
+    /// <para>
+    /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread.
+    /// The restart is enqueued for execution on the emulator thread at the next
+    /// instruction boundary, respecting 6502 atomic instruction guarantees.
+    /// </para>
+    /// <para>
+    /// <strong>Flat Collection:</strong> Unlike the hierarchical tree approach, all
+    /// restartable components are iterated by the <see cref="RestartCollection"/>.
+    /// Components tagged with <c>[Capability(typeof(IRestartable))]</c> are discovered
+    /// via DI; factory-generated cards are registered dynamically by <see cref="CardFactory"/>.
+    /// </para>
+    /// </remarks>
     public void DoRestart()
     {
-        // Perform full system reset (CPU, memory, soft switches, etc.) on anything
-        // implementing IResetable capability attribute `[Capability(typeof(IResetable))]`
-        _restarters.ResetAll();
+        Enqueue(() =>
+        {
+            InternalReset();  
+            _restarters.RestartAll();
+
+        });
     }
 
     /// <summary>
@@ -1414,6 +1474,13 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
         // Enqueue to run on emulator thread - delegates to keyboard handler
         Enqueue(() => _keyboardSetter.ResetKeyboard());
     }
+
+    /// <summary>
+    /// Explicit implementation of <see cref="IRestartable.Restart"/> inherited through
+    /// <see cref="IKeyboardSetter"/> → <see cref="IEmulatorCoreInterface"/>.
+    /// Delegates to <see cref="DoRestart"/> which iterates the <see cref="RestartCollection"/>.
+    /// </summary>
+    void IRestartable.Restart() => DoRestart();
 
     /// <summary>
     /// Sets the state of an Apple IIe pushbutton (game controller button).

@@ -68,7 +68,7 @@ public class MemoryInspectorTests
         public static void Reset() { }
     }
 
-    private class MockCard(int id, string name, byte romFill = 0x00, byte extRomFill = 0x00) : ICard
+    private class MockCard
     {
         private readonly byte _romFill = romFill;
         private readonly byte _extRomFill = extRomFill;

@@ -29,6 +29,7 @@ namespace Pandowdy.EmuCore;
 /// </para>
 /// </remarks>
 // Handles C000-C08F (System IO Area)
+[Capability(typeof(Interfaces.IRestartable))]
 public class SystemIoHandler : ISystemIoHandler
 {
     /// <summary>
@@ -145,6 +146,27 @@ public class SystemIoHandler : ISystemIoHandler
     public void Reset()
     {
         _softSwitches.ResetAllSwitches();
+    }
+
+    /// <summary>
+    /// Restores the system I/O handler to its initial power-on state (cold boot).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// SystemIoHandler is stateless beyond the soft switches it wraps. Soft switches are
+    /// independently restartable via <see cref="RestartCollection"/>, so this method is a
+    /// no-op. Keyboard and game controller are also independently restartable.
+    /// </para>
+    /// <para>
+    /// <strong>Note:</strong> <c>Reset()</c> still calls <see cref="SoftSwitches.ResetAllSwitches"/>
+    /// for warm-reset (Ctrl+Reset) which uses the tree-based call path. Cold boot uses the
+    /// flat <see cref="RestartCollection"/> path instead.
+    /// </para>
+    /// </remarks>
+    public void Restart()
+    {
+        // No-op: SoftSwitches is independently restartable via RestartCollection.
+        // SystemIoHandler has no additional state to clear.
     }
 
     /// <summary>

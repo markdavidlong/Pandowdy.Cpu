@@ -22,6 +22,7 @@ namespace Pandowdy.EmuCore.Services;
     /// is required if accessed from multiple threads (typically the emulator thread only).
     /// </para>
     /// </remarks>
+    [Capability(typeof(IRestartable))]
     public class SimpleGameController : IGameControllerStatus
     {
         /// <summary>
@@ -116,5 +117,16 @@ namespace Pandowdy.EmuCore.Services;
                     return _axes[paddle];
                 }
                 return 0;
+            }
+
+            /// <summary>
+            /// Restores the game controller to its initial power-on state (cold boot).
+            /// Releases all buttons and centers all paddles.
+            /// </summary>
+            public void Restart()
+            {
+                SetButton(0, false);
+                SetButton(1, false);
+                SetButton(2, false);
             }
         }

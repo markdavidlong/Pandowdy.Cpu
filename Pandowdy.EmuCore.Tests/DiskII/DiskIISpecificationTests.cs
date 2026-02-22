@@ -962,6 +962,12 @@ internal class MockDiskIIDrive(string name) : IDiskIIDrive
         MotorOn = false;
     }
 
+    public void Restart()
+    {
+        MotorOn = false;
+        QuarterTrack = 0;
+    }
+
     public void StepToHigherTrack()
     {
         if (QuarterTrack < DiskIIConstants.MaxQuarterTracks)

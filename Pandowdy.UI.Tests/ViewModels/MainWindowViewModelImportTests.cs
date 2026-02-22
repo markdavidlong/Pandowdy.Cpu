@@ -88,6 +88,8 @@ public class MainWindowViewModelImportTests
         public void EnqueueKey(byte key) { }
         public void ResetKeyboard() { }
         public void DoReset() { }
+        public void DoRestart() { }
+        public void Restart() { }
     }
 
     /// <summary>

@@ -36,6 +36,12 @@ namespace Pandowdy.EmuCore.Services;
 /// have shorter or different lifetimes than the factory itself (e.g., IDiskImageStore tied to
 /// the current project).
 /// </para>
+/// <para>
+/// <strong>Restart Lifecycle:</strong> Factory-created cards participate in cold boot via
+/// <see cref="Slots.Restart"/>, which iterates all installed cards and calls
+/// <see cref="Interfaces.IRestartable.Restart"/>. Cards do not need to be registered
+/// individually in <see cref="DataTypes.RestartCollection"/>.
+/// </para>
 /// </remarks>
 public class CardFactory(IEnumerable<ICard> cards, IDiskImageStore diskImageStore) : ICardFactory
 {

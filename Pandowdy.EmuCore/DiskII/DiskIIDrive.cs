@@ -157,6 +157,18 @@ public class DiskIIDrive : IDiskIIDrive
         _hitMaxLogged = false;
     }
 
+    /// <summary>
+    /// Restores the drive to its initial power-on state (cold boot).
+    /// Head returns to track 0, phase magnets cleared. Disk media stays inserted.
+    /// </summary>
+    public void Restart()
+    {
+        _quarterSteps = 0;
+        _hitMinLogged = false;
+        _hitMaxLogged = false;
+        _imageProvider?.SetQuarterTrack(_quarterSteps);
+    }
+
     /// <inheritdoc />
     public double Track => _quarterSteps / 4.0;
 

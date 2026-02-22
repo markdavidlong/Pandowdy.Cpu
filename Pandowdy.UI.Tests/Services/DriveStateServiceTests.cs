@@ -97,6 +97,7 @@ public class DriveStateServiceTests : IDisposable
         }
 
         public void Reset() { }
+        public void Restart() { }
         public void EjectDisk() => InsertedDiskPath = null;
         public void StepToHigherTrack() { }
         public void StepToLowerTrack() { }

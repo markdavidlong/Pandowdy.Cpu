@@ -36,7 +36,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// keyboard emulation: input injection (setter) and Apple IIe-style reading (reader).
 /// </para>
 /// </remarks>
-public interface IKeyboardSetter
+public interface IKeyboardSetter : IRestartable
 {
     /// <summary>
     /// Enqueues a raw key value with strobe bit automatically set.

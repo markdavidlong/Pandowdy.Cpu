@@ -54,6 +54,7 @@ namespace Pandowdy.EmuCore;
 /// The <see cref="ISystemStatusProvider"/> should handle any necessary synchronization.
 /// </para>
 /// </remarks>
+[Capability(typeof(IRestartable))]
 public class LanguageCard(
     ISystemRam mainRam,
     ISystemRam? auxRam,
@@ -89,6 +90,20 @@ public class LanguageCard(
     /// address space ($D000-$FFFF).
     /// </remarks>
     public int Size => 0x3000; // 12KB addressable space
+
+    /// <summary>
+    /// Restores the Language Card RAM to its initial power-on state by clearing both banks.
+    /// </summary>
+    /// <remarks>
+    /// Clears main 16KB and auxiliary 16KB Language Card RAM to zero. Banking state
+    /// (HighRead, HighWrite, Bank1, PreWrite) is reset by <see cref="SoftSwitches.ResetAllSwitches"/>
+    /// which sets all switches to false — HighRead=false means ROM is active (correct power-on default).
+    /// </remarks>
+    public void Restart()
+    {
+        _mainRam.Clear();
+        _auxRam?.Clear();
+    }
 
     /// <summary>
     /// Maps a Language Card address ($D000-$FFFF) to the physical RAM address (0x0000-0x3FFF).

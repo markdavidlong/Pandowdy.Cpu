@@ -44,6 +44,7 @@ namespace Pandowdy.EmuCore;
 /// Proper disposal ensures clean shutdown.
 /// </para>
 /// </remarks>
+[Capability(typeof(Interfaces.IRestartable), priority: 100)]
 public sealed class VA2MBus : IAppleIIBus, IDisposable
 {
     /// <summary>
@@ -271,6 +272,29 @@ public sealed class VA2MBus : IAppleIIBus, IDisposable
         _addressSpace.Reset();
         _cpu!.Reset(this);
         _clockCounters.Reset();
+    }
+
+    /// <summary>
+    /// Restores the bus to its initial power-on state (cold boot).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Resets the CPU by loading the reset vector ($FFFC/$FFFD). The CPU is not an
+    /// <see cref="IRestartable"/> participant — it is an external dependency that uses
+    /// the same <c>Reset(bus)</c> call for both warm and cold boot. The bus must perform
+    /// this step because the CPU needs a bus reference to read the reset vector, and this
+    /// read is order-dependent (soft switches must already be at power-on defaults so that
+    /// ROM is active for the vector read).
+    /// </para>
+    /// <para>
+    /// All other subsystems (AddressSpaceController, CpuClockingCounters, etc.) are
+    /// independently restartable via <see cref="DataTypes.RestartCollection"/>.
+    /// </para>
+    /// </remarks>
+    public void Restart()
+    {
+        ThrowIfDisposed();
+        _cpu.Reset(this);
     }
 
 

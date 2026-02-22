@@ -135,6 +135,15 @@ public class DiskIIStatusDecorator : IDiskIIDrive
         SyncStatus();
     }
 
+    /// <summary>
+    /// Restores the drive to its initial power-on state and synchronizes status.
+    /// </summary>
+    public void Restart()
+    {
+        _innerDrive.Restart();
+        SyncStatus();
+    }
+
     /// <inheritdoc />
     public void StepToHigherTrack()
     {

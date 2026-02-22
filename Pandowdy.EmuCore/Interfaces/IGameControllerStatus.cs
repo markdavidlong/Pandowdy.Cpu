@@ -18,7 +18,7 @@ namespace Pandowdy.EmuCore.Interfaces
     /// actually change to avoid unnecessary I/O handler updates and event spam.
     /// </para>
     /// </remarks>
-    public interface IGameControllerStatus
+    public interface IGameControllerStatus : IRestartable
     {
         /// <summary>
         /// Event raised when a button state changes.

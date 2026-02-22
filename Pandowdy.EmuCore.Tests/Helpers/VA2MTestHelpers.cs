@@ -144,7 +144,8 @@ public static class VA2MTestHelpers
                 _diskStatusProvider!,
                 _clockCounters!,
                 _memoryInspector!,
-                _slots!
+                _slots!,
+                new RestartCollection([])
             );
         }
     }
@@ -310,6 +311,8 @@ public class TestAppleIIBus : IAppleIIBus
     public bool GetPushButton(int num) => num >= 0 && num < 3 && _pushButtons[num];
     public int ResetCount => _resetCount;
     public int UserResetCount => _userResetCount;
+
+    public void Restart() => Reset();
 }
 
 /// <summary>

@@ -62,11 +62,9 @@ public class AddressSpaceControllerTests
                 _memory[offset] = value;
             }
         }
-    }
 
-    /// <summary>
-    /// Mock implementation of ISlots for testing routing.
-    /// </summary>
+        public void Restart() { /* No-op */ }
+    }
     private class MockSlots : ISlots
     {
         public ushort LastReadAddress { get; private set; }

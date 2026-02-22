@@ -78,6 +78,13 @@ public class DiskIIDebugDecorator : IDiskIIDrive
     }
 
     /// <inheritdoc />
+    public void Restart()
+    {
+        Debug.WriteLine($"IDiskIIDrive ({Name}): Restart()");
+        _inner.Restart();
+    }
+
+    /// <inheritdoc />
     public void StepToHigherTrack()
     {
         Debug.WriteLine($"IDiskIIDrive ({Name}) StepToHigherTrack()");

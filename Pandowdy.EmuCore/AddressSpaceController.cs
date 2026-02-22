@@ -70,7 +70,8 @@ MemoryAccessEventArgs : EventArgs
 /// the emulator worker thread. Cross-thread access should be coordinated by the bus (VA2MBus).
 /// </para>
 /// </remarks>
-public sealed class AddressSpaceController : IPandowdyMemory, IMemoryAccessNotifier, IDirectMemoryPoolReader, IDisposable
+[Capability(typeof(IRestartable))]
+public sealed class AddressSpaceController : IPandowdyMemory, IMemoryAccessNotifier, IDirectMemoryPoolReader, IDisposable, IRestartable
 {
     /// <summary>
     /// Gets the size of the addressable memory space (always 64KB for 6502).
@@ -264,6 +265,19 @@ public sealed class AddressSpaceController : IPandowdyMemory, IMemoryAccessNotif
     {
         _slots.Reset();
         _io.Reset();
+    }
+
+    /// <summary>
+    /// Restores the address space controller to its initial power-on state (cold boot).
+    /// </summary>
+    /// <remarks>
+    /// No-op: all subsystems (SystemRamSelector, SoftSwitches, Slots, LanguageCard) are
+    /// independently restartable via <see cref="RestartCollection"/>. AddressSpaceController
+    /// is stateless beyond references to its children.
+    /// </remarks>
+    public void Restart()
+    {
+        // No-op: children are independently restartable via RestartCollection.
     }
 
     /// <summary>

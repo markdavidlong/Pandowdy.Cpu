@@ -53,6 +53,19 @@ public class Slots : ISlots
     private ISystemStatusMutator _status;
 
     /// <summary>
+    /// Optional restart collection for registering cards that implement <see cref="IRestartable"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Set via <see cref="SetRestartCollection"/> after DI construction to avoid a circular
+    /// dependency (RestartCollection → IRestartable singletons → VA2MBus → AddressSpaceController
+    /// → ISlots → RestartCollection). When set, cards that implement <see cref="IRestartable"/>
+    /// are automatically registered on install and unregistered on remove.
+    /// </para>
+    /// </remarks>
+    private DataTypes.RestartCollection? _restartCollection;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="Slots"/> class with all slots empty.
     /// </summary>
     /// <param name="factory">The card factory for creating card instances.</param>
@@ -126,6 +139,23 @@ public class Slots : ISlots
     /// </remarks>
     public int Size { get => 0x1000; }
 
+    /// <summary>
+    /// Sets the <see cref="DataTypes.RestartCollection"/> for automatic card registration.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Called after DI construction (in <c>InitializeCoreAsync</c>) to avoid a circular
+    /// dependency. Once set, <see cref="InstallCard(int, SlotNumber)"/> and
+    /// <see cref="RemoveCard"/> automatically register/unregister cards that implement
+    /// <see cref="IRestartable"/>.
+    /// </para>
+    /// </remarks>
+    public void SetRestartCollection(DataTypes.RestartCollection restartCollection)
+    {
+        ArgumentNullException.ThrowIfNull(restartCollection);
+        _restartCollection = restartCollection;
+    }
+
  
     /// <inheritdoc/>
     public void InstallCard(int id, SlotNumber slot)
@@ -134,9 +164,11 @@ public class Slots : ISlots
         {
             throw new ArgumentException("Slot must be in the range Slot1-Slot7");
         }
+        UnregisterRestartable(slot);
         var card = _factory.GetCardWithId(id) ?? throw new InvalidOperationException($"Could not create a card with id {id} for slot {((int) slot)}");
         card.OnInstalled(slot);
         _cards[(int) slot] = card;
+        RegisterRestartable(card);
     }
     
     /// <inheritdoc/>
@@ -146,9 +178,11 @@ public class Slots : ISlots
         {
             throw new ArgumentException("Slot must be in the range Slot1-Slot7");
         }
+        UnregisterRestartable(slot);
         var card = _factory.GetCardWithName(name) ?? throw new InvalidOperationException($"Could not create a card with name {name} for slot {((int) slot)}");
         card.OnInstalled(slot);
         _cards[(int) slot] = card;
+        RegisterRestartable(card);
     }
 
     private void InstallExistingCard(ICard card, SlotNumber slot)
@@ -165,6 +199,7 @@ public class Slots : ISlots
     /// <inheritdoc/>
     public void RemoveCard(SlotNumber slot)
     {
+        UnregisterRestartable(slot);
         _cards[(int) slot] = _factory.GetNullCard() ?? throw new InvalidOperationException($"Could not create a Null Card while removing a card in slot {((int) slot)}");
     }
 
@@ -620,6 +655,31 @@ public class Slots : ISlots
         foreach (var card in _cards)
         {
             card.Reset();
+        }
+    }
+
+    /// <summary>
+    /// Registers a card in the <see cref="DataTypes.RestartCollection"/> if it implements
+    /// <see cref="IRestartable"/>.
+    /// </summary>
+    private void RegisterRestartable(ICard card)
+    {
+        if (_restartCollection != null && card is IRestartable restartable)
+        {
+            _restartCollection.Register(restartable);
+        }
+    }
+
+    /// <summary>
+    /// Unregisters the card currently in <paramref name="slot"/> from the
+    /// <see cref="DataTypes.RestartCollection"/> if it implements <see cref="IRestartable"/>.
+    /// </summary>
+    private void UnregisterRestartable(SlotNumber slot)
+    {
+        var existing = _cards[(int)slot];
+        if (_restartCollection != null && existing is IRestartable restartable)
+        {
+            _restartCollection.Unregister(restartable);
         }
     }
 

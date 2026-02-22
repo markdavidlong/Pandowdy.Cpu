@@ -25,7 +25,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// The <see cref="Track"/> property returns the fractional track (e.g., 17.25 for quarter-track 69).
 /// </para>
 /// </remarks>
-public interface IDiskIIDrive  
+public interface IDiskIIDrive : IRestartable
 {
     /// <summary>
     /// Gets the drive identification name for debugging and logging.

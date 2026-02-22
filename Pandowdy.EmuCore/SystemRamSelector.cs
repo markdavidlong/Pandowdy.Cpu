@@ -59,6 +59,7 @@ namespace Pandowdy.EmuCore;
 /// emulator thread. The <see cref="ISystemStatusProvider"/> provides the necessary soft switch state.
 /// </para>
 /// </remarks>
+[Capability(typeof(IRestartable))]
 public class SystemRamSelector(
     ISystemRam mainRam,
     ISystemRam? auxRam,
@@ -133,6 +134,19 @@ public class SystemRamSelector(
     /// the Language Card and system I/O handlers.
     /// </remarks>
     public int Size => RequiredRamSize; // 48kb addressable space
+
+    /// <summary>
+    /// Restores system RAM to its initial power-on state by clearing both banks.
+    /// </summary>
+    /// <remarks>
+    /// Clears main 48KB and auxiliary 48KB to zero. Soft switch state is not reset here —
+    /// <see cref="SystemIoHandler"/> handles that via <see cref="SoftSwitches.ResetAllSwitches"/>.
+    /// </remarks>
+    public void Restart()
+    {
+        _mainRam.Clear();
+        _auxRam?.Clear();
+    }
 
 
     /// <summary>

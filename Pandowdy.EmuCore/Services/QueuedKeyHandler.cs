@@ -61,6 +61,7 @@ namespace Pandowdy.EmuCore.Services;
 /// // Keys automatically feed to emulator at 50ms intervals after each ClearStrobe()
 /// </code>
 /// </example>
+[Capability(typeof(IRestartable))]
 public sealed class QueuedKeyHandler : IKeyboardReader, IKeyboardSetter, IDisposable
 {
     /// <summary>
@@ -433,6 +434,15 @@ public sealed class QueuedKeyHandler : IKeyboardReader, IKeyboardSetter, IDispos
                 _currentKey &= 0x7F;
             }
         }
+
+        /// <summary>
+        /// Restores the keyboard handler to its initial power-on state (cold boot).
+        /// </summary>
+        /// <remarks>
+        /// Delegates to <see cref="ResetKeyboard"/> — for the keyboard subsystem,
+        /// warm reset and cold boot are equivalent (clear latch, drain queue, cancel timer).
+        /// </remarks>
+        public void Restart() => ResetKeyboard();
 
         /// <summary>
         /// Disposes the QueuedKeyHandler, stopping timer and releasing resources.

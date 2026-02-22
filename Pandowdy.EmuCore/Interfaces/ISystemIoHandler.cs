@@ -35,7 +35,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// </remarks>
 /// <seealso cref="ISlots"/>
 /// <seealso cref="IPandowdyMemory"/>
-public interface ISystemIoHandler : IPandowdyMemory
+public interface ISystemIoHandler : IPandowdyMemory, IRestartable
 {
     /// <summary>
     /// Resets all soft switches and I/O state to power-on defaults.

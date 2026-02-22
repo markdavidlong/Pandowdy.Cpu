@@ -17,7 +17,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// buttons, and provides access to the system clock counter for timing-sensitive operations.
 /// </para>
 /// </remarks>
-public interface IAppleIIBus :  IPandowdyCpuBus
+public interface IAppleIIBus : IPandowdyCpuBus, IRestartable
 {
     /// <summary>
     /// Gets the memory pool representing the Apple IIe's 64k addressable memory space.

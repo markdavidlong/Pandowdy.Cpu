@@ -207,4 +207,7 @@ public class SingularKeyHandler : IKeyboardReader, IKeyboardSetter
         {
             _key &= 0x7F; // Clear strobe bit, preserve low 7 bits
         }
+
+        /// <inheritdoc />
+        public void Restart() => ResetKeyboard();
     }

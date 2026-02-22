@@ -62,7 +62,7 @@ public enum DiskIIMotorState
 /// Drives publish their own track/disk state through the <see cref="DiskIIStatusDecorator"/>.
 /// </para>
 /// </remarks>
-public abstract class DiskIIControllerCard : ICard
+public abstract class DiskIIControllerCard : ICard, IRestartable
 {
     protected readonly CpuClockingCounters _clocking;
     protected IDiskIIDrive[] _drives = [];
@@ -1285,6 +1285,56 @@ public abstract class DiskIIControllerCard : ICard
 
         // Update phase state for currently selected drive
         UpdatePhaseState(); // All phases off
+    }
+
+    /// <summary>
+    /// Restores the Disk II controller to its initial power-on state (cold boot).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Performs full cold initialisation: stops motor immediately, resets head to track 0
+    /// on all drives, clears all controller registers and sequencer state.
+    /// Mounted disk images are NOT ejected — disk ejection is a project-level operation.
+    /// </para>
+    /// </remarks>
+    public void Restart()
+    {
+        // Stop motor immediately (no delayed-off)
+        _motorOffScheduledCycle = 0;
+        SetMotorState(DiskIIMotorState.Off);
+
+        // Reset head to track 0 for all drives
+        foreach (var drive in _drives)
+        {
+            drive.Restart();
+        }
+
+        // Reset controller registers
+        _selectedDriveIndex = 0;
+        _shiftRegister = 0;
+        _diagnosticShiftReg = 0;
+
+        // Reset Q6/Q7 control lines
+        _q6 = false;
+        _q7 = false;
+
+        // Reset phase state bitfield
+        _currentPhase = 0;
+
+        // Reset timing synchronisation
+        _lastBitShiftCycle = _clocking.TotalCycles;
+
+        // Reset diagnostic tracking
+        _lastThreeBytes = new byte[3];
+        _diagnosticByteCount = 0;
+        _latchedReadCount = 0;
+        _addressFieldState = AddressFieldState.Idle;
+        _addressFieldIndex = 0;
+        _dataFieldState = DataFieldState.Idle;
+        _dataFieldIndex = 0;
+
+        // Refresh drive status to reflect cold state
+        RefreshAllDriveStatus();
     }
 
     /// <summary>

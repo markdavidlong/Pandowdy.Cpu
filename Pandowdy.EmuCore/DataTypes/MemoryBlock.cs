@@ -161,6 +161,9 @@ namespace Pandowdy.EmuCore.DataTypes
             _data[address] = data;
         }
 
+        /// <inheritdoc />
+        public void Clear() => Array.Clear(_data);
+
     }
 
 

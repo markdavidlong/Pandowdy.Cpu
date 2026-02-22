@@ -40,7 +40,7 @@ namespace Pandowdy.EmuCore.Interfaces;
 /// <seealso cref="ISystemRam"/>
 /// <seealso cref="IDirectMemoryPoolReader"/>
 /// <seealso cref="IPandowdyMemory"/>
-public interface ISystemRamSelector : IPandowdyMemory, IDirectMemoryPoolReader
+public interface ISystemRamSelector : IPandowdyMemory, IDirectMemoryPoolReader, IRestartable
 {
     /// <summary>
     /// Copies the entire main RAM bank (48KB) into the provided destination span.

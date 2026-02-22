@@ -61,7 +61,8 @@ namespace Pandowdy.EmuCore;
 /// Annunciators (AN0-AN3).
 /// </para>
 /// </remarks>
-public sealed class SoftSwitches
+[Capability(typeof(Interfaces.IRestartable))]
+public sealed class SoftSwitches : Interfaces.IRestartable
 {
     /// <summary>
     /// Identifies specific Apple IIe soft switches for type-safe access.
@@ -278,6 +279,22 @@ public sealed class SoftSwitches
             _switchValues[i] = defaultValue;
             SetStatus((SoftSwitchId)i, defaultValue);
         }
+    }
+
+    /// <summary>
+    /// Restores all soft switches to their initial power-on state (cold boot).
+    /// </summary>
+    /// <remarks>
+    /// Delegates to <see cref="ResetAllSwitches"/> — for soft switches the power-on
+    /// default (all false) is already the correct cold-boot state.
+    /// </remarks>
+    public void Restart()
+    {
+        ResetAllSwitches();
+        // IntC8RomSlot is a byte (not a boolean switch) tracking which slot's
+        // extended ROM is banked into $C800-$CFFF. Reset to 0 (no slot active)
+        // alongside the IntC8Rom boolean that ResetAllSwitches() already clears.
+        _status.SetIntC8RomSlot(0);
     }
 
 

@@ -4,6 +4,6 @@
 
 namespace Pandowdy.EmuCore.Interfaces;
 
-public interface ILanguageCard : IPandowdyMemory
+public interface ILanguageCard : IPandowdyMemory, IRestartable
 {
 }

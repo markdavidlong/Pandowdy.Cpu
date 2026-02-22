@@ -49,6 +49,14 @@ public class NullDiskIIDrive(string name = "NullDrive") : IDiskIIDrive
         // Motor control is now handled at controller level
     }
 
+    /// <summary>
+    /// Restores the null drive to its initial power-on state (cold boot). No-op.
+    /// </summary>
+    public void Restart()
+    {
+        // No state to clear
+    }
+
     /// <inheritdoc />
     public double Track => _quarterSteps / 4.0;
 

@@ -65,6 +65,8 @@ public class NoSlotClockIoHandlerTests
             ReadCount = 0;
             WriteCount = 0;
         }
+
+        public void Restart() => Reset();
     }
 
     /// <summary>

@@ -104,6 +104,23 @@ public class NoSlotClockIoHandler : ISystemIoHandler
     }
 
     /// <summary>
+    /// Restores the NSC to its initial power-on state (cold boot).
+    /// </summary>
+    /// <remarks>
+    /// Same behaviour as <see cref="Reset"/> — the time offset survives both warm reset
+    /// and power cycle, modelling battery-backed clock hardware.
+    /// </remarks>
+    public void Restart()
+    {
+        _downstream.Restart();
+        _state = NscState.Matching;
+        _bitIndex = 0;
+        _patternAccumulator = 0;
+        _clockData = 0;
+        // _timeOffsetTicks preserved intentionally — battery-backed RTC
+    }
+
+    /// <summary>
     /// Sets the emulator clock time by calculating offset from system time.
     /// </summary>
     /// <param name="emulatorTime">The desired emulator time.</param>

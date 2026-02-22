@@ -8,7 +8,8 @@ namespace Pandowdy.EmuCore.DataTypes;
 /// Manages CPU cycle counting and timing-related counters for the emulator.
 /// This provides a centralized location for timing information accessible to all components.
 /// </summary>
-public class CpuClockingCounters
+[Capability(typeof(Interfaces.IRestartable))]
+public class CpuClockingCounters : Interfaces.IRestartable
 {
     private long _vblankBlackoutCounter = 0;
     private ulong _totalCycleCount = 0;
@@ -199,4 +200,10 @@ public class CpuClockingCounters
         _totalCycleCount = 0;
         _nextVblankCycle = VBlankStartCycle;
     }
+
+    /// <summary>
+    /// Restores counters to their initial power-on state (cold boot).
+    /// Equivalent to <see cref="Reset"/> for the counter subsystem.
+    /// </summary>
+    public void Restart() => Reset();
 }
