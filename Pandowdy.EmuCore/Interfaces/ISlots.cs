@@ -106,7 +106,10 @@ public interface ISlots : IPandowdyMemory, IConfigurable
     /// <summary>
     /// Removes the card from the specified slot, replacing it with an empty slot (NullCard).
     /// </summary>
-    
+    /// <param name="slot">The slot number (Slot1–Slot7) to clear.</param>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if the card factory cannot create a NullCard to fill the vacated slot.
+    /// </exception>
     /// <seealso cref="InstallCard(int, SlotNumber)"/>
     /// <seealso cref="InstallCard(string, SlotNumber)"/>
     public void RemoveCard(SlotNumber slot);

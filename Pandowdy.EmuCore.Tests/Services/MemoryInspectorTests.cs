@@ -66,9 +66,10 @@ public class MemoryInspectorTests
         public static string GetMetadata() => string.Empty;
         public static bool ApplyMetadata(string _) => true;
         public static void Reset() { }
+        public void Restart() { }
     }
 
-    private class MockCard
+    private class MockCard(int id, string name, byte romFill = 0, byte extRomFill = 0) : ICard
     {
         private readonly byte _romFill = romFill;
         private readonly byte _extRomFill = extRomFill;

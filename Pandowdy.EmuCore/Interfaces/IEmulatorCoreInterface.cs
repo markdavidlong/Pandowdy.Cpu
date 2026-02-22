@@ -86,6 +86,28 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
     void DoReset();
 
 
+    /// <summary>
+    /// Queues a full cold boot (power cycle) restoring every registered
+    /// <see cref="IRestartable"/> component to its initial power-on state.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread.
+    /// The restart is enqueued for execution on the emulator thread at the next
+    /// instruction boundary, respecting 6502 atomic instruction guarantees.
+    /// </para>
+    /// <para>
+    /// <strong>Execution Sequence:</strong> Performs a warm reset first (keyboard clear,
+    /// CPU reset vector, throttle state), then iterates all registered
+    /// <see cref="IRestartable"/> components in priority order — clearing RAM, resetting
+    /// soft switches, cold-initializing cards, and finally resetting the CPU.
+    /// </para>
+    /// <para>
+    /// <strong>Difference from <see cref="DoReset"/>:</strong> <see cref="DoReset"/> is a
+    /// warm reset (Ctrl+Reset equivalent) that preserves RAM, soft switches, and card state.
+    /// <see cref="DoRestart"/> is a cold boot that resets everything to power-on defaults.
+    /// </para>
+    /// </remarks>
     void DoRestart();
 
     /// <summary>

@@ -79,7 +79,7 @@ namespace Pandowdy.EmuCore;
 /// orchestrator that brings together all emulator subsystems.
 /// </para>
 /// <para>
-/// <strong>Dependencies (12):</strong>
+/// <strong>Dependencies (15):</strong>
 /// <list type="number">
 /// <item><strong>IEmulatorState:</strong> State snapshot sink for UI display</item>
 /// <item><strong>IFrameProvider:</strong> Frame sink for video rendering</item>
@@ -93,6 +93,9 @@ namespace Pandowdy.EmuCore;
 /// <item><strong>IGameControllerStatus:</strong> Game controller state (SimpleGameController)</item>
 /// <item><strong>IDiskStatusProvider:</strong> Disk drive status observable (singleton)</item>
 /// <item><strong>CpuClockingCounters:</strong> CPU cycle counting and VBlank timing</item>
+/// <item><strong>IMemoryInspector:</strong> Read-only access to all memory regions</item>
+/// <item><strong>ISlots:</strong> Expansion slot manager for card message routing</item>
+/// <item><strong>RestartCollection:</strong> Registered restartable components for cold boot</item>
 /// </list>
 /// </para>
 /// <para>
@@ -112,7 +115,7 @@ namespace Pandowdy.EmuCore;
 /// <item><strong>Integral (Ki=0.15):</strong> Corrects accumulated drift</item>
 /// <item><strong>Derivative (Kd=0.02):</strong> Anticipates error trends</item>
 /// <item><strong>Adaptive SpinWait:</strong> Self-tuning (5-200 iterations)</item>
-/// <item><strong>Performance Reporting:</strong> Logs effective MHz every 5 seconds</item>
+/// <item><strong>Performance Reporting:</strong> Publishes effective MHz to UI every second</item>
 /// </list>
 /// </para>
 /// <para>
@@ -188,7 +191,9 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     private long _perfLastReportTicks;
     
     /// <summary>
-    /// Performance reporting interval (5 seconds).
+    /// Declared performance reporting interval (5 seconds). Not currently used by
+    /// <see cref="ReportPerformanceMetricsAsNeeded"/>, which compares directly against
+    /// <see cref="System.Diagnostics.Stopwatch.Frequency"/> (1 second).
     /// </summary>
     private static readonly TimeSpan PerfReportInterval = TimeSpan.FromSeconds(5);
     
@@ -444,6 +449,9 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </remarks>
     private readonly CpuClockingCounters _clockCounters;
 
+    /// <summary>
+    /// Collection of all registered <see cref="Interfaces.IRestartable"/> components, iterated during cold boot.
+    /// </summary>
     private readonly RestartCollection _restarters;
 
     /// <summary>
@@ -507,6 +515,9 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </summary>
     private readonly ISlots _slots;
 
+    /// <summary>
+    /// Game controller for pushbutton and paddle state, shared with <see cref="SystemIoHandler"/>.
+    /// </summary>
     private IGameControllerStatus _gameController;
 
     /// <summary>
@@ -526,12 +537,13 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// <param name="clockCounters">CPU clocking counters for VBlank timing and cycle tracking.</param>
     /// <param name="memoryInspector">Memory inspector for read-only access to all memory regions (RAM, ROM, slots).</param>
     /// <param name="slots">Slots manager for accessing expansion cards by slot number.</param>
+    /// <param name="restarters">Collection of restartable components iterated during cold boot.</param>
     /// <exception cref="ArgumentNullException">Thrown if any parameter is null.</exception>
     /// <remarks>
     /// <para>
     /// <strong>Initialization Sequence:</strong>
     /// <list type="number">
-    /// <item>Store dependency references (all 13 required)</item>
+    /// <item>Store dependency references (all 15 required)</item>
     /// <item>Load embedded Apple IIe ROM from resources</item>
     /// <item>Subscribe to VBlank event via <paramref name="clockCounters"/>.<see cref="CpuClockingCounters.VBlankOccurred"/></item>
     /// <item>Start flash timer for cursor blinking (~2.1 Hz)</item>
@@ -1092,7 +1104,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     {
         Enqueue(() =>
         {
-            InternalReset();      
+            InternalReset();
         });
     }
 
@@ -1185,7 +1197,6 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
         {
             InternalReset();  
             _restarters.RestartAll();
-
         });
     }
 
@@ -1338,7 +1349,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     }
 
     /// <summary>
-    /// Reports effective MHz performance metrics every 5 seconds.
+    /// Reports effective MHz performance metrics every second.
     /// </summary>
     /// <remarks>
     /// <para>
