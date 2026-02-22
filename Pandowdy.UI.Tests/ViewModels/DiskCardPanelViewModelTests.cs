@@ -8,13 +8,14 @@ using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Moq;
 using Pandowdy.EmuCore.DiskII.Messages;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.Project.Interfaces;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.ViewModels;
 using Xunit;
 
+using Pandowdy.EmuCore.DiskII;
 namespace Pandowdy.UI.Tests.ViewModels;
 
 /// <summary>

@@ -3,9 +3,10 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Memory;
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.Tests;
 

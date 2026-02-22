@@ -3,8 +3,8 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Video;
+using Pandowdy.EmuCore.Machine;
 using Xunit;
 
 namespace Pandowdy.EmuCore.Tests.Services;

@@ -4,8 +4,10 @@
 
 using Pandowdy.Cpu;
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Input;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Memory;
 using Pandowdy.EmuCore.Tests.Helpers;
 
 namespace Pandowdy.EmuCore.Tests;

@@ -4,6 +4,7 @@
 
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+using Pandowdy.EmuCore.IO;
 using Pandowdy.UI.ViewModels;
 
 namespace Pandowdy.UI;

@@ -3,7 +3,7 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
 using System.Reactive.Linq;
 
 namespace Pandowdy.EmuCore.Tests;

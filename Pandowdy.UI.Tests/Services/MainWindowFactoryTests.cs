@@ -7,8 +7,9 @@
 using Avalonia;
 using Avalonia.Headless;
 using Pandowdy.EmuCore;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Video;
 using Pandowdy.UI.ViewModels;
 using Pandowdy.UI.Interfaces;
 using Emulator;

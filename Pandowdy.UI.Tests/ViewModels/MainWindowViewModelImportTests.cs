@@ -3,9 +3,12 @@
 // See LICENSE file for details
 
 using Moq;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Memory;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Video;
 using Pandowdy.Project.Interfaces;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.ViewModels;
@@ -13,6 +16,7 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 
+using Pandowdy.EmuCore.DiskII;
 namespace Pandowdy.UI.Tests.ViewModels;
 
 /// <summary>

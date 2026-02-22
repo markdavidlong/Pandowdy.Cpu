@@ -4,6 +4,7 @@
 
 using Pandowdy.EmuCore.DataTypes;
 
+using Pandowdy.EmuCore.Machine;
 namespace Pandowdy.EmuCore.Tests.DataTypes;
 
 /// <summary>

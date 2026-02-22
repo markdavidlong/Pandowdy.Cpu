@@ -22,11 +22,10 @@
 // bugs in the implementation that need to be fixed, not tests that need updating.
 //------------------------------------------------------------------------------
 
-using Pandowdy.EmuCore.Cards;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.DiskII;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
 using Pandowdy.EmuCore.Tests.Mocks;
 
 namespace Pandowdy.EmuCore.Tests.DiskII;

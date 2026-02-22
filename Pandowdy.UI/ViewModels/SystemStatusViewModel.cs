@@ -3,9 +3,9 @@
 // See LICENSE file for details
 
 using ReactiveUI;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.IO;
 using System;
-using Pandowdy.EmuCore.Services;
 
 namespace Pandowdy.UI.ViewModels;
 

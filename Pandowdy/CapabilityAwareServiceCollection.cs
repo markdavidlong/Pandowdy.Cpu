@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Pandowdy.EmuCore;
 using System.Collections;
 
+using Pandowdy.EmuCore.Machine;
 namespace Pandowdy;
 
 internal class CapabilityAwareServiceCollection(IServiceCollection inner) : IServiceCollection

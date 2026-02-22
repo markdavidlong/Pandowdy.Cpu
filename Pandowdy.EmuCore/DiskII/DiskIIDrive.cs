@@ -4,7 +4,7 @@
 
 using System.Diagnostics;
 using Pandowdy.EmuCore.DiskII.Providers;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.DiskII;
 
@@ -34,7 +34,7 @@ namespace Pandowdy.EmuCore.DiskII;
 /// <para>
 /// <strong>Status Updates:</strong> For UI integration, wrap this drive with
 /// <see cref="DiskIIStatusDecorator"/> which synchronizes state changes with
-/// the <see cref="Services.IDiskStatusMutator"/>.
+/// the <see cref="IDiskStatusMutator"/>.
 /// </para>
 /// </remarks>
 public class DiskIIDrive : IDiskIIDrive
@@ -66,7 +66,7 @@ public class DiskIIDrive : IDiskIIDrive
     /// <para>
     /// This property provides access to the <see cref="InternalDiskImage"/> for reading
     /// dirty state and destination path information. Used by <see cref="DiskIIStatusDecorator"/>
-    /// to propagate these fields to the UI via <see cref="Services.IDiskStatusMutator"/>.
+    /// to propagate these fields to the UI via <see cref="IDiskStatusMutator"/>.
     /// </para>
     /// <para>
     /// Returns null if no disk is inserted or if the provider is not a

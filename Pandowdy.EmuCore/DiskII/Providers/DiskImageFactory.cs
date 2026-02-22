@@ -3,7 +3,7 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.DiskII.Importers;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.DiskII.Providers;
 

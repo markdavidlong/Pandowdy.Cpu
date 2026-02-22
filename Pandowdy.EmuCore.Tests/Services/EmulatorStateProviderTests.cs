@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
 using System.Reactive.Linq;
 
 namespace Pandowdy.EmuCore.Tests.Services;

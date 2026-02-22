@@ -10,11 +10,12 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using ReactiveUI;
 using Pandowdy.EmuCore.DiskII.Messages;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.Project.Interfaces;
 
+using Pandowdy.EmuCore.DiskII;
 namespace Pandowdy.UI.ViewModels;
 
 /// <summary>

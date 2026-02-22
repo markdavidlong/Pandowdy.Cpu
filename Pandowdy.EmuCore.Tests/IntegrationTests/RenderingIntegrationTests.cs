@@ -2,7 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Video;
 using Pandowdy.EmuCore.DataTypes;
 
 namespace Pandowdy.EmuCore.Tests.IntegrationTests;

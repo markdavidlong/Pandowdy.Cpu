@@ -3,10 +3,11 @@
 // See LICENSE file for details
 
 using System;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Memory;
 using System.Reactive.Linq;
 using ReactiveUI;
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.Disassembler;
 

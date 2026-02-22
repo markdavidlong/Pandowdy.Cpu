@@ -12,8 +12,9 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 
 using Pandowdy.EmuCore;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Video;
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
 
 namespace Pandowdy.UI;
 

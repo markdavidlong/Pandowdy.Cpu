@@ -2,7 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Memory;
 
 namespace Pandowdy.EmuCore.Tests.Helpers;
 

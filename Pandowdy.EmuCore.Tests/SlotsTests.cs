@@ -3,10 +3,12 @@
 // See LICENSE file for details
 
 using System.Diagnostics.CodeAnalysis;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Memory;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Messages;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
+using SlotsImpl = Pandowdy.EmuCore.Slots.Slots;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -154,7 +156,7 @@ public class SlotsTests
         public byte Read() => _value;
     }
 
-    private static Slots CreateSlots(
+    private static SlotsImpl CreateSlots(
         out MockCardFactory factory,
         out SystemStatusProvider status,
         out MockRomProvider rom,
@@ -165,7 +167,7 @@ public class SlotsTests
         rom = new MockRomProvider(0xFF);
         floatingBus = new MockFloatingBusProvider(0xFB);
 
-        return new Slots(factory, rom, floatingBus, status);
+        return new SlotsImpl(factory, rom, floatingBus, status);
     }
 
     #endregion
@@ -193,7 +195,7 @@ public class SlotsTests
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new Slots(null!, rom, floatingBus, status));
+            new SlotsImpl(null!, rom, floatingBus, status));
     }
 
     [Fact]
@@ -206,7 +208,7 @@ public class SlotsTests
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new Slots(factory, null!, floatingBus, status));
+            new SlotsImpl(factory, null!, floatingBus, status));
     }
 
     [Fact]
@@ -219,7 +221,7 @@ public class SlotsTests
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new Slots(factory, rom, null!, status));
+            new SlotsImpl(factory, rom, null!, status));
     }
 
     [Fact]
@@ -232,7 +234,7 @@ public class SlotsTests
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new Slots(factory, rom, floatingBus, null!));
+            new SlotsImpl(factory, rom, floatingBus, null!));
     }
 
     [Fact]

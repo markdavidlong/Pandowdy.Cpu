@@ -3,7 +3,8 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.DiskII.Messages;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 
 namespace Pandowdy.EmuCore.Tests.Cards;
 

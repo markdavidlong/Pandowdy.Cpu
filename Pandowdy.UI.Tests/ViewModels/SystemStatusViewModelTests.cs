@@ -2,7 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Machine;
 using Pandowdy.UI.ViewModels;
 
 namespace Pandowdy.UI.Tests.ViewModels;
