@@ -1,9 +1,12 @@
 [submodule "legacy/AppleSAWS"]
-	path = legacy/AppleSAWS
-	url = https://github.com/markdavidlong/AppleSAWS.git
+    path = legacy/AppleSAWS
+    url = git@github.com:LydianScaleSoftware/AppleSAWS.git
+
 [submodule "legacy/CiderPress2"]
-	path = legacy/CiderPress2
-	url = https://github.com/markdavidlong/CiderPress2.git
+    path = legacy/CiderPress2
+    url = git@github.com:LydianScaleSoftware/CiderPress2.git
+
 [submodule "Pandowdy.Cpu"]
-	path = Pandowdy.Cpu
-	url = https://github.com/LydianScaleSoftware/Pandowdy.Cpu.git
+    path = Pandowdy.Cpu
+    url = git@github.com:LydianScaleSoftware/Pandowdy.Cpu.git
+
