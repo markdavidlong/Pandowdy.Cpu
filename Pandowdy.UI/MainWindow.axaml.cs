@@ -375,6 +375,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <param name="viewModel">Main window view model containing UI state and commands.</param>
     /// <param name="machine">Emulator core control interface providing complete control surface.</param>
     /// <param name="refreshTicker">60 Hz ticker for driving display updates.</param>
+    /// <param name="driveStateService">Service for saving and restoring disk drive state.</param>
+    /// <param name="guiSettingsService">Master GUI settings service for persisting display preferences.</param>
     /// <exception cref="InvalidOperationException">Thrown if Initialize() is called more than once.</exception>
     /// <remarks>
     /// <para>
@@ -384,8 +386,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// </para>
     /// <para>
     /// <strong>Simplified Dependencies:</strong> With <see cref="IEmulatorCoreInterface"/> observable
-    /// accessors, this method now only needs 3 parameters instead of 4. Frame provider is accessed
-    /// through <see cref="IEmulatorCoreInterface.FrameProvider"/> instead of being a separate parameter.
+    /// accessors, the frame provider is accessed through <see cref="IEmulatorCoreInterface.FrameProvider"/>
+    /// instead of being a separate parameter.
     /// </para>
     /// <para>
     /// <strong>Dependency Injection:</strong> This method accepts:
@@ -593,6 +595,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 disposables.Add(c4);
                 var c5 = vm.TogglePauseOrContinue.Subscribe(_ => OnTogglePauseOrContinue());
                 disposables.Add(c5);
+                var c6 = vm.TogglePower.Subscribe(_ => TogglePower());
+                disposables.Add(c6);
             }
         });
 
@@ -1082,48 +1086,28 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     #region Emulator Control Methods
 
     /// <summary>
-    /// Performs initial emulator startup (called once when window opens).
+    /// Performs initial setup when the window opens.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <strong>Purpose:</strong> Separates initial startup from Debug→Start menu functionality.
-    /// Initial startup requires a reset to establish known state, while Start menu should
-    /// resume execution without resetting.
-    /// </para>
-    /// <para>
-    /// <strong>Startup Sequence:</strong>
-    /// <list type="number">
-    /// <item>Restore disk images from saved drive state (_driveStateService.LoadAndRestoreDriveStateAsync())</item>
-    /// <item>Reset machine to initial state (_machine.Reset())</item>
-    /// <item>Start emulator thread (OnEmuStartClicked)</item>
-    /// </list>
+    /// The emulator starts in the powered-off state per the PowerCycle blueprint.
+    /// Drive state has already been restored by MainWindowFactory. The machine
+    /// remains off until the user explicitly powers it on via Emulator → Power
+    /// (Ctrl+Alt+P).
     /// </para>
     /// <para>
     /// <strong>Called From:</strong> OnOpened event handler after window initialization completes.
-    /// </para>
-    /// <para>
-    /// <strong>Architecture:</strong> Disk restoration happens here (GUI layer) rather than in
-    /// Program.InitializeCoreAsync (core layer) to maintain proper separation between hardware
-    /// setup (core) and user state restoration (GUI).
     /// </para>
     /// </remarks>
     private void InitialStartup()
     {
         if (!_depsInjected || _machine is null) { return; }
 
-        System.Diagnostics.Debug.WriteLine("[MainWindow] === Initial Startup Sequence ===");
+        System.Diagnostics.Debug.WriteLine("[MainWindow] === Initial Startup (powered off) ===");
 
-        // Note: Drive state restoration is now handled in MainWindowFactory.Create()
-        // before the window is created, so disk images are already loaded at this point
-
-        // Reset to establish known initial state
-        System.Diagnostics.Debug.WriteLine("[MainWindow] Resetting machine to initial state");
-        _machine.DoReset();
-
-        // Start emulator thread
-        System.Diagnostics.Debug.WriteLine("[MainWindow] Starting emulator thread");
-        OnEmuStartClicked(this, new RoutedEventArgs());
-        System.Diagnostics.Debug.WriteLine("[MainWindow] === Startup Sequence Complete ===");
+        // Machine starts powered off. The display will show a blank (black) screen
+        // until the user powers on via Emulator → Power (Ctrl+Alt+P).
+        // Drive state restoration was handled in MainWindowFactory.Create().
     }
 
     /// <summary>
@@ -1496,6 +1480,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 if (data.MonoMixed.HasValue) { ViewModel.MonoMixed = data.MonoMixed.Value; }
                 if (data.ForceMonochrome.HasValue) { ViewModel.ForceMonochrome = data.ForceMonochrome.Value; }
                 if (data.DecreaseContrast.HasValue) { ViewModel.DecreaseFringing = data.DecreaseContrast.Value; }
+                if (data.CapsLockEnabled.HasValue) { ViewModel.CapsLockEnabled = data.CapsLockEnabled.Value; } else { ViewModel.CapsLockEnabled = true; }
                 if (data.ThrottleEnabled.HasValue) { ViewModel.ThrottleEnabled = data.ThrottleEnabled.Value; } else { ViewModel.ThrottleEnabled = true; }
                 if (data.ShowSoftSwitchStatus.HasValue) { ViewModel.ShowSoftSwitchStatus = data.ShowSoftSwitchStatus.Value; } else { ViewModel.ShowSoftSwitchStatus = true; }
                 if (data.ShowDiskStatus.HasValue) { ViewModel.ShowDiskStatus = data.ShowDiskStatus.Value; } else { ViewModel.ShowDiskStatus = false; }
@@ -1550,6 +1535,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 MonoMixed = ViewModel?.MonoMixed,
                 DecreaseContrast = ViewModel?.DecreaseFringing,
                 ForceMonochrome = ViewModel?.ForceMonochrome,
+                CapsLockEnabled = ViewModel?.CapsLockEnabled,
                 ThrottleEnabled = ViewModel?.ThrottleEnabled,
                 ShowSoftSwitchStatus = ViewModel?.ShowSoftSwitchStatus,
                 ShowDiskStatus = ViewModel?.ShowDiskStatus,
@@ -1607,6 +1593,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         public bool? DecreaseContrast { get; set; }
         /// <summary>Gets or sets whether to force monochrome display.</summary>
         public bool? ForceMonochrome { get; set; }
+        /// <summary>Gets or sets whether Caps Lock emulation is enabled (default: true).</summary>
+        public bool? CapsLockEnabled { get; set; }
         /// <summary>Gets or sets whether CPU throttling is enabled.</summary>
         public bool? ThrottleEnabled { get; set; }
         /// <summary>Gets or sets whether the soft switch status panel is visible.</summary>
@@ -1925,6 +1913,9 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 case Key.K:
                     ViewModel?.ToggleDiskStatus.Execute().Subscribe();
                     return true;
+                case Key.P:
+                    ViewModel?.TogglePower.Execute().Subscribe();
+                    return true;
             }
         }
         if ((e.KeyModifiers & KeyModifiers.Alt) != 0)
@@ -2032,4 +2023,66 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     }
 
     #endregion
+
+    /// <summary>
+    /// Toggles the emulated Apple IIe power state.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Power On:</strong> Calls <see cref="IEmulatorCoreInterface.DoRestart"/>
+    /// to cold-boot all subsystems (RAM cleared, soft switches reset, cards cold-inited,
+    /// CPU reset vector loaded), then starts the emulator thread.
+    /// </para>
+    /// <para>
+    /// <strong>Power Off:</strong> Stops the emulator thread, freezing all subsystem state.
+    /// The Apple2Display can observe <see cref="MainWindowViewModel.IsPoweredOn"/> to blank
+    /// the screen. Frozen state remains available for debugger inspection.
+    /// </para>
+    /// </remarks>
+    public void TogglePower()
+    {
+        if (!_depsInjected || _machine is null || ViewModel is null)
+        {
+            return;
+        }
+
+        var screenDisplay = GetScreenDisplay();
+
+        if (ViewModel.IsPoweredOn)
+        {
+            // Power Off: stop the emulator thread, then cold-reset all state
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Power OFF");
+            StopEmulator();
+
+            // TODO: Remove once a proper power-off state machine exists.
+            // Forces all components (status providers, cards, RAM, etc.) back
+            // to construction defaults so the UI doesn't show stale state.
+            _machine.DoRestart();
+
+            ViewModel.IsPoweredOn = false;
+
+            // Blank the display (simulates unpowered monitor)
+            if (screenDisplay != null)
+            {
+                screenDisplay.IsPoweredOn = false;
+                screenDisplay.RequestRefresh();
+            }
+        }
+        else
+        {
+            // Power On: cold boot + start emulator thread
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Power ON — cold boot via DoRestart()");
+            _machine.DoRestart();
+            ViewModel.IsPoweredOn = true;
+
+            // Restore display rendering
+            if (screenDisplay != null)
+            {
+                screenDisplay.IsPoweredOn = true;
+                screenDisplay.RequestRefresh();
+            }
+
+            OnEmuStartClicked(this, new RoutedEventArgs());
+        }
+    }
 }

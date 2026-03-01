@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Pandowdy.EmuCore.IO;
 using Pandowdy.EmuCore.Machine;
@@ -145,6 +146,7 @@ public class SystemRamSelector(
     /// </remarks>
     public void Restart()
     {
+        Debug.WriteLine("Clearing main ram and aux ram (if present) for restart.");
         _mainRam.Clear();
         _auxRam?.Clear();
     }

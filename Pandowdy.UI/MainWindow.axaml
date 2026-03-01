@@ -62,13 +62,15 @@
 				<MenuItem x:Name="ShowDiskStatusMenuItem" Header="Show _Disk Status" ToggleType="CheckBox" IsChecked="{Binding ShowDiskStatus}" Command="{Binding ToggleDiskStatus}" InputGesture="Ctrl+Alt+K"/>
 			</MenuItem>
 			<MenuItem Header="_Emulator">
-				<MenuItem Header="_Reset" Command="{Binding ResetEmu}" InputGesture="Ctrl+F12" />
+				<MenuItem Header="{Binding PowerMenuText}" Command="{Binding TogglePower}" InputGesture="Ctrl+Alt+P" />
+        <Separator/>
+				<MenuItem Header="_Reset" Command="{Binding ResetEmu}" InputGesture="Ctrl+F12" IsEnabled="{Binding CanReset}" />
 				<Separator/>
 				<MenuItem x:Name="ThrottleMenuItem" Header="_Throttle" ToggleType="CheckBox" IsChecked="{Binding ThrottleEnabled}" Command="{Binding ToggleThrottle}" InputGesture="F9" />
 				<MenuItem x:Name="CapsLockMenuItem" Header="Caps _Lock" ToggleType="CheckBox" IsChecked="{Binding CapsLockEnabled}" Command="{Binding ToggleCapsLock}" InputGesture="F10" />
 			</MenuItem>
 			<MenuItem Header="_Debug">
-				<MenuItem Header="{Binding PauseOrContinueText}" Command="{Binding TogglePauseOrContinue}" InputGesture="F5" />
+				<MenuItem Header="{Binding PauseOrContinueText}" Command="{Binding TogglePauseOrContinue}" InputGesture="F5" IsEnabled="{Binding IsPoweredOn}" />
 				<Separator/>
 				<MenuItem Header="_Step" Command="{Binding StepOnce}" InputGesture="F6" IsEnabled="{Binding CanStep}" />
 			</MenuItem>

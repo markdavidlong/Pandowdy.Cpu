@@ -19,25 +19,25 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="4">
                 <TextBlock Text="PC:" Foreground="#888888" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding PC, StringFormat=X4}" Foreground="#00FF00" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding PCDisplay}" Foreground="#00FF00" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="4">
                 <TextBlock Text="A:" Foreground="#888888" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding A, StringFormat=X2}" Foreground="#FFFF00" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding ADisplay}" Foreground="#FFFF00" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="4">
                 <TextBlock Text="X:" Foreground="#888888" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding X, StringFormat=X2}" Foreground="#FFFF00" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding XDisplay}" Foreground="#FFFF00" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="4">
                 <TextBlock Text="Y:" Foreground="#888888" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding Y, StringFormat=X2}" Foreground="#FFFF00" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding YDisplay}" Foreground="#FFFF00" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="4">
                 <TextBlock Text="SP:" Foreground="#888888" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding SP, StringFormat=X2}" Foreground="#FF8800" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Width="20" />
+                <TextBlock Text="{Binding SPDisplay}" Foreground="#FF8800" FontFamily="Consolas" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Width="20" />
                 <TextBlock Text="Size:" Foreground="#888888" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" Margin="8,0,0,0" />
-                <TextBlock Text="{Binding StackSize}" Foreground="#FF8800" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" Width="24" TextAlignment="Right" />
+                <TextBlock Text="{Binding StackSizeDisplay}" Foreground="#FF8800" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" Width="24" TextAlignment="Right" />
             </StackPanel>
             <Border Width="1" Background="#303030" Margin="4,0" />
             <StackPanel Orientation="Horizontal" Spacing="2">

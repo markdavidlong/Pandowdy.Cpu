@@ -201,9 +201,79 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </remarks>
     public ReactiveCommand<Unit, Unit> TogglePauseOrContinue { get; }
 
+    /// <summary>
+    /// Gets the command to toggle emulator power on/off.
+    /// </summary>
+    /// <value>Command that toggles between powered-on and powered-off states.</value>
+    /// <remarks>
+    /// <para>
+    /// Power On: calls <c>DoRestart()</c> on the emulator core (cold boot) and starts
+    /// the emulator thread. Power Off: stops the emulator thread, freezing all state
+    /// for debugger inspection.
+    /// </para>
+    /// <para>
+    /// The emulator starts in the powered-off state. The view handles the actual
+    /// start/stop logic; this command is a placeholder bridged to MainWindow.TogglePower().
+    /// </para>
+    /// <para>
+    /// Keyboard shortcut: Ctrl+Alt+P
+    /// </para>
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> TogglePower { get; }
+
     #endregion
 
     #region Emulator State Properties
+
+    /// <summary>
+    /// Backing field for IsPoweredOn property.
+    /// </summary>
+    private bool _isPoweredOn;
+
+    /// <summary>
+    /// Gets or sets whether the emulator is currently powered on.
+    /// </summary>
+    /// <value>True when the emulated Apple IIe is powered on, false when off.</value>
+    /// <remarks>
+    /// <para>
+    /// The emulator starts powered off. Toggling power on performs a cold boot
+    /// (<c>DoRestart()</c>) and starts the emulator thread. Toggling power off
+    /// stops the emulator thread, freezing all subsystem state.
+    /// </para>
+    /// <para>
+    /// The Apple2Display control can observe this to blank the screen when powered off.
+    /// Menu items that depend on the machine running should check both
+    /// <see cref="IsPoweredOn"/> and <see cref="IsRunning"/>.
+    /// </para>
+    /// </remarks>
+    public bool IsPoweredOn
+    {
+        get => _isPoweredOn;
+        set
+        {
+            if (_isPoweredOn != value)
+            {
+                this.RaiseAndSetIfChanged(ref _isPoweredOn, value);
+                this.RaisePropertyChanged(nameof(PowerMenuText));
+                this.RaisePropertyChanged(nameof(CanPause));
+                this.RaisePropertyChanged(nameof(CanContinue));
+                this.RaisePropertyChanged(nameof(CanStep));
+                this.RaisePropertyChanged(nameof(CanReset));
+                this.RaisePropertyChanged(nameof(PauseOrContinueText));
+
+                // Propagate power state to child panels so indicators
+                // are masked when the machine is off
+                DiskStatus.SetPoweredOn(value);
+                CpuStatus.SetPoweredOn(value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the text for the Power toggle menu item.
+    /// </summary>
+    /// <value>"Power _On" when off, "Power _Off" when on (includes mnemonic).</value>
+    public string PowerMenuText => _isPoweredOn ? "Power _Off" : "Power _On";
 
     /// <summary>
     /// Backing field for IsRunning property.
@@ -231,7 +301,7 @@ public sealed class MainWindowViewModel : ReactiveObject
                 this.RaisePropertyChanged(nameof(CanContinue));
                 this.RaisePropertyChanged(nameof(CanStep));
                 this.RaisePropertyChanged(nameof(PauseOrContinueText));
-                this.RaisePropertyChanged(nameof(CanToggleThrottle));
+                this.RaisePropertyChanged(nameof(CanReset));
             }
         }
     }
@@ -249,34 +319,26 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// <summary>
     /// Gets whether the Pause command can be executed.
     /// </summary>
-    /// <value>True when emulator is running, false when paused.</value>
-    public bool CanPause => IsRunning;
+    /// <value>True when emulator is powered on and running.</value>
+    public bool CanPause => IsPoweredOn && IsRunning;
 
     /// <summary>
     /// Gets whether the Continue command can be executed.
     /// </summary>
-    /// <value>True when emulator is paused, false when running.</value>
-    public bool CanContinue => !IsRunning;
+    /// <value>True when emulator is powered on and paused.</value>
+    public bool CanContinue => IsPoweredOn && !IsRunning;
 
     /// <summary>
     /// Gets whether the Step command can be executed.
     /// </summary>
-    /// <value>True when emulator is paused, false when running.</value>
-    public bool CanStep => !IsRunning;
+    /// <value>True when emulator is powered on and paused.</value>
+    public bool CanStep => IsPoweredOn && !IsRunning;
 
     /// <summary>
-    /// Gets whether the throttle toggle command can be executed.
+    /// Gets whether the Reset command can be executed.
     /// </summary>
-    /// <value>True when emulator is running, false when paused/stopped.</value>
-    /// <remarks>
-    /// Throttle toggling is disabled when the emulator is not running because:
-    /// <list type="bullet">
-    /// <item>Changing throttle while stopped has no effect</item>
-    /// <item>Prevents race conditions in throttle state during start/stop transitions</item>
-    /// <item>Single-step debug mode should always run unthrottled (instantaneous)</item>
-    /// </list>
-    /// </remarks>
-    public bool CanToggleThrottle => IsRunning;
+    /// <value>True when emulator is powered on (warm reset requires a running machine).</value>
+    public bool CanReset => IsPoweredOn;
 
     #endregion
 
@@ -553,15 +615,9 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </summary>
     /// <value>Command that inverts the ThrottleEnabled property.</value>
     /// <remarks>
-    /// <para>
     /// Bound to menu item or keyboard shortcut. Updates <see cref="ThrottleEnabled"/>
-    /// which the view observes to update VA2M.ThrottleEnabled.
-    /// </para>
-    /// <para>
-    /// <strong>Execution Guard:</strong> This command can only execute when the emulator
-    /// is running (<see cref="CanToggleThrottle"/>). This prevents changing throttle state
-    /// during pause/stop when it would have no effect or could cause race conditions.
-    /// </para>
+    /// which the view observes to update VA2M.ThrottleEnabled. Can be toggled at any time,
+    /// including while the machine is off — the setting takes effect on next start.
     /// </remarks>
     public ReactiveCommand<Unit, Unit> ToggleThrottle { get; }
     
@@ -956,9 +1012,7 @@ public sealed class MainWindowViewModel : ReactiveObject
         StepCommand = ReactiveCommand.Create(() => _emuState.RequestStep());
 
         // Initialize display option toggle commands
-        // ToggleThrottle is guarded by CanToggleThrottle (only when running)
-        var canToggleThrottle = this.WhenAnyValue(x => x.IsRunning);
-        ToggleThrottle = ReactiveCommand.Create(() => { ThrottleEnabled = !ThrottleEnabled; }, canToggleThrottle);
+        ToggleThrottle = ReactiveCommand.Create(() => { ThrottleEnabled = !ThrottleEnabled; });
         ToggleCapsLock = ReactiveCommand.Create(() => { CapsLockEnabled = !CapsLockEnabled; });
         ToggleScanLines = ReactiveCommand.Create(() => { ShowScanLines = !ShowScanLines; });
         ToggleMonochrome = ReactiveCommand.Create(() => { ForceMonochrome = !ForceMonochrome; });
@@ -973,6 +1027,7 @@ public sealed class MainWindowViewModel : ReactiveObject
         ResetEmu = ReactiveCommand.Create(() => { });
         StepOnce = ReactiveCommand.Create(() => { });
         TogglePauseOrContinue = ReactiveCommand.Create(() => { });
+        TogglePower = ReactiveCommand.Create(() => { });
 
         // Initialize project lifecycle commands
         // Save Project: enabled for file-based projects that are not pristine
@@ -1163,6 +1218,10 @@ public sealed class MainWindowViewModel : ReactiveObject
 
             // Auto-mount disk images from saved mount configuration
             await AutoMountFromConfigurationAsync();
+
+            // Refresh library state on all drive widgets so "Mount from Library"
+            // is enabled if the opened project has disk images in its library
+            await RefreshAllDriveLibraryStateAsync();
         }
         catch (Exception ex)
         {
@@ -1315,6 +1374,10 @@ public sealed class MainWindowViewModel : ReactiveObject
         _project = _projectManager.CurrentProject;
 
         RefreshProjectStateProperties();
+
+        // Refresh library state on all drive widgets — the new ad hoc project
+        // has an empty library, so "Mount from Library" should be disabled
+        await RefreshAllDriveLibraryStateAsync();
     }
 
     /// <summary>
@@ -1383,6 +1446,25 @@ public sealed class MainWindowViewModel : ReactiveObject
     }
 
     /// <summary>
+    /// Refreshes the library state on all drive widgets to update "Mount from Library" enablement.
+    /// </summary>
+    /// <remarks>
+    /// Called after any project lifecycle change that may affect the disk image library
+    /// (open, close, import). Each widget re-queries the project's disk image list and
+    /// enables or disables its mount command accordingly.
+    /// </remarks>
+    private async Task RefreshAllDriveLibraryStateAsync()
+    {
+        foreach (var card in DiskStatus.Cards)
+        {
+            foreach (var drive in card.Drives)
+            {
+                await drive.RefreshLibraryStateAsync();
+            }
+        }
+    }
+
+    /// <summary>
     /// Imports a disk image into the current project.
     /// </summary>
     /// <remarks>
@@ -1423,13 +1505,7 @@ public sealed class MainWindowViewModel : ReactiveObject
             RefreshProjectStateProperties();
 
             // Refresh library state in all drive widgets so "Mount from Library" gets re-enabled
-            foreach (var card in DiskStatus.Cards)
-            {
-                foreach (var drive in card.Drives)
-                {
-                    await drive.RefreshLibraryStateAsync();
-                }
-            }
+            await RefreshAllDriveLibraryStateAsync();
 
             // Show success message
             await _messageBoxService.ShowErrorAsync(
@@ -1495,12 +1571,16 @@ public sealed class MainWindowViewModel : ReactiveObject
     /// </remarks>
     public async Task<bool> OnClosingAsync()
     {
-        // Check for project unsaved changes first
+        // Check for project unsaved changes
         if (_project != null && _project.HasUnsavedChanges)
         {
+            var projectName = _project.IsAdHoc
+                ? "untitled"
+                : Path.GetFileName(_project.FilePath);
+
             var confirmed = await _messageBoxService.ShowConfirmationAsync(
                 "Unsaved Project Changes",
-                $"Project '{System.IO.Path.GetFileName(_project.FilePath)}' has unsaved changes.\n\nExit anyway?");
+                $"Project '{projectName}' has unsaved changes.\n\nExit anyway?");
 
             if (!confirmed)
             {
@@ -1530,8 +1610,8 @@ public sealed class MainWindowViewModel : ReactiveObject
         }
 
         // Persist mount configuration and flush project before exit.
-        // This is the .skillet equivalent of the legacy CaptureDriveStateSettings()
-        // that was called from SaveWindowAndDisplaySettings() on exit.
+        // SaveMountConfigurationAsync uses SetMountAsync which only marks dirty
+        // when the value actually changes, so writing the same config back is a no-op.
         if (_project != null)
         {
             try

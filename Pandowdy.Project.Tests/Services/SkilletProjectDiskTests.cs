@@ -74,6 +74,7 @@ public class SkilletProjectDiskTests(ITestOutputHelper output)
         // Modify disk (simulate emulator writes)
         diskImage.QuarterTracks[0]!.BitPosition = 0;
         diskImage.QuarterTracks[0]!.WriteOctet(0xAA);
+        diskImage.MarkDirty();
 
         // Act: Return the modified image
         await project.ReturnAsync(diskId, diskImage);
@@ -133,8 +134,9 @@ public class SkilletProjectDiskTests(ITestOutputHelper output)
         using var project = await CreateTestProjectAsync();
         long diskId = await InsertMockDiskImageAsync(project);
         
-        // Make disk dirty
+        // Make disk dirty (simulate emulator writes)
         var diskImage = await project.CheckOutAsync(diskId);
+        diskImage.MarkDirty();
         await project.ReturnAsync(diskId, diskImage);
         
         // Verify dirty

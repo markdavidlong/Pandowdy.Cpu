@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using Pandowdy.EmuCore.Machine;
 using Pandowdy.EmuCore.Slots;
 
 namespace Pandowdy.EmuCore.DiskII;
@@ -185,7 +186,8 @@ public interface IDiskStatusMutator : IDiskStatusProvider
 /// serialized access. Reads are safe from any thread due to immutable snapshots.
 /// </para>
 /// </remarks>
-public sealed class DiskStatusProvider : IDiskStatusMutator
+[Capability(typeof(IRestartable), priority: -10)]
+public sealed class DiskStatusProvider : IDiskStatusMutator, IRestartable
 {
     private const int MAX_SLOTS = 7;
     private const int DRIVES_PER_SLOT = 2;
@@ -211,6 +213,41 @@ public sealed class DiskStatusProvider : IDiskStatusMutator
         // Start with an empty array - drives will be registered dynamically
         _current = new DiskStatusSnapshot([]);
         _subject = new System.Reactive.Subjects.BehaviorSubject<DiskStatusSnapshot>(_current);
+    }
+
+    /// <summary>
+    /// Restores all registered drives to their construction-time default mechanical state.
+    /// </summary>
+    /// <remarks>
+    /// Preserves drive registrations and mounted disk identity (path, filename, DiskImageId,
+    /// read-only, dirty, destination path) since Restart() does not eject disks. Resets only
+    /// controller/mechanical state: track to 17.0, motor off, phases cleared.
+    /// Directly pushes the new snapshot through the BehaviorSubject, bypassing normal
+    /// queued mutation.
+    /// </remarks>
+    public void Restart()
+    {
+        // Reset each registered drive's mechanical state while preserving mounted disk info
+        var resetDrives = _current.Drives.Select(d => new DiskDriveStatusSnapshot(
+            SlotNumber: d.SlotNumber,
+            DriveNumber: d.DriveNumber,
+            DiskImagePath: d.DiskImagePath,
+            DiskImageFilename: d.DiskImageFilename,
+            IsReadOnly: d.IsReadOnly,
+            Track: 17.0,
+            Sector: -1,
+            MotorOn: false,
+            MotorOffScheduled: false,
+            PhaseState: 0,
+            HasValidTrackData: d.HasValidTrackData,
+            IsDirty: d.IsDirty,
+            HasDestinationPath: d.HasDestinationPath,
+            DiskImageId: d.DiskImageId
+        )).ToArray();
+
+        _current = new DiskStatusSnapshot(resetDrives);
+        _subject.OnNext(_current);
+        Changed?.Invoke(this, _current);
     }
 
     /// <summary>

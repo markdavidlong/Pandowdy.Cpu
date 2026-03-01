@@ -40,6 +40,7 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     private readonly IMessageBoxService _messageBoxService;
     private readonly ISkilletProjectManager _projectManager;
     private DiskDriveStatusSnapshot _snapshot;
+    private bool _isPoweredOn;
 
     /// <summary>
     /// Subject for library state changes (used to refresh InsertDiskCommand enablement).
@@ -237,6 +238,20 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     }
 
     /// <summary>
+    /// Updates the powered-on state, refreshing motor indicators.
+    /// </summary>
+    /// <remarks>
+    /// When the machine is powered off, motor indicators are masked to show
+    /// as off regardless of the underlying status snapshot. The status will
+    /// be cleared on the next <see cref="IRestartable.Restart"/>.
+    /// </remarks>
+    public void SetPoweredOn(bool isPoweredOn)
+    {
+        _isPoweredOn = isPoweredOn;
+        this.RaisePropertyChanged(nameof(MotorText));
+    }
+
+    /// <summary>
     /// Refreshes the library state to update InsertDiskCommand enablement.
     /// </summary>
     /// <remarks>
@@ -361,11 +376,19 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     /// <item>"⌚" = Motor-off scheduled (delayed)</item>
     /// <item>"⚡" = Motor running</item>
     /// </list>
+    /// A powered-off machine always shows motors as off regardless of the
+    /// underlying status snapshot. The status is cleared on the next cold boot.
     /// </remarks>
     public string MotorText
     {
         get
         {
+            // A powered-off machine must always show motors as off
+            if (!_isPoweredOn)
+            {
+                return "";
+            }
+
             var status = "";
             if (_snapshot.MotorOffScheduled)
             {

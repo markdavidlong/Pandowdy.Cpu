@@ -219,6 +219,17 @@ public class Apple2Display : Control
     /// </remarks>
     public bool UseNonLumaContrastMask { get; set; } = false;
 
+    /// <summary>
+    /// Gets or sets whether the emulated machine is powered on.
+    /// </summary>
+    /// <value>True when the Apple IIe is powered on, false when off.</value>
+    /// <remarks>
+    /// When false, <see cref="Render"/> fills the display with black to simulate
+    /// a powered-off monitor. The frame provider and frame data are preserved for
+    /// debugger inspection but not rendered.
+    /// </remarks>
+    public bool IsPoweredOn { get; set; }
+
     #endregion
 
     #region Display Constants
@@ -486,6 +497,14 @@ public class Apple2Display : Control
     public override void Render(DrawingContext context)
     {
         base.Render(context);
+
+        // Powered-off display: fill with black (simulates unpowered monitor)
+        if (!IsPoweredOn)
+        {
+            context.FillRectangle(Brushes.Black, new Rect(Bounds.Size));
+            return;
+        }
+
         if (_frameProvider != null && _lastFrame != null && _frameProvider.Width == 560 && _frameProvider.Height == 192)
         {
             EnsureBitmapForFrame();
@@ -535,13 +554,14 @@ public class Apple2Display : Control
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Triggers InvalidateVisual() if a frame provider and frame data are available.
-    /// Typically called by the UI refresh timer (see <see cref="Constants.RefreshRates.BaseTickerHz"/>).
+    /// Triggers InvalidateVisual() if rendering is needed. When powered off, always
+    /// invalidates to ensure the black screen is drawn. When powered on, only invalidates
+    /// if frame data is available.
     /// </para>
     /// </remarks>
     public void RequestRefresh()
     {
-        if (_frameProvider != null && _lastFrame != null)
+        if (!IsPoweredOn || (_frameProvider != null && _lastFrame != null))
         {
             InvalidateVisual();
         }

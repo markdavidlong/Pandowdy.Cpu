@@ -1287,12 +1287,12 @@ public abstract class DiskIIControllerCard : ICard, IRestartable
     }
 
     /// <summary>
-    /// Restores the Disk II controller to its initial power-on state (cold boot).
+    /// Restores the Disk II controller to its construction-time state (cold boot).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Performs full cold initialisation: stops motor immediately, resets head to track 0
-    /// on all drives, clears all controller registers and sequencer state.
+    /// Resets all mutable state to match what the constructor established:
+    /// motor off, drive 0 selected, all registers zeroed, diagnostic buffers cleared.
     /// Mounted disk images are NOT ejected — disk ejection is a project-level operation.
     /// </para>
     /// </remarks>
@@ -1302,7 +1302,7 @@ public abstract class DiskIIControllerCard : ICard, IRestartable
         _motorOffScheduledCycle = 0;
         SetMotorState(DiskIIMotorState.Off);
 
-        // Reset head to track 0 for all drives
+        // Reset drives to construction-time state
         foreach (var drive in _drives)
         {
             drive.Restart();
@@ -1329,8 +1329,10 @@ public abstract class DiskIIControllerCard : ICard, IRestartable
         _latchedReadCount = 0;
         _addressFieldState = AddressFieldState.Idle;
         _addressFieldIndex = 0;
+        Array.Clear(_addressFieldBytes);
         _dataFieldState = DataFieldState.Idle;
         _dataFieldIndex = 0;
+        Array.Clear(_dataFieldBytes);
 
         // Refresh drive status to reflect cold state
         RefreshAllDriveStatus();

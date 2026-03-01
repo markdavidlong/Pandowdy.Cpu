@@ -39,7 +39,7 @@ namespace Pandowdy.UI;
 /// <para>
 /// <strong>Data Binding:</strong> All status displays are bound to properties in
 /// <see cref="SystemStatusViewModel"/>, which receives updates from the emulator core via
-/// <see cref="Pandowdy.EmuCore.Interfaces.ISystemStatusProvider"/>.
+/// <see cref="Pandowdy.EmuCore.IO.ISystemStatusProvider"/>.
 /// </para>
 /// <para>
 /// <strong>Update Frequency:</strong> Updates occur whenever soft switch states change in the

@@ -82,6 +82,18 @@ public class DiskStatusWidgetViewModelTests
 
     #endregion
 
+    /// <summary>
+    /// Creates a widget view model with powered-on state for testing motor indicators.
+    /// </summary>
+    private DiskStatusWidgetViewModel CreatePoweredOnViewModel(DiskDriveStatusSnapshot snapshot)
+    {
+        var viewModel = new DiskStatusWidgetViewModel(
+            _mockEmulator.Object, _mockFileDialogService.Object,
+            _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
+        viewModel.SetPoweredOn(true);
+        return viewModel;
+    }
+
     #region Constructor and Initialization Tests
 
     [Fact]
@@ -126,7 +138,7 @@ public class DiskStatusWidgetViewModelTests
             hasDestinationPath: true);
 
         // Act
-        var viewModel = new DiskStatusWidgetViewModel(_mockEmulator.Object, _mockFileDialogService.Object, _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
+        var viewModel = CreatePoweredOnViewModel(snapshot);
 
         // Assert
         Assert.Equal("S6D2", viewModel.DiskId);
@@ -166,7 +178,7 @@ public class DiskStatusWidgetViewModelTests
         var snapshot = CreateSnapshot(motorOffScheduled: true, motorOn: false);
 
         // Act
-        var viewModel = new DiskStatusWidgetViewModel(_mockEmulator.Object, _mockFileDialogService.Object, _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
+        var viewModel = CreatePoweredOnViewModel(snapshot);
 
         // Assert
         Assert.Equal("⌚", viewModel.MotorText);
@@ -179,7 +191,7 @@ public class DiskStatusWidgetViewModelTests
         var snapshot = CreateSnapshot(motorOn: true, motorOffScheduled: true);
 
         // Act
-        var viewModel = new DiskStatusWidgetViewModel(_mockEmulator.Object, _mockFileDialogService.Object, _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
+        var viewModel = CreatePoweredOnViewModel(snapshot);
 
         // Assert
         Assert.Equal("⌚⚡", viewModel.MotorText);
@@ -519,7 +531,7 @@ public class DiskStatusWidgetViewModelTests
     {
         // Arrange
         var snapshot = CreateSnapshot(motorOn: true, motorOffScheduled: false);
-        var viewModel = new DiskStatusWidgetViewModel(_mockEmulator.Object, _mockFileDialogService.Object, _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
+        var viewModel = CreatePoweredOnViewModel(snapshot);
 
         // Act
         var result = viewModel.MotorText;
@@ -533,7 +545,7 @@ public class DiskStatusWidgetViewModelTests
     {
         // Arrange
         var snapshot = CreateSnapshot(motorOn: false, motorOffScheduled: true);
-        var viewModel = new DiskStatusWidgetViewModel(_mockEmulator.Object, _mockFileDialogService.Object, _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
+        var viewModel = CreatePoweredOnViewModel(snapshot);
 
         // Act
         var result = viewModel.MotorText;
@@ -547,13 +559,90 @@ public class DiskStatusWidgetViewModelTests
     {
         // Arrange
         var snapshot = CreateSnapshot(motorOn: true, motorOffScheduled: true);
-        var viewModel = new DiskStatusWidgetViewModel(_mockEmulator.Object, _mockFileDialogService.Object, _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
+        var viewModel = CreatePoweredOnViewModel(snapshot);
 
         // Act
         var result = viewModel.MotorText;
 
         // Assert
         Assert.Equal("⌚⚡", result);
+    }
+
+    #endregion
+
+    #region PoweredOn Motor Masking Tests
+
+    [Fact]
+    public void MotorText_WhenPoweredOff_ReturnsEmptyRegardlessOfMotorState()
+    {
+        // Arrange - motor on + scheduled off, but machine is powered off
+        var snapshot = CreateSnapshot(motorOn: true, motorOffScheduled: true);
+        var viewModel = new DiskStatusWidgetViewModel(
+            _mockEmulator.Object, _mockFileDialogService.Object,
+            _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
+
+        // Act (default _isPoweredOn = false)
+        var result = viewModel.MotorText;
+
+        // Assert
+        Assert.Equal("", result);
+    }
+
+    [Fact]
+    public void MotorText_AfterPowerOn_ShowsMotorState()
+    {
+        // Arrange
+        var snapshot = CreateSnapshot(motorOn: true, motorOffScheduled: false);
+        var viewModel = new DiskStatusWidgetViewModel(
+            _mockEmulator.Object, _mockFileDialogService.Object,
+            _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
+
+        // Act
+        viewModel.SetPoweredOn(true);
+        var result = viewModel.MotorText;
+
+        // Assert
+        Assert.Equal("⚡", result);
+    }
+
+    [Fact]
+    public void MotorText_AfterPowerOff_MasksMotorState()
+    {
+        // Arrange - start powered on with motor running
+        var snapshot = CreateSnapshot(motorOn: true, motorOffScheduled: true);
+        var viewModel = CreatePoweredOnViewModel(snapshot);
+        Assert.Equal("⌚⚡", viewModel.MotorText);
+
+        // Act - power off
+        viewModel.SetPoweredOn(false);
+
+        // Assert - motor indicators masked
+        Assert.Equal("", viewModel.MotorText);
+    }
+
+    [Fact]
+    public void SetPoweredOn_RaisesPropertyChangedForMotorText()
+    {
+        // Arrange
+        var snapshot = CreateSnapshot(motorOn: true);
+        var viewModel = new DiskStatusWidgetViewModel(
+            _mockEmulator.Object, _mockFileDialogService.Object,
+            _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
+
+        var propertyChangedEvents = new List<string>();
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != null)
+            {
+                propertyChangedEvents.Add(e.PropertyName);
+            }
+        };
+
+        // Act
+        viewModel.SetPoweredOn(true);
+
+        // Assert
+        Assert.Contains(nameof(DiskStatusWidgetViewModel.MotorText), propertyChangedEvents);
     }
 
     #endregion
@@ -565,7 +654,7 @@ public class DiskStatusWidgetViewModelTests
     {
         // Arrange
         var initialSnapshot = CreateSnapshot();
-        var viewModel = new DiskStatusWidgetViewModel(_mockEmulator.Object, _mockFileDialogService.Object, _mockMessageBoxService.Object, _mockProjectManager.Object, initialSnapshot);
+        var viewModel = CreatePoweredOnViewModel(initialSnapshot);
 
         var newSnapshot = CreateSnapshot(
             slotNumber: 5,
@@ -660,7 +749,7 @@ public class DiskStatusWidgetViewModelTests
     {
         // Arrange
         var initialSnapshot = CreateSnapshot(motorOn: false, motorOffScheduled: false);
-        var viewModel = new DiskStatusWidgetViewModel(_mockEmulator.Object, _mockFileDialogService.Object, _mockMessageBoxService.Object, _mockProjectManager.Object, initialSnapshot);
+        var viewModel = CreatePoweredOnViewModel(initialSnapshot);
 
         var updatedSnapshot = CreateSnapshot(motorOn: true, motorOffScheduled: true);
 
@@ -741,7 +830,7 @@ public class DiskStatusWidgetViewModelTests
     {
         // Arrange - Start with empty drive
         var emptySnapshot = CreateSnapshot(slotNumber: 6, driveNumber: 1);
-        var viewModel = new DiskStatusWidgetViewModel(_mockEmulator.Object, _mockFileDialogService.Object, _mockMessageBoxService.Object, _mockProjectManager.Object, emptySnapshot);
+        var viewModel = CreatePoweredOnViewModel(emptySnapshot);
 
         Assert.Equal("(empty)", viewModel.Filename);
         Assert.Equal("T-- S--", viewModel.TrackSectorText);

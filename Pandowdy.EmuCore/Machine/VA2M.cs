@@ -682,6 +682,13 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     private int _pendingWaitCounter = 0;
 
     /// <summary>
+    /// Internal cancellation token source used by <see cref="DoRestart"/> to stop
+    /// <see cref="RunAsync"/> if it happens to still be active. <see cref="RunAsync"/>
+    /// creates a linked token source combining this with the caller's external token.
+    /// </summary>
+    private volatile CancellationTokenSource? _runCts;
+
+    /// <summary>
     /// Enqueues an action to be executed on the emulator thread at the next opportunity.
     /// </summary>
     /// <param name="action">Action to execute. Null actions are ignored.</param>
@@ -1141,8 +1148,9 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </list>
     /// </para>
     /// <para>
-    /// <strong>Thread Context:</strong> Must be called on the emulator thread only
-    /// (always invoked inside an <see cref="Enqueue"/> action).
+    /// <strong>Thread Context:</strong> Called synchronously from <see cref="DoRestart"/>
+    /// (when emulator is stopped) or from an <see cref="Enqueue"/> action for
+    /// <see cref="DoReset"/> (when emulator is running).
     /// </para>
     /// </remarks>
     private void InternalReset()
@@ -1165,17 +1173,29 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     }
 
     /// <summary>
-    /// Queues a full cold boot (power cycle) that restores every registered
+    /// Performs a full cold boot (power cycle) restoring every registered
     /// <see cref="IRestartable"/> component to its initial power-on state.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <strong>Execution Sequence:</strong> First calls <see cref="InternalReset"/> to
-    /// establish the warm-reset baseline (keyboard clear, CPU reset vector, throttle state),
-    /// then calls <see cref="RestartCollection.RestartAll"/> to iterate all registered
+    /// <strong>When to Call:</strong> Only when the emulator thread is stopped — during
+    /// power-on from the off state. Executes synchronously on the calling thread.
+    /// </para>
+    /// <para>
+    /// <strong>Not Thread-Safe:</strong> Must only be called when <see cref="RunAsync"/>
+    /// is not active. There is no use case for a queued restart — the emulator is always
+    /// stopped when a cold boot is needed.
+    /// </para>
+    /// <para>
+    /// <strong>Execution Sequence:</strong>
+    /// <list type="number">
+    /// <item>Drain stale pending actions from any previous run</item>
+    /// <item>Call <see cref="InternalReset"/> for warm-reset baseline (keyboard clear,
+    /// CPU reset vector, throttle state)</item>
+    /// <item>Call <see cref="RestartCollection.RestartAll"/> to iterate all registered
     /// <see cref="IRestartable"/> components in priority order — clearing RAM, resetting
-    /// soft switches to power-on defaults, cold-initializing cards, and finally resetting
-    /// the CPU (via <see cref="VA2MBus"/> at priority 100).
+    /// soft switches, cold-initializing cards, and resetting the CPU</item>
+    /// </list>
     /// </para>
     /// <para>
     /// <strong>Overlap:</strong> Some operations in <c>InternalReset()</c> (e.g., keyboard
@@ -1183,11 +1203,6 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// <c>IRestartable.Restart()</c> implementations. This is intentional — the warm-reset
     /// baseline is established first, then the cold-boot pass ensures all components reach
     /// their power-on default state regardless of <c>InternalReset</c>'s coverage.
-    /// </para>
-    /// <para>
-    /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread.
-    /// The restart is enqueued for execution on the emulator thread at the next
-    /// instruction boundary, respecting 6502 atomic instruction guarantees.
     /// </para>
     /// <para>
     /// <strong>Flat Collection:</strong> Unlike the hierarchical tree approach, all
@@ -1198,11 +1213,16 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// </remarks>
     public void DoRestart()
     {
-        Enqueue(() =>
-        {
-            InternalReset();  
-            _restarters.RestartAll();
-        });
+        // Revoke the async running token if RunAsync is still active.
+        // This is a safety guard — DoRestart should only be called when the
+        // emulator is stopped, but if it isn't, cancel it now.
+        _runCts?.Cancel();
+
+        // Drain stale pending actions from any previous run
+        while (_pending.TryDequeue(out _)) { }
+
+        InternalReset();
+        _restarters.RestartAll();
     }
 
     /// <summary>
@@ -1274,16 +1294,26 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
         Thread.CurrentThread.Name = "Apple IIe Emulator";
 
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ticksPerSecond);
-        
-        // Calculate cycles per batch for adaptive throttling
-        double cyclesPerTick = TargetHz / ticksPerSecond;
-        double carry = 0.0;
-        
-        // Check for pending commands every N cycles to reduce input latency
-        const int PendingCheckInterval = 100; // Check every ~0.1ms at 1MHz
-        
-        while (!ct.IsCancellationRequested)
+
+        // Create an internal CTS that DoRestart() can cancel, linked with the
+        // caller's external token so either side can stop the loop.
+        var internalCts = new CancellationTokenSource();
+        var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, internalCts.Token);
+        _runCts = internalCts;
+
+        var effectiveToken = linkedCts.Token;
+
+        try
         {
+            // Calculate cycles per batch for adaptive throttling
+            double cyclesPerTick = TargetHz / ticksPerSecond;
+            double carry = 0.0;
+
+            // Check for pending commands every N cycles to reduce input latency
+            const int PendingCheckInterval = 100; // Check every ~0.1ms at 1MHz
+
+            while (!effectiveToken.IsCancellationRequested)
+            {
             if (ThrottleEnabled)
             {
                 // Calculate target cycles for this batch
@@ -1303,12 +1333,12 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
                     Bus.Clock();
                     _throttleCycles++;
                     
-                    if (ct.IsCancellationRequested)
+                    if (effectiveToken.IsCancellationRequested)
                     {
                         break;
                     }
                 }
-                
+
                 // Final pending check at end of batch
                 ProcessAnyPendingActions();
                 
@@ -1333,12 +1363,12 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
                     Bus.Clock();
                     _throttleCycles++;
                     
-                    if (ct.IsCancellationRequested)
+                    if (effectiveToken.IsCancellationRequested)
                     {
                         break;
                     }
                 }
-                
+
                 // Final pending check
                 ProcessAnyPendingActions();
 
@@ -1346,10 +1376,18 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
 
                 try
                 {
-                    await Task.Delay(0, ct);
+                    await Task.Delay(0, effectiveToken);
                 }
                 catch (OperationCanceledException) { break; }
             }
+        }
+        }
+        finally
+        {
+            // Clear the internal CTS so DoRestart doesn't cancel a stale token
+            _runCts = null;
+            linkedCts.Dispose();
+            internalCts.Dispose();
         }
     }
 
@@ -1494,7 +1532,7 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
     /// <summary>
     /// Explicit implementation of <see cref="IRestartable.Restart"/> inherited through
     /// <see cref="IKeyboardSetter"/> → <see cref="IEmulatorCoreInterface"/>.
-    /// Delegates to <see cref="DoRestart"/> which iterates the <see cref="RestartCollection"/>.
+    /// Performs the same cold boot sequence as <see cref="DoRestart"/>.
     /// </summary>
     void IRestartable.Restart() => DoRestart();
 
@@ -1582,7 +1620,9 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
         var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>(
             System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
 
-        Enqueue(() =>
+        // Extract the message delivery logic so it can be called both synchronously
+        // (when emulator is stopped) and from the enqueued action (when running).
+        void DeliverMessage()
         {
             try
             {
@@ -1624,7 +1664,21 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
                 tcs.SetException(new Pandowdy.EmuCore.Slots.CardMessageException(
                     $"Unexpected error sending message to slot {slot}: {ex.Message}", ex));
             }
-        });
+        }
+
+        if (_runCts == null)
+        {
+            // Emulator thread is not running — execute synchronously.
+            // This prevents the message from being enqueued with no thread to drain
+            // the queue, which would cause the returned Task to hang forever.
+            DeliverMessage();
+        }
+        else
+        {
+            // Emulator thread is running — enqueue for processing at the next
+            // instruction boundary to respect 6502 atomic instruction guarantees.
+            Enqueue(DeliverMessage);
+        }
 
         return tcs.Task;
     }
@@ -1681,6 +1735,10 @@ public class VA2M : IDisposable,  IEmulatorCoreInterface
         
         // Clear pending queue
         while (_pending.TryDequeue(out _)) { }
+
+        // Dispose internal run CTS if still active
+        _runCts?.Dispose();
+        _runCts = null;
         
         // Dispose bus (which handles VBlank event cleanup)
         if (Bus is IDisposable disposableBus)

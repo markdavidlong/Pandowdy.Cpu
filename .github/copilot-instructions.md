@@ -20,6 +20,7 @@ These scripts are maintenance tools and not part of the build process.
 - Prefer Git-aware commands in version-controlled workspaces
 
 ### Examples
+
 ```bash
 # Correct: Preserves history
 git mv old/path/File.cs new/path/File.cs
@@ -37,6 +38,7 @@ git mv old/path/File.cs new/path/File.cs
 - Never use single-line statements without braces
 
 ### Examples
+
 ```csharp
 // Correct: Always use braces
 if (condition)
@@ -61,6 +63,7 @@ if (condition) DoSomething(); // Also incorrect
 - **Single-line format ONLY for simple auto-properties** with default `{ get; set; }`
 
 ### Examples
+
 ```csharp
 // Correct: Multi-line for properties with logic or private setters
 public bool ThrottleEnabled
@@ -95,6 +98,7 @@ public bool ThrottleEnabled { get => _throttleEnabled; set => this.RaiseAndSetIf
 ## Project Structure
 
 ### Pandowdy.EmuCore (Emulator Core)
+
 ```
 Pandowdy.EmuCore/
 ├── Machine/ (Emulator orchestration)
@@ -166,6 +170,7 @@ Pandowdy.EmuCore/
 ```
 
 ### Pandowdy.EmuCore.Tests (Test Mirror)
+
 ```
 Pandowdy.EmuCore.Tests/
 ├── Machine/                       - VA2M, VA2MBus, CpuClockingCounters tests
@@ -184,6 +189,7 @@ Pandowdy.EmuCore.Tests/
 ```
 
 ### Pandowdy.UI (Avalonia GUI)
+
 ```
 Pandowdy.UI/
 ??? ViewModels/
@@ -201,6 +207,7 @@ Pandowdy.UI/
 ```
 
 ### Pandowdy.UI.Tests (UI Test Project)
+
 ```
 Pandowdy.UI.Tests/
 ??? ViewModels/
@@ -275,3 +282,15 @@ The Disk II controller emulation reflects hardware-accurate motor control:
   - Alt+letter
   - Multi-keystroke sequences
 - Simple Ctrl+letter is reserved for the emulator (unless focused in a future editor window).
+
+## Ad Hoc Projects
+- Prompt to save on exit if there are unsaved changes since inception.
+- Do not skip the `HasUnsavedChanges` check for ad hoc projects in `OnClosingAsync`.
+
+## Dependency Injection Guidelines
+
+- **ICard template registrations** should be singleton as they are prototypes for `CardFactory` to clone, not consumed directly.
+- **Keyed transient `ISystemRam` registrations** are correct since each resolution must yield a distinct `MemoryBlock` instance.
+
+## Emulator Startup Preferences
+- The default startup for the emulator should have CapsLock enabled (on). Without a saved preference in the settings JSON file, CapsLock defaults to On.

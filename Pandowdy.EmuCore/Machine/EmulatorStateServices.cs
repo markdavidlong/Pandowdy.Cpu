@@ -52,9 +52,27 @@ public record StateSnapshot(ushort PC, byte SP, ulong Cycles, int? LineNumber, b
 /// placeholders. These will be implemented when the execution control loop is integrated with this provider.
 /// </para>
 /// </remarks>
-public sealed class EmulatorStateProvider : IEmulatorState
+[Capability(typeof(IRestartable), priority: -10)]
+public sealed class EmulatorStateProvider : IEmulatorState, IRestartable
 {
-    private readonly System.Reactive.Subjects.BehaviorSubject<StateSnapshot> _subject = new(new StateSnapshot(0, 0, 0, null, false, false));
+    /// <summary>
+    /// The construction-time default state snapshot.
+    /// </summary>
+    private static readonly StateSnapshot s_defaultSnapshot = new(0, 0, 0, null, false, false);
+
+    private readonly System.Reactive.Subjects.BehaviorSubject<StateSnapshot> _subject = new(s_defaultSnapshot);
+
+    /// <summary>
+    /// Restores the emulator state to its construction-time default.
+    /// </summary>
+    /// <remarks>
+    /// Directly pushes the default snapshot (PC=0, SP=0, Cycles=0, not running)
+    /// through the BehaviorSubject, bypassing normal queued updates.
+    /// </remarks>
+    public void Restart()
+    {
+        _subject.OnNext(s_defaultSnapshot);
+    }
     
     /// <inheritdoc />
     /// <remarks>

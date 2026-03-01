@@ -144,14 +144,17 @@ public record SystemStatusSnapshot(
 /// This ensures reactive subscribers see updates before event handlers.
 /// </para>
 /// </remarks>
-public sealed class SystemStatusProvider : ISystemStatusMutator
+[Capability(typeof(IRestartable), priority: -10)]
+public sealed class SystemStatusProvider : ISystemStatusMutator, IRestartable
 {
-    // Current system state snapshot (immutable)
-    private SystemStatusSnapshot _current = new(
+    /// <summary>
+    /// Creates the default power-on snapshot matching construction-time state.
+    /// </summary>
+    private static SystemStatusSnapshot CreateDefaultSnapshot() => new(
         State80Store: false,
         StateRamRd: false,
         StateRamWrt: false,
-        StateIntCxRom: false,        
+        StateIntCxRom: false,
         StateIntC8Rom: false,
         StateAltZp: false,
         StateSlotC3Rom: false,
@@ -179,10 +182,28 @@ public sealed class SystemStatusProvider : ISystemStatusMutator
         StatePdl2: 0,
         StatePdl3: 0,
         StateIntC8RomSlot: 0,
-        StateCurrentMhz: -1.0);        
+        StateCurrentMhz: -1.0);
+
+    // Current system state snapshot (immutable)
+    private SystemStatusSnapshot _current = CreateDefaultSnapshot();
 
     // Reactive subject for observable pattern (replays current state to new subscribers)
     private readonly System.Reactive.Subjects.BehaviorSubject<SystemStatusSnapshot> _subject;
+
+    /// <summary>
+    /// Restores the system status to its construction-time default snapshot.
+    /// </summary>
+    /// <remarks>
+    /// Directly resets the snapshot and pushes it through the BehaviorSubject,
+    /// bypassing normal queued mutation. This ensures the status is clean
+    /// regardless of pending downstream updates.
+    /// </remarks>
+    public void Restart()
+    {
+        _current = CreateDefaultSnapshot();
+        _subject.OnNext(_current);
+        Changed?.Invoke(this, _current);
+    }
 
     /// <inheritdoc />
     public event EventHandler<SystemStatusSnapshot>? Changed;

@@ -95,6 +95,7 @@ public class CpuStatusPanelViewModelTests
             Emulator = new MockEmulatorCoreInterface();
             Ticker = new MockRefreshTicker();
             ViewModel = new CpuStatusPanelViewModel(Emulator, Ticker);
+            ViewModel.SetPoweredOn(true);
         }
 
         public void SetCpuState(CpuStateSnapshot state)
@@ -153,13 +154,20 @@ public class CpuStatusPanelViewModelTests
         // Arrange & Act
         var fixture = new CpuStatusPanelFixture();
 
-        // Assert - Should have default/zero values before activation
+        // Assert - Fixture calls SetPoweredOn(true), so display properties
+        // show formatted zero values (not powered-off placeholders)
         Assert.Equal(0, fixture.ViewModel.PC);
         Assert.Equal(0, fixture.ViewModel.SP);
-        Assert.Equal(0, fixture.ViewModel.StackSize);
+        Assert.Equal(255, fixture.ViewModel.StackSize);
         Assert.Equal(0, fixture.ViewModel.A);
         Assert.Equal(0, fixture.ViewModel.X);
         Assert.Equal(0, fixture.ViewModel.Y);
+        Assert.Equal("0000", fixture.ViewModel.PCDisplay);
+        Assert.Equal("00", fixture.ViewModel.ADisplay);
+        Assert.Equal("00", fixture.ViewModel.XDisplay);
+        Assert.Equal("00", fixture.ViewModel.YDisplay);
+        Assert.Equal("00", fixture.ViewModel.SPDisplay);
+        Assert.Equal("255", fixture.ViewModel.StackSizeDisplay);
         Assert.False(fixture.ViewModel.FlagN);
         Assert.False(fixture.ViewModel.FlagV);
         Assert.False(fixture.ViewModel.FlagB);
@@ -169,7 +177,6 @@ public class CpuStatusPanelViewModelTests
         Assert.False(fixture.ViewModel.FlagC);
         Assert.Equal(CpuExecutionStatus.Running, fixture.ViewModel.Status);
         Assert.Equal("Normal", fixture.ViewModel.StatusText);
-        Assert.Equal("", fixture.ViewModel.DisassemblyText);
     }
 
     #endregion
@@ -744,6 +751,94 @@ public class CpuStatusPanelViewModelTests
         Assert.Equal(0x42, fixture.ViewModel.A);
         Assert.False(fixture.ViewModel.FlagN);
         Assert.False(fixture.ViewModel.FlagZ);
+    }
+
+    #endregion
+
+    #region Powered-Off State Tests
+
+    [Fact]
+    public void SetPoweredOn_False_ShowsPlaceholders()
+    {
+        // Arrange - start powered on with CPU state
+        var emulator = new MockEmulatorCoreInterface();
+        var ticker = new MockRefreshTicker();
+        var viewModel = new CpuStatusPanelViewModel(emulator, ticker);
+        viewModel.SetPoweredOn(true);
+        emulator.CpuState = new CpuStateSnapshot { PC = 0xFA62, A = 0x42, SP = 0xF0, P = 0x81 };
+        viewModel.Activator.Activate();
+        ticker.Tick();
+        Assert.Equal(0xFA62, viewModel.PC);
+
+        // Act - power off
+        viewModel.SetPoweredOn(false);
+
+        // Assert - all display values show placeholders
+        Assert.Equal("----", viewModel.PCDisplay);
+        Assert.Equal("--", viewModel.ADisplay);
+        Assert.Equal("--", viewModel.XDisplay);
+        Assert.Equal("--", viewModel.YDisplay);
+        Assert.Equal("--", viewModel.SPDisplay);
+        Assert.Equal("--", viewModel.StackSizeDisplay);
+        Assert.False(viewModel.FlagN);
+        Assert.False(viewModel.FlagV);
+        Assert.False(viewModel.FlagC);
+        Assert.Equal("Off", viewModel.StatusText);
+        Assert.Equal("Powered Off", viewModel.DisassemblyText);
+    }
+
+    [Fact]
+    public void SetPoweredOn_True_RestoresCpuState()
+    {
+        // Arrange - powered off
+        var emulator = new MockEmulatorCoreInterface();
+        var ticker = new MockRefreshTicker();
+        var viewModel = new CpuStatusPanelViewModel(emulator, ticker);
+        viewModel.Activator.Activate();
+
+        emulator.CpuState = new CpuStateSnapshot { PC = 0x1234, A = 0x42 };
+
+        // Act - power on
+        viewModel.SetPoweredOn(true);
+
+        // Assert - display shows CPU state
+        Assert.Equal("1234", viewModel.PCDisplay);
+        Assert.Equal("42", viewModel.ADisplay);
+        Assert.Equal(0x1234, viewModel.PC);
+        Assert.Equal(0x42, viewModel.A);
+    }
+
+    [Fact]
+    public void PoweredOff_TickerUpdates_StillShowPlaceholders()
+    {
+        // Arrange - powered off with active CPU state
+        var emulator = new MockEmulatorCoreInterface();
+        var ticker = new MockRefreshTicker();
+        var viewModel = new CpuStatusPanelViewModel(emulator, ticker);
+        viewModel.Activator.Activate();
+        emulator.CpuState = new CpuStateSnapshot { PC = 0xFA62 };
+
+        // Act - ticker fires while powered off
+        ticker.Tick();
+
+        // Assert - still shows placeholders
+        Assert.Equal("----", viewModel.PCDisplay);
+        Assert.Equal("Off", viewModel.StatusText);
+        Assert.Equal("Powered Off", viewModel.DisassemblyText);
+    }
+
+    [Fact]
+    public void DefaultState_IsPoweredOff()
+    {
+        // Arrange & Act - fresh VM without SetPoweredOn
+        var emulator = new MockEmulatorCoreInterface();
+        var ticker = new MockRefreshTicker();
+        var viewModel = new CpuStatusPanelViewModel(emulator, ticker);
+
+        // Assert - default is powered off
+        Assert.Equal("----", viewModel.PCDisplay);
+        Assert.Equal("--", viewModel.SPDisplay);
+        Assert.Equal("--", viewModel.StackSizeDisplay);
     }
 
     #endregion

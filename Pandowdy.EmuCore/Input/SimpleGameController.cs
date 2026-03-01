@@ -121,12 +121,18 @@ namespace Pandowdy.EmuCore.Input;
 
             /// <summary>
             /// Restores the game controller to its initial power-on state (cold boot).
-            /// Releases all buttons and centers all paddles.
+            /// Releases all buttons and resets all paddles to zero.
             /// </summary>
             public void Restart()
             {
                 SetButton(0, false);
                 SetButton(1, false);
                 SetButton(2, false);
+
+                // Reset paddle axes to construction default (0)
+                for (int i = 0; i < _axes.Length; i++)
+                {
+                    SetPaddle(i, 0);
+                }
             }
         }

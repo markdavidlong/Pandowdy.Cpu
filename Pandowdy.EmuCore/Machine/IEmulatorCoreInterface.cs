@@ -95,20 +95,27 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
 
 
     /// <summary>
-    /// Queues a full cold boot (power cycle) restoring every registered
+    /// Performs a full cold boot (power cycle) restoring every registered
     /// <see cref="IRestartable"/> component to its initial power-on state.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <strong>Thread Safety:</strong> Thread-safe. Can be called from any thread.
-    /// The restart is enqueued for execution on the emulator thread at the next
-    /// instruction boundary, respecting 6502 atomic instruction guarantees.
+    /// <strong>When to Call:</strong> Only when the emulator thread is stopped — specifically
+    /// during power-on from the off state. This is a synchronous operation that executes
+    /// immediately on the calling thread.
     /// </para>
     /// <para>
-    /// <strong>Execution Sequence:</strong> Performs a warm reset first (keyboard clear,
-    /// CPU reset vector, throttle state), then iterates all registered
-    /// <see cref="IRestartable"/> components in priority order — clearing RAM, resetting
-    /// soft switches, cold-initializing cards, and finally resetting the CPU.
+    /// <strong>Not Thread-Safe:</strong> Must only be called when <c>RunAsync</c> is not
+    /// active. There is no use case for a queued restart — the emulator is always stopped
+    /// when a cold boot is needed. As a safety guard, this method cancels any active
+    /// <see cref="RunAsync"/> token before proceeding.
+    /// </para>
+    /// <para>
+    /// <strong>Execution Sequence:</strong> Drains any stale pending actions from a previous
+    /// run, performs a warm reset (keyboard clear, CPU reset vector, throttle state), then
+    /// iterates all registered <see cref="IRestartable"/> components in priority order —
+    /// clearing RAM, resetting soft switches, cold-initializing cards, and finally resetting
+    /// the CPU.
     /// </para>
     /// <para>
     /// <strong>Difference from <see cref="DoReset"/>:</strong> <see cref="DoReset"/> is a
@@ -142,7 +149,7 @@ public interface IEmulatorCoreInterface : IKeyboardSetter
     /// <param name="slot">Target slot (Slot1–Slot7), or <c>null</c> to broadcast to all slots.</param>
     /// <param name="message">The card message to deliver.</param>
     /// <returns>A task that completes when the message(s) have been processed on the emulator thread.</returns>
-    /// <exception cref="Exceptions.CardMessageException">
+    /// <exception cref="CardMessageException">
     /// Thrown (on the returned Task) if a targeted card rejects the message. Not thrown for
     /// broadcast messages — individual card failures are silently ignored during broadcast.
     /// </exception>

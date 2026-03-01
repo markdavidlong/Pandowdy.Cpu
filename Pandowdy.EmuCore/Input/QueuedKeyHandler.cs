@@ -439,10 +439,17 @@ public sealed class QueuedKeyHandler : IKeyboardReader, IKeyboardSetter, IDispos
         /// Restores the keyboard handler to its initial power-on state (cold boot).
         /// </summary>
         /// <remarks>
-        /// Delegates to <see cref="ResetKeyboard"/> — for the keyboard subsystem,
-        /// warm reset and cold boot are equivalent (clear latch, drain queue, cancel timer).
+        /// Clears the key latch completely (not just the strobe bit), drains the queue,
+        /// and cancels any pending auto-feed timer. Unlike <see cref="ResetKeyboard"/> (warm
+        /// reset) which preserves the low 7 bits, cold boot zeros the entire latch.
         /// </remarks>
-        public void Restart() => ResetKeyboard();
+        public void Restart()
+        {
+            ResetKeyboard();
+
+            // Cold boot: fully zero the key latch (ResetKeyboard only clears strobe)
+            _currentKey = 0;
+        }
 
         /// <summary>
         /// Disposes the QueuedKeyHandler, stopping timer and releasing resources.

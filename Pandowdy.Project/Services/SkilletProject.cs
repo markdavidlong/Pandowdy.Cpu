@@ -349,11 +349,23 @@ internal sealed class SkilletProject : ISkilletProject
     /// <summary>
     /// Returns a disk image to the store after ejection (IDiskImageStore.ReturnAsync).
     /// </summary>
+    /// <remarks>
+    /// Only marks the project dirty and writes the working blob if the disk was
+    /// actually modified (<see cref="InternalDiskImage.IsDirty"/>). Returning an
+    /// unmodified disk after checkout is not a state change — the stored data is
+    /// identical to what was checked out.
+    /// </remarks>
     public Task ReturnAsync(long diskImageId, InternalDiskImage image)
     {
         _checkedOutImages.TryRemove(diskImageId, out _);
-        MarkDirty();
-        return SaveDiskImageAsync(diskImageId, image);
+
+        if (image.IsDirty)
+        {
+            MarkDirty();
+            return SaveDiskImageAsync(diskImageId, image);
+        }
+
+        return Task.CompletedTask;
     }
 
     // Mount configuration
@@ -390,17 +402,50 @@ internal sealed class SkilletProject : ISkilletProject
     {
         return EnqueueAsync(conn =>
         {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"""
-                INSERT INTO {SkilletConstants.TableMountConfiguration} (slot, drive_number, disk_image_id, auto_mount)
-                VALUES (@slot, @drive, @diskId, 1)
-                ON CONFLICT(slot, drive_number) DO UPDATE SET disk_image_id = excluded.disk_image_id;
-                """;
-            cmd.Parameters.AddWithValue("@slot", slot);
-            cmd.Parameters.AddWithValue("@drive", driveNumber);
-            cmd.Parameters.AddWithValue("@diskId", (object?)diskImageId ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
-            MarkDirty();
+            // Read the current value first to detect real changes.
+            // This avoids false dirty when writing empty mount config for
+            // newly-discovered controller slots that weren't in the seed data.
+            long? currentDiskImageId;
+            bool rowExists;
+
+            using (var readCmd = conn.CreateCommand())
+            {
+                readCmd.CommandText = $"""
+                    SELECT disk_image_id FROM {SkilletConstants.TableMountConfiguration}
+                    WHERE slot = @slot AND drive_number = @drive;
+                    """;
+                readCmd.Parameters.AddWithValue("@slot", slot);
+                readCmd.Parameters.AddWithValue("@drive", driveNumber);
+
+                using var reader = readCmd.ExecuteReader();
+                rowExists = reader.Read();
+                currentDiskImageId = rowExists && !reader.IsDBNull(0) ? reader.GetInt64(0) : null;
+            }
+
+            // Write the value (UPSERT)
+            using (var writeCmd = conn.CreateCommand())
+            {
+                writeCmd.CommandText = $"""
+                    INSERT INTO {SkilletConstants.TableMountConfiguration} (slot, drive_number, disk_image_id, auto_mount)
+                    VALUES (@slot, @drive, @diskId, 1)
+                    ON CONFLICT(slot, drive_number) DO UPDATE SET disk_image_id = excluded.disk_image_id;
+                    """;
+                writeCmd.Parameters.AddWithValue("@slot", slot);
+                writeCmd.Parameters.AddWithValue("@drive", driveNumber);
+                writeCmd.Parameters.AddWithValue("@diskId", (object?)diskImageId ?? DBNull.Value);
+                writeCmd.ExecuteNonQuery();
+            }
+
+            // Only mark dirty if the effective state actually changed.
+            // Inserting a new row with NULL disk_image_id (just discovered a
+            // controller slot not in the seed) is not a meaningful mutation.
+            if (currentDiskImageId != diskImageId)
+            {
+                if (rowExists || diskImageId.HasValue)
+                {
+                    MarkDirty();
+                }
+            }
         });
     }
 

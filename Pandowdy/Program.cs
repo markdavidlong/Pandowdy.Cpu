@@ -95,15 +95,13 @@ namespace Pandowdy
             // Project management - ad hoc project always exists (Phase 2a)
             services.AddSingleton<ISkilletProjectManager, SkilletProjectManager>();
 
-            // IDiskImageStore - resolves from current project
-            // This allows cards to receive IDiskImageStore via constructor injection
-            services.AddSingleton<IDiskImageStore>(sp =>
-            {
-                var projectManager = sp.GetRequiredService<ISkilletProjectManager>();
-                return projectManager.CurrentProject ?? throw new InvalidOperationException("No project loaded (ad hoc project initialization failed)");
-            });
+            // IDiskImageStore - proxy that always delegates to the current project.
+            // Cards hold this reference for the emulator's lifetime; the proxy ensures
+            // they transparently use whichever project is currently open, avoiding
+            // stale references to disposed projects when the user opens/closes projects.
+            services.AddSingleton<IDiskImageStore, DiskImageStoreProxy>();
 
-            // Card factory - receives IDiskImageStore from current project
+            // Card factory - receives IDiskImageStore proxy
             services.AddSingleton<ICardFactory>(sp =>
             {
                 var cards = sp.GetServices<ICard>();
@@ -135,10 +133,12 @@ namespace Pandowdy
             services.AddSingleton<IDiskImageFactory, DiskImageFactory>();
             services.AddSingleton<IDiskIIFactory, DiskIIFactory>();
 
-            // Cards
-            services.AddTransient<ICard, NullCard>();
-            services.AddTransient<ICard, DiskIIControllerCard16Sector>();
-            services.AddTransient<ICard, DiskIIControllerCard13Sector>();
+            // Cards — singletons used as prototypes by CardFactory.Clone().
+            // CardFactory holds the template collection; actual slot cards are
+            // cloned from these prototypes, not resolved from DI.
+            services.AddSingleton<ICard, NullCard>();
+            services.AddSingleton<ICard, DiskIIControllerCard16Sector>();
+            services.AddSingleton<ICard, DiskIIControllerCard13Sector>();
 
             // Threaded rendering services
             services.AddSingleton<VideoMemorySnapshotPool>(sp => new VideoMemorySnapshotPool(maxPoolSize: 4));
@@ -157,6 +157,9 @@ namespace Pandowdy
             services.AddSingleton<ISystemStatusProvider>(sp => sp.GetRequiredService<SystemStatusProvider>());
             // Register read-write interface (inherits from ISystemStatusProvider)
             services.AddSingleton<ISystemStatusMutator>(sp => sp.GetRequiredService<SystemStatusProvider>());
+            // Register as IRestartable so RestartCollection includes it in cold boot.
+            // (Factory-based registrations aren't auto-discovered by CapabilityAwareServiceCollection.)
+            services.AddSingleton<IRestartable>(sp => sp.GetRequiredService<SystemStatusProvider>());
 
 
             // Floating Bus Provider
@@ -183,6 +186,10 @@ namespace Pandowdy
 
                 return new LanguageCard(mainRam, auxRam, systemRom, floatingBus, status);
             });
+            // Register as IRestartable so RestartCollection includes it in cold boot.
+            // (Factory-based registrations aren't auto-discovered by CapabilityAwareServiceCollection.)
+            services.AddSingleton<IRestartable>(sp => sp.GetRequiredService<ILanguageCard>() as IRestartable
+                ?? throw new InvalidOperationException("ILanguageCard must implement IRestartable"));
 
             // SystemRamSelector - uses two 48KB RAM blocks
             services.AddSingleton<ISystemRamSelector, SystemRamSelector>(sp =>
@@ -194,6 +201,10 @@ namespace Pandowdy
 
                 return new SystemRamSelector(mainRam, auxRam, floatingBus, status);
             });
+            // Register as IRestartable so RestartCollection includes it in cold boot.
+            // (Factory-based registrations aren't auto-discovered by CapabilityAwareServiceCollection.)
+            services.AddSingleton<IRestartable>(sp => sp.GetRequiredService<ISystemRamSelector>() as IRestartable
+                ?? throw new InvalidOperationException("ISystemRamSelector must implement IRestartable"));
 
             services.AddSingleton<IAppleIIBus, VA2MBus>();
 
@@ -208,14 +219,16 @@ namespace Pandowdy
             services.AddSingleton<GuiSettingsService>(); // Master GUI settings service
             services.AddSingleton<IDriveStateService, DriveStateService>();
 
-            // ViewModels
-            services.AddTransient<EmulatorStateViewModel>();
-            services.AddTransient<SystemStatusViewModel>();
-            services.AddTransient<DiskStatusPanelViewModel>();
-            services.AddTransient<CpuStatusPanelViewModel>();
-            services.AddTransient<StatusBarViewModel>();
-            services.AddTransient<PeripheralsMenuViewModel>();
-            services.AddTransient<MainWindowViewModel>();
+            // ViewModels — singletons (one UI instance each).
+            // Only DiskCard/DiskDrive widget VMs need multiple instances; those are
+            // created by DiskStatusPanelViewModel, not resolved from DI.
+            services.AddSingleton<EmulatorStateViewModel>();
+            services.AddSingleton<SystemStatusViewModel>();
+            services.AddSingleton<DiskStatusPanelViewModel>();
+            services.AddSingleton<CpuStatusPanelViewModel>();
+            services.AddSingleton<StatusBarViewModel>();
+            services.AddSingleton<PeripheralsMenuViewModel>();
+            services.AddSingleton<MainWindowViewModel>();
 
             services.AddSingleton<RestartCollection>();
 

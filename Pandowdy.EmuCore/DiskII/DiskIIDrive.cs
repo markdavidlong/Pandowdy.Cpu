@@ -158,12 +158,13 @@ public class DiskIIDrive : IDiskIIDrive
     }
 
     /// <summary>
-    /// Restores the drive to its initial power-on state (cold boot).
-    /// Head returns to track 0, phase magnets cleared. Disk media stays inserted.
+    /// Restores the drive to its initial construction-time state (cold boot).
+    /// Head returns to track 17 (construction default), diagnostic flags cleared.
+    /// Disk media stays inserted.
     /// </summary>
     public void Restart()
     {
-        _quarterSteps = 0;
+        _quarterSteps = 4 * 17;
         _hitMinLogged = false;
         _hitMaxLogged = false;
         _imageProvider?.SetQuarterTrack(_quarterSteps);

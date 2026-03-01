@@ -118,4 +118,20 @@ public class DiskStatusPanelViewModel : ReactiveObject
             allDrives[i].UpdateSnapshot(snapshot.Drives[i]);
         }
     }
+
+    /// <summary>
+    /// Propagates powered-on state to all drive widgets.
+    /// </summary>
+    /// <remarks>
+    /// When the machine is powered off, drive widgets mask their motor indicators
+    /// to show as off. The underlying status snapshot is not modified — it will be
+    /// cleaned up on the next cold boot via <see cref="IRestartable.Restart"/>.
+    /// </remarks>
+    public void SetPoweredOn(bool isPoweredOn)
+    {
+        foreach (var drive in Cards.SelectMany(card => card.Drives))
+        {
+            drive.SetPoweredOn(isPoweredOn);
+        }
+    }
 }

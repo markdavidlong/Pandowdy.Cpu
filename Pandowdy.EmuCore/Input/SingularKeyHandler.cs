@@ -209,6 +209,17 @@ public class SingularKeyHandler : IKeyboardReader, IKeyboardSetter
             _key &= 0x7F; // Clear strobe bit, preserve low 7 bits
         }
 
-        /// <inheritdoc />
-        public void Restart() => ResetKeyboard();
+        /// <summary>
+        /// Restores the keyboard handler to its initial power-on state (cold boot).
+        /// </summary>
+        /// <remarks>
+        /// Clears the key latch completely (not just the strobe bit). Unlike
+        /// <see cref="ResetKeyboard"/> (warm reset) which preserves the low 7 bits,
+        /// cold boot zeros the entire latch.
+        /// </remarks>
+        public void Restart()
+        {
+            ResetKeyboard();
+            _key = 0;
+        }
     }
