@@ -22,10 +22,9 @@ using Pandowdy.UI.ViewModels;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.Helpers;
 using Pandowdy.UI.Services;
-using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Machine;
-using Pandowdy.EmuCore.Video;
 using Pandowdy.UI._hold_;
+// ReSharper disable MethodSupportsCancellation
 
 namespace Pandowdy.UI;
 
@@ -45,7 +44,7 @@ namespace Pandowdy.UI;
 /// <para>
 /// <strong>Dependency Injection Constraint:</strong> Avalonia requires windows to have a
 /// parameterless constructor for XAML loading. To work around this limitation while maintaining
-/// testability and avoiding service locator anti-pattern, this class uses a two-phase initialization:
+/// testability and avoiding service locator antipattern, this class uses a two-phase initialization:
 /// <list type="number">
 /// <item><strong>Constructor:</strong> Parameterless, called by XAML loader, minimal initialization</item>
 /// <item><strong>Initialize():</strong> Called immediately after construction by MainWindowFactory, injects dependencies</item>
@@ -267,12 +266,12 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         var mainMenu = GetMainMenu();
         if (mainMenu != null)
         {
-            mainMenu.PointerEntered += (_, __) => _menuPointerActive = true;
-            mainMenu.PointerExited += (_, __) => _menuPointerActive = false;
+            mainMenu.PointerEntered += (_, _) => _menuPointerActive = true;
+            mainMenu.PointerExited += (_, _) => _menuPointerActive = false;
         }
 
         // Track window size changes to save "normal" bounds (for maximized restoration)
-        this.PropertyChanged += OnWindowPropertyChanged;
+        PropertyChanged += OnWindowPropertyChanged;
 
         // No FindControl calls needed - controls are available via x:Name fields (with fallback)
         // Defer attaching machine/frame until Initialize, which should be called next.
@@ -326,7 +325,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 }
                 else if (_sizeHistory.Count > 0)
                 {
-                    // Fall back to oldest entry in history if all are too recent
+                    // Fall back to the oldest entry in history if all are too recent
                     var oldest = historyArray[0];
                     _normalBounds = (oldest.Left, oldest.Top, oldest.Width, oldest.Height);
                     System.Diagnostics.Debug.WriteLine($"[MainWindow] Using oldest history entry: {_normalBounds.Value.Width}x{_normalBounds.Value.Height} at ({_normalBounds.Value.Left},{_normalBounds.Value.Top})");
@@ -428,16 +427,16 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <item><strong>ShowScanLines:</strong> Controls CRT scanline visual effect</item>
     /// <item><strong>ForceMonochrome:</strong> Controls color vs monochrome display</item>
     /// <item><strong>DecreaseContrast:</strong> Controls contrast reduction</item>
-    /// <item><strong>MonoMixed:</strong> Controls mixed mode text defring</item>
+    /// <item><strong>MonoMixed:</strong> Controls mixed mode text defringing</item>
     /// </list>
     /// </para>
     /// <para>
     /// <strong>Command Bridging:</strong> Links view model commands to code-behind event handlers:
     /// <list type="bullet">
-    /// <item>StartEmu â†’ OnEmuStartClicked</item>
-    /// <item>StopEmu â†’ OnEmuStopClicked</item>
-    /// <item>ResetEmu â†’ OnEmuResetClicked</item>
-    /// <item>StepOnce â†’ OnEmuStepOnceClicked</item>
+    /// <item>StartEmu → OnEmuStartClicked</item>
+    /// <item>StopEmu → OnEmuStopClicked</item>
+    /// <item>ResetEmu → OnEmuResetClicked</item>
+    /// <item>StepOnce → OnEmuStepOnceClicked</item>
     /// </list>
     /// </para>
     /// <para>
@@ -546,17 +545,11 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 disposables.Add(s6);
                 var s7 = vm.WhenAnyValue(x => x.ShowSoftSwitchStatus)
                     .ObserveOn(RxApp.MainThreadScheduler)
-                    .Subscribe(v =>
-                    {
-                        UpdateSoftSwitchStatusVisibility(v);
-                    });
+                    .Subscribe(UpdateSoftSwitchStatusVisibility);
                 disposables.Add(s7);
                 var s8 = vm.WhenAnyValue(x => x.ShowDiskStatus)
                     .ObserveOn(RxApp.MainThreadScheduler)
-                    .Subscribe(v =>
-                    {
-                        UpdateDiskStatusVisibility(v);
-                    });
+                    .Subscribe(UpdateDiskStatusVisibility);
                 disposables.Add(s8);
 
                 // Subscribe to Grid column width changes to sync disk panel width back to ViewModel
@@ -575,7 +568,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                             {
                                 var widthValue = newWidth.Value;
                                 // Only update if it's different (avoid feedback loop)
-                                if (System.Math.Abs(widthValue - vm.DiskPanelWidth) > 0.5)
+                                if (Math.Abs(widthValue - vm.DiskPanelWidth) > 0.5)
                                 {
                                     vm.DiskPanelWidth = widthValue;
                                 }
@@ -600,7 +593,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             }
         });
 
-        // Settings are now pre-loaded by MainWindowFactory before window creation
+        // Settings are now preloaded by MainWindowFactory before window creation
         // Just sync the column width to ensure binding is active
         SyncDiskPanelColumnWidth();
     }
@@ -710,10 +703,10 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
         // If MainWindowFactory flagged this window to be maximized, do it now
         // (after the window is shown, so restore bounds are properly set)
-        if (Tag is string tag && tag == "ShouldMaximize")
+        if (Tag is string and "ShouldMaximize")
         {
             WindowState = WindowState.Maximized;
-            Tag = null; // Clear the flag
+            Tag = null;
         }
 
         // Windows 11 workaround: Reapply saved position after a short delay
@@ -735,7 +728,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 });
         }
         // Initial startup: Reset + Start
-        Dispatcher.UIThread.Post(() => InitialStartup());
+        Dispatcher.UIThread.Post(InitialStartup);
     }
 
     /// <summary>
@@ -776,7 +769,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                         }
 
                         // Reapply position - often succeeds where the initial attempt failed
-                        Position = new Avalonia.PixelPoint(settings.Left ?? 0, settings.Top ?? 0);
+                        Position = new PixelPoint(settings.Left ?? 0, settings.Top ?? 0);
 
                         // Only reapply size if not maximized
                         if (settings.IsMaximized != true)
@@ -859,7 +852,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                         _exitConfirmed = true;
                         Close();
                     }
-                    // else: User cancelled - stay open (e.Cancel = true already set)
+                    // else: User canceled - stay open (e.Cancel = true already set)
                 }
                 catch (Exception ex)
                 {
@@ -870,8 +863,6 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     Close();
                 }
             });
-
-            return; // Exit OnClosing early - we'll close again if confirmed
         }
     }
 
@@ -1043,7 +1034,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         }
         foreach (var item in mainMenu.Items)
         {
-            if (item is MenuItem mi && mi.IsSubMenuOpen)
+            if (item is MenuItem { IsSubMenuOpen: true })
             {
                 return true;
             }
@@ -1155,7 +1146,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         lock (_emuStateLock)
         {
             // If there's a pending task that hasn't been cleaned up, wait for it
-            if (_emuTask != null && !_emuTask.IsCompleted)
+            if (_emuTask is { IsCompleted: false })
             {
                 // Already running - don't start another
                 return;
@@ -1211,7 +1202,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 }
 
                 // Update running state after stopping (only if we're the one who stopped)
-                if (ViewModel != null && ViewModel.IsRunning)
+                if (ViewModel is { IsRunning: true })
                 {
                     // IsRunning might already be false from StopEmulator - only update if needed
                     ViewModel.IsRunning = false;
@@ -1228,6 +1219,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <remarks>
     /// Delegates to StopEmulator() to cancel the emulator thread.
     /// </remarks>
+    // ReSharper disable once UnusedParameter.Local
     private void OnEmuStopClicked(object? sender, RoutedEventArgs e) => StopEmulator();
 
     /// <summary>
@@ -1280,6 +1272,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// CPU instruction completes, maintaining 6502 atomic instruction guarantees.
     /// </para>
     /// </remarks>
+    // ReSharper disable once UnusedParameter.Local
+    // ReSharper disable once UnusedParameter.Local
     private void OnEmuResetClicked(object? sender, RoutedEventArgs e)
     {
         if (_depsInjected)
@@ -1292,7 +1286,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// Handles the single-step command (execute one CPU instruction).
     /// </summary>
     /// <param name="sender">Event sender (menu item or command).</param>
-    /// <param name="e">Routed event arguments.</param>
+    /// <param name="_">Routed event arguments.</param>
     /// <remarks>
     /// <para>
     /// <strong>Step Mode:</strong> Only works when the emulator is stopped (not running).
@@ -1303,7 +1297,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// to observe CPU state changes one instruction at a time.
     /// </para>
     /// </remarks>
-    private void OnEmuStepOnceClicked(object? sender, RoutedEventArgs e)
+    // ReSharper disable once UnusedParameter.Local
+    private void OnEmuStepOnceClicked(object? sender, RoutedEventArgs _)
     {
         if (!_depsInjected || _emuCts != null || _machine is null)
         {
@@ -1429,7 +1424,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <strong>Settings Restored:</strong>
     /// <list type="bullet">
     /// <item>ShowScanLines (CRT scanline effect)</item>
-    /// <item>MonoMixed (mixed mode text defring)</item>
+    /// <item>MonoMixed (mixed mode text defringing)</item>
     /// <item>ForceMonochrome (color vs monochrome)</item>
     /// <item>DecreaseContrast (contrast reduction)</item>
     /// <item>ThrottleEnabled (CPU speed control, defaults to true)</item>
@@ -1480,11 +1475,11 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 if (data.MonoMixed.HasValue) { ViewModel.MonoMixed = data.MonoMixed.Value; }
                 if (data.ForceMonochrome.HasValue) { ViewModel.ForceMonochrome = data.ForceMonochrome.Value; }
                 if (data.DecreaseContrast.HasValue) { ViewModel.DecreaseFringing = data.DecreaseContrast.Value; }
-                if (data.CapsLockEnabled.HasValue) { ViewModel.CapsLockEnabled = data.CapsLockEnabled.Value; } else { ViewModel.CapsLockEnabled = true; }
-                if (data.ThrottleEnabled.HasValue) { ViewModel.ThrottleEnabled = data.ThrottleEnabled.Value; } else { ViewModel.ThrottleEnabled = true; }
-                if (data.ShowSoftSwitchStatus.HasValue) { ViewModel.ShowSoftSwitchStatus = data.ShowSoftSwitchStatus.Value; } else { ViewModel.ShowSoftSwitchStatus = true; }
-                if (data.ShowDiskStatus.HasValue) { ViewModel.ShowDiskStatus = data.ShowDiskStatus.Value; } else { ViewModel.ShowDiskStatus = false; }
-                if (data.DiskPanelWidth.HasValue) { ViewModel.DiskPanelWidth = data.DiskPanelWidth.Value; } else { ViewModel.DiskPanelWidth = 200.0; }
+                ViewModel.CapsLockEnabled = !data.CapsLockEnabled.HasValue || data.CapsLockEnabled.Value;
+                ViewModel.ThrottleEnabled = !data.ThrottleEnabled.HasValue || data.ThrottleEnabled.Value;
+                ViewModel.ShowSoftSwitchStatus = !data.ShowSoftSwitchStatus.HasValue || data.ShowSoftSwitchStatus.Value;
+                ViewModel.ShowDiskStatus = data.ShowDiskStatus.HasValue && data.ShowDiskStatus.Value;
+                ViewModel.DiskPanelWidth = data.DiskPanelWidth ?? 200.0;
 
                 System.Diagnostics.Debug.WriteLine($"[MainWindow.RestoreSettings] Applied to ViewModel successfully");
             }
@@ -1992,7 +1987,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// </remarks>
     private bool TryInjectSpecialKey(KeyEventArgs e)
     {
-        if ((e.KeyModifiers & KeyModifiers.Control) != 0 && e.Key >= Key.A && e.Key <= Key.Z)
+        if ((e.KeyModifiers & KeyModifiers.Control) != 0 && e.Key is >= Key.A and <= Key.Z)
         {
             byte ctrl = (byte)(e.Key - Key.A + 1);
             _machine?.EnqueueKey((byte)(ctrl | 0x80));
@@ -2001,14 +1996,14 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         }
         byte? ascii = e.Key switch
         {
-            Key.Up => (byte)0x0B,
-            Key.Down => (byte)0x0A,
-            Key.Left => (byte)0x08,
-            Key.Right => (byte)0x15,
-            Key.Delete => (byte)0x7F,
+            Key.Up => 0x0B,
+            Key.Down => 0x0A,
+            Key.Left => 0x08,
+            Key.Right => 0x15,
+            Key.Delete => 0x7F,
             Key.Enter => (byte)'\r',
             Key.Tab => (byte)'\t',
-            Key.Escape => (byte)0x1B,
+            Key.Escape => 0x1B,
             Key.Back => (e.KeyModifiers & KeyModifiers.Shift) != 0 ? (byte)0x7F : (byte)0x08,
             _ => null
         };

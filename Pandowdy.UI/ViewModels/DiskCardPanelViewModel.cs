@@ -6,7 +6,6 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
-using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.Machine;
 using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DiskII.Messages;

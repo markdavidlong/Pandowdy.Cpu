@@ -63,7 +63,7 @@ public class MessageBoxService(ISkilletProjectManager projectManager) : IMessage
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Content = new StackPanel
             {
-                Margin = new Avalonia.Thickness(20),
+                Margin = new Thickness(20),
                 Spacing = 20,
                 Children =
                 {
@@ -117,7 +117,7 @@ public class MessageBoxService(ISkilletProjectManager projectManager) : IMessage
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Content = new StackPanel
             {
-                Margin = new Avalonia.Thickness(20),
+                Margin = new Thickness(20),
                 Spacing = 20,
                 Children =
                 {

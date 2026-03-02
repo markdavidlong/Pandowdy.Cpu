@@ -3,7 +3,6 @@
 // See LICENSE file for details
 
 using ReactiveUI;
-using Pandowdy.EmuCore.Machine;
 using Pandowdy.EmuCore.IO;
 using System;
 

@@ -8,9 +8,7 @@ using Pandowdy.UI.ViewModels;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.Helpers;
 using Pandowdy.UI.Services;
-using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Machine;
-using Pandowdy.EmuCore.Video;
 
 namespace Pandowdy.UI;
 

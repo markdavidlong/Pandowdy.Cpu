@@ -73,7 +73,7 @@ public class DiskStatusWidgetViewModel : ReactiveObject
 
         // Check if project library has disk images (disable Insert when empty)
         var diskImages = _projectManager.CurrentProject?.GetAllDiskImagesAsync().GetAwaiter().GetResult();
-        var hasLibraryImages = diskImages != null && diskImages.Count > 0;
+        var hasLibraryImages = diskImages is { Count: > 0 };
         _hasLibraryImages = new System.Reactive.Subjects.BehaviorSubject<bool>(hasLibraryImages);
 
         // Commands that show file dialogs

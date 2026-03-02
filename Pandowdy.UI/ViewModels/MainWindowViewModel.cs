@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using System.Reactive;
 using System.Threading.Tasks;
-using Avalonia.Controls;
 using ReactiveUI;
 using Pandowdy.EmuCore.DiskII.Messages;
 using Pandowdy.EmuCore.Machine;
@@ -1127,7 +1126,7 @@ public sealed class MainWindowViewModel : ReactiveObject
     private async Task NewProjectAsync()
     {
         // Check for unsaved changes in current project
-        if (_project != null && _project.HasUnsavedChanges)
+        if (_project is { HasUnsavedChanges: true })
         {
             var save = await _messageBoxService.ShowConfirmationAsync(
                 "Unsaved Changes",
@@ -1181,7 +1180,7 @@ public sealed class MainWindowViewModel : ReactiveObject
     private async Task OpenProjectAsync()
     {
         // Check for unsaved changes in current project
-        if (_project != null && _project.HasUnsavedChanges)
+        if (_project is { HasUnsavedChanges: true })
         {
             var save = await _messageBoxService.ShowConfirmationAsync(
                 "Unsaved Changes",
@@ -1400,7 +1399,7 @@ public sealed class MainWindowViewModel : ReactiveObject
 
         foreach (var config in mountConfigs)
         {
-            if (config.AutoMount && config.DiskImageId.HasValue)
+            if (config is { AutoMount: true, DiskImageId: not null })
             {
                 try
                 {
@@ -1572,7 +1571,7 @@ public sealed class MainWindowViewModel : ReactiveObject
     public async Task<bool> OnClosingAsync()
     {
         // Check for project unsaved changes
-        if (_project != null && _project.HasUnsavedChanges)
+        if (_project is { HasUnsavedChanges: true })
         {
             var projectName = _project.IsAdHoc
                 ? "untitled"

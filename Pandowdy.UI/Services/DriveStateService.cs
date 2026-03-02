@@ -2,15 +2,12 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DiskII;
-using Pandowdy.EmuCore.Machine;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.Models;
 using System;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -203,7 +200,7 @@ public class DriveStateService(
             var card = _slots.GetCardIn(slotNumber);
 
             // Verify it's a Disk II controller
-            if (card is not Pandowdy.EmuCore.DiskII.DiskIIControllerCard diskController)
+            if (card is not DiskIIControllerCard diskController)
             {
                 System.Diagnostics.Debug.WriteLine($"[DriveStateService] Slot {controller.Slot} is not a Disk II controller");
                 continue;
@@ -267,7 +264,7 @@ public class DriveStateService(
             var card = _slots.GetCardIn(slotNumber);
 
             // Verify it's a Disk II controller
-            if (card is not Pandowdy.EmuCore.DiskII.DiskIIControllerCard diskController)
+            if (card is not DiskIIControllerCard diskController)
             {
                 System.Diagnostics.Debug.WriteLine($"[DriveStateService] Slot {entry.Slot} is not a Disk II controller");
                 continue;

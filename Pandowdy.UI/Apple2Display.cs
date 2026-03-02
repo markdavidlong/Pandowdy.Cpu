@@ -10,8 +10,6 @@ using Avalonia.Input.Platform;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-
-using Pandowdy.EmuCore;
 using Pandowdy.EmuCore.Machine;
 using Pandowdy.EmuCore.Video;
 using Pandowdy.EmuCore.DataTypes;
@@ -993,7 +991,7 @@ bool showScanLines)
     /// </summary>
     /// <param name="key">Key to check.</param>
     /// <returns>True if key is between F1 and F24 inclusive.</returns>
-    private static bool IsFunctionKey(Key key) => key >= Key.F1 && key <= Key.F24;
+    private static bool IsFunctionKey(Key key) => key is >= Key.F1 and <= Key.F24;
 
     /// <summary>
     /// Attaches the emulator core control interface to this display control.
@@ -1083,7 +1081,7 @@ bool showScanLines)
             // Apply emulator caps lock conversion if:
             // 1. Emulator caps lock is enabled, AND
             // 2. Character is lowercase (from keyboard)
-            if (emuCapsLockState && c >= 'a' && c <= 'z')
+            if (emuCapsLockState && c is >= 'a' and <= 'z')
             {
                 c = (char) (c - 32);  // Convert lowercase to uppercase
             }
@@ -1148,7 +1146,7 @@ bool showScanLines)
             _suppressNextTextInput = true;
             return;
         }
-        if ((e.KeyModifiers & KeyModifiers.Control) != 0 && e.Key >= Key.A && e.Key <= Key.Z)
+        if ((e.KeyModifiers & KeyModifiers.Control) != 0 && e.Key is >= Key.A and <= Key.Z)
         {
             byte ctrl = (byte) (e.Key - Key.A + 1);
             _machine.EnqueueKey((byte) (ctrl | 0x80));
@@ -1157,14 +1155,14 @@ bool showScanLines)
         }
         byte? ascii = e.Key switch
         {
-            Key.Up => (byte) 0x0B,
-            Key.Down => (byte) 0x0A,
-            Key.Left => (byte) 0x08,
-            Key.Right => (byte) 0x15,
-            Key.Delete => (byte) 0x7F,
+            Key.Up => 0x0B,
+            Key.Down => 0x0A,
+            Key.Left => 0x08,
+            Key.Right => 0x15,
+            Key.Delete => 0x7F,
             Key.Enter => (byte) '\r',
             Key.Tab => (byte) '\t',
-            Key.Escape => (byte) 0x1B,
+            Key.Escape => 0x1B,
             Key.Back => (e.KeyModifiers & KeyModifiers.Shift) != 0 ? (byte) 0x7F : (byte) 0x08,
             _ => null
         };
@@ -1282,7 +1280,7 @@ bool showScanLines)
                 }
 
                 // Apply emulator caps lock if enabled and character is lowercase
-                if (emuCapsLockState && c >= 'a' && c <= 'z')
+                if (emuCapsLockState && c is >= 'a' and <= 'z')
                 {
                     c = (char)(c - 32); // Convert to uppercase
                 }

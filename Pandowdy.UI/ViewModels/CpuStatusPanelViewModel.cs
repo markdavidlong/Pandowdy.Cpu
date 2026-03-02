@@ -7,7 +7,6 @@ using Pandowdy.EmuCore.Machine;
 using Pandowdy.EmuCore.Memory;
 using System.Reactive.Linq;
 using ReactiveUI;
-using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.Disassembler;
 
