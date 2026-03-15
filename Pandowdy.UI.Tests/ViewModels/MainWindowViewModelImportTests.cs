@@ -24,6 +24,13 @@ namespace Pandowdy.UI.Tests.ViewModels;
 /// </summary>
 public class MainWindowViewModelImportTests
 {
+    /// <summary>
+    /// Path to the shared TestImages folder in Pandowdy.EmuCore.Tests.
+    /// These images are copied to the output directory by the build.
+    /// </summary>
+    private static string TestImagesFolder =>
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Pandowdy.EmuCore.Tests", "TestImages");
+
     #region Test Helpers
 
     /// <summary>
@@ -197,14 +204,14 @@ public class MainWindowViewModelImportTests
     {
         // Arrange
         var fixture = new ImportTestFixture();
-        var testFilePath = "C:\\disks\\loderunner.woz";
+        var testFilePath = Path.Combine(TestImagesFolder, "test.woz");
         
         fixture.MockDiskFileDialogService
             .Setup(s => s.ShowOpenFileDialogAsync())
             .ReturnsAsync(testFilePath);
         
         fixture.MockProject
-            .Setup(p => p.ImportDiskImageAsync(testFilePath, "loderunner"))
+            .Setup(p => p.ImportDiskImageAsync(testFilePath, "test"))
             .ReturnsAsync(42L); // Return disk image ID
 
         // Act
@@ -212,7 +219,7 @@ public class MainWindowViewModelImportTests
 
         // Assert
         fixture.MockProject.Verify(
-            p => p.ImportDiskImageAsync(testFilePath, "loderunner"),
+            p => p.ImportDiskImageAsync(testFilePath, "test"),
             Times.Once);
     }
 
@@ -221,7 +228,7 @@ public class MainWindowViewModelImportTests
     {
         // Arrange
         var fixture = new ImportTestFixture();
-        var testFilePath = "C:\\disks\\karateka.nib";
+        var testFilePath = Path.Combine(TestImagesFolder, "prodos.woz");
         var diskImageId = 123L;
         
         fixture.MockDiskFileDialogService
@@ -229,7 +236,7 @@ public class MainWindowViewModelImportTests
             .ReturnsAsync(testFilePath);
         
         fixture.MockProject
-            .Setup(p => p.ImportDiskImageAsync(testFilePath, "karateka"))
+            .Setup(p => p.ImportDiskImageAsync(testFilePath, "prodos"))
             .ReturnsAsync(diskImageId);
 
         // Act
@@ -239,7 +246,7 @@ public class MainWindowViewModelImportTests
         fixture.MockMessageBoxService.Verify(
             s => s.ShowErrorAsync(
                 "Import Successful",
-                It.Is<string>(msg => msg.Contains("karateka") && msg.Contains("123"))),
+                It.Is<string>(msg => msg.Contains("prodos") && msg.Contains("123"))),
             Times.Once);
     }
 
@@ -248,7 +255,7 @@ public class MainWindowViewModelImportTests
     {
         // Arrange
         var fixture = new ImportTestFixture();
-        var testFilePath = "C:\\disks\\corrupt.dsk";
+        var testFilePath = Path.Combine(TestImagesFolder, "audit.dsk");
         var errorMessage = "Invalid disk image format";
         
         fixture.MockDiskFileDialogService
@@ -256,7 +263,7 @@ public class MainWindowViewModelImportTests
             .ReturnsAsync(testFilePath);
         
         fixture.MockProject
-            .Setup(p => p.ImportDiskImageAsync(testFilePath, "corrupt"))
+            .Setup(p => p.ImportDiskImageAsync(testFilePath, "audit"))
             .ThrowsAsync(new ArgumentException(errorMessage));
 
         // Act
@@ -275,14 +282,14 @@ public class MainWindowViewModelImportTests
     {
         // Arrange
         var fixture = new ImportTestFixture();
-        var testFilePath = "C:\\apple2\\games\\prince-of-persia.woz";
+        var testFilePath = Path.Combine(TestImagesFolder, "David-DOS.woz");
         
         fixture.MockDiskFileDialogService
             .Setup(s => s.ShowOpenFileDialogAsync())
             .ReturnsAsync(testFilePath);
         
         fixture.MockProject
-            .Setup(p => p.ImportDiskImageAsync(testFilePath, "prince-of-persia"))
+            .Setup(p => p.ImportDiskImageAsync(testFilePath, "David-DOS"))
             .ReturnsAsync(1L);
 
         // Act
@@ -290,7 +297,7 @@ public class MainWindowViewModelImportTests
 
         // Assert
         fixture.MockProject.Verify(
-            p => p.ImportDiskImageAsync(testFilePath, "prince-of-persia"),
+            p => p.ImportDiskImageAsync(testFilePath, "David-DOS"),
             Times.Once);
     }
 
@@ -299,14 +306,14 @@ public class MainWindowViewModelImportTests
     {
         // Arrange
         var fixture = new ImportTestFixture();
-        var testFilePath = "C:\\My Documents\\Apple II Software\\DOS 3.3 System Master.dsk";
+        var testFilePath = Path.Combine(TestImagesFolder, "Copy II Plus v4.3.woz");
         
         fixture.MockDiskFileDialogService
             .Setup(s => s.ShowOpenFileDialogAsync())
             .ReturnsAsync(testFilePath);
         
         fixture.MockProject
-            .Setup(p => p.ImportDiskImageAsync(testFilePath, "DOS 3.3 System Master"))
+            .Setup(p => p.ImportDiskImageAsync(testFilePath, "Copy II Plus v4.3"))
             .ReturnsAsync(99L);
 
         // Act
@@ -314,7 +321,7 @@ public class MainWindowViewModelImportTests
 
         // Assert
         fixture.MockProject.Verify(
-            p => p.ImportDiskImageAsync(testFilePath, "DOS 3.3 System Master"),
+            p => p.ImportDiskImageAsync(testFilePath, "Copy II Plus v4.3"),
             Times.Once);
     }
 
