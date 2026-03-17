@@ -3,10 +3,15 @@
 // See LICENSE file for details
 
 using Pandowdy.Cpu;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Input;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Memory;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DataTypes;
+using Pandowdy.EmuCore.Video;
 
+using Pandowdy.EmuCore.DiskII;
 namespace Pandowdy.EmuCore.Tests.Helpers;
 
 /// <summary>
@@ -144,7 +149,8 @@ public static class VA2MTestHelpers
                 _diskStatusProvider!,
                 _clockCounters!,
                 _memoryInspector!,
-                _slots!
+                _slots!,
+                new RestartCollection([])
             );
         }
     }
@@ -310,6 +316,8 @@ public class TestAppleIIBus : IAppleIIBus
     public bool GetPushButton(int num) => num >= 0 && num < 3 && _pushButtons[num];
     public int ResetCount => _resetCount;
     public int UserResetCount => _userResetCount;
+
+    public void Restart() => Reset();
 }
 
 /// <summary>

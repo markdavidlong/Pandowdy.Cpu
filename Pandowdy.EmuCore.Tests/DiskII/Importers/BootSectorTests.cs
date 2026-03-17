@@ -114,7 +114,7 @@ public class BootSectorTests(ITestOutputHelper output)
         byte[] physicalSector0 = new byte[256];
         using (var fs = File.OpenRead(TestDiskImages.TestDo))
         {
-            fs.Read(physicalSector0, 0, 256);
+            fs.ReadExactly(physicalSector0, 0, 256);
         }
 
         _output.WriteLine("First 64 bytes of physical sector 0 from file:");

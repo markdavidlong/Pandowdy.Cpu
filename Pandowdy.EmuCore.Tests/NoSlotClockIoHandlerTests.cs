@@ -3,7 +3,8 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -65,6 +66,8 @@ public class NoSlotClockIoHandlerTests
             ReadCount = 0;
             WriteCount = 0;
         }
+
+        public void Restart() => Reset();
     }
 
     /// <summary>

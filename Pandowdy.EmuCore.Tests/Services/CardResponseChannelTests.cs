@@ -3,9 +3,8 @@
 // See LICENSE file for details
 
 using System.Reactive.Linq;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Messages;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Slots;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.Tests.Services;
 

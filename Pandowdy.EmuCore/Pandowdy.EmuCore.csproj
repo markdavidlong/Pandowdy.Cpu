@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <!-- Disable TypeScript compilation - _docs_ contains reference TS files only -->
@@ -18,7 +19,7 @@
     <ProjectReference Include="..\legacy\CiderPress2\CommonUtil\CommonUtil.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\DiskArc\DiskArc.csproj" />
     <ProjectReference Include="..\Pandowdy.Cpu\Pandowdy.Cpu\Pandowdy.Cpu.csproj" />
-    <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
+    <PackageReference Include="System.IO.Hashing" Version="10.0.3" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
   </ItemGroup>
 

@@ -11,6 +11,9 @@ trim_trailing_whitespace = true
 # Encoding
 charset = utf-8
 
+file_header_template = // Copyright 2026 Mark D. Long\n// Licensed under the Apache License, Version 2.0\n// See LICENSE file for details\n\n
+
+
 # Always require braces for control flow statements
 csharp_prefer_braces = always:error
 # Enforce analyzer IDE0011 (add braces) as error

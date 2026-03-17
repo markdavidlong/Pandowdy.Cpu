@@ -2,7 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Memory;
 
 namespace Pandowdy.EmuCore.Tests.Helpers;
 
@@ -41,6 +43,8 @@ public sealed class TestLanguageCard : ILanguageCard
     /// Ignores all writes (no-op).
     /// </summary>
     public void Write(ushort address, byte value) { /* No-op */ }
+
+    public void Restart() { /* No-op */ }
 }
 
 /// <summary>
@@ -62,6 +66,8 @@ public sealed class TestSystemRam(int size) : ISystemRam
     {
         _memory.AsSpan().CopyTo(destination);
     }
+
+    public void Clear() => Array.Clear(_memory);
 }
 
 /// <summary>
@@ -124,6 +130,8 @@ public sealed class TestSystemRamSelector : ISystemRamSelector
         destination.Fill(0xFF);
         return true;
     }
+
+    public void Restart() { /* No-op */ }
 }
 
 public sealed class Test64KSystemRamSelector : ISystemRamSelector
@@ -147,6 +155,8 @@ public sealed class Test64KSystemRamSelector : ISystemRamSelector
         data.AsSpan().CopyTo(destination);
         return true;
     }
+
+    public void Restart() { /* No-op */ }
 }
 
 /// <summary>

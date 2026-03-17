@@ -3,7 +3,7 @@
 // See LICENSE file for details
 
 using System.Diagnostics;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.DiskII.Providers;
 

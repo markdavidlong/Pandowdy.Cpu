@@ -3,13 +3,16 @@
 // See LICENSE file for details
 
 using System.Reactive.Subjects;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Memory;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Messages;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Video;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.ViewModels;
 
+using Pandowdy.EmuCore.DiskII;
 namespace Pandowdy.UI.Tests.ViewModels;
 
 /// <summary>
@@ -64,7 +67,9 @@ public class EmulatorStateViewModelTests
         public void SetPushButton(byte button, bool pressed) { }
         public void EnqueueKey(byte key) { }
         public void ResetKeyboard() { }
-        public void Reset() { }
+        public void DoReset() { }
+        public void DoRestart() { }
+        public void Restart() { }
     }
 
     /// <summary>

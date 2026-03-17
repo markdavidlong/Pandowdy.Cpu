@@ -36,7 +36,7 @@ namespace Pandowdy.EmuCore.DataTypes;
 /// is required. Reads via <see cref="GetBit"/> are safe as long as no concurrent writes occur.
 /// </para>
 /// <para>
-/// <strong>Usage in Pandowdy:</strong> Used by <see cref="BitmapDataArray"/> to
+/// <strong>Usage in Pandowdy:</strong> Used by <see cref="Video.BitmapDataArray"/> to
 /// manage per-pixel flags across 16 bitplanes, enabling efficient packed storage
 /// of multiple boolean attributes per pixel (e.g., color, intensity, visibility).
 /// </para>

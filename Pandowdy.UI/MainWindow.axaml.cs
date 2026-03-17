@@ -22,9 +22,9 @@ using Pandowdy.UI.ViewModels;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.Helpers;
 using Pandowdy.UI.Services;
-using Pandowdy.EmuCore;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
 using Pandowdy.UI._hold_;
+// ReSharper disable MethodSupportsCancellation
 
 namespace Pandowdy.UI;
 
@@ -44,7 +44,7 @@ namespace Pandowdy.UI;
 /// <para>
 /// <strong>Dependency Injection Constraint:</strong> Avalonia requires windows to have a
 /// parameterless constructor for XAML loading. To work around this limitation while maintaining
-/// testability and avoiding service locator anti-pattern, this class uses a two-phase initialization:
+/// testability and avoiding service locator antipattern, this class uses a two-phase initialization:
 /// <list type="number">
 /// <item><strong>Constructor:</strong> Parameterless, called by XAML loader, minimal initialization</item>
 /// <item><strong>Initialize():</strong> Called immediately after construction by MainWindowFactory, injects dependencies</item>
@@ -77,7 +77,7 @@ namespace Pandowdy.UI;
 /// var factory = serviceProvider.GetRequiredService&lt;IMainWindowFactory&gt;();
 /// var mainWindow = factory.Create();
 /// mainWindow.Show();
-/// 
+///
 /// // Incorrect: Manual construction
 /// var mainWindow = new MainWindow(); // Missing dependencies!
 /// </code>
@@ -88,14 +88,14 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     #region Private Fields
 
     //  private readonly AppHook mAppHook = new(new SimpleMessageLog());
-    
+
     /// <summary>
     /// Temporary disk read test functionality (will be removed in future refactoring).
     /// </summary>
 #pragma warning disable CS0169 // Field is never used - reserved for future disk image support
     private DiskReadTestTemp? mDiskReadTest;
 #pragma warning restore CS0169
-    
+
     /// <summary>
     /// Last used directory path for disk file operations.
     /// </summary>
@@ -113,7 +113,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// and execution control via RunAsync, Clock, and ThrottleEnabled.
     /// </remarks>
     private IEmulatorCoreInterface? _machine;
-    
+
     /// <summary>
     /// Cancellation token source for controlling emulator thread lifetime.
     /// </summary>
@@ -158,7 +158,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// True while mouse pointer is over the menu bar (prevents keyboard capture).
     /// </summary>
     private bool _menuPointerActive;
-    
+
     /// <summary>
     /// Guard flag ensuring Initialize() is called exactly once.
     /// </summary>
@@ -252,7 +252,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// // Correct: Use factory
     /// var factory = serviceProvider.GetRequiredService&lt;IMainWindowFactory&gt;();
     /// var window = factory.Create();
-    /// 
+    ///
     /// // Incorrect: Manual construction (missing dependencies!)
     /// var window = new MainWindow();
     /// </code>
@@ -261,18 +261,18 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     public MainWindow()
     {
         InitializeComponent();
-        
+
         // Setup menu interaction handlers using x:Name generated field or fallback
         var mainMenu = GetMainMenu();
         if (mainMenu != null)
         {
-            mainMenu.PointerEntered += (_, __) => _menuPointerActive = true;
-            mainMenu.PointerExited += (_, __) => _menuPointerActive = false;
+            mainMenu.PointerEntered += (_, _) => _menuPointerActive = true;
+            mainMenu.PointerExited += (_, _) => _menuPointerActive = false;
         }
-        
+
         // Track window size changes to save "normal" bounds (for maximized restoration)
-        this.PropertyChanged += OnWindowPropertyChanged;
-        
+        PropertyChanged += OnWindowPropertyChanged;
+
         // No FindControl calls needed - controls are available via x:Name fields (with fallback)
         // Defer attaching machine/frame until Initialize, which should be called next.
     }
@@ -288,26 +288,26 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             var oldState = _previousWindowState;
             var newState = WindowState;
             System.Diagnostics.Debug.WriteLine($"[MainWindow] WindowState changed: {oldState} â†’ {newState}");
-            
+
             _previousWindowState = newState;
-            
+
             // If transitioning TO Maximized, find the last valid user-set size from history
             if (oldState == WindowState.Normal && newState == WindowState.Maximized)
             {
                 var now = DateTime.UtcNow;
                 var threshold = TimeSpan.FromMilliseconds(SizeHistoryThresholdMs);
-                
+
                 // Walk backwards through history to find a size that's old enough to be a real user action
                 (int Left, int Top, int Width, int Height)? validBounds = null;
                 var historyArray = _sizeHistory.ToArray();
-                
+
                 for (int i = historyArray.Length - 1; i >= 0; i--)
                 {
                     var entry = historyArray[i];
                     var age = now - entry.Timestamp;
-                    
+
                     System.Diagnostics.Debug.WriteLine($"[MainWindow] History[{i}]: {entry.Width}x{entry.Height} at ({entry.Left},{entry.Top}) age={age.TotalMilliseconds:F0}ms");
-                    
+
                     // Find the first entry that's older than our threshold
                     if (age >= threshold)
                     {
@@ -316,7 +316,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                         break;
                     }
                 }
-                
+
                 // If we found a valid historical size, use it; otherwise fall back to current
                 if (validBounds.HasValue)
                 {
@@ -325,7 +325,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 }
                 else if (_sizeHistory.Count > 0)
                 {
-                    // Fall back to oldest entry in history if all are too recent
+                    // Fall back to the oldest entry in history if all are too recent
                     var oldest = historyArray[0];
                     _normalBounds = (oldest.Left, oldest.Top, oldest.Width, oldest.Height);
                     System.Diagnostics.Debug.WriteLine($"[MainWindow] Using oldest history entry: {_normalBounds.Value.Width}x{_normalBounds.Value.Height} at ({_normalBounds.Value.Left},{_normalBounds.Value.Top})");
@@ -339,7 +339,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             }
             return;
         }
-        
+
         // Track size changes in history ONLY when in Normal state
         if ((e.Property == WidthProperty || e.Property == HeightProperty))
         {
@@ -351,16 +351,16 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 var newWidth = (int)Width;
                 var newHeight = (int)Height;
                 var now = DateTime.UtcNow;
-                
+
                 // Add to circular buffer
                 _sizeHistory.Enqueue((newLeft, newTop, newWidth, newHeight, now));
-                
+
                 // Keep buffer size limited
                 while (_sizeHistory.Count > MaxSizeHistoryCount)
                 {
                     _sizeHistory.Dequeue();
                 }
-                
+
                 // Also update _normalBounds directly for non-maximize scenarios
                 _normalBounds = (newLeft, newTop, newWidth, newHeight);
                 System.Diagnostics.Debug.WriteLine($"[MainWindow] Added to history: {newWidth}x{newHeight} at ({newLeft},{newTop}) (history size={_sizeHistory.Count})");
@@ -374,6 +374,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <param name="viewModel">Main window view model containing UI state and commands.</param>
     /// <param name="machine">Emulator core control interface providing complete control surface.</param>
     /// <param name="refreshTicker">60 Hz ticker for driving display updates.</param>
+    /// <param name="driveStateService">Service for saving and restoring disk drive state.</param>
+    /// <param name="guiSettingsService">Master GUI settings service for persisting display preferences.</param>
     /// <exception cref="InvalidOperationException">Thrown if Initialize() is called more than once.</exception>
     /// <remarks>
     /// <para>
@@ -383,8 +385,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// </para>
     /// <para>
     /// <strong>Simplified Dependencies:</strong> With <see cref="IEmulatorCoreInterface"/> observable
-    /// accessors, this method now only needs 3 parameters instead of 4. Frame provider is accessed
-    /// through <see cref="IEmulatorCoreInterface.FrameProvider"/> instead of being a separate parameter.
+    /// accessors, the frame provider is accessed through <see cref="IEmulatorCoreInterface.FrameProvider"/>
+    /// instead of being a separate parameter.
     /// </para>
     /// <para>
     /// <strong>Dependency Injection:</strong> This method accepts:
@@ -425,16 +427,16 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <item><strong>ShowScanLines:</strong> Controls CRT scanline visual effect</item>
     /// <item><strong>ForceMonochrome:</strong> Controls color vs monochrome display</item>
     /// <item><strong>DecreaseContrast:</strong> Controls contrast reduction</item>
-    /// <item><strong>MonoMixed:</strong> Controls mixed mode text defring</item>
+    /// <item><strong>MonoMixed:</strong> Controls mixed mode text defringing</item>
     /// </list>
     /// </para>
     /// <para>
     /// <strong>Command Bridging:</strong> Links view model commands to code-behind event handlers:
     /// <list type="bullet">
-    /// <item>StartEmu â†’ OnEmuStartClicked</item>
-    /// <item>StopEmu â†’ OnEmuStopClicked</item>
-    /// <item>ResetEmu â†’ OnEmuResetClicked</item>
-    /// <item>StepOnce â†’ OnEmuStepOnceClicked</item>
+    /// <item>StartEmu → OnEmuStartClicked</item>
+    /// <item>StopEmu → OnEmuStopClicked</item>
+    /// <item>ResetEmu → OnEmuResetClicked</item>
+    /// <item>StepOnce → OnEmuStepOnceClicked</item>
     /// </list>
     /// </para>
     /// <para>
@@ -473,7 +475,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         {
             throw new InvalidOperationException("ScreenDisplay control not found. Ensure x:Name='ScreenDisplay' is set in XAML.");
         }
-        
+
         // Initialize status panel with its view model
         var statusPanel = SoftSwitchStatusPanel ?? this.FindControl<SoftSwitchStatusPanel>("SoftSwitchStatusPanel");
         statusPanel?.Initialize(viewModel.SystemStatus);
@@ -543,17 +545,11 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 disposables.Add(s6);
                 var s7 = vm.WhenAnyValue(x => x.ShowSoftSwitchStatus)
                     .ObserveOn(RxApp.MainThreadScheduler)
-                    .Subscribe(v =>
-                    {
-                        UpdateSoftSwitchStatusVisibility(v);
-                    });
+                    .Subscribe(UpdateSoftSwitchStatusVisibility);
                 disposables.Add(s7);
                 var s8 = vm.WhenAnyValue(x => x.ShowDiskStatus)
                     .ObserveOn(RxApp.MainThreadScheduler)
-                    .Subscribe(v =>
-                    {
-                        UpdateDiskStatusVisibility(v);
-                    });
+                    .Subscribe(UpdateDiskStatusVisibility);
                 disposables.Add(s8);
 
                 // Subscribe to Grid column width changes to sync disk panel width back to ViewModel
@@ -572,7 +568,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                             {
                                 var widthValue = newWidth.Value;
                                 // Only update if it's different (avoid feedback loop)
-                                if (System.Math.Abs(widthValue - vm.DiskPanelWidth) > 0.5)
+                                if (Math.Abs(widthValue - vm.DiskPanelWidth) > 0.5)
                                 {
                                     vm.DiskPanelWidth = widthValue;
                                 }
@@ -592,10 +588,12 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 disposables.Add(c4);
                 var c5 = vm.TogglePauseOrContinue.Subscribe(_ => OnTogglePauseOrContinue());
                 disposables.Add(c5);
+                var c6 = vm.TogglePower.Subscribe(_ => TogglePower());
+                disposables.Add(c6);
             }
         });
 
-        // Settings are now pre-loaded by MainWindowFactory before window creation
+        // Settings are now preloaded by MainWindowFactory before window creation
         // Just sync the column width to ensure binding is active
         SyncDiskPanelColumnWidth();
     }
@@ -645,7 +643,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             diskPanel.IsVisible = isVisible;
         }
     }
-    
+
     /// <summary>
     /// Gets the Apple2Display control with fallback to FindControl.
     /// </summary>
@@ -654,7 +652,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// First attempts to use the x:Name generated field, falls back to FindControl if needed.
     /// </remarks>
     private Apple2Display? GetScreenDisplay() => ScreenDisplay ?? this.FindControl<Apple2Display>("ScreenDisplay");
-    
+
     /// <summary>
     /// Gets the main menu control with fallback to FindControl.
     /// </summary>
@@ -702,22 +700,22 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     {
         base.OnOpened(e);
         if (!_depsInjected) { return; }
-        
+
         // If MainWindowFactory flagged this window to be maximized, do it now
         // (after the window is shown, so restore bounds are properly set)
-        if (Tag is string tag && tag == "ShouldMaximize")
+        if (Tag is string and "ShouldMaximize")
         {
             WindowState = WindowState.Maximized;
-            Tag = null; // Clear the flag
+            Tag = null;
         }
-        
+
         // Windows 11 workaround: Reapply saved position after a short delay
         // This gives Windows 11 time to do its "smart" placement, then we override it with our saved position
         ApplyWindows11PositionFallback();
-        
+
         var screenDisplay = ScreenDisplay ?? this.FindControl<Apple2Display>("ScreenDisplay");
         screenDisplay?.Focus();
-        
+
         if (_refreshTicker != null && screenDisplay != null)
         {
             _refreshTicker.Start();
@@ -730,7 +728,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 });
         }
         // Initial startup: Reset + Start
-        Dispatcher.UIThread.Post(() => InitialStartup());
+        Dispatcher.UIThread.Post(InitialStartup);
     }
 
     /// <summary>
@@ -771,7 +769,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                         }
 
                         // Reapply position - often succeeds where the initial attempt failed
-                        Position = new Avalonia.PixelPoint(settings.Left ?? 0, settings.Top ?? 0);
+                        Position = new PixelPoint(settings.Left ?? 0, settings.Top ?? 0);
 
                         // Only reapply size if not maximized
                         if (settings.IsMaximized != true)
@@ -854,7 +852,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                         _exitConfirmed = true;
                         Close();
                     }
-                    // else: User cancelled - stay open (e.Cancel = true already set)
+                    // else: User canceled - stay open (e.Cancel = true already set)
                 }
                 catch (Exception ex)
                 {
@@ -865,8 +863,6 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     Close();
                 }
             });
-
-            return; // Exit OnClosing early - we'll close again if confirmed
         }
     }
 
@@ -1038,7 +1034,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         }
         foreach (var item in mainMenu.Items)
         {
-            if (item is MenuItem mi && mi.IsSubMenuOpen)
+            if (item is MenuItem { IsSubMenuOpen: true })
             {
                 return true;
             }
@@ -1081,48 +1077,28 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     #region Emulator Control Methods
 
     /// <summary>
-    /// Performs initial emulator startup (called once when window opens).
+    /// Performs initial setup when the window opens.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <strong>Purpose:</strong> Separates initial startup from Debug→Start menu functionality.
-    /// Initial startup requires a reset to establish known state, while Start menu should
-    /// resume execution without resetting.
-    /// </para>
-    /// <para>
-    /// <strong>Startup Sequence:</strong>
-    /// <list type="number">
-    /// <item>Restore disk images from saved drive state (_driveStateService.LoadAndRestoreDriveStateAsync())</item>
-    /// <item>Reset machine to initial state (_machine.Reset())</item>
-    /// <item>Start emulator thread (OnEmuStartClicked)</item>
-    /// </list>
+    /// The emulator starts in the powered-off state per the PowerCycle blueprint.
+    /// Drive state has already been restored by MainWindowFactory. The machine
+    /// remains off until the user explicitly powers it on via Emulator → Power
+    /// (Ctrl+Alt+P).
     /// </para>
     /// <para>
     /// <strong>Called From:</strong> OnOpened event handler after window initialization completes.
-    /// </para>
-    /// <para>
-    /// <strong>Architecture:</strong> Disk restoration happens here (GUI layer) rather than in
-    /// Program.InitializeCoreAsync (core layer) to maintain proper separation between hardware
-    /// setup (core) and user state restoration (GUI).
     /// </para>
     /// </remarks>
     private void InitialStartup()
     {
         if (!_depsInjected || _machine is null) { return; }
 
-        System.Diagnostics.Debug.WriteLine("[MainWindow] === Initial Startup Sequence ===");
+        System.Diagnostics.Debug.WriteLine("[MainWindow] === Initial Startup (powered off) ===");
 
-        // Note: Drive state restoration is now handled in MainWindowFactory.Create()
-        // before the window is created, so disk images are already loaded at this point
-
-        // Reset to establish known initial state
-        System.Diagnostics.Debug.WriteLine("[MainWindow] Resetting machine to initial state");
-        _machine.Reset();
-
-        // Start emulator thread
-        System.Diagnostics.Debug.WriteLine("[MainWindow] Starting emulator thread");
-        OnEmuStartClicked(this, new RoutedEventArgs());
-        System.Diagnostics.Debug.WriteLine("[MainWindow] === Startup Sequence Complete ===");
+        // Machine starts powered off. The display will show a blank (black) screen
+        // until the user powers on via Emulator → Power (Ctrl+Alt+P).
+        // Drive state restoration was handled in MainWindowFactory.Create().
     }
 
     /// <summary>
@@ -1170,7 +1146,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         lock (_emuStateLock)
         {
             // If there's a pending task that hasn't been cleaned up, wait for it
-            if (_emuTask != null && !_emuTask.IsCompleted)
+            if (_emuTask is { IsCompleted: false })
             {
                 // Already running - don't start another
                 return;
@@ -1226,7 +1202,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 }
 
                 // Update running state after stopping (only if we're the one who stopped)
-                if (ViewModel != null && ViewModel.IsRunning)
+                if (ViewModel is { IsRunning: true })
                 {
                     // IsRunning might already be false from StopEmulator - only update if needed
                     ViewModel.IsRunning = false;
@@ -1243,6 +1219,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <remarks>
     /// Delegates to StopEmulator() to cancel the emulator thread.
     /// </remarks>
+    // ReSharper disable once UnusedParameter.Local
     private void OnEmuStopClicked(object? sender, RoutedEventArgs e) => StopEmulator();
 
     /// <summary>
@@ -1295,19 +1272,21 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// CPU instruction completes, maintaining 6502 atomic instruction guarantees.
     /// </para>
     /// </remarks>
-    private void OnEmuResetClicked(object? sender, RoutedEventArgs e) 
-    { 
-        if (_depsInjected) 
-        { 
-            _machine?.Reset(); 
-        } 
+    // ReSharper disable once UnusedParameter.Local
+    // ReSharper disable once UnusedParameter.Local
+    private void OnEmuResetClicked(object? sender, RoutedEventArgs e)
+    {
+        if (_depsInjected)
+        {
+            _machine?.DoReset();
+        }
     }
 
     /// <summary>
     /// Handles the single-step command (execute one CPU instruction).
     /// </summary>
     /// <param name="sender">Event sender (menu item or command).</param>
-    /// <param name="e">Routed event arguments.</param>
+    /// <param name="_">Routed event arguments.</param>
     /// <remarks>
     /// <para>
     /// <strong>Step Mode:</strong> Only works when the emulator is stopped (not running).
@@ -1318,7 +1297,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// to observe CPU state changes one instruction at a time.
     /// </para>
     /// </remarks>
-    private void OnEmuStepOnceClicked(object? sender, RoutedEventArgs e)
+    // ReSharper disable once UnusedParameter.Local
+    private void OnEmuStepOnceClicked(object? sender, RoutedEventArgs _)
     {
         if (!_depsInjected || _emuCts != null || _machine is null)
         {
@@ -1437,138 +1417,6 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     }
 
     /// <summary>
-    /// Restores display settings from the configuration file.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <strong>Settings Restored:</strong>
-    /// <list type="bullet">
-    /// <item>ShowScanLines (CRT scanline effect)</item>
-    /// <item>MonoMixed (mixed mode text defring)</item>
-    /// <item>ForceMonochrome (color vs monochrome)</item>
-    /// <item>DecreaseContrast (contrast reduction)</item>
-    /// <item>ThrottleEnabled (CPU speed control, defaults to true)</item>
-    /// <item>ShowSoftSwitchStatus (panel visibility, defaults to true)</item>
-    /// <item>ShowDiskStatus (disk panel visibility, defaults to true)</item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// <strong>Note:</strong> Window position and size are now handled by WindowSettingsHelper
-    /// and stored in a separate file (window-settings.json).
-    /// </para>
-    /// <para>
-    /// <strong>File Location:</strong> %AppData%\LydianScaleSoftware\Pandowdy\settings.json
-    /// </para>
-    /// <para>
-    /// <strong>Error Handling:</strong> Silently catches and ignores all exceptions (missing file,
-    /// corrupt JSON, etc.). Uses default values if settings cannot be loaded.
-    /// </para>
-    /// </remarks>
-    private void RestoreSettingsFromConfigFile()
-    {
-        try
-        {
-            var path = GetConfigPath();
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.RestoreSettings] Loading display settings from: {path}");
-
-            if (!File.Exists(path))
-            {
-                System.Diagnostics.Debug.WriteLine($"[MainWindow.RestoreSettings] Settings file not found, using defaults");
-                return;
-            }
-            var json = File.ReadAllText(path);
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.RestoreSettings] JSON content: {json}");
-
-            var data = JsonSerializer.Deserialize<SettingsConfig>(json);
-            if (data == null)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MainWindow.RestoreSettings] Deserialization returned null");
-                return;
-            }
-
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.RestoreSettings] Deserialized: ShowScanLines={data.ShowScanLines}, MonoMixed={data.MonoMixed}, ThrottleEnabled={data.ThrottleEnabled}");
-
-            // Note: Width and Height are now handled by WindowSettingsHelper
-            if (ViewModel != null)
-            {
-                if (data.ShowScanLines.HasValue) { ViewModel.ShowScanLines = data.ShowScanLines.Value; }
-                if (data.MonoMixed.HasValue) { ViewModel.MonoMixed = data.MonoMixed.Value; }
-                if (data.ForceMonochrome.HasValue) { ViewModel.ForceMonochrome = data.ForceMonochrome.Value; }
-                if (data.DecreaseContrast.HasValue) { ViewModel.DecreaseFringing = data.DecreaseContrast.Value; }
-                if (data.ThrottleEnabled.HasValue) { ViewModel.ThrottleEnabled = data.ThrottleEnabled.Value; } else { ViewModel.ThrottleEnabled = true; }
-                if (data.ShowSoftSwitchStatus.HasValue) { ViewModel.ShowSoftSwitchStatus = data.ShowSoftSwitchStatus.Value; } else { ViewModel.ShowSoftSwitchStatus = true; }
-                if (data.ShowDiskStatus.HasValue) { ViewModel.ShowDiskStatus = data.ShowDiskStatus.Value; } else { ViewModel.ShowDiskStatus = false; }
-                if (data.DiskPanelWidth.HasValue) { ViewModel.DiskPanelWidth = data.DiskPanelWidth.Value; } else { ViewModel.DiskPanelWidth = 200.0; }
-
-                System.Diagnostics.Debug.WriteLine($"[MainWindow.RestoreSettings] Applied to ViewModel successfully");
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.RestoreSettings] Failed to load settings: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Saves display settings to the configuration file.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <strong>Settings Saved:</strong>
-    /// <list type="bullet">
-    /// <item>ShowScanLines, MonoMixed, ForceMonochrome, DecreaseContrast</item>
-    /// <item>ThrottleEnabled</item>
-    /// <item>ShowSoftSwitchStatus</item>
-    /// <item>ShowDiskStatus</item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// <strong>Note:</strong> Window position and size are now handled by WindowSettingsHelper
-    /// and stored in a separate file (window-settings.json).
-    /// </para>
-    /// <para>
-    /// <strong>Format:</strong> JSON with indentation for human readability.
-    /// </para>
-    /// <para>
-    /// <strong>File Location:</strong> %AppData%\LydianScaleSoftware\Pandowdy\settings.json
-    /// Directory is created if it doesn't exist.
-    /// </para>
-    /// <para>
-    /// <strong>Error Handling:</strong> Silently catches and ignores all exceptions (I/O errors,
-    /// permission issues, etc.). Settings loss is non-fatal.
-    /// </para>
-    /// </remarks>
-    private void SaveSettingsToConfigFile()
-    {
-        try
-        {
-            var data = new SettingsConfig
-            {
-                // Note: Width/Height now handled by WindowSettingsHelper
-                ShowScanLines = ViewModel?.ShowScanLines,
-                MonoMixed = ViewModel?.MonoMixed,
-                DecreaseContrast = ViewModel?.DecreaseFringing,
-                ForceMonochrome = ViewModel?.ForceMonochrome,
-                ThrottleEnabled = ViewModel?.ThrottleEnabled,
-                ShowSoftSwitchStatus = ViewModel?.ShowSoftSwitchStatus,
-                ShowDiskStatus = ViewModel?.ShowDiskStatus,
-                DiskPanelWidth = ViewModel?.DiskPanelWidth,
-            };
-#pragma warning disable CA1869 // Cache and reuse 'JsonSerializerOptions' instances
-            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-#pragma warning restore CA1869 // Cache and reuse 'JsonSerializerOptions' instances
-            var path = GetConfigPath();
-            File.WriteAllText(path, json);
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.SaveSettings] Saved display settings to: {path}");
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.SaveSettings] Settings: ShowScanLines={data.ShowScanLines}, MonoMixed={data.MonoMixed}, ThrottleEnabled={data.ThrottleEnabled}, DiskPanelWidth={data.DiskPanelWidth}");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.SaveSettings] Failed to save settings: {ex.Message}");
-        }
-    }
-
-    /// <summary>
     /// Gets the full path to the settings configuration file.
     /// </summary>
     /// <returns>Full path: %AppData%\LydianScaleSoftware\Pandowdy\settings.json</returns>
@@ -1606,6 +1454,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         public bool? DecreaseContrast { get; set; }
         /// <summary>Gets or sets whether to force monochrome display.</summary>
         public bool? ForceMonochrome { get; set; }
+        /// <summary>Gets or sets whether Caps Lock emulation is enabled (default: true).</summary>
+        public bool? CapsLockEnabled { get; set; }
         /// <summary>Gets or sets whether CPU throttling is enabled.</summary>
         public bool? ThrottleEnabled { get; set; }
         /// <summary>Gets or sets whether the soft switch status panel is visible.</summary>
@@ -1616,45 +1466,6 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         public double? DiskPanelWidth { get; set; }
     }
 
-    /// <summary>
-    /// Loads display settings from the configuration file.
-    /// </summary>
-    /// <returns>Settings configuration object, or null if file doesn't exist or is invalid.</returns>
-    /// <remarks>
-    /// This is a static method that can be called before the window is created,
-    /// allowing MainWindowFactory to pre-configure the ViewModel with saved settings.
-    /// </remarks>
-    internal static SettingsConfig? LoadSettingsConfig()
-    {
-        try
-        {
-            var path = GetConfigPath();
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.LoadSettingsConfig] Loading display settings from: {path}");
-
-            if (!File.Exists(path))
-            {
-                System.Diagnostics.Debug.WriteLine($"[MainWindow.LoadSettingsConfig] Settings file not found, using defaults");
-                return null;
-            }
-            var json = File.ReadAllText(path);
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.LoadSettingsConfig] JSON content: {json}");
-
-            var data = JsonSerializer.Deserialize<SettingsConfig>(json);
-            if (data == null)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MainWindow.LoadSettingsConfig] Deserialization returned null");
-                return null;
-            }
-
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.LoadSettingsConfig] Deserialized: ShowScanLines={data.ShowScanLines}, DiskPanelWidth={data.DiskPanelWidth}");
-            return data;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MainWindow.LoadSettingsConfig] Failed to load settings: {ex.Message}");
-            return null;
-        }
-    }
 
     #endregion
 
@@ -1669,6 +1480,40 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// Closes the window, triggering the OnClosed event which handles cleanup and settings save.
     /// </remarks>
     private void OnQuitClicked(object? sender, RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// Handles the File > Import Disk Image menu command.
+    /// </summary>
+    /// <param name="sender">Event sender (menu item).</param>
+    /// <param name="e">Routed event arguments.</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Operation:</strong> Shows a file picker dialog to select a disk image file
+    /// (.woz, .nib, .dsk, .do, .po, .2mg), then imports it into the current Skillet project's
+    /// disk image library via ImportDiskImageAsync.
+    /// </para>
+    /// <para>
+    /// <strong>Import Process:</strong>
+    /// <list type="number">
+    /// <item>User selects disk image file from file picker</item>
+    /// <item>File is copied into project's .skillet SQLite database</item>
+    /// <item>Both original and working copies are stored</item>
+    /// <item>Disk image appears in Mount from Library dialog</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>Keyboard Shortcut:</strong> Accessible via Ctrl+Shift+I. Note that Ctrl+I alone
+    /// is reserved for sending to the emulator (Ctrl+I = ASCII 0x09, TAB character).
+    /// </para>
+    /// <para>
+    /// <strong>Requirements:</strong> Only enabled when a Skillet project is open
+    /// (HasProject = true in view model).
+    /// </para>
+    /// </remarks>
+    private void OnImportDiskImageClicked(object? sender, RoutedEventArgs e)
+    {
+        ViewModel?.ImportDiskImageCommand.Execute().Subscribe();
+    }
 
     /// <summary>
     /// Handles the Edit > Paste menu command.
@@ -1816,6 +1661,13 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// <returns>True if accelerator was handled, false to continue processing.</returns>
     /// <remarks>
     /// <para>
+    /// <strong>Ctrl+Shift + Key Accelerators:</strong>
+    /// <list type="bullet">
+    /// <item>Ctrl+Shift+I: Import disk image (File menu)</item>
+    /// <item>Ctrl+Shift+V: Paste from clipboard (Edit menu)</item>
+    /// </list>
+    /// </para>
+    /// <para>
     /// <strong>Ctrl+Alt + Key Accelerators:</strong>
     /// <list type="bullet">
     /// <item>Ctrl+Alt+S: Toggle scanlines</item>
@@ -1848,6 +1700,19 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// </remarks>
     private bool HandleAccelerator(KeyEventArgs e)
     {
+        if ((e.KeyModifiers & KeyModifiers.Control) != 0 && (e.KeyModifiers & KeyModifiers.Shift) != 0)
+        {
+            switch (e.Key)
+            {
+                case Key.I:
+                    ViewModel?.ImportDiskImageCommand.Execute().Subscribe();
+                    return true;
+                case Key.V:
+                    var display = GetScreenDisplay();
+                    display?.PasteFromClipboard();
+                    return true;
+            }
+        }
         if ((e.KeyModifiers & KeyModifiers.Control) != 0 && (e.KeyModifiers & KeyModifiers.Alt) != 0)
         {
             switch (e.Key)
@@ -1869,6 +1734,9 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                     return true;
                 case Key.K:
                     ViewModel?.ToggleDiskStatus.Execute().Subscribe();
+                    return true;
+                case Key.P:
+                    ViewModel?.TogglePower.Execute().Subscribe();
                     return true;
             }
         }
@@ -1901,16 +1769,15 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             case Key.F10:
                 ViewModel?.ToggleCapsLock.Execute().Subscribe();
                 return true;
+            case Key.F12:
+            ViewModel?.ResetEmu.Execute().Subscribe();
+            return true;
+
         }
         if ((e.KeyModifiers & KeyModifiers.Control) != 0 && (e.KeyModifiers & KeyModifiers.Shift) != 0 && e.Key == Key.D2)
         {
             _machine?.EnqueueKey(0x00);
             e.Handled = true;
-            return true;
-        }
-        if (e.Key == Key.F12 && (e.KeyModifiers & KeyModifiers.Control) != 0)
-        {
-            ViewModel?.ResetEmu.Execute().Subscribe();
             return true;
         }
         return false;
@@ -1947,7 +1814,7 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     /// </remarks>
     private bool TryInjectSpecialKey(KeyEventArgs e)
     {
-        if ((e.KeyModifiers & KeyModifiers.Control) != 0 && e.Key >= Key.A && e.Key <= Key.Z)
+        if ((e.KeyModifiers & KeyModifiers.Control) != 0 && e.Key is >= Key.A and <= Key.Z)
         {
             byte ctrl = (byte)(e.Key - Key.A + 1);
             _machine?.EnqueueKey((byte)(ctrl | 0x80));
@@ -1956,14 +1823,14 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
         }
         byte? ascii = e.Key switch
         {
-            Key.Up => (byte)0x0B,
-            Key.Down => (byte)0x0A,
-            Key.Left => (byte)0x08,
-            Key.Right => (byte)0x15,
-            Key.Delete => (byte)0x7F,
+            Key.Up => 0x0B,
+            Key.Down => 0x0A,
+            Key.Left => 0x08,
+            Key.Right => 0x15,
+            Key.Delete => 0x7F,
             Key.Enter => (byte)'\r',
             Key.Tab => (byte)'\t',
-            Key.Escape => (byte)0x1B,
+            Key.Escape => 0x1B,
             Key.Back => (e.KeyModifiers & KeyModifiers.Shift) != 0 ? (byte)0x7F : (byte)0x08,
             _ => null
         };
@@ -1977,4 +1844,72 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     }
 
     #endregion
+
+    /// <summary>
+    /// Toggles the emulated Apple IIe power state.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Power On:</strong> Calls <see cref="IEmulatorCoreInterface.DoRestart"/>
+    /// to cold-boot all subsystems (RAM cleared, soft switches reset, cards cold-inited,
+    /// CPU reset vector loaded), then starts the emulator thread.
+    /// </para>
+    /// <para>
+    /// <strong>Power Off:</strong> Stops the emulator thread, freezing all subsystem state.
+    /// The Apple2Display can observe <see cref="MainWindowViewModel.IsPoweredOn"/> to blank
+    /// the screen. Frozen state remains available for debugger inspection.
+    /// </para>
+    /// </remarks>
+    public void TogglePower()
+    {
+        if (!_depsInjected || _machine is null || ViewModel is null)
+        {
+            return;
+        }
+
+        var screenDisplay = GetScreenDisplay();
+
+        if (ViewModel.IsPoweredOn)
+        {
+            // Power Off: stop the emulator thread, then cold-reset all state
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Power OFF");
+            StopEmulator();
+
+            // TODO: Remove once a proper power-off state machine exists.
+            // Forces all components (status providers, cards, RAM, etc.) back
+            // to construction defaults so the UI doesn't show stale state.
+            _machine.DoRestart();
+
+            ViewModel.IsPoweredOn = false;
+
+            // Blank the display (simulates unpowered monitor)
+            if (screenDisplay != null)
+            {
+                screenDisplay.IsPoweredOn = false;
+                screenDisplay.RequestRefresh();
+            }
+        }
+        else
+        {
+            // Power On: cold boot + start emulator thread
+            System.Diagnostics.Debug.WriteLine("[MainWindow] Power ON — cold boot via DoRestart()");
+            _machine.DoRestart();
+
+            // DoRestart() drains the command queue, which may discard a pending
+            // ThrottleEnabled change enqueued before the emulator thread started.
+            // Re-apply the VM's current throttle state so the core matches the UI.
+            _machine.ThrottleEnabled = ViewModel.ThrottleEnabled;
+
+            ViewModel.IsPoweredOn = true;
+
+            // Restore display rendering
+            if (screenDisplay != null)
+            {
+                screenDisplay.IsPoweredOn = true;
+                screenDisplay.RequestRefresh();
+            }
+
+            OnEmuStartClicked(this, new RoutedEventArgs());
+        }
+    }
 }

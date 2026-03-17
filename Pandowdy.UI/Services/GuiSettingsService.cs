@@ -30,12 +30,10 @@ public class GuiSettingsService
     /// <summary>
     /// Gets the full path to the master settings file.
     /// </summary>
-    /// <returns>Full path to pandowdy-settings.json in %AppData%\LydianScaleSoftware\Pandowdy\</returns>
+    /// <returns>Full path to pandowdy-settings.json in the settings directory.</returns>
     public virtual string GetMasterSettingsFilePath()
     {
-        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var pandowdyPath = Path.Combine(appDataPath, "LydianScaleSoftware", "Pandowdy");
-        return Path.Combine(pandowdyPath, MasterSettingsFileName);
+        return Path.Combine(GetSettingsDirectory(), MasterSettingsFileName);
     }
 
     /// <summary>

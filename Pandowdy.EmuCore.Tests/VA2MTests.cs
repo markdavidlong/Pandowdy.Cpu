@@ -2,7 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Input;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Memory;
 using Pandowdy.EmuCore.Tests.Helpers;
 
 namespace Pandowdy.EmuCore.Tests;
@@ -225,7 +227,7 @@ public class VA2MTests
             .Build();
 
         // Act
-        va2m.Reset();
+        va2m.DoReset();
         va2m.Clock(); // Process pending queue
 
         // Assert
@@ -248,7 +250,7 @@ public class VA2MTests
         Assert.Equal(3UL, va2m.SystemClock); // Verify we're at 3 cycles
 
         // Act
-        va2m.Reset(); // Enqueues reset operation
+        va2m.DoReset(); // Enqueues reset operation
         
         // Process pending queue - this will execute the reset AND increment bus clock by 1
         // After reset executes: SystemClock = 0
@@ -547,7 +549,7 @@ public class VA2MTests
             .Build();
 
         // Act - Simulate basic boot
-        va2m.Reset();
+        va2m.DoReset();
         for (int i = 0; i < 100; i++)
         {
             va2m.Clock(); // First Clock() processes the Reset, subsequent ones execute normally
@@ -906,7 +908,7 @@ public class VA2MTests
         Assert.Equal(100UL, va2m.SystemClock);
 
         // Act - Reset
-        va2m.Reset();
+        va2m.DoReset();
         va2m.Clock(); // Process reset (which also increments clock by 1)
 
         // Assert - Clock reset to 1 (reset executed + 1 clock increment)
@@ -925,7 +927,7 @@ public class VA2MTests
         Assert.Equal(0, testBus.ResetCount);
 
         // Act
-        va2m.Reset();
+        va2m.DoReset();
         va2m.Clock(); // Process pending queue
 
         // Assert
@@ -946,7 +948,7 @@ public class VA2MTests
         va2m.EnqueueKey(0x42);
 
         // Act - Reset before commands are processed
-        va2m.Reset();
+        va2m.DoReset();
         va2m.Clock(); // Process reset (clears queue)
 
         // Assert - Commands should not have been executed
@@ -970,7 +972,7 @@ public class VA2MTests
         await Task.Delay(50); // Let it run
 
         // Act - Reset while running
-        va2m.Reset();
+        va2m.DoReset();
         await Task.Delay(10); // Allow reset to process
 
         var clockBeforeCancel = va2m.SystemClock;

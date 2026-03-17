@@ -5,7 +5,7 @@
 using System.Diagnostics;
 using CommonUtil;
 using DiskArc.Disk;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.DiskII.Providers;
 

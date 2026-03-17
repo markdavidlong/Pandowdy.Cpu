@@ -43,12 +43,6 @@ namespace Pandowdy.UI;
 public sealed class AvaloniaRefreshTicker : IRefreshTicker
 {
     /// <summary>
-    /// Observable stream that emits timestamps at the configured refresh rate
-    /// (see <see cref="Constants.RefreshRates.BaseTickerHz"/>).
-    /// </summary>
-    private readonly IObservable<DateTime> _stream;
-    
-    /// <summary>
     /// Subject used to publish timestamp events to the observable stream.
     /// </summary>
     /// <remarks>
@@ -78,7 +72,7 @@ public sealed class AvaloniaRefreshTicker : IRefreshTicker
     public AvaloniaRefreshTicker()
     {
         _subject = new System.Reactive.Subjects.Subject<DateTime>();
-        _stream = _subject.AsObservable();
+        Stream = _subject.AsObservable();
     }
 
     /// <summary>
@@ -104,7 +98,7 @@ public sealed class AvaloniaRefreshTicker : IRefreshTicker
     /// <strong>Subscription Example:</strong>
     /// <code>
     /// ticker.Stream
-    ///     .Subscribe(timestamp => 
+    ///     .Subscribe(timestamp =>
     ///     {
     ///         // This executes on UI thread at the configured refresh rate
     ///         UpdateDisplay();
@@ -112,7 +106,7 @@ public sealed class AvaloniaRefreshTicker : IRefreshTicker
     /// </code>
     /// </para>
     /// </remarks>
-    public IObservable<DateTime> Stream => _stream;
+    public IObservable<DateTime> Stream { get; }
 
     /// <summary>
     /// Starts the refresh ticker, causing it to begin emitting periodic timing signals.

@@ -2,9 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Exceptions;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Messages;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 
 namespace Pandowdy.EmuCore.Tests.Messages;
 

@@ -3,7 +3,8 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.Tests;
 

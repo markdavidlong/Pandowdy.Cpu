@@ -4,11 +4,9 @@
 
 using System;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Platform;
 using Pandowdy.UI.Models;
 
 namespace Pandowdy.UI.Helpers;

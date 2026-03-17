@@ -6,7 +6,11 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Pandowdy.Project.Interfaces;
+using Pandowdy.Project.Models;
+using Pandowdy.UI.Controls;
 using Pandowdy.UI.Interfaces;
+using Pandowdy.UI.ViewModels;
 
 namespace Pandowdy.UI.Services;
 
@@ -20,11 +24,13 @@ namespace Pandowdy.UI.Services;
 /// the main window is created.
 /// </para>
 /// </remarks>
-public class MessageBoxService : IMessageBoxService
+public class MessageBoxService(ISkilletProjectManager projectManager) : IMessageBoxService
 {
+    private readonly ISkilletProjectManager _projectManager = projectManager;
+
     /// <summary>
     /// Gets the current active main window, or null if none is available.
-    /// </summary>
+    /// </summary> 
     private static Window? GetMainWindow()
     {
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -57,7 +63,7 @@ public class MessageBoxService : IMessageBoxService
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Content = new StackPanel
             {
-                Margin = new Avalonia.Thickness(20),
+                Margin = new Thickness(20),
                 Spacing = 20,
                 Children =
                 {
@@ -111,7 +117,7 @@ public class MessageBoxService : IMessageBoxService
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Content = new StackPanel
             {
-                Margin = new Avalonia.Thickness(20),
+                Margin = new Thickness(20),
                 Spacing = 20,
                 Children =
                 {
@@ -161,6 +167,114 @@ public class MessageBoxService : IMessageBoxService
                 noButton.Click += (_, _) =>
                 {
                     result = false;
+                    dialog.Close();
+                };
+            }
+        }
+
+        await dialog.ShowDialog(ownerWindow);
+        return result;
+    }
+
+    /// <summary>
+    /// Shows the Mount from Library dialog and returns the selected disk image.
+    /// </summary>
+    /// <returns>
+    /// The selected <see cref="DiskImageRecord"/> if the user clicked Mount,
+    /// or null if the user clicked Cancel.
+    /// </returns>
+    public async Task<DiskImageRecord?> ShowMountFromLibraryDialogAsync()
+    {
+        var ownerWindow = GetMainWindow();
+        if (ownerWindow == null)
+        {
+            return null; // No window available
+        }
+
+        var viewModel = new MountFromLibraryDialogViewModel(_projectManager);
+        var dialog = new MountFromLibraryDialog(viewModel);
+
+        await dialog.ShowDialog(ownerWindow);
+
+        // Return the selected disk image if user clicked Mount
+        return dialog.DialogResult == true ? viewModel.SelectedDiskImage : null;
+    }
+
+    /// <inheritdoc />
+    public async Task<SavePromptResult> ShowSavePromptAsync(
+        string title,
+        string message,
+        string saveLabel = "Save",
+        string dontSaveLabel = "Don't Save")
+    {
+        var ownerWindow = GetMainWindow();
+        if (ownerWindow == null)
+        {
+            return SavePromptResult.Cancel;
+        }
+
+        var result = SavePromptResult.Cancel;
+
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 460,
+            Height = 200,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(20),
+                Spacing = 20,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = message,
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap
+                    },
+                    new StackPanel
+                    {
+                        Orientation = Avalonia.Layout.Orientation.Horizontal,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children =
+                        {
+                            new Button { Content = saveLabel, MinWidth = 100 },
+                            new Button { Content = dontSaveLabel, MinWidth = 100 },
+                            new Button { Content = "Cancel", MinWidth = 80 }
+                        }
+                    }
+                }
+            }
+        };
+
+        if (dialog.Content is StackPanel panel &&
+            panel.Children[1] is StackPanel buttonPanel)
+        {
+            if (buttonPanel.Children[0] is Button saveButton)
+            {
+                saveButton.Click += (_, _) =>
+                {
+                    result = SavePromptResult.Save;
+                    dialog.Close();
+                };
+            }
+
+            if (buttonPanel.Children[1] is Button dontSaveButton)
+            {
+                dontSaveButton.Click += (_, _) =>
+                {
+                    result = SavePromptResult.DontSave;
+                    dialog.Close();
+                };
+            }
+
+            if (buttonPanel.Children[2] is Button cancelButton)
+            {
+                cancelButton.Click += (_, _) =>
+                {
+                    result = SavePromptResult.Cancel;
                     dialog.Close();
                 };
             }

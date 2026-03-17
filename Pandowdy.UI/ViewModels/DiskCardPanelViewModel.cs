@@ -6,10 +6,9 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
-using Pandowdy.EmuCore.Cards;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DiskII.Messages;
-using Pandowdy.EmuCore.Exceptions;
-using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.UI.Interfaces;
 using ReactiveUI;
 

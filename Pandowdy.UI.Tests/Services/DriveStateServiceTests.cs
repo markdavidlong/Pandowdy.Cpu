@@ -4,10 +4,10 @@
 
 using Moq;
 using Pandowdy.EmuCore.DataTypes;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.DiskII.Providers;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
 using Pandowdy.UI.Models;
 using Pandowdy.UI.Services;
 using System;
@@ -62,8 +62,8 @@ public class DriveStateServiceTests : IDisposable
     /// Test-specific DriveStateService that uses a custom directory instead of %AppData%.
     /// </summary>
     private class TestDriveStateService(
-        EmuCore.Services.IDiskStatusProvider diskStatusProvider,
-        EmuCore.Services.IDiskStatusMutator diskStatusMutator,
+        IDiskStatusProvider diskStatusProvider,
+        IDiskStatusMutator diskStatusMutator,
         ISlots slots,
         string testDirectory)
         : DriveStateService(diskStatusProvider, diskStatusMutator, slots)
@@ -97,6 +97,7 @@ public class DriveStateServiceTests : IDisposable
         }
 
         public void Reset() { }
+        public void Restart() { }
         public void EjectDisk() => InsertedDiskPath = null;
         public void StepToHigherTrack() { }
         public void StepToLowerTrack() { }
@@ -111,14 +112,15 @@ public class DriveStateServiceTests : IDisposable
     /// Test wrapper for DiskIIControllerCard that exposes drives directly for testing.
     /// This concrete implementation allows DriveStateService to cast and access Drives.
     /// </summary>
-    private class TestDiskController : Pandowdy.EmuCore.Cards.DiskIIControllerCard
+    private class TestDiskController : Pandowdy.EmuCore.DiskII.DiskIIControllerCard
     {
         public TestDiskController(params IDiskIIDrive[] drives)
             : base(
                 new CpuClockingCounters(),
                 Mock.Of<IDiskIIFactory>(),
                 Mock.Of<IDiskStatusMutator>(),
-                Mock.Of<ICardResponseEmitter>())
+                Mock.Of<ICardResponseEmitter>(),
+                Mock.Of<IDiskImageStore>())
         {
             _drives = drives; // Set drives directly (protected field)
         }
@@ -128,6 +130,11 @@ public class DriveStateServiceTests : IDisposable
         public override int Id => 101; // Disk II controller ID
         public override byte? ReadRom(byte offset) => null;
         public override ICard Clone() => new TestDiskController(_drives);
+
+        public override Pandowdy.EmuCore.DiskII.DiskIIControllerCard CreateWithStore(IDiskImageStore diskImageStore)
+        {
+            return new TestDiskController(_drives);
+        }
     }
 
     #endregion
@@ -435,7 +442,7 @@ public class DriveStateServiceTests : IDisposable
         await _service.SaveDriveStateAsync(config);
 
         // Setup: slot 6 has no card
-        _mockSlots.Setup(s => s.GetCardIn(SlotNumber.Slot6)).Returns((ICard?)null);
+        _mockSlots.Setup(s => s.GetCardIn(SlotNumber.Slot6)).Returns((ICard)null!);
 
         // Act & Assert - Should not throw
         var exception = await Record.ExceptionAsync(() => _service.LoadAndRestoreDriveStateAsync());

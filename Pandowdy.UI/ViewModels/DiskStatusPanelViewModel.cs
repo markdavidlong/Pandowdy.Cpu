@@ -6,11 +6,13 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive.Linq;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
+using Pandowdy.Project.Interfaces;
 using Pandowdy.UI.Interfaces;
 using ReactiveUI;
 
+using Pandowdy.EmuCore.DiskII;
 namespace Pandowdy.UI.ViewModels;
 
 /// <summary>
@@ -37,6 +39,7 @@ public class DiskStatusPanelViewModel : ReactiveObject
     private readonly IEmulatorCoreInterface _emulator;
     private readonly IDiskFileDialogService _fileDialogService;
     private readonly IMessageBoxService _messageBoxService;
+    private readonly ISkilletProjectManager _projectManager;
 
     /// <summary>
     /// Gets the collection of disk card panels, grouped by expansion slot.
@@ -50,16 +53,19 @@ public class DiskStatusPanelViewModel : ReactiveObject
     /// <param name="statusProvider">Status provider for observing drive state changes.</param>
     /// <param name="fileDialogService">Service for displaying file picker dialogs.</param>
     /// <param name="messageBoxService">Service for displaying error and confirmation dialogs.</param>
+    /// <param name="projectManager">Project manager for checking library state.</param>
     public DiskStatusPanelViewModel(
         IEmulatorCoreInterface emulator,
         IDiskStatusProvider statusProvider,
         IDiskFileDialogService fileDialogService,
-        IMessageBoxService messageBoxService)
+        IMessageBoxService messageBoxService,
+        ISkilletProjectManager projectManager)
     {
         _emulator = emulator;
         _statusProvider = statusProvider;
         _fileDialogService = fileDialogService;
         _messageBoxService = messageBoxService;
+        _projectManager = projectManager;
 
         // Initialize card panels grouped by slot
         Cards = [];
@@ -77,7 +83,7 @@ public class DiskStatusPanelViewModel : ReactiveObject
 
             foreach (var driveSnapshot in slotGroup)
             {
-                drives.Add(new DiskStatusWidgetViewModel(_emulator, _fileDialogService, _messageBoxService, driveSnapshot));
+                drives.Add(new DiskStatusWidgetViewModel(_emulator, _fileDialogService, _messageBoxService, _projectManager, driveSnapshot));
             }
 
             // TODO: Card name should come from card identification (Phase 3B)
@@ -110,6 +116,22 @@ public class DiskStatusPanelViewModel : ReactiveObject
         for (int i = 0; i < snapshot.Drives.Length && i < allDrives.Count; i++)
         {
             allDrives[i].UpdateSnapshot(snapshot.Drives[i]);
+        }
+    }
+
+    /// <summary>
+    /// Propagates powered-on state to all drive widgets.
+    /// </summary>
+    /// <remarks>
+    /// When the machine is powered off, drive widgets mask their motor indicators
+    /// to show as off. The underlying status snapshot is not modified — it will be
+    /// cleaned up on the next cold boot via <see cref="IRestartable.Restart"/>.
+    /// </remarks>
+    public void SetPoweredOn(bool isPoweredOn)
+    {
+        foreach (var drive in Cards.SelectMany(card => card.Drives))
+        {
+            drive.SetPoweredOn(isPoweredOn);
         }
     }
 }

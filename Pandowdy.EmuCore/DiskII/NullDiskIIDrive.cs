@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.DiskII;
 
@@ -26,7 +26,7 @@ namespace Pandowdy.EmuCore.DiskII;
 /// </list>
 /// </para>
 /// <para>
-/// <strong>Motor Control:</strong> Motor state is managed by the <see cref="Cards.DiskIIControllerCard"/>,
+/// <strong>Motor Control:</strong> Motor state is managed by the <see cref="DiskIIControllerCard"/>,
 /// not individual drives. This null drive is a passive device like all drives.
 /// </para>
 /// </remarks>
@@ -47,6 +47,14 @@ public class NullDiskIIDrive(string name = "NullDrive") : IDiskIIDrive
         // Per interface contract: head position preserved
         // Head position (_quarterSteps) is intentionally NOT reset
         // Motor control is now handled at controller level
+    }
+
+    /// <summary>
+    /// Restores the null drive to its initial power-on state (cold boot). No-op.
+    /// </summary>
+    public void Restart()
+    {
+        // No state to clear
     }
 
     /// <inheritdoc />

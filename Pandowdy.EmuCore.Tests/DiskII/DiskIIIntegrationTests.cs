@@ -2,12 +2,12 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Cards;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.DiskII.Providers;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Tests.Mocks;
 
 namespace Pandowdy.EmuCore.Tests.DiskII;
 
@@ -28,6 +28,7 @@ public class DiskIIIntegrationTests
     private readonly CardResponseChannel _responseChannel = new();
     private readonly DiskImageFactory _imageFactory = new();
     private readonly DiskIIFactory _driveFactory;
+    private static readonly MockDiskImageStore MockStore = new();
 
     public DiskIIIntegrationTests()
     {
@@ -38,7 +39,7 @@ public class DiskIIIntegrationTests
 
     private DiskIIControllerCard16Sector CreateController()
     {
-        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
     }
 
     private static void InstallController(DiskIIControllerCard16Sector controller, SlotNumber slot = SlotNumber.Slot6)
@@ -446,7 +447,7 @@ public class DiskIIIntegrationTests
         [Fact]
         public void FullStack_13SectorController_WorksSameAs16Sector()
         {
-            var controller13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+            var controller13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
             controller13.OnInstalled(SlotNumber.Slot6);
 
             // Should create 2 drives just like 16-sector

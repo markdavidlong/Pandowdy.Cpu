@@ -4,7 +4,7 @@
 
 using System;
 using ReactiveUI;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
 using System.Reactive.Linq;
 using Pandowdy.UI.Interfaces;
 

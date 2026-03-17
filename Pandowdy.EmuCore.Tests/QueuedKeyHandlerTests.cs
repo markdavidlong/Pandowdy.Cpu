@@ -2,7 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Input;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.Tests;
 
@@ -24,12 +25,38 @@ namespace Pandowdy.EmuCore.Tests;
 /// </list>
 /// </para>
 /// <para>
-/// <strong>Timing Tests:</strong> Tests involving timer delays use Task.Delay with generous
-/// margins (2-3x expected delay) to account for thread scheduling variability in test environment.
+/// <strong>Timing Tests:</strong> Tests that wait for the auto-feed timer use a polling helper
+/// (<see cref="WaitForStrobeAsync"/>) instead of <c>Task.Delay</c> to eliminate flakiness from
+/// thread pool scheduling variability. Tests that verify a timer did NOT fire (reset/dispose
+/// cancellation) still use <c>Task.Delay</c> with generous margins.
 /// </para>
 /// </remarks>
 public class QueuedKeyHandlerTests
 {
+    /// <summary>
+    /// Polls until the handler has a strobe-pending key, or times out.
+    /// </summary>
+    /// <remarks>
+    /// Replaces fragile <c>await Task.Delay(N)</c> patterns that depended on the timer
+    /// callback completing within a fixed window. Under heavy CPU load (CI, parallel tests),
+    /// <c>Timer</c> and <c>Task.Delay</c> resolution can exceed expected margins. Polling
+    /// with a generous timeout makes the tests deterministic while still exercising the
+    /// timer-based auto-feed behavior.
+    /// </remarks>
+    private static async Task WaitForStrobeAsync(QueuedKeyHandler handler, int timeoutMs = 2000)
+    {
+        var deadline = Environment.TickCount64 + timeoutMs;
+        while (!handler.StrobePending())
+        {
+            if (Environment.TickCount64 >= deadline)
+            {
+                Assert.Fail($"Timed out after {timeoutMs}ms waiting for strobe to become pending.");
+            }
+
+            await Task.Delay(1);
+        }
+    }
+
     #region Constructor Tests (4 tests)
 
     [Fact]
@@ -243,7 +270,7 @@ public class QueuedKeyHandlerTests
 
         // Act
         handler.ClearStrobe(); // Should trigger timer
-        await Task.Delay(50); // Wait for timer (2.5x delay for safety)
+        await WaitForStrobeAsync(handler);
 
         // Assert
         Assert.True(handler.StrobePending()); // 'B' loaded with strobe
@@ -260,7 +287,7 @@ public class QueuedKeyHandlerTests
 
         // Act
         handler.ClearStrobe(); // No keys queued
-        await Task.Delay(50);
+        await Task.Delay(100);
 
         // Assert
         Assert.False(handler.StrobePending()); // Still cleared
@@ -283,13 +310,13 @@ public class QueuedKeyHandlerTests
 
         // Clear 'A' and wait for 'B'
         handler.ClearStrobe();
-        await Task.Delay(50);
+        await WaitForStrobeAsync(handler);
         Assert.Equal(0xC2, handler.PeekCurrentKeyAndStrobe());
         Assert.Equal(2, handler.NumKeysPending()); // B in latch + C in queue
 
         // Clear 'B' and wait for 'C'
         handler.ClearStrobe();
-        await Task.Delay(50);
+        await WaitForStrobeAsync(handler);
         Assert.Equal(0xC3, handler.PeekCurrentKeyAndStrobe());
         Assert.Equal(1, handler.NumKeysPending()); // C in latch, queue empty
     }
@@ -311,8 +338,8 @@ public class QueuedKeyHandlerTests
         Assert.False(handler.StrobePending());
         Assert.Equal(1, handler.NumKeysPending()); // Only 'B' in queue
 
-        // Wait for full delay
-        await Task.Delay(100);
+        // Wait for timer to fire
+        await WaitForStrobeAsync(handler);
 
         // Assert - Now 'B' should be loaded
         Assert.Equal(0xC2, handler.PeekCurrentKeyAndStrobe());
@@ -341,7 +368,7 @@ public class QueuedKeyHandlerTests
 
         // Trigger auto-feed and verify keys feed in SOME order (may not be sequential due to concurrent enqueue)
         handler.ClearStrobe();
-        await Task.Delay(30);
+        await WaitForStrobeAsync(handler);
         
         // Just verify a key was fed (don't check exact value due to concurrency)
         var firstFed = handler.PeekCurrentKeyValue();
@@ -350,7 +377,7 @@ public class QueuedKeyHandlerTests
         Assert.Equal(16, handler.NumKeysPending()); // One key in latch, 15 in queue
 
         handler.ClearStrobe();
-        await Task.Delay(30);
+        await WaitForStrobeAsync(handler);
         
         var secondFed = handler.PeekCurrentKeyValue();
         Assert.InRange(secondFed, (byte)0x42, (byte)0x51); // Should be another B-Q
@@ -368,7 +395,7 @@ public class QueuedKeyHandlerTests
 
         // Act - Clear 'A', start auto-feed
         handler.ClearStrobe();
-        await Task.Delay(30); // 'B' should be loaded
+        await WaitForStrobeAsync(handler); // 'B' should be loaded
 
         // User types 'C' manually while 'B' is unread
         handler.EnqueueKey(0x43); // 'C' - should queue
@@ -379,7 +406,7 @@ public class QueuedKeyHandlerTests
 
         // Clear 'B', 'C' should feed
         handler.ClearStrobe();
-        await Task.Delay(30);
+        await WaitForStrobeAsync(handler);
         Assert.Equal(0xC3, handler.PeekCurrentKeyAndStrobe());
         Assert.Equal(1, handler.NumKeysPending()); // 'C' in latch with strobe
     }
@@ -407,12 +434,12 @@ public class QueuedKeyHandlerTests
 
         // Clear and verify auto-feed
         handler.ClearStrobe();
-        await Task.Delay(30);
+        await WaitForStrobeAsync(handler);
         Assert.Equal(0xC9, handler.PeekCurrentKeyAndStrobe()); // 'I'
         Assert.Equal(2, handler.NumKeysPending()); // I in latch + Return in queue
 
         handler.ClearStrobe();
-        await Task.Delay(30);
+        await WaitForStrobeAsync(handler);
         Assert.Equal(0x8D, handler.PeekCurrentKeyAndStrobe()); // Return
         Assert.Equal(1, handler.NumKeysPending()); // Return in latch
     }
@@ -435,15 +462,15 @@ public class QueuedKeyHandlerTests
         Assert.Equal(11, handler.NumKeysPending()); // H in latch + 10 in queue
 
         // Verify first few characters feed correctly
-        handler.ClearStrobe(); await Task.Delay(60);
+        handler.ClearStrobe(); await WaitForStrobeAsync(handler);
         Assert.Equal(0xC5, handler.PeekCurrentKeyAndStrobe()); // 'E'
         Assert.Equal(10, handler.NumKeysPending()); // E in latch + 9 in queue
 
-        handler.ClearStrobe(); await Task.Delay(60);
+        handler.ClearStrobe(); await WaitForStrobeAsync(handler);
         Assert.Equal(0xCC, handler.PeekCurrentKeyAndStrobe()); // 'L'
         Assert.Equal(9, handler.NumKeysPending()); // L in latch + 8 in queue
 
-        handler.ClearStrobe(); await Task.Delay(60);
+        handler.ClearStrobe(); await WaitForStrobeAsync(handler);
         Assert.Equal(0xCC, handler.PeekCurrentKeyAndStrobe()); // 'L'
         Assert.Equal(8, handler.NumKeysPending()); // L in latch + 7 in queue
     }
@@ -618,7 +645,7 @@ public class QueuedKeyHandlerTests
         handler.ClearStrobe(); // Redundant
         handler.ClearStrobe(); // Redundant
 
-        await Task.Delay(50);
+        await WaitForStrobeAsync(handler);
 
         // Assert - Only 'B' should have been fed once
         Assert.Equal(0xC2, handler.PeekCurrentKeyAndStrobe());

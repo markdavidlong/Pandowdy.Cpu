@@ -7,10 +7,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive.Linq;
-using Pandowdy.EmuCore.Cards;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Messages;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.DiskII;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 using ReactiveUI;
 
 namespace Pandowdy.UI.ViewModels;

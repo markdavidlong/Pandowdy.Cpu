@@ -3,7 +3,7 @@
 // See LICENSE file for details
 
 using System.Diagnostics;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.DiskII;
 
@@ -75,6 +75,13 @@ public class DiskIIDebugDecorator : IDiskIIDrive
     {
         Debug.WriteLine($"IDiskIIDrive ({Name}): Reset()");
         _inner.Reset();
+    }
+
+    /// <inheritdoc />
+    public void Restart()
+    {
+        Debug.WriteLine($"IDiskIIDrive ({Name}): Restart()");
+        _inner.Restart();
     }
 
     /// <inheritdoc />

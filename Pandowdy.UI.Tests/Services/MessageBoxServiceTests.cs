@@ -3,6 +3,8 @@
 // See LICENSE file for details
 
 using System.Threading.Tasks;
+using Moq;
+using Pandowdy.Project.Interfaces;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.Services;
 using Xunit;
@@ -31,8 +33,11 @@ public class MessageBoxServiceTests
     [Fact]
     public void Constructor_CreatesInstance_Successfully()
     {
+        // Arrange
+        var mockProjectManager = new Mock<ISkilletProjectManager>();
+
         // Act
-        var service = new MessageBoxService();
+        var service = new MessageBoxService(mockProjectManager.Object);
 
         // Assert
         Assert.NotNull(service);
@@ -47,7 +52,8 @@ public class MessageBoxServiceTests
     public void ShowErrorAsync_ReturnsTask_WhenNoWindowAvailable()
     {
         // Arrange
-        var service = new MessageBoxService();
+        var mockProjectManager = new Mock<ISkilletProjectManager>();
+        var service = new MessageBoxService(mockProjectManager.Object);
 
         // Act
         var task = service.ShowErrorAsync("Test Title", "Test Message");
@@ -61,7 +67,8 @@ public class MessageBoxServiceTests
     public async Task ShowConfirmationAsync_ReturnsTask_WhenNoWindowAvailable()
     {
         // Arrange
-        var service = new MessageBoxService();
+        var mockProjectManager = new Mock<ISkilletProjectManager>();
+        var service = new MessageBoxService(mockProjectManager.Object);
 
         // Act
         var result = await service.ShowConfirmationAsync("Test Title", "Test Message");

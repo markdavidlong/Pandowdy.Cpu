@@ -2,13 +2,13 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Cards;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.DiskII.Messages;
 using Pandowdy.EmuCore.DiskII.Providers;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Tests.Mocks;
 
 namespace Pandowdy.EmuCore.Tests.Cards;
 
@@ -21,12 +21,13 @@ public class DiskIIControllerCardTests
     private readonly DiskStatusProvider _statusProvider = new();
     private readonly CardResponseChannel _responseChannel = new();
     private readonly MockDiskIIFactory _driveFactory = new();
+    private static readonly MockDiskImageStore MockStore = new();
 
     #region Helper Methods
 
     private DiskIIControllerCard16Sector CreateCard()
     {
-        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
     }
 
     private void AdvanceCycles(int cycles)
@@ -52,21 +53,21 @@ public class DiskIIControllerCardTests
     public void Constructor_ThrowsOnNullClocking()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new DiskIIControllerCard16Sector(null!, _driveFactory, _statusProvider, _responseChannel));
+            new DiskIIControllerCard16Sector(null!, _driveFactory, _statusProvider, _responseChannel, MockStore));
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullDriveFactory()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new DiskIIControllerCard16Sector(_clocking, null!, _statusProvider, _responseChannel));
+            new DiskIIControllerCard16Sector(_clocking, null!, _statusProvider, _responseChannel, MockStore));
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullStatusMutator()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new DiskIIControllerCard16Sector(_clocking, _driveFactory, null!, _responseChannel));
+            new DiskIIControllerCard16Sector(_clocking, _driveFactory, null!, _responseChannel, MockStore));
     }
 
     [Fact]
@@ -83,35 +84,35 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_Name_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         Assert.Equal("Disk II", card.Name);
     }
 
     [Fact]
     public void Card16Sector_Description_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         Assert.Equal("Disk II Controller - 16-Sector ROM", card.Description);
     }
 
     [Fact]
     public void Card16Sector_Id_Returns10()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         Assert.Equal(10, card.Id);
     }
 
     [Fact]
     public void Card16Sector_Slot_ReturnsUnslotted_BeforeInstall()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         Assert.Equal(SlotNumber.Unslotted, card.Slot);
     }
 
     [Fact]
     public void Card16Sector_Clone_ReturnsNewInstance()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         var clone = card.Clone();
 
         Assert.NotSame(card, clone);
@@ -121,7 +122,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_Clone_IsUnslotted()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         card.OnInstalled(SlotNumber.Slot6);
 
         var clone = card.Clone();
@@ -133,7 +134,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_Clone_HasSameProperties()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         var clone = (DiskIIControllerCard16Sector)card.Clone();
 
         // Clone should have same metadata
@@ -149,28 +150,28 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card13Sector_Name_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         Assert.Equal("Disk II (13-Sector)", card.Name);
     }
 
     [Fact]
     public void Card13Sector_Description_ReturnsCorrectValue()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         Assert.Equal("Disk II Controller - 13-Sector ROM", card.Description);
     }
 
     [Fact]
     public void Card13Sector_Id_Returns11()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         Assert.Equal(11, card.Id);
     }
 
     [Fact]
     public void Card13Sector_Clone_ReturnsNewInstance()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         var clone = card.Clone();
 
         Assert.NotSame(card, clone);
@@ -180,7 +181,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card13Sector_Clone_IsUnslotted()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
         card.OnInstalled(SlotNumber.Slot5);
 
         var clone = card.Clone();
@@ -258,7 +259,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_ReadRom_ReturnsValidBytes()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
 
         // First byte should be 0xA2 (LDX #$20)
         Assert.Equal((byte)0xA2, card.ReadRom(0x00));
@@ -267,7 +268,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_ReadRom_ReturnsNullForOutOfBounds()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
 
         // ROM is 256 bytes, offset 0x100 is out of bounds
         // ReadRom takes byte, so we can only test up to 255
@@ -280,7 +281,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card16Sector_ReadRom_ContainsBootSignature()
     {
-        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
 
         // Check for known boot ROM pattern at $C6F8 (offset 0xF8)
         // JMP $0801 = 4C 01 08
@@ -296,7 +297,7 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card13Sector_ReadRom_ReturnsValidBytes()
     {
-        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
 
         // First byte should be 0xA2 (LDX #$20) - same as 16-sector
         Assert.Equal((byte)0xA2, card.ReadRom(0x00));
@@ -305,8 +306,8 @@ public class DiskIIControllerCardTests
     [Fact]
     public void Card13Sector_ReadRom_DiffersFrom16Sector()
     {
-        var card16 = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
-        var card13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        var card16 = new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
+        var card13 = new DiskIIControllerCard13Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
 
         // The ROMs should differ at some point
         bool foundDifference = false;
@@ -1347,6 +1348,12 @@ internal class MockDiskIIDrive(string name) : IDiskIIDrive
     {
         // Per interface contract: motor off, head position preserved
         MotorOn = false;
+    }
+
+    public void Restart()
+    {
+        MotorOn = false;
+        QuarterTrack = 0;
     }
 
     public void StepToHigherTrack()

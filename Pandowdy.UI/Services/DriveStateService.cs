@@ -2,15 +2,12 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.DataTypes;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DiskII;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.Models;
 using System;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -24,8 +21,8 @@ namespace Pandowdy.UI.Services;
 /// Initializes a new instance of the <see cref="DriveStateService"/> class.
 /// </remarks>
 public class DriveStateService(
-    EmuCore.Services.IDiskStatusProvider diskStatusProvider,
-    EmuCore.Services.IDiskStatusMutator diskStatusMutator,
+    IDiskStatusProvider diskStatusProvider,
+    IDiskStatusMutator diskStatusMutator,
     ISlots slots) : IDriveStateService
 {
     private const string DriveStateFileName = "drive-state.json";
@@ -34,8 +31,8 @@ public class DriveStateService(
         WriteIndented = true
     };
 
-    private readonly EmuCore.Services.IDiskStatusProvider _diskStatusProvider = diskStatusProvider;
-    private readonly EmuCore.Services.IDiskStatusMutator _diskStatusMutator = diskStatusMutator;
+    private readonly IDiskStatusProvider _diskStatusProvider = diskStatusProvider;
+    private readonly IDiskStatusMutator _diskStatusMutator = diskStatusMutator;
     private readonly ISlots _slots = slots;
 
     /// <inheritdoc/>
@@ -203,7 +200,7 @@ public class DriveStateService(
             var card = _slots.GetCardIn(slotNumber);
 
             // Verify it's a Disk II controller
-            if (card is not Pandowdy.EmuCore.Cards.DiskIIControllerCard diskController)
+            if (card is not DiskIIControllerCard diskController)
             {
                 System.Diagnostics.Debug.WriteLine($"[DriveStateService] Slot {controller.Slot} is not a Disk II controller");
                 continue;
@@ -267,7 +264,7 @@ public class DriveStateService(
             var card = _slots.GetCardIn(slotNumber);
 
             // Verify it's a Disk II controller
-            if (card is not Pandowdy.EmuCore.Cards.DiskIIControllerCard diskController)
+            if (card is not DiskIIControllerCard diskController)
             {
                 System.Diagnostics.Debug.WriteLine($"[DriveStateService] Slot {entry.Slot} is not a Disk II controller");
                 continue;

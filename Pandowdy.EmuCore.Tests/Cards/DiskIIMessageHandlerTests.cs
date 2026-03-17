@@ -3,7 +3,8 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.DiskII.Messages;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 
 namespace Pandowdy.EmuCore.Tests.Cards;
 
@@ -18,7 +19,7 @@ namespace Pandowdy.EmuCore.Tests.Cards;
 /// </para>
 /// <para>
 /// <strong>Test Coverage:</strong><br/>
-/// - Message type recognition (InsertDiskMessage, EjectDiskMessage, SwapDrivesMessage, etc.)<br/>
+/// - Message type recognition (InsertBlankDiskMessage, EjectDiskMessage, SwapDrivesMessage, etc.)<br/>
 /// - Drive number validation<br/>
 /// - Error handling for invalid messages and parameters<br/>
 /// - Message payload structure and immutability<br/>
@@ -37,17 +38,6 @@ namespace Pandowdy.EmuCore.Tests.Cards;
 public class DiskIIMessageHandlerTests
 {
     #region Message Structure Tests
-
-    [Fact]
-    public void InsertDiskMessage_IsImmutableRecord()
-    {
-        var message1 = new InsertDiskMessage(1, "E:\\disk.woz");
-        var message2 = new InsertDiskMessage(1, "E:\\disk.woz");
-        
-        Assert.Equal(message1, message2);
-        Assert.Equal(1, message1.DriveNumber);
-        Assert.Equal("E:\\disk.woz", message1.DiskImagePath);
-    }
 
     [Fact]
     public void InsertBlankDiskMessage_IsImmutableRecord()
@@ -129,14 +119,6 @@ public class DiskIIMessageHandlerTests
 
     #pragma warning disable xUnit2032 // IsAssignableFrom is the correct assertion for interface implementation checks
     [Fact]
-    public void InsertDiskMessage_ImplementsICardMessage()
-    {
-        var message = new InsertDiskMessage(1, "E:\\disk.woz");
-        
-        Assert.IsAssignableFrom<ICardMessage>(message);
-    }
-
-    [Fact]
     public void InsertBlankDiskMessage_ImplementsICardMessage()
     {
         var message = new InsertBlankDiskMessage(1);
@@ -190,27 +172,6 @@ public class DiskIIMessageHandlerTests
     #region Message Validation Tests
 
     [Theory]
-    [InlineData(0)]  // Below valid range
-    [InlineData(-1)] // Negative
-    [InlineData(3)]  // Above valid range for typical 2-drive controller
-    public void InsertDiskMessage_WithInvalidDriveNumber_CanBeCreated(int driveNumber)
-    {
-        // Message creation should not validate - validation happens in HandleMessage
-        var message = new InsertDiskMessage(driveNumber, "E:\\disk.woz");
-        
-        Assert.Equal(driveNumber, message.DriveNumber);
-    }
-
-    [Fact]
-    public void InsertDiskMessage_WithEmptyPath_CanBeCreated()
-    {
-        // Message creation should not validate - validation happens in HandleMessage
-        var message = new InsertDiskMessage(1, "");
-        
-        Assert.Equal(string.Empty, message.DiskImagePath);
-    }
-
-    [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(3)]
@@ -230,7 +191,6 @@ public class DiskIIMessageHandlerTests
     public void AllDiskIIMessages_HaveConsistentNaming()
     {
         // Verify all Disk II messages follow the *Message naming pattern
-        Assert.Contains("Message", nameof(InsertDiskMessage));
         Assert.Contains("Message", nameof(InsertBlankDiskMessage));
         Assert.Contains("Message", nameof(EjectDiskMessage));
         Assert.Contains("Message", nameof(SwapDrivesMessage));

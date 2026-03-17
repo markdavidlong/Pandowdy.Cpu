@@ -3,10 +3,10 @@
 // See LICENSE file for details
 
 using System;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Memory;
 using System.Reactive.Linq;
 using ReactiveUI;
-using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.Disassembler;
 
@@ -36,11 +36,22 @@ public sealed class CpuStatusPanelViewModel : ReactiveObject, IActivatableViewMo
 {
     private readonly IEmulatorCoreInterface _emulator;
     private readonly IRefreshTicker _refreshTicker;
+    private bool _isPoweredOn;
 
     /// <summary>
     /// Gets the view model activator for managing subscription lifecycle.
     /// </summary>
     public ViewModelActivator Activator { get; } = new();
+
+    /// <summary>
+    /// Sets the powered-on state, masking all CPU display values when powered off.
+    /// </summary>
+    /// <param name="poweredOn">True if the emulator is powered on; false to show powered-off placeholders.</param>
+    public void SetPoweredOn(bool poweredOn)
+    {
+        _isPoweredOn = poweredOn;
+        UpdateFromCpuState();
+    }
 
     #region Register Properties
 
@@ -106,6 +117,70 @@ public sealed class CpuStatusPanelViewModel : ReactiveObject, IActivatableViewMo
     {
         get => _y;
         private set => this.RaiseAndSetIfChanged(ref _y, value);
+    }
+
+    #endregion
+
+    #region Display Properties (powered-off masking)
+
+    private string _pcDisplay = "----";
+    /// <summary>
+    /// Gets the Program Counter as display text ("----" when powered off).
+    /// </summary>
+    public string PCDisplay
+    {
+        get => _pcDisplay;
+        private set => this.RaiseAndSetIfChanged(ref _pcDisplay, value);
+    }
+
+    private string _aDisplay = "--";
+    /// <summary>
+    /// Gets the Accumulator as display text ("--" when powered off).
+    /// </summary>
+    public string ADisplay
+    {
+        get => _aDisplay;
+        private set => this.RaiseAndSetIfChanged(ref _aDisplay, value);
+    }
+
+    private string _xDisplay = "--";
+    /// <summary>
+    /// Gets the X register as display text ("--" when powered off).
+    /// </summary>
+    public string XDisplay
+    {
+        get => _xDisplay;
+        private set => this.RaiseAndSetIfChanged(ref _xDisplay, value);
+    }
+
+    private string _yDisplay = "--";
+    /// <summary>
+    /// Gets the Y register as display text ("--" when powered off).
+    /// </summary>
+    public string YDisplay
+    {
+        get => _yDisplay;
+        private set => this.RaiseAndSetIfChanged(ref _yDisplay, value);
+    }
+
+    private string _spDisplay = "--";
+    /// <summary>
+    /// Gets the Stack Pointer as display text ("--" when powered off).
+    /// </summary>
+    public string SPDisplay
+    {
+        get => _spDisplay;
+        private set => this.RaiseAndSetIfChanged(ref _spDisplay, value);
+    }
+
+    private string _stackSizeDisplay = "--";
+    /// <summary>
+    /// Gets the stack depth as display text ("--" when powered off).
+    /// </summary>
+    public string StackSizeDisplay
+    {
+        get => _stackSizeDisplay;
+        private set => this.RaiseAndSetIfChanged(ref _stackSizeDisplay, value);
     }
 
     #endregion
@@ -245,6 +320,36 @@ public sealed class CpuStatusPanelViewModel : ReactiveObject, IActivatableViewMo
     /// </summary>
     private void UpdateFromCpuState()
     {
+        if (!_isPoweredOn)
+        {
+            // Powered-off state: show placeholders for all values
+            PC = 0;
+            SP = 0;
+            StackSize = 0;
+            A = 0;
+            X = 0;
+            Y = 0;
+
+            PCDisplay = "----";
+            ADisplay = "--";
+            XDisplay = "--";
+            YDisplay = "--";
+            SPDisplay = "--";
+            StackSizeDisplay = "--";
+
+            FlagN = false;
+            FlagV = false;
+            FlagB = false;
+            FlagD = false;
+            FlagI = false;
+            FlagZ = false;
+            FlagC = false;
+
+            StatusText = "Off";
+            DisassemblyText = "Powered Off";
+            return;
+        }
+
         var cpu = _emulator.CpuState;
 
         // Registers
@@ -254,6 +359,14 @@ public sealed class CpuStatusPanelViewModel : ReactiveObject, IActivatableViewMo
         A = cpu.A;
         X = cpu.X;
         Y = cpu.Y;
+
+        // Display strings
+        PCDisplay = cpu.PC.ToString("X4");
+        ADisplay = cpu.A.ToString("X2");
+        XDisplay = cpu.X.ToString("X2");
+        YDisplay = cpu.Y.ToString("X2");
+        SPDisplay = cpu.SP.ToString("X2");
+        StackSizeDisplay = (0xFF - cpu.SP).ToString();
 
         // Flags
         FlagN = cpu.FlagN;

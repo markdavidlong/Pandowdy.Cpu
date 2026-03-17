@@ -6,11 +6,11 @@ using System;
 using System.Reactive;
 using System.Threading.Tasks;
 using Avalonia.Media;
-using Pandowdy.EmuCore.Cards;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
+using Pandowdy.EmuCore.DiskII;
 using Pandowdy.EmuCore.DiskII.Messages;
-using Pandowdy.EmuCore.Exceptions;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.Project.Interfaces;
 using Pandowdy.UI.Interfaces;
 using ReactiveUI;
 
@@ -38,7 +38,14 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     private readonly IEmulatorCoreInterface _emulator;
     private readonly IDiskFileDialogService _fileDialogService;
     private readonly IMessageBoxService _messageBoxService;
+    private readonly ISkilletProjectManager _projectManager;
     private DiskDriveStatusSnapshot _snapshot;
+    private bool _isPoweredOn;
+
+    /// <summary>
+    /// Subject for library state changes (used to refresh InsertDiskCommand enablement).
+    /// </summary>
+    private readonly System.Reactive.Subjects.BehaviorSubject<bool> _hasLibraryImages;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DiskStatusWidgetViewModel"/> class.
@@ -46,58 +53,85 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     /// <param name="emulator">Emulator core interface for sending card messages.</param>
     /// <param name="fileDialogService">Service for displaying file picker dialogs.</param>
     /// <param name="messageBoxService">Service for displaying error and confirmation dialogs.</param>
+    /// <param name="projectManager">Project manager for checking library state.</param>
     /// <param name="initialSnapshot">Initial drive status snapshot.</param>
     public DiskStatusWidgetViewModel(
         IEmulatorCoreInterface emulator,
         IDiskFileDialogService fileDialogService,
         IMessageBoxService messageBoxService,
+        ISkilletProjectManager projectManager,
         DiskDriveStatusSnapshot initialSnapshot)
     {
         _emulator = emulator;
         _fileDialogService = fileDialogService;
         _messageBoxService = messageBoxService;
+        _projectManager = projectManager;
         _snapshot = initialSnapshot;
 
         // Create observables for command enablement
         var hasDiskObservable = this.WhenAnyValue(x => x.HasDisk);
-        var canSaveObservable = this.WhenAnyValue(
-            x => x.HasDisk,
-            x => x.HasDestinationPath,
-            x => x.IsDirty,
-            (hasDisk, hasDest, isDirty) => hasDisk && hasDest && isDirty);
+
+        // Check if project library has disk images (disable Insert when empty)
+        var diskImages = _projectManager.CurrentProject?.GetAllDiskImagesAsync().GetAwaiter().GetResult();
+        var hasLibraryImages = diskImages is { Count: > 0 };
+        _hasLibraryImages = new System.Reactive.Subjects.BehaviorSubject<bool>(hasLibraryImages);
 
         // Commands that show file dialogs
-        InsertDiskCommand = ReactiveCommand.CreateFromTask(async () => await InsertDiskWithDialogAsync());
+        InsertDiskCommand = ReactiveCommand.CreateFromTask(
+            async () => await InsertDiskWithDialogAsync(),
+            _hasLibraryImages);
         InsertBlankDiskCommand = ReactiveCommand.CreateFromTask(async () => await InsertBlankDiskAsync());
 
         EjectDiskCommand = ReactiveCommand.CreateFromTask(
             async () =>
             {
-                // Show confirmation if disk has unsaved changes
+                // Show three-choice save prompt if disk has unsaved changes
                 if (_snapshot.IsDirty)
                 {
-                    var confirmed = await _messageBoxService.ShowConfirmationAsync(
-                        "Unsaved Changes",
-                        "Disk has unsaved changes. Eject anyway?");
-                    if (!confirmed)
+                    var diskName = string.IsNullOrEmpty(_snapshot.DiskImageFilename)
+                        ? _snapshot.DiskId
+                        : _snapshot.DiskImageFilename;
+
+                    var choice = await _messageBoxService.ShowSavePromptAsync(
+                        "Unsaved Disk Changes",
+                        $"Disk '{diskName}' ({_snapshot.DiskId}) has unsaved changes.",
+                        "Save Disk Data",
+                        "Eject Without Saving");
+
+                    switch (choice)
                     {
-                        return;
+                        case SavePromptResult.Cancel:
+                            return; // User cancelled — don't eject
+
+                        case SavePromptResult.Save:
+                            // Eject normally — ReturnAsync captures dirty data, then save project
+                            await _emulator.SendCardMessageAsync(
+                                (SlotNumber)_snapshot.SlotNumber,
+                                new EjectDiskMessage(_snapshot.DriveNumber));
+                            // Persist the captured changes to the project store
+                            if (_projectManager.CurrentProject is { IsAdHoc: false } project)
+                            {
+                                await project.SaveAsync();
+                            }
+                            return;
+
+                        case SavePromptResult.DontSave:
+                            // Eject and discard changes — ClearDirty before ReturnAsync
+                            await _emulator.SendCardMessageAsync(
+                                (SlotNumber)_snapshot.SlotNumber,
+                                new EjectDiskMessage(_snapshot.DriveNumber, DiscardChanges: true));
+                            return;
                     }
                 }
 
+                // Disk is not dirty — eject normally
                 await _emulator.SendCardMessageAsync(
                     (SlotNumber)_snapshot.SlotNumber,
                     new EjectDiskMessage(_snapshot.DriveNumber));
             },
             hasDiskObservable);
 
-        SaveCommand = ReactiveCommand.CreateFromTask(
-            async () => await _emulator.SendCardMessageAsync(
-                (SlotNumber)_snapshot.SlotNumber,
-                new SaveDiskMessage(_snapshot.DriveNumber)),
-            canSaveObservable);
-
-        SaveAsCommand = ReactiveCommand.CreateFromTask(async () => await SaveAsAsync(), hasDiskObservable);
+        ExportDiskCommand = ReactiveCommand.CreateFromTask(async () => await ExportDiskAsync(), hasDiskObservable);
 
         ToggleWriteProtectCommand = ReactiveCommand.CreateFromTask(
             async () =>
@@ -115,25 +149,37 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     /// Inserts a disk image from a file path (called by drag-and-drop or command).
     /// </summary>
     /// <param name="filePath">The full path to the disk image file.</param>
+    /// <remarks>
+    /// PHASE 2a: This method is temporarily disabled during the transition to project-based
+    /// disk loading. Filesystem-based disk insertion has been removed. Use the "Mount from
+    /// Library" workflow instead (import disk to project, then mount via MountDiskMessage).
+    /// This method will be replaced with the mount-from-library picker in Step 14.
+    /// </remarks>
+    [Obsolete("Filesystem-based disk loading removed in Phase 2a. Use Mount from Library workflow.")]
     public async Task InsertDiskAsync(string filePath)
     {
-        await _emulator.SendCardMessageAsync(
-            (SlotNumber)_snapshot.SlotNumber,
-            new InsertDiskMessage(_snapshot.DriveNumber, filePath));
+        await Task.CompletedTask; // Silence async warning
+        throw new NotSupportedException(
+            "Direct filesystem disk insertion is no longer supported. " +
+            "Import the disk image to the project first, then mount it from the library.");
     }
 
     private async Task InsertDiskWithDialogAsync()
     {
-        var filePath = await _fileDialogService.ShowOpenFileDialogAsync();
-        if (!string.IsNullOrEmpty(filePath))
+        // Show Mount from Library dialog
+        var selectedDisk = await _messageBoxService.ShowMountFromLibraryDialogAsync();
+
+        if (selectedDisk != null)
         {
             try
             {
-                await InsertDiskAsync(filePath);
+                await _emulator.SendCardMessageAsync(
+                    (SlotNumber)_snapshot.SlotNumber,
+                    new MountDiskMessage(_snapshot.DriveNumber, selectedDisk.Id));
             }
             catch (CardMessageException ex)
             {
-                await _messageBoxService.ShowErrorAsync("Insert Disk Failed", ex.Message);
+                await _messageBoxService.ShowErrorAsync("Mount Disk Failed", ex.Message);
             }
         }
     }
@@ -145,7 +191,7 @@ public class DiskStatusWidgetViewModel : ReactiveObject
             new InsertBlankDiskMessage(_snapshot.DriveNumber));
     }
 
-    private async Task SaveAsAsync()
+    private async Task ExportDiskAsync()
     {
         var suggestedName = _snapshot.DiskImageFilename;
         var filePath = await _fileDialogService.ShowSaveFileDialogAsync(suggestedName);
@@ -154,13 +200,15 @@ public class DiskStatusWidgetViewModel : ReactiveObject
         {
             try
             {
+                // Detect format from extension
+                var format = DiskFormatHelper.GetFormatFromPath(filePath);
                 await _emulator.SendCardMessageAsync(
                     (SlotNumber)_snapshot.SlotNumber,
-                    new SaveDiskAsMessage(_snapshot.DriveNumber, filePath));
+                    new ExportDiskMessage(_snapshot.DriveNumber, filePath, format));
             }
             catch (CardMessageException ex)
             {
-                await _messageBoxService.ShowErrorAsync("Save Disk Failed", ex.Message);
+                await _messageBoxService.ShowErrorAsync("Export Disk Failed", ex.Message);
             }
         }
     }
@@ -181,14 +229,17 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit> EjectDiskCommand { get; }
 
     /// <summary>
-    /// Gets the command for saving the disk to its attached destination path.
+    /// Gets the command for exporting the disk to the filesystem.
     /// </summary>
-    public ReactiveCommand<Unit, Unit> SaveCommand { get; }
-
-    /// <summary>
-    /// Gets the command for saving the disk to a user-chosen path (Save As).
-    /// </summary>
-    public ReactiveCommand<Unit, Unit> SaveAsCommand { get; }
+    /// <remarks>
+    /// <para>
+    /// Replaces the legacy Save/Save As commands. In the project-based workflow,
+    /// disk images are automatically persisted to the .skillet project on eject
+    /// (via ReturnAsync) and project save. Export is an explicit user action to
+    /// write a disk image to an external file for sharing or backup.
+    /// </para>
+    /// </remarks>
+    public ReactiveCommand<Unit, Unit> ExportDiskCommand { get; }
 
     /// <summary>
     /// Gets the command for toggling write-protect state.
@@ -215,9 +266,56 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     }
 
     /// <summary>
+    /// Updates the powered-on state, refreshing motor indicators.
+    /// </summary>
+    /// <remarks>
+    /// When the machine is powered off, motor indicators are masked to show
+    /// as off regardless of the underlying status snapshot. The status will
+    /// be cleared on the next <see cref="IRestartable.Restart"/>.
+    /// </remarks>
+    public void SetPoweredOn(bool isPoweredOn)
+    {
+        _isPoweredOn = isPoweredOn;
+        this.RaisePropertyChanged(nameof(MotorText));
+    }
+
+    /// <summary>
+    /// Refreshes the library state to update InsertDiskCommand enablement.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This method should be called after importing a new disk image to the project
+    /// library to re-enable the "Mount from Library" command if it was previously disabled.
+    /// </para>
+    /// </remarks>
+    public async Task RefreshLibraryStateAsync()
+    {
+        var diskImages = _projectManager.CurrentProject != null
+            ? await _projectManager.CurrentProject.GetAllDiskImagesAsync()
+            : new System.Collections.Generic.List<Project.Models.DiskImageRecord>();
+        var hasLibraryImages = diskImages.Count > 0;
+        _hasLibraryImages.OnNext(hasLibraryImages);
+    }
+
+    /// <summary>
     /// Gets the disk identifier (e.g., "S6D1").
     /// </summary>
     public string DiskId => _snapshot.DiskId;
+
+    /// <summary>
+    /// Gets the slot number of the controller card (1-7).
+    /// </summary>
+    public int SlotNumber => _snapshot.SlotNumber;
+
+    /// <summary>
+    /// Gets the drive number on the controller (1 or 2).
+    /// </summary>
+    public int DriveNumber => _snapshot.DriveNumber;
+
+    /// <summary>
+    /// Gets the skillet database ID of the mounted disk image, or null if empty.
+    /// </summary>
+    public long? DiskImageId => _snapshot.DiskImageId;
 
     /// <summary>
     /// Gets a value indicating whether a disk is inserted in this drive.
@@ -306,11 +404,19 @@ public class DiskStatusWidgetViewModel : ReactiveObject
     /// <item>"⌚" = Motor-off scheduled (delayed)</item>
     /// <item>"⚡" = Motor running</item>
     /// </list>
+    /// A powered-off machine always shows motors as off regardless of the
+    /// underlying status snapshot. The status is cleared on the next cold boot.
     /// </remarks>
     public string MotorText
     {
         get
         {
+            // A powered-off machine must always show motors as off
+            if (!_isPoweredOn)
+            {
+                return "";
+            }
+
             var status = "";
             if (_snapshot.MotorOffScheduled)
             {

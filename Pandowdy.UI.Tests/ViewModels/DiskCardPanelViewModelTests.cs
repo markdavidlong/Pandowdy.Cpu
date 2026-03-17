@@ -2,17 +2,20 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Moq;
 using Pandowdy.EmuCore.DiskII.Messages;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
+using Pandowdy.Project.Interfaces;
 using Pandowdy.UI.Interfaces;
 using Pandowdy.UI.ViewModels;
 using Xunit;
 
+using Pandowdy.EmuCore.DiskII;
 namespace Pandowdy.UI.Tests.ViewModels;
 
 /// <summary>
@@ -23,12 +26,20 @@ public class DiskCardPanelViewModelTests
     private readonly Mock<IEmulatorCoreInterface> _mockEmulator;
     private readonly Mock<IDiskFileDialogService> _mockFileDialogService;
     private readonly Mock<IMessageBoxService> _mockMessageBoxService;
+    private readonly Mock<ISkilletProjectManager> _mockProjectManager;
 
     public DiskCardPanelViewModelTests()
     {
         _mockEmulator = new Mock<IEmulatorCoreInterface>();
         _mockFileDialogService = new Mock<IDiskFileDialogService>();
         _mockMessageBoxService = new Mock<IMessageBoxService>();
+        _mockProjectManager = new Mock<ISkilletProjectManager>();
+
+        // Setup default project manager behavior (empty library)
+        var mockProject = new Mock<ISkilletProject>();
+        mockProject.Setup(p => p.GetAllDiskImagesAsync())
+            .ReturnsAsync(new List<Pandowdy.Project.Models.DiskImageRecord>());
+        _mockProjectManager.Setup(pm => pm.CurrentProject).Returns(mockProject.Object);
     }
 
     private DiskStatusWidgetViewModel CreateMockDriveViewModel(
@@ -52,7 +63,7 @@ public class DiskCardPanelViewModelTests
             IsDirty: false,
             HasDestinationPath: hasDisk
         );
-        return new DiskStatusWidgetViewModel(emulator, _mockFileDialogService.Object, _mockMessageBoxService.Object, snapshot);
+        return new DiskStatusWidgetViewModel(emulator, _mockFileDialogService.Object, _mockMessageBoxService.Object, _mockProjectManager.Object, snapshot);
     }
 
     #region Constructor Tests

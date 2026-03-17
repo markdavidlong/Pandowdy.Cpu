@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <!-- Enable unsafe code for direct bitmap pixel manipulation -->
@@ -13,15 +14,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.10" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.10" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.10" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.10" />
+    <PackageReference Include="Avalonia" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.12" />
     <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.8" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.1" />
-    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.10">
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.3" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.12">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
@@ -59,6 +60,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Pandowdy.EmuCore\Pandowdy.EmuCore.csproj" />
     <ProjectReference Include="..\Pandowdy.Disassembler\Pandowdy.Disassembler.csproj" />
+    <ProjectReference Include="..\Pandowdy.Project\Pandowdy.Project.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\CommonUtil\CommonUtil.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\DiskArc\DiskArc.csproj" />
     <ProjectReference Include="..\legacy\CiderPress2\FileConv\FileConv.csproj" />

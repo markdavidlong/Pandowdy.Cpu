@@ -2,9 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Messages;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Memory;
+using Pandowdy.EmuCore.Slots;
 
 namespace Pandowdy.EmuCore.Tests.Services;
 
@@ -66,9 +67,10 @@ public class MemoryInspectorTests
         public static string GetMetadata() => string.Empty;
         public static bool ApplyMetadata(string _) => true;
         public static void Reset() { }
+        public void Restart() { }
     }
 
-    private class MockCard(int id, string name, byte romFill = 0x00, byte extRomFill = 0x00) : ICard
+    private class MockCard(int id, string name, byte romFill = 0, byte extRomFill = 0) : ICard
     {
         private readonly byte _romFill = romFill;
         private readonly byte _extRomFill = extRomFill;

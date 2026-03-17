@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // See LICENSE file for details
 
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 
 namespace Pandowdy.EmuCore.DiskII;
 
@@ -122,6 +122,7 @@ public class DiskIIStatusDecorator : IDiskIIDrive
             builder.HasValidTrackData = false;
             builder.IsDirty = false;
             builder.HasDestinationPath = false;
+            builder.DiskImageId = null;
         });
     }
 
@@ -131,6 +132,15 @@ public class DiskIIStatusDecorator : IDiskIIDrive
         _innerDrive.Reset();
 
         // Sync full state after reset
+        SyncStatus();
+    }
+
+    /// <summary>
+    /// Restores the drive to its initial power-on state and synchronizes status.
+    /// </summary>
+    public void Restart()
+    {
+        _innerDrive.Restart();
         SyncStatus();
     }
 

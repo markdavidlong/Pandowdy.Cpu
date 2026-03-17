@@ -4,7 +4,7 @@
 
 using System.Diagnostics;
 using Pandowdy.EmuCore.DiskII.Providers;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.DiskII;
 
@@ -21,7 +21,7 @@ namespace Pandowdy.EmuCore.DiskII;
 /// </list>
 /// </para>
 /// <para>
-/// <strong>Motor Control:</strong> Motor state is managed by the <see cref="Cards.DiskIIControllerCard"/>,
+/// <strong>Motor Control:</strong> Motor state is managed by the <see cref="DiskIIControllerCard"/>,
 /// not individual drives. The controller has a single motor line that powers the currently selected drive.
 /// This drive is a passive mechanical device that responds to head positioning and I/O operations
 /// when the controller's motor is running.
@@ -34,7 +34,7 @@ namespace Pandowdy.EmuCore.DiskII;
 /// <para>
 /// <strong>Status Updates:</strong> For UI integration, wrap this drive with
 /// <see cref="DiskIIStatusDecorator"/> which synchronizes state changes with
-/// the <see cref="Services.IDiskStatusMutator"/>.
+/// the <see cref="IDiskStatusMutator"/>.
 /// </para>
 /// </remarks>
 public class DiskIIDrive : IDiskIIDrive
@@ -49,7 +49,7 @@ public class DiskIIDrive : IDiskIIDrive
     /// Gets or sets the image provider for this drive (internal accessor for swap support).
     /// </summary>
     /// <remarks>
-    /// This property is used by <see cref="Cards.DiskIIControllerCard"/> to swap
+    /// This property is used by <see cref="DiskIIControllerCard"/> to swap
     /// disk media between drives. The controller manages the swap operation directly
     /// since it owns the drive array.
     /// </remarks>
@@ -66,7 +66,7 @@ public class DiskIIDrive : IDiskIIDrive
     /// <para>
     /// This property provides access to the <see cref="InternalDiskImage"/> for reading
     /// dirty state and destination path information. Used by <see cref="DiskIIStatusDecorator"/>
-    /// to propagate these fields to the UI via <see cref="Services.IDiskStatusMutator"/>.
+    /// to propagate these fields to the UI via <see cref="IDiskStatusMutator"/>.
     /// </para>
     /// <para>
     /// Returns null if no disk is inserted or if the provider is not a
@@ -155,6 +155,19 @@ public class DiskIIDrive : IDiskIIDrive
         // Motor control is now handled at controller level
         _hitMinLogged = false;
         _hitMaxLogged = false;
+    }
+
+    /// <summary>
+    /// Restores the drive to its initial construction-time state (cold boot).
+    /// Head returns to track 17 (construction default), diagnostic flags cleared.
+    /// Disk media stays inserted.
+    /// </summary>
+    public void Restart()
+    {
+        _quarterSteps = 4 * 17;
+        _hitMinLogged = false;
+        _hitMaxLogged = false;
+        _imageProvider?.SetQuarterTrack(_quarterSteps);
     }
 
     /// <inheritdoc />
@@ -285,7 +298,14 @@ public class DiskIIDrive : IDiskIIDrive
         {
             if (_imageProvider is UnifiedDiskImageProvider unifiedProvider)
             {
-                return unifiedProvider.InternalImage?.SourceFilePath;
+                var image = unifiedProvider.InternalImage;
+                if (image == null)
+                {
+                    return null;
+                }
+
+                // Prefer DiskImageName (project-based) over SourceFilePath (filesystem-based)
+                return image.DiskImageName ?? image.SourceFilePath;
             }
             return null;
         }

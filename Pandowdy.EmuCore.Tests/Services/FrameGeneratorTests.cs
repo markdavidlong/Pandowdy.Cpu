@@ -3,8 +3,11 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Input;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Memory;
+using Pandowdy.EmuCore.Video;
 using System.Reactive.Subjects;
 
 namespace Pandowdy.EmuCore.Tests.Services;

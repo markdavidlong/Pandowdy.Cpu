@@ -3,8 +3,11 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.DataTypes;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Input;
+using Pandowdy.EmuCore.IO;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Memory;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.Tests.Helpers;
 
 namespace Pandowdy.EmuCore.Tests;
@@ -62,11 +65,9 @@ public class AddressSpaceControllerTests
                 _memory[offset] = value;
             }
         }
-    }
 
-    /// <summary>
-    /// Mock implementation of ISlots for testing routing.
-    /// </summary>
+        public void Restart() { /* No-op */ }
+    }
     private class MockSlots : ISlots
     {
         public ushort LastReadAddress { get; private set; }

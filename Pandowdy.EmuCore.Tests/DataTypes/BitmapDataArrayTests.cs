@@ -3,6 +3,7 @@
 // See LICENSE file for details
 
 using Pandowdy.EmuCore.DataTypes;
+using Pandowdy.EmuCore.Video;
 
 namespace Pandowdy.EmuCore.Tests;
 

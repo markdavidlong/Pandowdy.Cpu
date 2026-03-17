@@ -4,7 +4,7 @@
 
 using System.Diagnostics;
 using CommonUtil;
-using Pandowdy.EmuCore.Interfaces;
+using Pandowdy.EmuCore.Machine;
 
 namespace Pandowdy.EmuCore.DiskII.Providers;
 
@@ -139,7 +139,7 @@ public class NibDiskImageProvider : IDiskImageProvider, IDisposable
         {
             // Load the entire disk image into memory
             _diskData = new byte[_stream.Length];
-            _stream.Read(_diskData, 0, _diskData.Length);
+            _stream.ReadExactly(_diskData);
 
             // Validate file size (should be 35 tracks Ã— 6656 bytes = 232,960 bytes)
             int expectedSize = DiskIIConstants.TrackCount * DiskIIConstants.BytesPerNibTrack;

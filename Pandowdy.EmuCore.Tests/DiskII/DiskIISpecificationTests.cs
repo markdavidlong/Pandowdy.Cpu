@@ -22,11 +22,11 @@
 // bugs in the implementation that need to be fixed, not tests that need updating.
 //------------------------------------------------------------------------------
 
-using Pandowdy.EmuCore.Cards;
+using Pandowdy.EmuCore.Machine;
+using Pandowdy.EmuCore.Slots;
 using Pandowdy.EmuCore.DataTypes;
 using Pandowdy.EmuCore.DiskII;
-using Pandowdy.EmuCore.Interfaces;
-using Pandowdy.EmuCore.Services;
+using Pandowdy.EmuCore.Tests.Mocks;
 
 namespace Pandowdy.EmuCore.Tests.DiskII;
 
@@ -57,10 +57,11 @@ public class DiskIISpecificationTests
     private readonly DiskStatusProvider _statusProvider = new();
     private readonly CardResponseChannel _responseChannel = new();
     private readonly MockDiskIIFactory _driveFactory = new();
+    private static readonly MockDiskImageStore MockStore = new();
 
     private DiskIIControllerCard16Sector CreateCard()
     {
-        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel);
+        return new DiskIIControllerCard16Sector(_clocking, _driveFactory, _statusProvider, _responseChannel, MockStore);
     }
 
     private void AdvanceCycles(int cycles)
@@ -958,6 +959,12 @@ internal class MockDiskIIDrive(string name) : IDiskIIDrive
         // Per interface contract: motor off, head position preserved
         // (matches real Disk II hardware behavior)
         MotorOn = false;
+    }
+
+    public void Restart()
+    {
+        MotorOn = false;
+        QuarterTrack = 0;
     }
 
     public void StepToHigherTrack()
